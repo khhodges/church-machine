@@ -1,0 +1,594 @@
+NFB1 focused baseline test output
+
+
+=== node simulator/test_rci_threading.js ===
+Exit: 1; duration: 0.96 seconds
+PASS RCI1 audit produces an RCI result
+FAIL RCI1 RCI severity is error — pass
+FAIL RCI1 violations array present
+FAIL RCI1 first violation exists — no violation object
+FAIL RCI1 sourceLine matches lineNums[1] = 7 — –
+PASS RCI2 audit produces an RCI result
+FAIL RCI2 first violation exists — no violation object
+FAIL RCI2 sourceLine is null when lineNums omitted — –
+FAIL RCI3 violation exists with partial lineNums — no violation
+FAIL RCI3 sourceLine is null when lineNums[wi] is undefined — –
+FAIL RCI4 compileAssembly succeeds with no errors — Callable LUMPs require explicit method declarations. Use abstraction RciFixture { capabilities { SELF E } method Run() { ... } }. Move instructions into declared methods and remove the hand-written dispatch table; the compiler generates it. Labels and comments are not method declarations.
+PASS RCI4 result carries lineNums array
+FAIL RCI4 lineNums length equals word count — lineNums.length=3, words=0
+FAIL RCI5 compileAssembly succeeds — Callable LUMPs require explicit method declarations. Use abstraction RciFixture { capabilities { SELF E } method Run() { ... } }. Move instructions into declared methods and remove the hand-written dispatch table; the compiler generates it. Labels and comments are not method declarations.
+PASS RCI5 lineNums[0] = 2 (first instruction on line 2)
+PASS RCI5 lineNums[1] = 3 (second instruction on line 3)
+PASS RCI5 lineNums[2] = 4 (third instruction on line 4)
+FAIL RCI5 method.lineNums matches result.lineNums — (none)
+PASS RCI6 BRANCH out-of-range produces RCI error
+PASS RCI6 BRANCH violation present
+PASS RCI6 BRANCH violation sourceLine matches lineNums[1] = 99
+PASS RCI6 BRANCH violation sourceLine is null when lineNums omitted
+FAIL RCI7 audit produces RCI error with two violations — violations=none
+FAIL RCI7 first violation sourceLine = 10 — –
+FAIL RCI7 second violation sourceLine = 11 — –
+PASS RCI-pass RCI severity is pass when no violations
+PASS RCI-pass violations array absent or empty on pass
+PASS RCI8 slot 0 with cc=1: RCI result present
+PASS RCI8 slot 0 with cc=1: severity is pass (not a violation)
+PASS RCI8 slot 0 with cc=1: no violations array
+PASS RCI9 slot 1 with cc=1: RCI result present
+FAIL RCI9 slot 1 with cc=1: severity is error — pass
+FAIL RCI9 slot 1 with cc=1: violation references slot 1 — –
+FAIL DSP1 one show-error entry produced — got 0
+FAIL DSP1 line equals sourceLine (12) — –
+FAIL DSP1 message starts with [RCI] — –
+FAIL DSP2 one show-error entry produced — got 0
+FAIL DSP2 line is null when no lineNums — –
+FAIL DSP3 two entries produced — got 0
+FAIL DSP3 first entry line = 20 — –
+FAIL DSP3 second entry line = 21 — –
+FAIL DSP4 only violations with non-null sourceLine become entries — got 0
+FAIL DSP4 entry line = 30 — –
+FAIL DSP5 fallback: one entry when all violations have null sourceLine — got 0
+FAIL DSP5 fallback line is null — –
+FAIL DSP5 fallback message starts with [RCI] — –
+PASS DSP6 non-RCI produces one entry
+PASS DSP6 line is null for non-RCI
+PASS DSP6 message includes [R1]
+FAIL DSP7 two entries total (R99 + RCI) — got 1
+PASS DSP7 first entry [R99] has null line
+FAIL DSP7 second entry [RCI] has line = 7 — –
+PASS DSP8 one show-error entry for BRANCH violation
+PASS DSP8 BRANCH violation line = 99
+PASS DSP8 BRANCH violation message starts with [RCI]
+
+23 passed, 32 failed
+
+
+=== node simulator/test_lazy_resolve_pending.js ===
+Exit: 1; duration: 1.59 seconds
+
+--- T001: makePendingGT / isPendingGT / pendingGTName ---
+PASS T001a: upper 16 bits of pending GT equal 0xFEED
+PASS T001b: isPendingGT returns true for a word produced by makePendingGT
+PASS T001c: pendingGTName round-trips the original pet name
+PASS T001d: isPendingGT returns false for null GT (0)
+PASS T001e: isPendingGT returns false for an ordinary word (0x12345678)
+PASS T001f: same pet name → same word (index deduplication)
+PASS T001g: different pet names → different lower 16-bit indices
+PASS T001h: isPendingGT returns true for 0xFEED0000 (index 0 sentinel)
+
+--- T002: _execLoad instant resolution ---
+PASS T002a: no LAZY_RESOLVE_PENDING fault was raised
+FAIL T002b: c-list slot is no longer a pending sentinel after resolution
+PASS T002c: c-list slot was updated to a non-zero real GT
+FAIL T002d: requested R is retained without default E
+FAIL T002e: capability LOAD raises no fault
+FAIL T002f: resolved GT points to the installed target
+
+--- T003: _execLoad unresolvable → LAZY_RESOLVE_PENDING fault ---
+FAIL T003a: LAZY_RESOLVE_PENDING fault was fired
+FAIL T003b: faultCode is null (no hardware numeric code assigned)
+FAIL T003c: fault entry carries petName = "UnknownService"
+FAIL T003d: fault entry carries slot = 0 (c-list offset 0)
+PASS T003e: unavailable resolver leaves the pending row unchanged
+FAIL T003f: failed resolution changes no Namespace authority or binding
+
+--- T004: _injectClistNow CASE B — integration test ---
+PASS T004a: unknown cap name → sentinel is non-zero (not null-GT)
+PASS T004b: sentinel produced for unknown name is recognised by isPendingGT
+PASS T004c: sentinel produced for unknown name preserves the pet name
+PASS T004d: known NS label → createGT() produces a non-pending real GT
+PASS T004e: null GT (0) is not a pending sentinel
+PASS T004f: _injectClistNow CASE B located and executed without throwing
+PASS T004g: CASE B writes a 0xFEED____ pending sentinel for unknown cap name
+PASS T004h: CASE B sentinel preserves the pet name "FutureWidget"
+PASS T004i: validated exact-token runtime injection succeeds
+PASS T004j: UART_TX runtime token remains exact W-only 0x22000002
+
+--- T005: lump-audit RPN — pending sentinel prevents unnamed-slot warning ---
+PASS T005a: RPN rule appears in audit results
+PASS T005b: pending sentinel prevents unnamed-slot warning — RPN severity is "pass"
+PASS T005c: RPN pass message confirms all capabilities are identified
+PASS T005d: null GT in c-list produces RPN warn (control — confirms T005b is causal)
+PASS T005e: RPN pass detail contains the pending pet name or "pending" token
+
+--- T006: NULL GT named slot → free-list reservation via LOAD ---
+FAIL T006a: step() returns a truthy result (not null)
+FAIL T006b: resolution does not suspend
+PASS T006c: thread remains runnable
+FAIL T006d: no fault was logged during capability resolution
+FAIL T006e: reservation retains its pet name
+FAIL T006f: reservation uses free-list head
+PASS T006g: no interactive pending request is created
+PASS T006h: no lazyResolvePending event is emitted
+FAIL T006i: declaration requests E explicitly
+FAIL T006j: target body remains absent until load
+FAIL T006k: subsequent capability LOAD does not load the absent body
+
+--- T007: LOAD resolves, CALL fails to load absent body ---
+FAIL T007-load: explicit LOAD resolves the declared E capability
+PASS T007a: indexed CALL fails when the actual target body is absent
+FAIL T007b: the attempted target call faults CODE_NOT_RESIDENT
+FAIL T007c: resolution reserved a slot before the attempted load
+FAIL T007d: a declared target is not mistaken for NULL authority
+
+--- T008: NULL GT no pet name → immediate NULL_CAP fault ---
+PASS T008a: result is null or a fault result (not lazy suspension)
+FAIL T008b: NULL_CAP fault was raised
+PASS T008c: sim._lazySuspended is false (no suspension)
+
+--- T009: resolvePendingSlot — NULL slot (Task #1519 path) ---
+PASS T009 denied: absent requested rights cannot silently grant E
+PASS T009 rights: interactive resolution retains R without granting E
+PASS T009a: resolvePendingSlot returns ok=true for NULL slot
+PASS T009b: memory at c-list slot 0 is now non-zero (GT written)
+PASS T009c: written GT is not a pending sentinel (0xFEED____)
+PASS T009d: _pendingResolves entry for slot 0 is cleared
+PASS T009e: sim._lazySuspended is false after resolve clears all pending
+PASS T009f: sim.output contains [RESOLVE] marker
+PASS T009g: result.pendingName contains "BetaService"
+
+--- T010: escalateLazyResolve — fires NULL_CAP fault ---
+PASS T010a: escalate fires at least one fault
+PASS T010b: escalated fault is NULL_CAP or LAZY_RESOLVE_PENDING
+PASS T010c: sim._lazySuspended is false after escalation
+PASS T010d: _pendingResolves cleared after escalation
+
+--- T011: NULL GT instant inline resolution when NS label is valid ---
+PASS T011a: sim._lazySuspended is false (resolved inline, no suspension)
+FAIL T011b: c-list slot 0 is now a real GT (not null, not pending)
+FAIL T011c: existing binding is reused with declared E rights
+PASS T011d: no NULL_CAP or LAZY_RESOLVE_PENDING fault was logged
+
+────────────────────────────────────────────────────────────
+Results: 47 passed, 24 failed
+
+
+=== node simulator/test_fault_recovery.js ===
+Exit: 1; duration: 0.37 seconds
+
+--- T004: Scheduler.pause timer fire ---
+PASS T004a: Scheduler.pause — ok=true
+PASS T004b: Scheduler.pause — irqState.timerArmed=true
+PASS T004c: Scheduler.pause — timerDeadline = stepAtCall + DURATION
+PASS T004d: Scheduler.pause — timerRegs[4] = 1 (CTL armed)
+PASS T004e: Scheduler.pause — timerRegs[3] = deadline (ALARM_CMP)
+PASS T004f: _fireSchedulerIRQ(TIMER) returned true
+PASS T004g: timerArmed cleared to false after IRQ fires
+PASS T004h: irqSweepCount incremented
+PASS T004i: irqActive is false after TIMER IRQ completes
+
+--- T005: Scheduler.Wait(flag) / signal / wake ---
+PASS T005a: Scheduler.Wait — ok=true
+PASS T005b: Scheduler.Wait — thread state = sleeping
+PASS T005c: Scheduler.Wait — thread.waitFlag = startFlag
+PASS T005d: Scheduler.Wait — irqState.waitingOnFlags[1] = startFlag
+PASS T005e: IRQ dispatch ok=true
+PASS T005f: thread woken to ready after flag signal
+PASS T005g: waitFlag cleared from thread
+PASS T005h: irqState.waitingOnFlags[1] cleared after wake
+PASS T005i: pendingWakeFlags cleared (startFlag consumed)
+PASS T005j: irqSweepCount incremented
+
+--- T006: Structured fault record (unhandled) ---
+PASS T006a: faultLog has one entry
+PASS T006b: faultCode = BOUNDS code
+PASS T006c: tier is null (all tiers failed — halt)
+PASS T006d: catchInvoked=false
+PASS T006e: irqInvoked=false (halt-always path; no IRQ dispatch on fault)
+PASS T006f: tier3Recovery=false
+PASS T006g: machine halted
+PASS T006h: "Scheduler" pet name maps to NS slot 8
+PASS T006i: "Scheduler.IRQ.Thread" pet name maps to NS slot 50
+PASS T006j: FAULT_CODES object has PERM_R key
+PASS T006k: FAULT_CODES object has NULL_CAP key
+
+--- T008: Scheduler.pause assembled LOAD/CALL + runtime dispatch ---
+PASS T008a: NS slot 8 is the Scheduler abstraction
+PASS T008b: Scheduler.methods[4] === "pause" (0-based index 4)
+PASS T008c: explicit Scheduler LOAD/CALL assembles without errors
+PASS T008c-opcodes: program is LOAD CR0, CR6[8]; CALL CR0, 4; HALT
+PASS T008d: assembled LOAD encodes Scheduler c-list row=8
+PASS T008e: assembled CALL encodes method 5 (1-based) for pause (0-based index 4)
+PASS T008f: methods[encodedMethod0] resolves to "pause"
+PASS T008g: dispatch via assembled index returns ok=true (no fault)
+PASS T008h: calling thread state === "sleeping" (not "running" or faulted)
+PASS T008i: wakeStep is set to stepAtCall + DURATION
+PASS T008j: machine did NOT halt (pause is not a fault)
+
+--- T008-step: sim.step() executes Scheduler.pause (method index 4) ---
+PASS T008-step-a: step() executed the CALL instruction (non-null result)
+PASS T008-step-b: step() desc confirms Scheduler.pause was dispatched
+PASS T008-step-c: no faults logged after CALL (pause is not a fault)
+PASS T008-step-d: machine NOT halted after Scheduler.pause step()
+PASS T008-step-e: thread[0].state === "sleeping" after step()
+PASS T008-step-f: thread[0].wakeStep is set (timer deadline > 0)
+
+--- T009: loadProgram + step() pause + step() timer wake ---
+PASS T009-A1: assembler produces no errors for explicit Scheduler LOAD/CALL
+PASS T009-A2: LOAD encodes Scheduler c-list row 8
+PASS T009-A3: CALL encodes method index 5 (1-based) for pause
+PASS T009-B1: step() executed the CALL instruction (non-null result)
+PASS T009-B2: step() desc confirms Scheduler.pause was dispatched
+PASS T009-B3: no faults after CALL (pause is not a fault path)
+PASS T009-B4: machine did NOT halt (pause ≠ HALT instruction)
+PASS T009-B5: irqState.timerArmed === true after pause call
+PASS T009-B6: timerDeadline = stepCount + T9_DURATION at call time
+PASS T009-B7: calling thread state === "sleeping" after pause
+PASS T009-B8: thread.wakeStep is set to timerDeadline
+PASS T009-C1: second step() returned a result (timer IRQ injected)
+PASS T009-C2: result carries timerIRQ=true sentinel
+PASS T009-C3: result desc mentions "Timer IRQ" or "Scheduler.IRQ"
+PASS T009-C4: irqState.timerArmed cleared to false after IRQ fires
+PASS T009-C5: _irqSweepCount incremented (IRQ sweep ran)
+PASS T009-C6: sleeping thread woken to "ready" state after timer IRQ
+PASS T009-C7: thread.waitFlag cleared after wake
+PASS T009-C8: machine still NOT halted (timer IRQ is not a fault)
+PASS T009-C9: no new faults logged during timer IRQ phase
+
+--- T010: continuous step() loop — timer fires without manual stepCount ---
+PASS T010-B1: CALL step returned non-null (instruction executed)
+PASS T010-B2: CALL desc confirms Scheduler.pause was dispatched
+PASS T010-B3: no faults after CALL (pause is not a fault path)
+PASS T010-B4: irqState.timerArmed === true after CALL
+PASS T010-B5: timerDeadline === stepCount + DURATION at time of pause call
+PASS T010-B6: calling thread state === "sleeping" after pause
+PASS T010-B7: thread.wakeStep === timerDeadline
+PASS T010-C1: timer IRQ fired before max_steps guard expired
+PASS T010-C2: timerIRQ sentinel is true in the result
+PASS T010-C3: result desc mentions "Timer" or "Scheduler.IRQ"
+PASS T010-C4: timer fired at step == deadline (±0)
+PASS T010-C5: irqState.timerArmed cleared to false after IRQ fires
+PASS T010-C6: _irqSweepCount incremented (IRQ sweep ran)
+PASS T010-C7: sleeping thread woken to "ready" state after timer IRQ
+PASS T010-C8: thread.waitFlag cleared after wake
+PASS T010-C9: machine NOT halted (timer IRQ is not a fault)
+PASS T010-C10: no faults logged during loop (timer is not a fault path)
+PASS T010-C11: HALT sentinel not reached before timer IRQ
+
+--- T011: Multi-thread pause — Thread 0 sleeps, Thread 1 keeps running ---
+PASS T011-A1: Thread 0 starts as running
+PASS T011-A2: Thread 1 starts as running
+PASS T011-A3: currentThread is 0 (Thread 0 is the caller)
+PASS T011-B1: Scheduler.pause returns ok=true
+PASS T011-B2: Thread 0 state is now "sleeping"
+PASS T011-B3: Thread 0 wakeStep set to stepAtCall + DURATION
+PASS T011-B4: Thread 1 state is still "running" (pause only affects the caller)
+PASS T011-B5: irqState.timerArmed set to true
+PASS T011-B6: timerDeadline equals stepAtCall + DURATION
+PASS T011-B7: machine did NOT halt (pause is not a fault)
+PASS T011-C1: Thread 0 still "sleeping" at mid-point (wakeStep not reached)
+PASS T011-C2: Thread 0 wakeStep unchanged at mid-point
+PASS T011-C3: Thread 1 still "running" at mid-point (unaffected by pause)
+PASS T011-C4: timerArmed still true at mid-point (deadline not yet reached)
+PASS T011-C5: machine still NOT halted at mid-point
+PASS T011-D1: _fireSchedulerIRQ at deadline returns true
+PASS T011-D2: _irqSweepCount incremented by deadline sweep
+PASS T011-D3: Thread 0 woken to "ready" after timer fires
+PASS T011-D4: Thread 0 waitFlag cleared after wake
+PASS T011-D5: Thread 1 is still "running" — was never put to sleep
+PASS T011-D6: timerArmed cleared after deadline IRQ fires
+PASS T011-D7: machine still NOT halted after full pause cycle
+PASS T011-D8: no faults logged during the multi-thread pause cycle
+PASS T011-E1: Thread 0 re-armed to "sleeping" for step() phase
+PASS T011-E2: Thread 1 still "running" after re-arm
+PASS T011-E3: timerArmed=true after re-arm
+PASS T011-E4: step() returned a non-null result (timer IRQ injected)
+PASS T011-E5: step() result carries timerIRQ=true sentinel
+PASS T011-E6: step() result desc mentions Timer or Scheduler.IRQ
+PASS T011-E7: timerArmed cleared by step() timer path
+PASS T011-E8: _irqSweepCount incremented by step() timer IRQ
+PASS T011-E9: Thread 0 woken to "ready" via step() timer path
+PASS T011-E10: Thread 1 still "running" after step() timer IRQ
+PASS T011-E11: no faults logged during step() timer phase
+PASS T011-E12: machine NOT halted after step() timer phase
+
+--- T012: Two threads with different pause durations — step() driven ---
+PASS T012-A1: Thread 0 starts as "running"
+PASS T012-A2: Thread 1 starts as "running"
+PASS T012-B1: Thread 0 Scheduler.pause(3) returns ok=true
+PASS T012-B2: Thread 0 state is "sleeping" after pause(3)
+PASS T012-B3: Thread 0 wakeStep = stepAtBase + 3
+PASS T012-B4: timerArmed=true after first pause()
+PASS T012-B5: timerDeadline = stepAtBase + 3 after first pause()
+PASS T012-B6: Thread 1 Scheduler.pause(7) returns ok=true
+PASS T012-B7: Thread 1 state is "sleeping" after pause(7)
+PASS T012-B8: Thread 1 wakeStep = stepAtBase + 7
+PASS T012-B9: timerDeadline still = stepAtBase + 3 (min-deadline preserved after second pause)
+PASS T012-B10: timerArmed still true
+PASS T012-B11: machine NOT halted after both pause() calls
+PASS T012-C1: first timer IRQ fired (deadline_A = stepAtBase + 3)
+PASS T012-C2: first timerIRQ sentinel is true
+PASS T012-C3: first timer fired at stepCount == deadline_A
+PASS T012-C4: Thread 0 woken to "ready" at deadline_A
+PASS T012-C5: Thread 0 wakeStep cleared after first timer
+PASS T012-C6: Thread 1 STILL "sleeping" after first timer (wakeStep 7 > stepCount 3)
+PASS T012-C7: Thread 1 wakeStep unchanged after first timer (still = stepAtBase + 7)
+PASS T012-C8: timerArmed re-armed to deadline_B by IRQ handler after first fire
+PASS T012-C9: _irqSweepCount incremented by first sweep
+PASS T012-C10: no faults logged during first timer phase
+PASS T012-D1: second timer IRQ fired (deadline_B = stepAtBase + 7)
+PASS T012-D2: second timerIRQ sentinel is true
+PASS T012-D3: second timer fired at stepCount == deadline_B
+PASS T012-D4: Thread 1 woken to "ready" at deadline_B
+PASS T012-D5: Thread 1 wakeStep cleared after second timer
+PASS T012-D6: Thread 0 remains "ready" (undisturbed by second timer)
+PASS T012-D7: timerArmed cleared — no more sleeping threads
+PASS T012-D8: _irqSweepCount incremented by second sweep
+PASS T012-D9: no faults logged during second timer phase
+PASS T012-D10: machine NOT halted after full two-thread pause cycle
+PASS T012-E1: third Scheduler.pause() returns ok=true
+PASS T012-E2: timerArmed=true for third alarm
+PASS T012-E3: timerDeadline = stepAtC + 5
+PASS T012-E4: Thread 0 sleeping for third alarm
+PASS T012-E5: third alarm fires via step() loop
+PASS T012-E6: third timerIRQ sentinel is true
+PASS T012-E7: Thread 0 woken to "ready" after third alarm
+PASS T012-E8: timerArmed cleared after third alarm
+PASS T012-E9: _irqSweepCount incremented for third alarm
+PASS T012-E10: no faults at any point in three-alarm sequence
+PASS T012-E11: machine NOT halted throughout
+
+--- T_RESOLVE: resolvePendingSlot ---
+PASS T_RESOLVE_A1: returns ok=true
+PASS T_RESOLVE_A2: result.nsIdx matches requested NS_SLOT
+PASS T_RESOLVE_A3: result.pendingName matches pet name
+PASS T_RESOLVE_A4: memory slot is no longer a pending sentinel
+PASS T_RESOLVE_A5: written GT encodes NS_SLOT in low 16 bits
+PASS T_RESOLVE_A6: written GT has E-permission encoding
+PASS T_RESOLVE_A7: result.gt matches the word written to memory
+PASS T_RESOLVE_A8: SELF and neighbouring rows are unchanged
+PASS T_RESOLVE_B1: double-resolve returns ok=false
+PASS T_RESOLVE_B2: error mentions "pending"
+PASS T_RESOLVE_C1: invalid nsIdx returns ok=false
+PASS T_RESOLVE_C2: error mentions the NS slot index
+PASS T_RESOLVE_D1: out-of-range slotIdx returns ok=false
+PASS T_RESOLVE_D2: error mentions the slot index
+PASS T_RESOLVE_D3: error mentions "out of range" or "range"
+PASS T_RESOLVE_E1: unbooted sim returns ok=false
+PASS T_RESOLVE_E2: error mentions "not booted" or "boot"
+PASS T_RESOLVE_F1: sim.output grew after successful resolve
+PASS T_RESOLVE_F2: sim.output contains [RESOLVE] tag
+PASS T_RESOLVE_F3: [RESOLVE] line mentions the slot index
+PASS T_RESOLVE_F4: [RESOLVE] line mentions the NS slot
+PASS T_RESOLVE_F5: [RESOLVE] line contains the pet name
+PASS T_RESOLVE_G1: null CR6 returns ok=false
+PASS T_RESOLVE_G2: error mentions "CR6" or "c-list"
+PASS T_RESOLVE_H1: CR6 word0=0 returns ok=false
+PASS T_RESOLVE_H2: error mentions "CR6" or "c-list"
+PASS T_RESOLVE_I1: clistCount=0 causes slotIdx=0 to return ok=false
+PASS T_RESOLVE_I2: error mentions "out of range" or "range"
+PASS T_RESOLVE_I3: error reports clistCount as 0
+PASS T_RESOLVE_J: reject invalid rights undefined
+PASS T_RESOLVE_J: rejection does not write undefined
+PASS T_RESOLVE_J: reject invalid rights []
+PASS T_RESOLVE_J: rejection does not write []
+PASS T_RESOLVE_J: reject invalid rights ["BOGUS"]
+PASS T_RESOLVE_J: rejection does not write ["BOGUS"]
+PASS T_RESOLVE_J: reject invalid rights ["R","E"]
+PASS T_RESOLVE_J: rejection does not write ["R","E"]
+PASS T_RESOLVE_J: reject invalid rights ["L","S"]
+PASS T_RESOLVE_J: rejection does not write ["L","S"]
+PASS T_RESOLVE_K: ordinary SELF cannot be interactively replaced
+PASS T_RESOLVE_K: rejected SELF remains unchanged
+PASS T_RESOLVE_L: requested RW rights and live sequence are preserved
+
+--- T013: Scheduler.IRQ LAZY_LOAD reason code ---
+PASS T013-A1: LAZY_LOAD (happy) returns ok=true
+PASS T013-A2: Loader.Load was called (lazyLoad stub invoked)
+PASS T013-A3: correct slot (20) was passed to lazyLoad
+PASS T013-A4: result.slot matches the requested slot
+PASS T013-A5: message mentions "LAZY_LOAD"
+PASS T013-A6: machine NOT halted after LAZY_LOAD recovery
+PASS T013-B1: LAZY_LOAD (unknown slot) returns ok=false
+PASS T013-B2: fault field is "LAZY_LOAD"
+PASS T013-B3: message mentions "LAZY_LOAD"
+PASS T013-B4: machine NOT halted (the IRQ handler is not a halt path)
+PASS T013-C1: DR1 fallback returns ok=true
+PASS T013-C2: DR1 slot (33) used when args.slot absent
+
+--- T014: Scheduler.IRQ LAZY_RESOLVE reason code ---
+PASS T014-A1: LAZY_RESOLVE returns ok=true
+PASS T014-A2: result.slot matches requested slot
+PASS T014-A3: result.petName matches the pending GT pet name
+PASS T014-A4: result.suspended === true
+PASS T014-A5: calling thread state === "sleeping"
+PASS T014-A6: calling thread waitFlag === "lazy_resolve:2"
+PASS T014-A7: irqState.waitingOnFlags[currentThread] set correctly
+PASS T014-A8: sim.output grew (UART message emitted)
+PASS T014-A9: output contains [IRQ] LAZY_RESOLVE tag
+PASS T014-A10: output mentions the pet name
+PASS T014-A11: machine NOT halted after LAZY_RESOLVE
+PASS T014-B1: LAZY_RESOLVE (no CR6) still returns ok=true
+PASS T014-B2: thread still suspended when CR6 absent
+PASS T014-B3: output still contains [IRQ] LAZY_RESOLVE tag
+PASS T014-B4: message still present in result
+PASS T014-C1: thread is sleeping after LAZY_RESOLVE
+PASS T014-C2: TIMER sweep after resolve-flag signal returns ok=true
+PASS T014-C3: thread woken to "ready" after flag consumed
+PASS T014-C4: waitFlag cleared from thread after wake
+PASS T014-C5: lazy_resolve flag consumed from pendingWakeFlags
+PASS T014-C6: machine NOT halted throughout
+
+--- T015: LAZY_LOAD wired from _execCall (cw=0 lump) ---
+PASS T015-A1: step() returned a non-null result (instruction executed)
+PASS T015-A2: result.lazySuspended === true
+PASS T015-A3: result.kind === "LAZY_LOAD"
+PASS T015-A4: result.slot === NS_SLOT (20)
+PASS T015-A5: result.instrName === "CALL"
+PASS T015-A6: _fireSchedulerIRQ was called with reason "LAZY_LOAD"
+PASS T015-A7: _fireSchedulerIRQ received the correct NS slot (20)
+PASS T015-A8: Loader.Load was invoked (lazyLoad stub called)
+PASS T015-A9: machine NOT halted after LAZY_LOAD path
+PASS T015-A10: no faults logged (LAZY_LOAD is not a fault)
+PASS T015-A11: output contains [LAZY-LOAD] tag
+PASS T015-A12: output mentions NS slot 20
+PASS T015-A13: callStack is empty — no orphaned frame pushed before LAZY_LOAD
+PASS T015-A14: sto is unchanged — not decremented before LAZY_LOAD suspension
+PASS T015-B1: without IRQ registry, step() returns null (fault path)
+PASS T015-B2: CODE_NOT_RESIDENT fault logged when IRQ not available
+
+--- T016: declared resolution through LOAD + CALL ---
+PASS T016 symbolic false: LOAD completes without suspension
+PASS T016 symbolic false: exact row contains loaded Inform GT
+PASS T016 symbolic false: descriptor retains declared name
+PASS T016 symbolic false: grant is exactly E with live sequence
+PASS T016 symbolic false: no fault, halt or IRQ
+PASS T016 symbolic false: LOAD reports resolved name
+PASS T016 symbolic true: LOAD completes without suspension
+PASS T016 symbolic true: exact row contains loaded Inform GT
+PASS T016 symbolic true: descriptor retains declared name
+PASS T016 symbolic true: grant is exactly E with live sequence
+PASS T016 symbolic true: no fault, halt or IRQ
+PASS T016 symbolic true: LOAD reports resolved name
+PASS T016-D absent: fails with pending-resolution fault
+PASS T016-D absent: pending row is unchanged
+PASS T016-D absent: no capability loaded into destination
+PASS T016-D absent: no scheduler IRQ substitutes for missing authority
+PASS T016-D missing-rights: fails with pending-resolution fault
+PASS T016-D missing-rights: pending row is unchanged
+PASS T016-D missing-rights: no capability loaded into destination
+PASS T016-D missing-rights: no scheduler IRQ substitutes for missing authority
+PASS T016-D mixed-domains: fails with pending-resolution fault
+PASS T016-D mixed-domains: pending row is unchanged
+PASS T016-D mixed-domains: no capability loaded into destination
+PASS T016-D mixed-domains: no scheduler IRQ substitutes for missing authority
+PASS T016-E opcode=8 pending=false: retired opcode faults
+PASS T016-E opcode=8 pending=false: c-list row remains unchanged
+PASS T016-E opcode=8 pending=false: no capability loaded
+PASS T016-E opcode=8 pending=false: no lazy-resolution IRQ
+PASS T016-E opcode=8 pending=true: retired opcode faults
+PASS T016-E opcode=8 pending=true: c-list row remains unchanged
+PASS T016-E opcode=8 pending=true: no capability loaded
+PASS T016-E opcode=8 pending=true: no lazy-resolution IRQ
+PASS T016-E opcode=9 pending=false: retired opcode faults
+PASS T016-E opcode=9 pending=false: c-list row remains unchanged
+PASS T016-E opcode=9 pending=false: no capability loaded
+PASS T016-E opcode=9 pending=false: no lazy-resolution IRQ
+PASS T016-E opcode=9 pending=true: retired opcode faults
+PASS T016-E opcode=9 pending=true: c-list row remains unchanged
+PASS T016-E opcode=9 pending=true: no capability loaded
+PASS T016-E opcode=9 pending=true: no lazy-resolution IRQ
+PASS T016 false: LOAD succeeds without suspension or fault
+PASS T016 false: exact GT replaces unresolved word and populates CR0
+PASS T016 false: no LAZY_RESOLVE IRQ for a declared live target
+PASS T016 false: explicit CALL succeeds after resolution
+PASS T016 true: LOAD succeeds without suspension or fault
+PASS T016 true: exact GT replaces unresolved word and populates CR0
+PASS T016 true: no LAZY_RESOLVE IRQ for a declared live target
+PASS T016 true: explicit CALL succeeds after resolution
+PASS T016: pending sentinel without a declaration fails closed
+PASS T016: rejected pending sentinel is not rewritten
+
+--- T017: SCHEDULER_IRQ_CLIST authority check (Task #1530) ---
+PASS T017-A1: Scheduler abstraction (NS[8]) exists
+PASS T017-A2: capabilities array has 4 entries (cc=4)
+PASS T017-A3: idx 0 → CR12_PORT, target=NS[19], E-perm
+PASS T017-A4: idx 1 → CR13_PORT, target=NS[20], E-perm
+PASS T017-A5: idx 2 → CR12_MBIT, target=NS[21], E-perm
+PASS T017-A6: idx 3 → CR13_MBIT, target=NS[22], E-perm
+PASS T017-B1: _fireSchedulerIRQ returns truthy with valid clist
+PASS T017-B2: output contains authority check OK message
+PASS T017-C1: _fireSchedulerIRQ returns false when CR12_PORT target is wrong
+PASS T017-C2: output contains authority check FAILED message
+PASS T017-C3: irqActive remains false after authority failure
+PASS T017-D1: _fireSchedulerIRQ returns false when CR13_PORT E-perm stripped
+PASS T017-D2: output mentions CR13_PORT in FAILED message
+PASS T017-E1: ChurchSimulator.SCHEDULER_IRQ_CLIST is defined
+PASS T017-E2: static clist has 4 entries
+PASS T017-E3: static clist[0] is CR12_PORT → NS[19]
+PASS T017-E4: static clist[1] is CR13_PORT → NS[20]
+PASS T017-E5: static clist[2] is CR12_MBIT → NS[21]
+PASS T017-E6: static clist[3] is CR13_MBIT → NS[22]
+
+--- T018: LAZY_RESOLVE wired from _execLoad (petNameMemory) ---
+PASS T018-A1: machine IS halted after NULL_CAP on unnamed slot
+PASS T018-A2: faultLog has at least one entry (NULL_CAP logged)
+PASS T018-A3: fault code is NULL_CAP
+PASS T018-A4: _fireSchedulerIRQ NOT called with LAZY_RESOLVE on unnamed slot
+PASS T018-B1: machine NOT halted after LAZY_RESOLVE on named slot
+PASS T018-B2: faultLog is empty (LAZY_RESOLVE is not a halt-level fault)
+PASS T018-B3: _fireSchedulerIRQ was called with reason "LAZY_RESOLVE"
+PASS T018-B4: _fireSchedulerIRQ received the correct c-list slot
+PASS T018-B5: step() returned a non-null lazySuspended result
+PASS T018-B6: result.slot matches LOAD_SLOT
+PASS T018-B7: output contains [LAZY-RESOLVE] tag
+PASS T018-B8a: missing rights cannot clear or resume a pending suspension
+PASS T018-B8: interactive introduction resumes and clears pending state
+PASS T018-B9: original PC, registers, flags and STO restored
+PASS T018-B10: original LOAD retries successfully with exact granted rights
+
+--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---
+PASS T019a: _lumpIsStub detects all-RETURN code region as stub
+PASS T019b: faultLog has exactly one entry after calling stub LUMP
+PASS T019c: fault type is STUB_METHOD
+PASS T019d: catchInvoked=false (halt-always path; no Tier 1 recovery)
+PASS T019e: faultLog entry tier === null (halt-always path)
+PASS T019f: machine halted after STUB_METHOD fault
+
+--- T012: faultSnapshot event emitted before _returnToBoot() ---
+PASS T012a: faultLog has one entry after fault()
+PASS T012b: faultCode is BOUNDS code
+PASS T012c: faultSnapshot event was emitted
+PASS T012d: snap.source === "simulator"
+PASS T012e: snap.fault_code matches BOUNDS
+FAIL T012f: snap.fault_message preserves the exact routed fault record
+PASS T012g: snap.nia matches PC at fault time
+PASS T012h: snap.cr is a 16-element array
+PASS T012i: at least one CR row has a non-zero word0 (CR14 was set)
+PASS T012j: snap.dr is a 16-element array
+PASS T012k: snap.dr[3] === 0xDEADBEEF (captured before clear)
+PASS T012l: snap.call_depth === 1 (one frame on stack at fault)
+PASS T012m: snap.led_bits === 0b101010
+PASS T012n: snap.abstraction_label is a string
+PASS T012o: snap.ts is a positive number (Unix timestamp)
+PASS T012p: pc reset to 0 after _fastBoot (state cleared)
+PASS T012q: callStack cleared after _fastBoot
+PASS T012r: captured snapshot is unchanged (snapshot predates state clear)
+
+--- T013: immutable fault instruction evidence ---
+PASS T013a: fault captures the exact fetched instruction word
+PASS T013b: fault captures its mnemonic at fault time
+PASS T013c: later memory replacement cannot alter faultRawWord
+
+365 passed, 1 failed
+
+
+=== node simulator/test_namespace_image_install.js ===
+Exit: 0; duration: 0.15 seconds
+PASS exact selected image UI: pinned selection, confirmation, cancellation, offline, authorization
+
+
+=== node simulator/test_fpga_control_auth.js ===
+Exit: 0; duration: 0.2 seconds
+PASS FPGA control authorization and denied-request messages (no network requests)
+
+
+=== node simulator/test_build_approval_revision_selection.js ===
+Exit: 0; duration: 0.28 seconds
+PASS exact approved Namespace revision selection
+
+
+=== python3 -m pytest hardware/test_wukong_thread_scheduler_contract.py -q --disable-warnings ===
+Exit: 0; duration: 65.46 seconds
+...................................................                      [100%]
+51 passed in 51.85s
+

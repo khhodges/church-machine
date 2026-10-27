@@ -1410,3 +1410,31 @@ mtime_ms = 1793102902475
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/38d96dab-7a25-4fd1-be7f-473887755f25/6000fdfc-bc27-493e-b50a-9d8425a6511b"
 storage_version_token = "1793102923538206"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "TNe0eKk8DoXRCXlAbx3Hd"
+uri = "file://docs/phase-1/nfb1-starting-baseline.md"
+type = "text"
+title = "NFB1 — Starting Baseline Report"
+description = "Inventory, fingerprints, focused test results, existing failures, and remaining NFB1 implementation gaps. No board commands or runtime changes."
+logical_id = "71d6b5e6-b4c9-44a9-baf3-002f8fcc4b7d"
+content_hash = "sha256:616d6c30ba15ecce192c1604f193a290a556043f3bff898776a1a4c81bd26de7"
+size = 9248
+mtime_ms = 1793104309592
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/71d6b5e6-b4c9-44a9-baf3-002f8fcc4b7d/141efb31-f57e-40b0-adb6-35d42e3945a9"
+storage_version_token = "1793104327128336"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "nt6Pm0ST5pxHm9TktJ0_2"
+uri = "file://docs/phase-1/nfb1-baseline-test-evidence.txt"
+type = "text"
+title = "NFB1 — Focused Test Evidence"
+description = "Full output and exit status for the seven focused baseline checks."
+logical_id = "cda6f3c8-143f-4741-951d-c85ad8fab248"
+content_hash = "sha256:5dd7f9a2415d16ccb3244f362a7ae544ea8f98b4d6dd9b3eedd89f170acd52ef"
+size = 31834
+mtime_ms = 1793104326368
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cda6f3c8-143f-4741-951d-c85ad8fab248/d46048ec-47a3-400c-9607-bf0f9360f61e"
+storage_version_token = "1793104327843404"
+content_type = "text/plain"
