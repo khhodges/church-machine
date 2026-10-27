@@ -2156,7 +2156,7 @@
   {
     "token": "bb1e4bed",
     "abstraction": "ide.SelfTest",
-    "filename": "ide.SelfTest.1.c01f5b7c.lump",
+    "filename": "ide.SelfTest_v101.lump",
     "lump_version": 101,
     "compiled_at": 1792602465.6058593,
     "operation_id": "9016e9ce-b9f4-41f2-af81-6adfc027baa6",
@@ -2212,7 +2212,9 @@
       "signing_scheme": "church-compiler-hmac-sha256/v2",
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "052fa7125554ed123525dfe9f96125da00cdf4a1afb7e2add836d80ba37dce5a"
-    }
+    },
+    "archived": true,
+    "binary_hash": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb"
   },
   {
     "token": "8b09f156",
@@ -3855,6 +3857,68 @@
       "signing_scheme": "church-compiler-hmac-sha256/v2",
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "d1ca30ac75674e737f48c7c2b834770bc518e5acdbaf4defa4531a94612fc86e"
+    }
+  },
+  {
+    "token": "bb1e4bed",
+    "abstraction": "ide.SelfTest",
+    "filename": "ide.SelfTest.1.c01f5b7c.lump",
+    "lump_version": 102,
+    "compiled_at": 1793129636.437926,
+    "operation_id": "12d67853-01e5-4737-973a-2c423759a43f",
+    "output_variants": {
+      "api": {
+        "sha256": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+        "bytes": 4096,
+        "file_bytes": 863,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/adc326262060f0a0586f008c323ce126d3bad0e054bb56f616108e221e8d4d21/api?compressed=1"
+      },
+      "compact": {
+        "sha256": "f04b048ea7a157fd7bb267a9e2eb6a4914116a00c2391991b676fd0c9ce602c6",
+        "bytes": 16384,
+        "file_bytes": 2839,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/adc326262060f0a0586f008c323ce126d3bad0e054bb56f616108e221e8d4d21/compact?compressed=1"
+      },
+      "full": {
+        "sha256": "b3e8bcb9b8b2bddb7d46b794744fa519d688bdfb1a557390614ccb1288669441",
+        "bytes": 32768,
+        "file_bytes": 6486,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/adc326262060f0a0586f008c323ce126d3bad0e054bb56f616108e221e8d4d21/full?compressed=1"
+      }
+    },
+    "variant_primary_hash": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+    "variant_bundle_id": "adc326262060f0a0586f008c323ce126d3bad0e054bb56f616108e221e8d4d21",
+    "variant_compiler_record": {
+      "binary_hash": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+      "source_hash": "b797178b074f292f16f5c9ba86d8d1f6ac98553fd9d819448d317adf4b1870de",
+      "language": "javascript",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "520946a112517f128efea815fb49af01b74e316d0aecc889461325b92f4afe3f",
+        "inputs": {
+          "language": "auto",
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "javascript"
+      },
+      "hardfault_sites": [],
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "998bf3860ef08ca21765c342d3cc4f80f0d69105cdd47d089020f93fd52afb44"
     }
   }
 ]
