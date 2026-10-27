@@ -1,8 +1,10 @@
 # Next Factory Build — approval specification
 
 **Status: Scope and Mallory fault disposition approved to proceed. Detailed
-target bindings and normal turn scheduling remain unresolved approval gates.
-No authorization to flash or activate hardware.**
+target bindings, normal turn scheduling, fault-journal/reboot handoff,
+MTBF measurement and standalone Ethernet contracts remain unresolved approval
+gates. Phase 1 completion requires Ethernet and standalone FPGA singletons.
+No authorization to flash, activate hardware or publish.**
 
 ## 1. Purpose and operator boundary
 
@@ -338,6 +340,62 @@ months to exposure units remain to be specified. Do not silently choose a
 The priority remains exposing the fault at its first occurrence and fixing
 its cause, not masking it with retries or recovery claims.
 
+### Fault journal, reboot handoff and exposure accounting
+
+**Required outcome; detailed mechanism pending approval.** Fault evidence and
+reliability history must not depend on an open IDE browser or a continuously
+connected UART host. A reboot must not erase the reason for the event, make
+OFFLINE code eligible again, reset accumulated exposure, or count an old
+incident as a new fault.
+
+The journal contract must define capture before execution context is lost,
+retention, delivery, and acknowledgement as distinct operations. Remembering
+or forwarding a fault does not authorize reboot or resumption. The contained
+Mallory demonstration must continue other eligible work without requiring
+a whole-board reboot.
+
+The following is the **proposed record and delivery design**, not an approved
+storage layout, wire protocol, service ABI or claim of existing functionality:
+
+- Record a stable incident identity, board identity and boot session; exact
+  executing artifact/revision; Namespace slot/version and Thread; instruction
+  and actual fault code; relevant capability bounds/permissions; affected
+  object when established; and an exposure checkpoint. Do not export unrelated
+  protected memory or proof secrets.
+- Keep containment observations, OFFLINE decisions and corrected-design
+  adoption associated with the original incident without rewriting it.
+- On reboot, create a distinct boot-session record linked to the predecessor
+  and known reset reason. Operator reset, installation and unknown reset are
+  not automatically counted as Abstraction faults.
+- Retain undelivered records independently of the faulting Abstraction.
+  Authenticate Ethernet reports; acknowledge durable server receipt rather
+  than merely receipt of a packet. Re-delivery uses the same incident identity.
+  Retrying telemetry must never retry the faulting instruction.
+- Reconcile cumulative exposure checkpoints by revision and measurement
+  session instead of summing repeated reports. Separate occurrence information
+  from server arrival time. Network downtime neither proves execution stopped
+  nor supplies evidence of continued operation.
+- Detect incomplete records, queue overflow and missing exposure intervals;
+  surface evidence gaps rather than claiming complete fault counts or MTBF.
+
+For a defined revision, workload and fault population with qualifying faults,
+the proposed point estimate is **qualifying operating exposure / qualifying
+fault count**. Both terms must cover the same observation population. Report
+zero faults as “zero observed over the stated exposure,” not infinite MTBF.
+Intentional attack demonstrations remain separate from operational estimates.
+Threshold evaluation remains Unassessed until the approved sufficiency rules
+are satisfied; fault reporting and containment do not wait for that evaluation.
+
+| Decision still requiring approval | Required definition |
+| --- | --- |
+| Capture and ownership | Who captures, retains and delivers evidence without depending on the failed Abstraction or a live IDE connection; bounded fields and access authority. |
+| Retention | Storage medium, capacity, atomic record completion and overflow policy; guarantees separately for Church reset, FPGA reconfiguration and power loss. RAM retention must not be represented as power-loss durability. |
+| Reboot handoff | Incident/session identity, reset-reason source, incomplete-capture behavior and explicitly authorized reboot sequencing; no new automatic recovery permission. |
+| Exposure | Execution-time versus active-service-time clock, units, checkpoint frequency, wrap/reset handling and excluded inactive/faulted/OFFLINE periods. |
+| Assessment | Month conversion, observation sufficiency, estimator/confidence model and treatment of evidence gaps; preserve the approved strict less-than threshold. |
+| Ethernet | Device identity/authentication, protected transport, acknowledgement, deduplication and disconnected queue behavior; reporting authority is separate from control authority. |
+| Standalone lifecycle | Startup and runtime behavior without UART or an IDE connection, including preserving OFFLINE decisions and reporting failures without inventing additional program recovery. |
+
 ### Per-object reliability and Must Resolve queue
 
 When corruption is confirmed contained within one Abstraction, unaffected
@@ -524,12 +582,46 @@ Before a candidate build is accepted:
   running, halted, and faulted states using exact retained build/image bytes,
   then confirms both LightningBolt targets execute in the approved order.
 
+### Mandatory Phase 1 Ethernet and standalone completion gates
+
+These extend the UART acceptance work; they do not replace it. Execute them
+against the approved journal, measurement and Ethernet contracts, not invented
+test-only defaults. Retain exact build/image identities and scoped results.
+
+- Start and operate each FPGA singleton with the IDE UART host and external
+  UART bridge disconnected. Prove actual authorized work, not merely a
+  running indicator. An open IDE browser is not required.
+- Deliver fault incidents and exposure evidence over board-native Ethernet
+  to the IDE server while the browser is closed; reopening the IDE must show
+  the retained evidence and its exact device, session and artifact attribution.
+- Interrupt the network, continue the independently authorized workload,
+  reconnect, and verify delayed delivery, deduplication and exposure
+  reconciliation. Do not infer exposure from the length of the outage.
+- Exercise duplicate, reordered, interrupted and rejected reports, lost
+  acknowledgements, server restart and bounded queue exhaustion. No duplicate
+  faults or exposure totals; incomplete evidence must be visible.
+- At separately authorized reboot boundaries, verify original incidents remain
+  identifiable, reset reasons are distinguished, new sessions do not fabricate
+  faults, and OFFLINE revisions are not revived. Test Church reset, FPGA
+  reconfiguration and power-loss retention separately against the approved
+  guarantees; do not substitute one for another.
+- Verify unauthenticated or replayed reporting cannot forge incidents, change
+  management state, grant execution authority or trigger reboot/Start.
+- Verify MTBF results from known exposure/fault inputs, including zero faults,
+  duplicated checkpoints, missing intervals, revision changes and intentional
+  demo events. Test below/equal/above the 12-month threshold using the approved
+  unit conversion and sufficiency rules.
+
+UART-only operation and bridge-mediated network delivery cannot close these
+standalone gates. No result here implies multi-FPGA coordination acceptance.
+
 Simulation results, synthesized build results, and physical evidence must
 remain separately identified. None may stand in for the others.
 
 ## 10. Approval and release boundary
 
-1. Review this scope and resolve the binding/scheduling items in section 7.
+1. Review this scope and resolve the binding/scheduling, journal/reboot,
+   measurement and Ethernet/standalone contracts in section 7.
 2. Explicitly approve the completed specification before building.
 3. Implement, validate, and produce the next Factory Build with retained
    source, inputs, bitstream identity, and test evidence.
@@ -539,6 +631,28 @@ remain separately identified. None may stand in for the others.
 
 No build, physical upload, reset, flash, activation, or publication is
 authorized merely by preparing this document.
+
+### Work sequence through Phase 1 completion
+
+This sequence preserves the completed investigations and adds the mandatory
+standalone endpoint. It is a documentation-level sequence, not authorization
+to begin implementation or hardware operations.
+
+| Stage | Deliverable and exit condition |
+| --- | --- |
+| 1. Starting baseline — delivered | [Baseline report](nfb1-starting-baseline.md): retain the observed failures and evidence limits; delivery is not a green release baseline. |
+| 2. Mallory mechanism — delivered | [Reconciliation report](nfb1-mallory-fault-reconciliation.md): retained C-list bounds denial explained by isolated RTL evidence, not proof of target RW access or physical NFB1 acceptance. |
+| 3. Bindings and turns — approval pending | Define context ownership, exact targets/revisions, first turn, normal turn boundary, on-use GT validation and contained-fault handoff for both demonstrations. |
+| 4. Evidence and standalone contracts — approval pending | Resolve the journal/reboot/exposure/MTBF decisions above and Ethernet/standalone lifecycle. Design these before implementing a UART-dependent evidence system. |
+| 5. UART implementation and validation — future authorized work | Implement the approved hold/load/readback/explicit-Start flow and both demonstrations, including correction/adoption/fallback and evidence accounting. Resolve relevant baseline failures before claiming release gates pass. |
+| 6. UART physical milestone — separate authorization | Validate exact retained builds/images through the published IDE. Preserve installation and demonstration receipts; this is intermediate Phase 1 acceptance only. |
+| 7. Ethernet and standalone implementation — future authorized work | Implement board-native reporting and independent operation using the approved evidence contract; a networked UART bridge is not the final deliverable. |
+| 8. Standalone physical acceptance — separate authorization | Complete the Ethernet/standalone gates above, with UART disconnected, browser closed, outages and reboot evidence. Only then may the transport/standalone portion of Phase 1 be declared complete. Other Phase 1 gates remain applicable. |
+
+Historical investigation reports remain unchanged as evidence of their original
+inputs and scope. Their earlier “next step” wording is historical; this section
+is the current work sequence. No stage retroactively promotes an earlier test
+into proof of a newer requirement.
 
 ## References
 

@@ -8,6 +8,19 @@
 
 ## Software review scope
 
+- **[Next Factory Build — approval specification](factory-build-verified-install-approval.md)** —
+  current scope, approval gates and work sequence: start with IDE UART and
+  finish Phase 1 with Ethernet and standalone FPGA singletons. Includes both
+  the Mallory Thread demonstration and CapabilityTest/SelfTest/CallHome loop,
+  verified installation, fault/reboot evidence and MTBF accounting.
+  Journal, measurement and Ethernet mechanisms remain approval items;
+  UART-only success is not standalone completion.
+  - [Current work sequence](factory-build-verified-install-approval.md#work-sequence-through-phase-1-completion)
+  - [Standalone acceptance gates](factory-build-verified-install-approval.md#mandatory-phase-1-ethernet-and-standalone-completion-gates)
+  - [Starting baseline](nfb1-starting-baseline.md) and
+    [Mallory fault reconciliation](nfb1-mallory-fault-reconciliation.md) —
+    historical investigation evidence, not completed Factory Build acceptance.
+
 - **[Two Namespace layouts and full-image reload](namespace-layouts-and-full-image-reload.md)** —
   one minimal baseline and one full development/test layout; complete stopped
   memory replacement, simulator-first evidence, no incremental loader required.
