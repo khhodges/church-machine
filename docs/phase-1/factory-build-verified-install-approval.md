@@ -378,6 +378,11 @@ Current design decision and superseded-draft record:
 Phase 1 uses the **saved Thread context**, not a separate 96-word dump object.
 Boot.Thread inspects that saved context. The earlier separate-dump register
 table, release interface and capture policy are superseded, not approved.
+Microcode primes Boot.Thread with both the existing GT of the Thread executing
+at the fault and its existing Namespace capability. No replacement GT
+or separate dump capability is introduced. Their receiving registers remain
+to be selected; these references are distinct from Boot.Thread's own active
+CR12 identity and Boot Namespace in live CR15.
 Define only the additional fault facts and faulting Namespace information
 not already retained by the saved context; their exact placement and
 Boot.Thread inspection authority remain review items.

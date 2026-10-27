@@ -19,6 +19,13 @@ system.
   still require definition.
 - Boot.Thread inspects the saved context under explicitly approved authority.
   A saved context is not permission to resume the denied instruction.
+- **Agreed references:** microcode primes Boot.Thread with both the existing
+  GT of the Thread executing at the fault and its existing Namespace capability.
+  Preserve those references rather than minting replacements or introducing
+  a separate dump capability. Pass them together; do not resolve the original
+  Thread's slot against Boot.
+  Boot.Thread's own CR12 remains its active Thread identity, distinct from
+  the supplied reference to the original Thread.
 - Treat a hard fault that blocks saving or CHANGE as a fault to diagnose
   and correct. Do not add retry/fallback machinery or claim a partial save
   is complete. The existing failure matrix remains a review checklist;
@@ -30,11 +37,12 @@ The user's PP250 experience is the rationale for expecting such blocking
 Thread hard faults to be few and readily diagnosed. This is an engineering
 expectation, not measured FPGA evidence or permission to omit failure tests.
 
-**Next register review:** replace CR1's proposed separate-dump binding with
-the agreed means of inspecting the saved Thread context; specify how the
-faulting Namespace and save outcome reach Boot.Thread. Do not invent a
-generic R capability over protected Thread state. The exact assignments
-remain unapproved.
+**Next register review:** assign receiving registers for the existing Thread
+GT and faulting Namespace capability (CR1 for the Thread is a candidate,
+not yet selected); specify how the save outcome reaches Boot.Thread and how
+the existing authority is used
+for inspection. Do not invent a generic R capability over protected Thread
+state or refresh the supplied GT. The exact assignments remain unapproved.
 
 The 96-word layout, COMPLETE-only entry rule, diagnostic-object authority,
 FAULT_RELEASE interface, single-slot capture policy and watchdog selection

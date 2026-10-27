@@ -55,6 +55,18 @@ authority; do not assume CR15 is already in Thread homes. Diagnose blocking
 hard faults before adding recovery machinery. The separate 96-word dump and
 its proposed release interface are superseded, not implementation authority.
 
+Boot.Thread is primed with both the existing GT of the Thread executing at
+the fault and its existing Namespace capability.
+
+**Why:** The user explicitly selected the existing Thread GT as the reference
+for the saved-context approach, then explicitly added “and Namespace.”
+
+**How to apply:** Carry that reference with its faulting Namespace association;
+do not mint a replacement, silently refresh it or invent a dump capability.
+Keep the references distinct from Boot.Thread's own CR12 and Boot Namespace
+in live CR15. The receiving registers and
+inspection interface still require agreement.
+
 Mint always primes a Thread with Amoeba (spelled Amobea in earlier notes).
 The supplied E-GT identifies the application abstraction Amoeba will start,
 not Amoeba itself or a routine Mint should call to format the Thread.
