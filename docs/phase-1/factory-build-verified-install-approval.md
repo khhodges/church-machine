@@ -375,6 +375,10 @@ its cause, not masking it with retries or recovery claims.
 
 Current design decision and superseded-draft record:
 [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md).
+The [minimal service-restoration sequence](boot-thread-fault-entry-proposal.md#proposed-minimal-service-restoration-sequence)
+now proposes one save attempt followed by validated Boot entry for either
+save outcome, then Mint/Amoeba clean-template execution. It is awaiting
+approval and is not an implementation or hardware acceptance claim.
 Phase 1 uses the **saved Thread context**, not a separate 96-word dump object.
 The context is remembered, not diagnosed as a prerequisite to restoring
 service. The earlier separate-dump register

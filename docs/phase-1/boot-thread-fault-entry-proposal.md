@@ -146,14 +146,126 @@ assert that the handoff succeeded or authorize a retry.
 
 ### Entry ordering and remaining review
 
-Retain original CR12/CR15 and the fault facts; perform the protected save
-attempt; prime the proposed registers; publish Boot Namespace, Boot.Thread
-ownership and handler entry without a second CHANGE save. Condition flags
-are proposed as zero. Entry NIA, fresh root-frame construction, ownership
-commit and safe partial-save handoff still require approval. Diagnostic
-inspection is no longer a prerequisite to this recovery contract.
+The concrete sequence below is the proposal for approval. Diagnostic inspection
+is not a prerequisite. Condition flags start at zero; handler entry is offset
+zero in the exact prepared executable, with a fresh canonical poison root
+and no return continuation into the failed application.
 Neither these tables nor the saved-context reference authorize resuming the
 denied instruction, changing Namespace versions or retrying the application.
+
+## Proposed minimal service-restoration sequence
+
+**Scope:** one fault-entry mechanism and one configured software recovery
+path. The same sequence handles complete, incomplete and failed saves; those
+outcomes change the remembered status, not the choice of recovery program.
+This is a proposal for approval, not RTL implementation or physical evidence.
+
+### Prepared inputs
+
+The approved image supplies exact Boot Namespace, Boot.Thread and recovery
+handler bindings. Boot's declared C-list supplies its existing authorized
+Mint/Amoeba and transaction-template references. The handler starts at
+program-relative word offset **0**, not an address or executable selected
+from the damaged context. No “latest revision” lookup occurs at recovery.
+
+Application configuration supplies the service's selected transaction template
+and its eligible application revision. A fault report identifies the incident;
+it is not authority to select arbitrary replacement code or grant capabilities.
+Missing or invalid recovery inputs cannot be silently substituted.
+
+### FPGA mechanism
+
+| Step | Required action | Completion or failure |
+| --- | --- | --- |
+| 1. Stop and remember | Block application instruction fetch/retirement. Retain original CR12 and CR15 plus fault code, issuer byte address and instruction word. Keep these small handoff latches independent of the attempted Thread save. | Do not allocate a duplicate register dump. The original fault is never replaced by a save error. |
+| 2. Settle memory activity | Allow already accepted operations to finish or fail; issue no further operation from the faulting instruction. Exclude conflicting writers during save and Boot entry. | A failed old operation does not authorize retry or imply rollback of earlier effects. An unquiesceable memory interface cannot safely prime Boot and reports recovery unavailable. |
+| 3. Attempt the protected Thread save once | Validate original Thread geometry and save using the existing private homes and canonical frame encoding. Do not run a CHANGE instruction. | Complete: DR3=1, DR5=0. Save error: stop further save requests, DR3=2 and actual secondary code in DR5, then proceed to Boot validation. No retry and no complete-save prerequisite. |
+| 4. Validate Boot inputs | Validate the configured Boot root, Thread, handler and C-list under existing authority/type/version/seal/bounds rules. Stage the incoming values without changing the root used for the original save. | Failed save geometry is not reused as Boot geometry. Stale Boot authority is not refreshed. Boot validation failure means recovery unavailable, not a fallback target. |
+| 5. Prime Boot | Initialize Boot.Thread's canonical poison-root/STO state; write the active register table, including original Thread in CR1, original Namespace in CR2 and save outcome in DR3/DR5. | Fetch stays blocked until all writes complete. Do not save the outgoing context again or rewrite its Namespace. Do not zero Boot's ordinary heap or erase retained incident records. |
+| 6. Commit and enter | Make Boot Namespace/root, Boot.Thread ownership, handler CR14 and handler NIA visible as one execution boundary. Handler NIA is its validated code origin, offset 0. | Release fetch only after successful priming. No CALL return frame to the application, no boot-ROM execution over the old application image, no bridge/IDE acknowledgement. |
+
+**Save layout, not a new format:** for Thread body size L words, DR homes
+are body words 1–16, protected STO/indicator is word 17, and CR0–CR11 GT
+homes are words L−12 through L−1, as defined by `shared/thread_design.json`.
+The saved executable/NIA use the existing two-word CHURCH frame; there is
+no extra executable-identity word. Derive stack limits from the actual header.
+For this fault capture, the saved relative NIA names the faulting instruction,
+not its successor; it is evidence and is never selected for service restart.
+Original CR12/CR15 travel in the handoff latches because they are not among
+those twelve serialized CR homes.
+
+DR3=0 is reserved for no complete save being established before an attempt
+can be made; it is not success. A rejected save setup uses DR3=2 when an
+actual save error is available. Do not invent a secondary numeric fault code.
+The normal CHANGE path and its continuation semantics remain unchanged.
+
+Boot's stack uses the existing poison-root encoding and geometry, not a
+second stack convention. Reinitializing this control context does not imply
+that the faulting Thread was defective or that the whole Namespace was reset.
+The proposed recovery-entry guard remains set until service handoff succeeds:
+a further fault during this mechanism or in Boot's recovery execution cannot
+recursively re-prime Boot. Preserve available evidence and report recovery
+unavailable; do not invent a second recovery system.
+
+### Software: remember, then restore service
+
+1. **Remember the event:** preserve the CR1/CR2 association, DR1–DR5, selected
+   revision/session attribution and available exposure checkpoint through the
+   approved local journal path. Mark absent information explicitly. No saved-
+   context inspection, forensic analysis or MTBF calculation is required.
+   Reporting to the IDE is asynchronous; network delivery is not a prerequisite.
+2. **Select the configured clean transaction:** use the already selected,
+   eligible template and application revision. Respect OFFLINE and caller
+   stop-polling decisions. Restoring service does not mean executing the
+   unchanged Mallory attack again.
+3. **Mint a fresh Thread:** Mint primes it with Amoeba; Amoeba initializes
+   the selected application transaction from its template and admitted inputs.
+   Do not copy a damaged continuation or mutable old stack into the new Thread.
+4. **Hand over through normal validated execution:** use the approved
+   Thread/Namespace mechanisms appropriate to the prepared target. Do not
+   resolve foreign Thread GTs against Boot's Namespace or assume that CHANGE
+   alone changes Namespace. The exact cross-Namespace return-to-service
+   sequence must be bound to the selected templates before RTL integration.
+5. **Confirm useful service:** completion of the template's defined useful
+   transaction is restoration evidence. A handler entry, successful Mint,
+   running badge or lack of another fault is not sufficient.
+
+Local retention failure must be reported as an evidence gap, not trigger a
+diagnostic loop or falsely claim the incident was durably saved. It must not
+be converted into a requirement to wait for the IDE. The persistence mechanism
+and its reset/power-loss guarantees remain part of the journal contract.
+Old contexts must not be silently freed or reused while referenced as evidence;
+their eventual release follows the approved lifecycle, not a new hardware
+garbage collector.
+
+A fresh Thread does not undo prior data writes or external effects. Each
+transaction template must declare a safe restart point and admitted persistent
+state; do not replay irreversible operations merely to demonstrate recovery.
+If an eligible template cannot initialize or the recovery path cannot run,
+service is unavailable. That result is not permission to bypass authority.
+
+### Acceptance for this sequence
+
+- Inject the same original fault with successful save, rejected save setup
+  and interrupted save. Where Boot inputs remain valid, all reach the same
+  configured handler and clean-template service path with truthful DR3/DR5.
+- Assert original CR12/CR15 survive as CR1/CR2, live CR12/CR15 identify Boot,
+  and no second outgoing save occurs. Check every register assignment.
+- Use distinct Boot/faulting Namespace roots with colliding slot numbers;
+  prove validation and later service handoff use the correct root.
+- Verify original Thread homes use canonical geometry, save failure never
+  publishes success, and ordinary CHANGE behavior is unchanged.
+- Inject Boot validation/priming and nested recovery failures: no partial
+  handler execution, recursive restart, substitute GT or false service claim.
+- Demonstrate useful service from an approved Mint/Amoeba template with the
+  IDE disconnected, without diagnosing or resuming the old context. Preserve
+  OFFLINE decisions and distinguish restored work from replayed external effects.
+
+**Approval boundary:** approve this sequence and active register table before
+implementation. Exact prepared identities, the journal interface, transaction
+restart contract, cross-Namespace service handoff and bus failure/timeout
+interface must be resolved for the chosen build. None may be silently inferred
+from the withdrawn separate-dump design below.
 
 The 96-word layout, COMPLETE-only entry rule, diagnostic-object authority,
 FAULT_RELEASE interface, single-slot capture policy and watchdog selection

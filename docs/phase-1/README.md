@@ -21,7 +21,9 @@
   - [Current work sequence](factory-build-verified-install-approval.md#work-sequence-through-phase-1-completion)
   - [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md) —
     current saved-Thread-context decision and superseded separate-dump draft;
-    revised register/inspection contract remains under review, not implemented RTL.
+    revised register and service-recovery contract remains under review, not implemented RTL.
+    Includes the proposed [minimal service-restoration sequence](boot-thread-fault-entry-proposal.md#proposed-minimal-service-restoration-sequence):
+    remember the event, enter Boot without a second save, restore clean service.
   - [Standalone acceptance gates](factory-build-verified-install-approval.md#mandatory-phase-1-ethernet-and-standalone-completion-gates)
   - [Starting baseline](nfb1-starting-baseline.md) and
     [Mallory fault reconciliation](nfb1-mallory-fault-reconciliation.md) —
