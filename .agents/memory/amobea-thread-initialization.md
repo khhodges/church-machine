@@ -19,7 +19,8 @@ Fault entry must bypass CHANGE's outgoing save and explicitly prime
 Boot.Thread's DRs and CRs. Microcode owns this priming under the KISS rule.
 
 **Ordering:** Prime Boot.Thread FIRST, before attempting to save the faulting
-Thread. Preserve the original live context while preparing the destination;
+Thread. Immediately stash the event directly into Boot.Thread without
+intermediate registers or a scratch event bank. Preserve the original live context while preparing the destination;
 after the save attempt, finalize outcome fields and activate the primed Boot
 context without a second CHANGE save.
 
@@ -30,7 +31,19 @@ must come first!” Boot readiness must not depend on a successful old-context s
 priming precedes outgoing save writes, preserves their source state, and
 survives save failure. Do not reintroduce save-first ordering in diagrams or
 microcode. If source and destination alias, do not overwrite the source and
-claim it was preserved; the safe mechanism must be explicitly defined.
+claim it was preserved.
+
+If Boot stash fails, catastrophic recovery loops indefinitely flashing an LED.
+Useful service is a programmer task, outside the FPGA fault-entry mechanism.
+
+**Why:** The user explicitly removed intermediate register storage, specified
+the endless LED-loop failure outcome and said to ignore useful service in
+this mechanism's design.
+
+**How to apply:** Do not reintroduce handoff latches, dump banks, service tests
+or template/journal design as prerequisites to this FPGA path. Preserve the
+separate Phase 1 Mint goals. The failure loop is not an application restart or
+repeated-stash policy; its indication must not depend on Boot code or the IDE.
 
 **Why:** The user specified this while reviewing successful/failed fault-context
 saves and Boot.Thread dump inspection. The handoff must not repeat the save.

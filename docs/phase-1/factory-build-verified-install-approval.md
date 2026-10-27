@@ -377,8 +377,11 @@ Current design decision and superseded-draft record:
 [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md).
 The [minimal service-restoration sequence](boot-thread-fault-entry-proposal.md#proposed-minimal-service-restoration-sequence)
 requires Boot.Thread priming first, then one outgoing save attempt and
-entry into the already-primed Boot context for either save outcome, then
-Mint/Amoeba clean-template execution. Detailed implementation is awaiting
+entry into the already-primed Boot context for either save outcome. Immediately
+on fault, stash directly into Boot.Thread without intermediate registers.
+A failed Boot stash enters an indefinite catastrophic-recovery loop flashing
+an LED. Useful service is the programmer's task, outside this FPGA mechanism.
+The wider Phase 1 Mint/template goals remain separate. Detailed implementation is awaiting
 approval and is not an implementation or hardware acceptance claim.
 Phase 1 uses the **saved Thread context**, not a separate 96-word dump object.
 The context is remembered, not diagnosed as a prerequisite to restoring
@@ -447,13 +450,14 @@ Abstraction fault; it does not declare the Thread itself defective.
 | 9. Reporting disconnected | Local handling succeeds but UART/Ethernet delivery is unavailable. | Retain evidence under the approved durability contract; reporting delay must not retry application execution. |
 | 10. Mint initialization fails | Authorized fresh-Thread creation cannot complete. | Retain the initialization failure; never execute partial state or silently resume the faulting continuation. |
 
-Required design order: retain the original fault facts; **prime Boot.Thread
-first**, preserving the outgoing live context; attempt its protected save
+Required design order: **immediately stash the event directly into Boot.Thread
+and prime it first**, with no intermediate event registers and without
+destroying the outgoing live context; attempt its protected save
 once and finalize the outcome fields; transfer to the already-primed Boot
-context **without CHANGE save**; remember the incident and restore clean
-service. Diagnosis is not a prerequisite.
-Capture failure, priming failure and nested faults need explicit outcomes.
-The minimum fault latch and diagnostic-save mechanism remain unresolved.
+context **without CHANGE save**. Useful-service restoration belongs to the
+programmer. Diagnosis is not a prerequisite. Failed Boot stash means an
+indefinite catastrophic LED-flashing loop, not a new event latch or another
+stash attempt. Direct-store and failure-detection timing remain to be specified.
 
 **Required outcome; detailed mechanism pending approval.** Fault evidence and
 reliability history must not depend on an open IDE browser or a continuously

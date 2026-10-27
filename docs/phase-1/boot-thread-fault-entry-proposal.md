@@ -2,6 +2,11 @@
 
 ## Current Phase 1 decision — saved Thread context
 
+**Required first action:** immediately on fault, microcode stashes the event
+directly into Boot.Thread's existing DR/CR homes. No intermediate registers,
+scratch event bank or separate dump object. If this Boot stash fails, enter
+an indefinite catastrophic-recovery loop flashing an LED.
+
 **Required ordering: prime Boot.Thread first, then attempt the faulting
 Thread save, then enter the already-primed Boot.Thread without CHANGE save.**
 Priming prepares the destination context; it must not destroy the original
@@ -13,14 +18,14 @@ recovery: remember the event, then restore service. Do not diagnose the old
 context as a prerequisite to recovery. This supersedes diagnostic-first
 dispositions in the earlier review matrix, not capability enforcement.
 
-Use the configured Boot entry and Mint/Amoeba application-transaction templates
-to establish clean service execution. Retain available original and secondary
+Useful service restoration is a programmer task, outside this FPGA mechanism.
+Its successful endpoint is entry into the configured Boot.Thread with the
+stashed event, not proof of an application transaction. Retain original and secondary
 fault facts and mark missing/incomplete context honestly. No separate dump,
 forensic reconstruction, IDE response or MTBF calculation gates recovery.
-The exact safe entry/commit sequence still needs definition; a service-restoration
-objective is not proof that failed priming succeeded. If the configured
-recovery path cannot execute, report recovery unavailable rather than inventing
-authority, recursively retrying or claiming restored service.
+The exact safe entry/commit sequence still needs implementation definition.
+Failed Boot stash means the indefinite LED-flashing catastrophic loop, not
+another stash attempt, alternate target or falsely claimed successful entry.
 
 **The separate dump design below is superseded.** Phase 1 uses the saved
 Thread context as retained evidence. Do not require Boot.Thread to inspect it
@@ -164,41 +169,49 @@ denied instruction, changing Namespace versions or retrying the application.
 
 ## Proposed minimal service-restoration sequence
 
-**Scope:** one fault-entry mechanism and one configured software recovery
-path. The same sequence handles complete, incomplete and failed saves; those
+**Scope:** direct Boot stash, one outgoing save attempt and Boot entry, or
+the catastrophic LED loop. Useful service and application recovery are
+programmer responsibilities, not gates for this FPGA mechanism.
+The same sequence handles complete, incomplete and failed saves; those
 outcomes change the remembered status, not the choice of recovery program.
 This is a proposal for approval, not RTL implementation or physical evidence.
 
 ### Prepared inputs
 
 The approved image supplies exact Boot Namespace, Boot.Thread and recovery
-handler bindings. Boot's declared C-list supplies its existing authorized
-Mint/Amoeba and transaction-template references. The handler starts at
+handler bindings. Application capabilities are programmer-supplied, not
+selected by microcode. The handler starts at
 program-relative word offset **0**, not an address or executable selected
 from the damaged context. No “latest revision” lookup occurs at recovery.
 
-Application configuration supplies the service's selected transaction template
-and its eligible application revision. A fault report identifies the incident;
-it is not authority to select arbitrary replacement code or grant capabilities.
-Missing or invalid recovery inputs cannot be silently substituted.
+Boot's stash destination must be established by the admitted machine
+configuration before application execution. The event is written directly
+from its existing source signals/registers while execution is held; do not
+copy it into newly introduced intermediate registers. The actual source
+stability and bus handshake must be proven by RTL tests.
 
 ### FPGA mechanism
 
 | Step | Required action | Completion or failure |
 | --- | --- | --- |
-| 1. Stop and remember | Block application instruction fetch/retirement. Retain original CR12 and CR15 plus fault code, issuer byte address and instruction word. Keep these small handoff latches independent of the attempted Thread save. | Do not allocate a duplicate register dump. The original fault is never replaced by a save error. |
-| 2. Settle memory activity | Allow already accepted operations to finish or fail; issue no further operation from the faulting instruction. Exclude conflicting writers during save and Boot entry. | A failed old operation does not authorize retry or imply rollback of earlier effects. An unquiesceable memory interface cannot safely prime Boot and reports recovery unavailable. |
-| 3. Validate Boot inputs | Validate the configured Boot root, Thread, handler and C-list under existing authority/type/version/seal/bounds rules. Preserve the original live context. | No outgoing save is attempted before Boot is ready. Stale Boot authority is not refreshed. Boot validation failure means recovery unavailable, not a fallback target. |
-| 4. Prime Boot FIRST | Prepare Boot.Thread's destination register context and canonical root/STO entry state, with original Thread in CR1, original Namespace in CR2, DR3=0 and DR5=0. Keep the original live registers and root intact for saving. | Boot priming must complete before the first outgoing save write. Fetch remains blocked. Do not zero Boot's ordinary heap or erase retained incidents. Priming is preparation, not activation. |
-| 5. Attempt the protected Thread save once | Validate original Thread geometry and save using its existing private homes and canonical frame encoding. Do not run CHANGE. | Complete: finalize the primed DR3=1, DR5=0. Save error: stop further save requests, finalize DR3=2 and the actual secondary code in DR5. Proceed to the already-primed Boot context without retry, re-priming or a complete-save prerequisite. |
-| 6. Commit and enter | Activate the primed register context and publish Boot Namespace/root, Boot.Thread ownership, handler CR14 and handler NIA as one execution boundary. Handler NIA is its validated code origin, offset 0. | No second outgoing save. No CALL return frame to the application, old-image boot-ROM execution or bridge/IDE acknowledgement. Release fetch only after the prepared context and final status are installed successfully. |
+| 1. Stash directly into Boot FIRST | On fault, hold application execution and directly write the event into Boot.Thread homes: original CR12 GT to CR1, original CR15 GT to CR2, and original fault facts to the proposed DR homes, initially DR3=0 and DR5=0. | No intermediate register store and no outgoing save first. Any failed Boot stash enters the indefinite catastrophic LED loop. Bus serialization must preserve source stability and exclude conflicting writes; it is not an earlier diagnostic/capture stage. |
+| 2. Finish Boot priming | Prepare the configured entry/root state and remaining destination register values under normal authority checks. Keep original live context intact until its save attempt. | No live root change or application execution yet. Failure to complete Boot priming enters the catastrophic LED loop; no substitute GT or silent refresh. |
+| 3. Attempt the protected Thread save once | Save under the original Thread/Namespace using existing homes and frame encoding; do not run CHANGE. | Finalize Boot DR3/DR5 directly: complete = 1/0; failed = 2/actual secondary code. No retry or second priming pass. If this Boot status write fails, use the catastrophic LED loop. |
+| 4. Enter Boot | Activate the primed context and publish Boot Namespace/root, Boot.Thread ownership and configured handler entry as one execution boundary. | No second CHANGE save or IDE acknowledgement. Successful Boot entry completes this FPGA mechanism. Failed entry must not execute a partially primed context. |
+
+**Catastrophic loop:** remain indefinitely in the machine-controlled failure
+loop with an LED flashing. Do not depend on functioning Boot memory, a Church
+program, UART, Ethernet or the IDE to sustain the indication. No repeated
+stash, program restart or recovery target selection is implied by “loop.”
+The board LED assignment and blink timing must be fixed for the selected
+build; reset/power removal is external to this non-terminating path.
 
 Primed destination storage and the outgoing save region must be distinct and
 protected from each other's writes. Use Boot.Thread's normal destination
 context/entry machinery, not a duplicate fault dump. If the faulting context
 is Boot.Thread itself or overlaps that destination, this sequence must not
-overwrite the source to pretend it saved it: retain the defined unavailable/
-nested-fault boundary until an explicit safe mechanism is approved.
+overwrite the source to pretend it saved it: if the direct stash cannot be
+completed safely, take the catastrophic LED loop.
 The detailed staging implementation must preserve these ordering invariants.
 
 **Save layout, not a new format:** for Thread body size L words, DR homes
@@ -208,8 +221,8 @@ The saved executable/NIA use the existing two-word CHURCH frame; there is
 no extra executable-identity word. Derive stack limits from the actual header.
 For this fault capture, the saved relative NIA names the faulting instruction,
 not its successor; it is evidence and is never selected for service restart.
-Original CR12/CR15 travel in the handoff latches because they are not among
-those twelve serialized CR homes.
+Original CR12/CR15 GTs are stashed directly into Boot.Thread's CR1/CR2 homes
+because they are not among those twelve outgoing serialized CR homes.
 
 DR3=0 is reserved for no complete save being established before an attempt
 can be made; it is not success. A rejected save setup uses DR3=2 when an
@@ -219,12 +232,16 @@ The normal CHANGE path and its continuation semantics remain unchanged.
 Boot's stack uses the existing poison-root encoding and geometry, not a
 second stack convention. Reinitializing this control context does not imply
 that the faulting Thread was defective or that the whole Namespace was reset.
-The proposed recovery-entry guard remains set until service handoff succeeds:
-a further fault during this mechanism or in Boot's recovery execution cannot
-recursively re-prime Boot. Preserve available evidence and report recovery
-unavailable; do not invent a second recovery system.
+Do not recursively enter fault priming when the stash/priming mechanism fails;
+take the catastrophic LED loop. Application behavior after successful Boot
+entry is outside this FPGA proposal.
 
-### Software: remember, then restore service
+### Programmer responsibilities — outside this FPGA mechanism
+
+The following software outline is context only, not a required implementation
+or acceptance gate for this fault-entry mechanism. Useful service is the
+programmer's responsibility. Phase 1's separately agreed Mint/template and
+reporting goals remain separate work; they must not delay defining this path.
 
 1. **Remember the event:** preserve the CR1/CR2 association, DR1–DR5, selected
    revision/session attribution and available exposure checkpoint through the
@@ -264,12 +281,15 @@ service is unavailable. That result is not permission to bypass authority.
 ### Acceptance for this sequence
 
 - Prove Boot priming completes before any outgoing Thread-save write.
+  Prove the first event storage is Boot.Thread itself, with no intermediate
+  event registers or scratch snapshot bank. Exercise source stability during
+  memory stalls and delayed-instruction faults.
   Check the original live context remains unchanged by priming and that a
   save error cannot overwrite or invalidate the prepared Boot context.
   Only outcome fields are finalized after saving; no second priming pass.
 - Inject the same original fault with successful save, rejected save setup
   and interrupted save. Where Boot inputs remain valid, all reach the same
-  configured handler and clean-template service path with truthful DR3/DR5.
+  configured handler with truthful DR3/DR5.
 - Assert original CR12/CR15 survive as CR1/CR2, live CR12/CR15 identify Boot,
   and no second outgoing save occurs. Check every register assignment.
 - Use distinct Boot/faulting Namespace roots with colliding slot numbers;
@@ -278,14 +298,17 @@ service is unavailable. That result is not permission to bypass authority.
   publishes success, and ordinary CHANGE behavior is unchanged.
 - Inject Boot validation/priming and nested recovery failures: no partial
   handler execution, recursive restart, substitute GT or false service claim.
-- Demonstrate useful service from an approved Mint/Amoeba template with the
-  IDE disconnected, without diagnosing or resuming the old context. Preserve
-  OFFLINE decisions and distinguish restored work from replayed external effects.
+- Inject each Boot-stash write failure and failure to complete: prove entry
+  into the indefinite catastrophic loop, continuous LED flashing, no dependence
+  on a running application/IDE and no repeated stash or application execution.
+- Verify successful Boot entry with UART/IDE disconnected. Useful application
+  service is not an acceptance gate for this FPGA mechanism.
 
 **Approval boundary:** approve this sequence and active register table before
-implementation. Exact prepared identities, the journal interface, transaction
-restart contract, cross-Namespace service handoff and bus failure/timeout
-interface must be resolved for the chosen build. None may be silently inferred
+implementation. Exact prepared Boot identities, direct-store source stability,
+bus failure/timeout detection and LED mapping/timing must be resolved for the
+chosen build. Journal and application service design are not prerequisites
+for this mechanism. None may be silently inferred
 from the withdrawn separate-dump design below.
 
 The 96-word layout, COMPLETE-only entry rule, diagnostic-object authority,

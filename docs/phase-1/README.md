@@ -23,8 +23,9 @@
     current saved-Thread-context decision and superseded separate-dump draft;
     revised register and service-recovery contract remains under review, not implemented RTL.
     Includes the proposed [minimal service-restoration sequence](boot-thread-fault-entry-proposal.md#proposed-minimal-service-restoration-sequence):
-    prime Boot first, attempt the old Thread save, enter Boot without a second
-    save, then restore clean service.
+    stash directly into Boot first without intermediate registers, attempt the
+    old Thread save, then enter Boot without a second save. Failed Boot stash
+    loops indefinitely flashing an LED; useful service is programmer-owned.
   - [Standalone acceptance gates](factory-build-verified-install-approval.md#mandatory-phase-1-ethernet-and-standalone-completion-gates)
   - [Starting baseline](nfb1-starting-baseline.md) and
     [Mallory fault reconciliation](nfb1-mallory-fault-reconciliation.md) —
