@@ -81,8 +81,10 @@ Only finite sequencing state is needed, not a general elapsed-time watchdog.
 Outgoing context saves also require real completion, not the tied-high signal.
 A failed outgoing save stops once and finalizes Boot DR3/DR5; failure of that
 status store is a Boot failure and takes the LED loop. Preserve existing numeric
-save errors; selecting a new memory-interface error code requires an explicit
-fault-code decision, not an invented constant.
+save errors. The user subsequently approved **THREAD_CONTEXT (0x1D)** for
+outgoing-save memory failures (missed grant/completion). This does not assign
+a new code or widen the fault interface. Boot stash/status/activation failures
+still take the catastrophic outcome.
 
 **Detection limit:** grant checks detect control/ownership failures; readback
 detects a wrong stored value at that check. Neither proves immunity to common-mode
