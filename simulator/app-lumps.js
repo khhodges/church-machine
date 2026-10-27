@@ -2513,6 +2513,10 @@ function _formatCanonicalSavedLumpWords(words, details) {
                 .decode(bytes.subarray(0, byteLength)));
             if (!decodedDefinition || typeof decodedDefinition !== 'object' ||
                     Array.isArray(decodedDefinition)) throw new Error('definition is not a JSON object');
+            if (decodedDefinition.methods && !Array.isArray(decodedDefinition.methods)) {
+                if (!window.LumpApiCodec) throw new Error('Compact API decoder unavailable');
+                decodedDefinition = window.LumpApiCodec.expand(decodedDefinition, words);
+            }
             embedded = decodedDefinition;
             definitionStatus = 'PetNames below are decoded from this binary’s embedded definition.';
         } catch (error) {

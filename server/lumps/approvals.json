@@ -4384,6 +4384,92 @@
         "signature": "3856720551c4edf7799752e011bf685b9e71ab489972e9500f61c0042b2c011d"
       },
       "identity_hash": "8bab4488e3189b64ec248dfa557f16d76be99790db09c8376d093eb7fee867c1"
+    },
+    "0f8bc28aaebe1413508e14c5023466048a1359fc5689ea845bc8381559c12fb6": {
+      "binary_hash": "0f8bc28aaebe1413508e14c5023466048a1359fc5689ea845bc8381559c12fb6",
+      "dot_name": "ide.AmoebaStartup",
+      "issue_n": 1,
+      "abstraction": "ide.AmoebaStartup",
+      "filename": "ide.AmoebaStartup.1.6695f7d8.lump",
+      "compiled_at": 1793141872.8382025,
+      "portable_binding": {
+        "calls": [
+          {
+            "word_offset": 3,
+            "full_name": "ide.CapabilityTest",
+            "row": 1,
+            "source_line": 26,
+            "condition": 14
+          }
+        ],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.CapabilityTest",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.ActorManager",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread2",
+            "rights": [],
+            "relocation_row": 3,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.AmoebaStartup",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "0f8bc28aaebe1413508e14c5023466048a1359fc5689ea845bc8381559c12fb6",
+        "source_hash": "418e290b40f5598351108cae30510040b8a5fb093138a9b0da0b4ed1b438c269",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "0be3e99d6e13193d3811a6dddb65669e655dca2ce457fb1b088b982b21b9a63f",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "bcceaf675d44bed0708c231acb4123a709c27c38012bc9898395037462f30c67"
+      },
+      "identity_hash": "ba1427c1973e591cf4956427bec9aaa336a9cfc8a7460adacca980be7e5fb543"
     }
   }
 }
