@@ -8,6 +8,18 @@ and approve bitstreams. These role names supersede the older Builder/system
 engineer terminology below. Hardware flashing remains a separate explicit action.
 Do not combine these into one implicit Save/Prepare/Run/Flash workflow.
 
+For the proposed combined hardware-check, image-install, readback-verification,
+and explicit-start flow, the user requires the operator interface to be only
+the published IDE at lab.cloomc.org.
+
+**Why:** The user clarified “Just the published IDE at lab.cloomc.org” when
+discussing JTAG-free routine image replacement.
+
+**How to apply:** Keep routine operator steps in the published IDE, with board
+communication handled by the bridge. Distinguish the prerequisite firmware
+upgrade from routine image installation; this requirement does not authorize
+physical flashing or establish that readback is already supported.
+
 Each role must be able to work concurrently against exact approved upstream
 deliverables without changing another role's approved outputs. A new LUMP does
 not automatically replace a Namespace selection; a Namespace edit does not
