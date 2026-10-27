@@ -373,15 +373,21 @@ its cause, not masking it with retries or recovery claims.
 
 #### Fault entry into Boot.Thread — CHANGE save bypass
 
-Concrete design for approval:
+Current design decision and superseded-draft record:
 [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md).
-Its register assignments, single-incident policy and terminal failure choices
-are proposed, not yet approved or implemented.
+Phase 1 uses the **saved Thread context**, not a separate 96-word dump object.
+Boot.Thread inspects that saved context. The earlier separate-dump register
+table, release interface and capture policy are superseded, not approved.
+Define only the additional fault facts and faulting Namespace information
+not already retained by the saved context; their exact placement and
+Boot.Thread inspection authority remain review items.
 
 **Agreed direction:** the fault handoff bypasses CHANGE's outgoing-context
-save and explicitly primes Boot.Thread's DRs and CRs. A separate attempt to
-save the faulting Thread's diagnostic context is not the CHANGE save and
-must not be repeated implicitly during handoff.
+save and explicitly primes Boot.Thread's DRs and CRs. The faulting Thread's
+protected context-save attempt precedes this handoff; it must not be repeated
+implicitly by CHANGE. In the matrix below, “dump” means this saved Thread
+context, not a separate diagnostic object. Hard faults blocking save/CHANGE
+must be diagnosed and corrected, not hidden by speculative recovery machinery.
 
 **Agreed ownership and KISS rule:** microcode primes Boot.Thread's DRs and
 CRs for this fault entry. Keep this a minimal, deterministic mechanism using

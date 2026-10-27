@@ -1,5 +1,53 @@
 # Boot.Thread fault entry — FPGA approval proposal
 
+## Current Phase 1 decision — saved Thread context
+
+**The separate dump design below is superseded.** Phase 1 uses the saved
+Thread context for Boot.Thread inspection. Start with that mechanism and
+evaluate actual failures before adding another capture format or recovery
+system.
+
+- Save the faulting Thread's context through the defined protected save path.
+  Do not introduce a second 96-word diagnostic object or duplicate register
+  bank for this proposal.
+- Microcode primes Boot.Thread's DRs/CRs and enters the Boot Namespace.
+  This handoff bypasses CHANGE's outgoing save: it must not save the same
+  context again.
+- Remember the faulting Namespace before replacing live CR15. Existing
+  Thread homes must not be assumed to contain CR15 or every fault fact:
+  the exact minimal retained fault/Namespace information and its placement
+  still require definition.
+- Boot.Thread inspects the saved context under explicitly approved authority.
+  A saved context is not permission to resume the denied instruction.
+- Treat a hard fault that blocks saving or CHANGE as a fault to diagnose
+  and correct. Do not add retry/fallback machinery or claim a partial save
+  is complete. The existing failure matrix remains a review checklist;
+  exact incomplete-save handling is not yet approved.
+- Preserve the original fault history, OFFLINE decisions and normal Mint/
+  Amoeba template-based new-Thread initialization requirements.
+
+The user's PP250 experience is the rationale for expecting such blocking
+Thread hard faults to be few and readily diagnosed. This is an engineering
+expectation, not measured FPGA evidence or permission to omit failure tests.
+
+**Next register review:** replace CR1's proposed separate-dump binding with
+the agreed means of inspecting the saved Thread context; specify how the
+faulting Namespace and save outcome reach Boot.Thread. Do not invent a
+generic R capability over protected Thread state. The exact assignments
+remain unapproved.
+
+The 96-word layout, COMPLETE-only entry rule, diagnostic-object authority,
+FAULT_RELEASE interface, single-slot capture policy and watchdog selection
+below are withdrawn from the active Phase 1 proposal. They are retained only
+to explain the earlier review, not as implementation requirements.
+No RTL change, hardware programming or activation is authorized.
+
+## Superseded draft — historical review only
+
+**Everything below describes the superseded separate-dump proposal.**
+Its references to “approval requested” and register assignments are historical,
+not a current request to approve that design.
+
 **Status: proposed for design approval, not implemented.** The user has agreed
 that microcode primes Boot.Thread's DRs/CRs, bypassing CHANGE's outgoing save
 under the KISS rule. The concrete assignments below are new proposals.

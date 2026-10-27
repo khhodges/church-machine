@@ -42,6 +42,19 @@ Resolve destination bindings against Boot, retain original Namespace/Thread/
 executable attribution, and never reinterpret fault evidence using Boot slots.
 This correction does not approve the rest of the proposed register ABI.
 
+Phase 1 fault inspection uses the saved Thread context, not a separate
+diagnostic dump object or duplicated register snapshot.
+
+**Why:** The user chose to see how far saved context takes Phase 1, citing
+PP250 experience that Thread hard faults blocking CHANGE should be few and
+easy to locate. This is a design rationale, not measured FPGA reliability.
+
+**How to apply:** Keep microcode Boot.Thread priming and bypass the second
+CHANGE save. Define minimal missing fault/Namespace evidence and inspection
+authority; do not assume CR15 is already in Thread homes. Diagnose blocking
+hard faults before adding recovery machinery. The separate 96-word dump and
+its proposed release interface are superseded, not implementation authority.
+
 Mint always primes a Thread with Amoeba (spelled Amobea in earlier notes).
 The supplied E-GT identifies the application abstraction Amoeba will start,
 not Amoeba itself or a routine Mint should call to format the Thread.
