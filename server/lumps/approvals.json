@@ -4242,6 +4242,80 @@
         "signature": "d1ca30ac75674e737f48c7c2b834770bc518e5acdbaf4defa4531a94612fc86e"
       },
       "identity_hash": "e34d95a87b1d5de3ea01d7c44b37f0801dbe44b7ff791d2a976640f61157e97e"
+    },
+    "d7e8d3eed63a3346dd51eed9f45323e539b487702d029b74bf1970a2bec3c336": {
+      "binary_hash": "d7e8d3eed63a3346dd51eed9f45323e539b487702d029b74bf1970a2bec3c336",
+      "dot_name": "ide.WukongCallHome",
+      "issue_n": 1,
+      "abstraction": "ide.WukongCallHome",
+      "filename": "ide.WukongCallHome.1.4d2dd0b2.lump",
+      "compiled_at": 1793129963.5844676,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.LED_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.UART_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.WukongCallHome",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "d7e8d3eed63a3346dd51eed9f45323e539b487702d029b74bf1970a2bec3c336",
+        "source_hash": "8c077db07ebc417477ebc5a5d3190a2e0cc278031e7d63a3d4aee19e6d21f7e7",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "520946a112517f128efea815fb49af01b74e316d0aecc889461325b92f4afe3f",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "5071c32c4714639c01d9335afdc002244cb8a5335a2cfe7af004d31ce99d20a3"
+      },
+      "identity_hash": "d99a2bc1bdf8f9315bb31b192448055368b56b8bb02f45b956bd0e703a9ca803"
     }
   }
 }
