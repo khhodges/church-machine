@@ -3,6 +3,19 @@ name: Fault snapshot reboot correlation
 description: Automatic hardware recovery must wait for a durably promoted snapshot correlated to the exact fault event.
 ---
 
+The Factory Build review must define why and how fault evidence and reliability
+exposure cross reboot, including IDE updates without a direct connection and
+Ethernet delivery options.
+
+**Why:** The user explicitly added reboot information handoff and disconnected
+IDE reporting to the reliability discussion.
+
+**How to apply:** Distinguish retaining evidence from authorizing reboot or
+resumption. Evaluate bridge-mediated versus board-native Ethernet delivery;
+neither transport selection nor a new persistence mechanism is approved yet.
+Preserve incident identity across retransmission and distinguish CPU reset,
+FPGA reconfiguration, and power loss when specifying retention.
+
 When a hardware fault triggers an automatic reboot, the bridge must not treat
 an HTTP success for the snapshot transport as permission to reset. It must wait
 for server confirmation that the complete snapshot was promoted as Last Fault
