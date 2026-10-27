@@ -7,6 +7,18 @@ Run Alice and Mallory in different Threads for the protection demonstration.
 The user confirmed priming each Thread's respective actor entry capability
 in CR1, not the protected object's capability.
 
+The Factory Build must demonstrate both Thread-GT and callable-Abstraction-GT
+cases, not choose one: the Mallory attack and the
+CapabilityTest/SelfTest/CallHome loop respectively.
+
+**Why:** When asked to choose between the two arrangements, the user explicitly
+required both demonstrations.
+
+**How to apply:** Keep their context ownership, exact bindings, and turn
+contracts separate for approval. Preserve separate actor Threads and the
+CapabilityTest-owned CALL/RETURN loop; do not infer new boot CR0 authority
+or a fault-continuation ABI from this scope decision.
+
 The error case is **one RW data object in Mallory**, with the instruction at
 error pinpointed.
 

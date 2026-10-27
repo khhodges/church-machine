@@ -144,13 +144,25 @@ The next Factory Build must include both options in the same approved image.
 Amobea owns their round-robin control; the IDE must not alternate them through
 host-timed commands, and hardware must not substitute unrelated target choices.
 
+**Both GT-use cases must be demonstrated; they are not alternatives.**
+
+| Demonstration | Required distinction |
+| --- | --- |
+| Mallory attack | Thread-GT scheduling between the separate Alice and Mallory Threads; preserve each actor entry GT in its own Thread's CR1. Mallory remains the faulted Abstraction, not a disabled Thread. |
+| CapabilityTest/SelfTest/CallHome loop | Callable-Abstraction GT use with CALL/RETURN. CapabilityTest calls SelfTest and WukongCallHome, which return to CapabilityTest. Preserve the loop's CHANGE coverage; this case is not evidence of switching between the two actor Threads. |
+
+Keep each case's register context, GT type, selected revisions, and execution
+evidence distinct. Demonstrating both does not authorize repurposing the boot
+Thread's prepared CR0 or imply that the same CR0/CR1 values serve both cases.
+SelfTest does not gain a Next capability; the caller owns its loop.
+
 The requested CR0/CR1 GT arrangement is required. Exact binding and scheduling
-details must be approved before implementation:
+details for each case must be approved before implementation:
 
 | Approval item | Required selection |
 | --- | --- |
-| CR0 target | Exact selected LightningBolt abstraction/revision: **unresolved** |
-| CR1 target | Exact selected LightningBolt abstraction/revision: **unresolved** |
+| CR0 target | Per-case GT type, exact target and selected revision: **unresolved** |
+| CR1 target | Per-case GT type, exact target and selected revision: **unresolved** |
 | Register/context ownership | Specify whose CR0/CR1 contain the two GTs and how existing startup and application bindings are preserved. |
 | Turn boundary | Specify the approved completion, yield, or scheduling event that advances Amobea to the other target. |
 | First turn | Specify initial target and fresh-start/reset behavior. |
@@ -451,6 +463,10 @@ Before a candidate build is accepted:
 - Exact-image tests cover immutable revision selection and byte order.
 - Amobea tests demonstrate the approved two-target turn sequence and GT
   bindings without bypassing normal runtime authority checks.
+- Retain separate evidence for Thread-GT scheduling in the Mallory attack
+  demonstration and callable-Abstraction CALL/RETURN in the
+  CapabilityTest/SelfTest/WukongCallHome loop. Neither substitutes for the other.
+  Identify the owning register context and actual targets in both cases.
 - Change a destination slot version between turns and prove that a retained
   CR0/CR1 GT is rejected on use without silent refresh or a check/use race.
 - Match the displayed fault code, reason, instruction, and object to the
