@@ -51,9 +51,22 @@ easy to locate. This is a design rationale, not measured FPGA reliability.
 
 **How to apply:** Keep microcode Boot.Thread priming and bypass the second
 CHANGE save. Define minimal missing fault/Namespace evidence and inspection
-authority; do not assume CR15 is already in Thread homes. Diagnose blocking
-hard faults before adding recovery machinery. The separate 96-word dump and
+authority; do not assume CR15 is already in Thread homes. The separate 96-word dump and
 its proposed release interface are superseded, not implementation authority.
+
+Treat the fault/save/handoff cases as catastrophic recovery: remember the
+event, then restore service rather than diagnosing the saved context first.
+
+**Why:** The user explicitly changed the priority: “remembered but not
+diagnosed the objective is to recover service not contemplate the past.”
+
+**How to apply:** Use the configured Boot and Mint/Amoeba transaction-template
+path, keeping available fault/save facts. Do not gate service restoration on
+forensics, IDE response or MTBF calculation. Preserve capability checks and
+OFFLINE restrictions; incomplete capture is not complete evidence. Define safe
+entry mechanics without inventing recursive retry or claiming success if the
+recovery path itself is unavailable. This supersedes diagnostic-first review
+dispositions, not the original instruction's hard fault.
 
 Keep the original Abstraction fault separate from a secondary context-save
 failure; “Faulting Thread” identifies the executing context, not necessarily

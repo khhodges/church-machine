@@ -376,7 +376,8 @@ its cause, not masking it with retries or recovery claims.
 Current design decision and superseded-draft record:
 [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md).
 Phase 1 uses the **saved Thread context**, not a separate 96-word dump object.
-Boot.Thread inspects that saved context. The earlier separate-dump register
+The context is remembered, not diagnosed as a prerequisite to restoring
+service. The earlier separate-dump register
 table, release interface and capture policy are superseded, not approved.
 Microcode primes Boot.Thread with both the existing GT of the Thread executing
 at the fault and its existing Namespace capability. No replacement GT
@@ -393,8 +394,11 @@ Boot.Thread inspection authority remain review items.
 save and explicitly primes Boot.Thread's DRs and CRs. The faulting Thread's
 protected context-save attempt precedes this handoff; it must not be repeated
 implicitly by CHANGE. In the matrix below, “dump” means this saved Thread
-context, not a separate diagnostic object. Hard faults blocking save/CHANGE
-must be diagnosed and corrected, not hidden by speculative recovery machinery.
+context, not a separate diagnostic object. Treat these cases as catastrophic
+recovery: remember the event and restore service through the configured Boot
+path and Mint/Amoeba transaction templates. Diagnosis, IDE reporting and MTBF
+calculation must not gate restoration. Do not resume the denied instruction,
+revive OFFLINE code or claim incomplete evidence is complete.
 
 **Agreed ownership and KISS rule:** microcode primes Boot.Thread's DRs and
 CRs for this fault entry. Keep this a minimal, deterministic mechanism using
@@ -415,8 +419,12 @@ does not bypass destination capability validation or authorize new GTs.
 Boot.Thread priming must not inherit arbitrary application authority.
 Normal prepared boot behavior remains separate from this fault-entry path.
 
-The following matrix is a proposed disposition review, not implemented
-recovery. “Faulting Thread” identifies the execution context of the
+The following matrix retains earlier case descriptions for test coverage;
+its diagnostic-first dispositions are superseded by the common catastrophic
+recovery policy above. No separate diagnostic workflow is required per row.
+Actual safe entry/commit and behavior if the recovery path itself is unavailable
+still need specification; neither a safety-check bypass nor successful
+restoration is implied. “Faulting Thread” identifies the execution context of the
 Abstraction fault; it does not declare the Thread itself defective.
 
 | Case | Diagnostic save and inspection | Boot.Thread entry and disposition |

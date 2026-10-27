@@ -2,10 +2,23 @@
 
 ## Current Phase 1 decision — saved Thread context
 
+**Current recovery policy:** treat the fault/save/handoff cases as catastrophic
+recovery: remember the event, then restore service. Do not diagnose the old
+context as a prerequisite to recovery. This supersedes diagnostic-first
+dispositions in the earlier review matrix, not capability enforcement.
+
+Use the configured Boot entry and Mint/Amoeba application-transaction templates
+to establish clean service execution. Retain available original and secondary
+fault facts and mark missing/incomplete context honestly. No separate dump,
+forensic reconstruction, IDE response or MTBF calculation gates recovery.
+The exact safe entry/commit sequence still needs definition; a service-restoration
+objective is not proof that failed priming succeeded. If the configured
+recovery path cannot execute, report recovery unavailable rather than inventing
+authority, recursively retrying or claiming restored service.
+
 **The separate dump design below is superseded.** Phase 1 uses the saved
-Thread context for Boot.Thread inspection. Start with that mechanism and
-evaluate actual failures before adding another capture format or recovery
-system.
+Thread context as retained evidence. Do not require Boot.Thread to inspect it
+before restoring service.
 
 - Save the faulting Thread's context through the defined protected save path.
   Do not introduce a second 96-word diagnostic object or duplicate register
@@ -17,8 +30,8 @@ system.
   Thread homes must not be assumed to contain CR15 or every fault fact:
   the exact minimal retained fault/Namespace information and its placement
   still require definition.
-- Boot.Thread inspects the saved context under explicitly approved authority.
-  A saved context is not permission to resume the denied instruction.
+- Any later inspection uses explicitly approved authority. A saved context
+  is not permission to resume the denied instruction.
 - **Agreed references:** microcode primes Boot.Thread with both the existing
   GT of the Thread executing at the fault and its existing Namespace capability.
   Preserve those references rather than minting replacements or introducing
@@ -26,10 +39,11 @@ system.
   Thread's slot against Boot.
   Boot.Thread's own CR12 remains its active Thread identity, distinct from
   the supplied reference to the original Thread.
-- Treat a hard fault that blocks saving or CHANGE as a fault to diagnose
-  and correct. Do not add retry/fallback machinery or claim a partial save
-  is complete. The existing failure matrix remains a review checklist;
-  exact incomplete-save handling is not yet approved.
+- A fault blocking save or CHANGE is remembered as part of catastrophic
+  recovery, not a reason to diagnose the past before restoring service.
+  Do not retry the failed save or claim a partial save is complete.
+  The matrix remains a failure-injection checklist, not separate diagnostic
+  workflows. Exact safe entry after incomplete saving still requires definition.
 - Preserve the original fault history, OFFLINE decisions and normal Mint/
   Amoeba template-based new-Thread initialization requirements.
 
@@ -62,8 +76,8 @@ These tables replace the separate-dump register table in the historical draft.
 CR1 and CR2 are a pair: do not interpret CR1's slot against live CR15.
 Preserving the existing GT does not make a stale capability valid, expand
 permissions, or authorize unrestricted access to protected Thread homes.
-The exact checked inspection operation using this pair must be specified
-before implementation. Capture existing references before priming; do not
+Any later inspection operation must respect this pair and existing protection;
+it is not a prerequisite to service restoration. Capture existing references before priming; do not
 manufacture fresh caches from Boot's slot table.
 
 ### Data registers
@@ -83,9 +97,9 @@ sequence in this revised table.
 | DR6–DR15 | Zero. |
 
 Set DR3=1 only after the entire defined protected save completes. Never
-interpret DR3=0 or 2 as a valid resumable context. These status encodings
-do not approve handler execution after a failed save; that disposition remains
-part of failure-path review. If safe handler entry itself fails, do not imply
+interpret DR3=0 or 2 as a valid resumable context. All outcomes follow the
+service-restoration policy without a diagnostic gate; safe fault entry after
+failed saving still needs an exact mechanism. If handler entry itself fails, do not imply
 that these registers were successfully delivered.
 
 ### Register examples — original fault versus save failure
@@ -136,7 +150,8 @@ Retain original CR12/CR15 and the fault facts; perform the protected save
 attempt; prime the proposed registers; publish Boot Namespace, Boot.Thread
 ownership and handler entry without a second CHANGE save. Condition flags
 are proposed as zero. Entry NIA, fresh root-frame construction, ownership
-commit, inspection ABI and partial-save disposition still require approval.
+commit and safe partial-save handoff still require approval. Diagnostic
+inspection is no longer a prerequisite to this recovery contract.
 Neither these tables nor the saved-context reference authorize resuming the
 denied instruction, changing Namespace versions or retrying the application.
 
