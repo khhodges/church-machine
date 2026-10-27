@@ -176,6 +176,15 @@ version changes; hardware validates versions and never changes them itself.
 Previously issued GTs become stale after the slot version changes. Do not
 silently refresh those GTs or mint matching replacements to bypass OFFLINE.
 
+**Caller responsibility:** This analysis directs Amoeba, as the user/caller
+of Mallory, to stop polling Mallory. Amoeba must stop issuing further
+requests to Mallory and continue other eligible work. Repeated stale-GT
+faults are not a substitute for the caller respecting the OFFLINE decision.
+This is an Abstraction-level calling decision, not removal of the Thread
+from scheduling. Hardware version enforcement remains the independent
+protection if a stale capability is nevertheless used. No particular
+notification or control ABI is implied by this requirement.
+
 OFFLINE requires a design correction. In this demonstration, the correction
 is **removing Mallory's attack**. A reset, retry, or operator acknowledgement
 alone is not that correction and must not restore the unchanged attack.
@@ -322,6 +331,9 @@ Before a candidate build is accepted:
   or erase its fault state outside an eligible demonstration cycle or the
   authorized corrected-design adoption path. Verify stale GTs cannot bypass
   version-defined OFFLINE and a reset cannot restore the unchanged attack.
+  Verify Amoeba stops issuing Mallory polls after acting on the analysis,
+  rather than repeatedly provoking stale-GT faults, while other eligible
+  work continues.
   Verify the Thread
   itself remains available for authorized work. A running badge alone is not
   proof of continued execution.

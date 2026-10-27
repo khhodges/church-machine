@@ -67,6 +67,16 @@ continue the loop. Preserve the explanation while OFFLINE. Authorized software
 owns slot-version changes; hardware only checks them. Returning the object
 requires corrected design adoption, not merely operator acknowledgement.
 
+The analysis directs **Amoeba, Mallory's user/caller, to stop polling Mallory**.
+
+**Why:** The user explicitly assigned the caller this response; repeated
+hardware denials are not the intended ongoing demonstration behavior.
+
+**How to apply:** Stop Mallory requests in Amoeba while continuing other
+eligible work. Do not disable the Thread or substitute repeated stale-GT
+faults for caller compliance. Hardware version checks remain independent
+enforcement; this requirement does not specify a new notification ABI.
+
 **Why:** The user explicitly confirmed that expected endpoint.
 
 **How to apply:** Correlate the denial with Mallory's actual instruction and
