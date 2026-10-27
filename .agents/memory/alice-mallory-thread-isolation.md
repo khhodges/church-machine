@@ -7,6 +7,18 @@ Run Alice and Mallory in different Threads for the protection demonstration.
 The user confirmed priming each Thread's respective actor entry capability
 in CR1, not the protected object's capability.
 
+The error case is **one RW data object in Mallory**, with the instruction at
+error pinpointed.
+
+**Why:** The user corrected the overly broad fault description and explicitly
+required: “This example should explain security not hide it.”
+
+**How to apply:** Distinguish executing Abstraction, affected object, GT, and
+Thread. Show the exact instruction, attempted operation, failed check, and
+containment evidence rather than a generic fault badge. Do not invent which
+permission/bounds check failed or label a blocked access as actual corruption.
+Attribute per-object reliability to the actual object, not a whole Thread.
+
 Mallory's denied “steal” attempt must be reported but must not halt the whole
 FPGA. This supersedes treating that denial as a whole-board stopping endpoint
 for the next Factory Build.

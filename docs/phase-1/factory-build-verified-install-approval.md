@@ -137,6 +137,34 @@ The denied operation must not complete or acquire additional authority.
 Preserve the faulting instruction, actor/Thread identity, and denial reason
 as evidence; show the contained fault separately from board execution state.
 
+### Explain the security boundary: one RW data object in Mallory
+
+The user identifies this example's error case as **one RW data object in
+Mallory**. Pinpoint the instruction at error; do not replace this explanation
+with a generic whole-Abstraction, Thread, or FPGA failure badge.
+
+The operator-facing evidence must show:
+
+- The exact affected RW object identity and its relationship to Mallory.
+- The executing Mallory revision, faulting instruction address/offset and
+  disassembly, and the corresponding source location when an exact source
+  mapping exists. If the mapping is unavailable, say so instead of guessing.
+- The attempted operation and the capability/GT used, resolved to its object
+  identity, with the relevant actual permissions and bounds.
+- The precise failed runtime check and why that operation was not permitted.
+  RW rights do not authorize access outside the capability's object or bounds;
+  do not invent the particular failure reason before inspecting the evidence.
+- What effect was blocked, whether any state changed, and the evidence that
+  effects did not propagate outside the affected object.
+- What authorized work continues on the Thread and FPGA.
+
+Keep the executing Abstraction, affected data object, capability, and Thread
+distinct in the report. Attribute per-object reliability evidence to the
+actual affected object rather than collapsing every Mallory incident into one
+generic counter. Do not conflate denied access with demonstrated corruption:
+report the actual observation. This example must explain security, not conceal
+the mechanism behind a success badge or expose unrelated protected contents.
+
 Amobea must retain control of scheduling so the other authorized work can
 continue. **Approved disposition: the Mallory Abstraction remains faulted,
 not the Thread.** Do not mark the Thread faulted or remove it from scheduling
