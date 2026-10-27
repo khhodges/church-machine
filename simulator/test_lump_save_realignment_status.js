@@ -72,7 +72,9 @@ const newRevision = mount({...ready.context._savedLumpRealignment,
     retryInput:{...retryInput,response:{token:'new-saved',lump_version:4}}}, new Map(ready.storage));
 assert.equal(newRevision.host.hidden, true, 'another successful revision also needs no popup');
 const failed = mount({pending:false, message:'LUMP saved; realignment incomplete. Connection failed.', retryInput});
-assert.equal(failed.host.attributes['data-state'], 'error');
+assert.equal(failed.host.attributes['data-state'], 'previous');
+assert.match(failed.host.children[0].textContent, /Previous preparation attempt — saved/);
+assert.match(failed.host.children[0].textContent, /Current Namespace state has not been rechecked/);
 assert.match(failed.host.children[0].textContent, /Connection failed/);
 assert.equal(failed.host.children[1].textContent, 'Retry simulation preparation');
 assert.match(failed.host.children[1].title, /Does not compile/);
@@ -81,9 +83,26 @@ dismissAndCheck(failed);
 failed.context.LumpSaveRealignment.begin();
 assert.equal(failed.host.hidden, false, 'a new operation displays its own status');
 assert.equal(failed.host.attributes['data-state'], 'pending');
+assert.doesNotMatch(failed.host.children[0].textContent, /Previous preparation attempt/);
+assert(Number.isFinite(Date.parse(failed.context._savedLumpRealignment.recordedAt)));
 assert.equal(failed.host.children.filter(n => n.textContent === 'Retry simulation preparation').length, 0);
 dismissAndCheck(failed);
 assert.equal(mount(null).host.hidden, true);
+const interrupted = mount({pending:true,message:'Preparing saved revision',retryInput:{
+    response:{token:'saved',lump:'ide.Example.1.token.lump',lump_version:4},metadata:{}
+},recordedAt:'2026-10-27T21:00:00.000Z'});
+assert.match(interrupted.host.children[0].textContent,
+    /ide.Example.1.token.lump \(saved revision 4\)/);
+assert.match(interrupted.host.children[0].textContent, /Recorded 2026-10-27/);
+assert.match(interrupted.host.children[0].textContent,
+    /interrupted; completion is unconfirmed/);
+assert.equal(interrupted.context._savedLumpRealignment.privateReady, undefined);
+dismissAndCheck(interrupted);
+const legacy = mount({pending:false,message:'Namespace has unsaved edits'});
+assert.match(legacy.host.children[0].textContent, /saved revision unavailable/);
+assert.match(legacy.host.children[0].textContent, /Previous report: Namespace has unsaved edits/);
+assert(!legacy.host.children.some(n=>n.textContent==='Retry simulation preparation'),
+    'missing retry identity cannot invent a destination or trigger preparation');
 for (const state of [
     {pending:false, reason:'namespace-unassigned', message:'old wording', retryInput},
     {pending:false, message:'LUMP saved; realignment incomplete. This saved LUMP has no Namespace assignment. Select a destination before simulation.', retryInput},

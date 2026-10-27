@@ -7,6 +7,8 @@
     const unassignedMessage = 'LUMP saved successfully. Not prepared for simulation: no destination Namespace slot selected. Select a destination in Namespace before preparing for simulation.';
     let retryInput = null;
     let dismissedNotice = null;
+    let restoredNotice = false;
+    let restoredPending = false;
     try { dismissedNotice = root.sessionStorage.getItem(dismissalKey); } catch (_) {}
     function noticeKey(state) {
         if (!state) return null;
@@ -33,10 +35,25 @@
         const ready = state && !state.pending && state.privateReady === true;
         host.hidden = !state || ready || dismissedNotice === noticeKey(state);
         if (!state || ready) return;
-        host.setAttribute('data-state', state.pending ? 'pending' : 'error');
+        host.setAttribute('data-state', restoredNotice ? 'previous' : state.pending ? 'pending' : 'error');
         host.style.borderColor = state.pending ? '#93c5fd' : '#e0a055';
         host.style.background = '#29344c';
-        host.append(document.createTextNode(state.message+' '));
+        let message = state.message;
+        if (restoredNotice) {
+            const saved = (state.retryInput || retryInput)?.response || {};
+            const revision = saved.lump || saved.filename || saved.token;
+            const version = saved.lump_version != null ? ' (saved revision ' + saved.lump_version + ')' : '';
+            const recordedAt = typeof state.recordedAt === 'string' &&
+                Number.isFinite(Date.parse(state.recordedAt))
+                ? ' Recorded ' + state.recordedAt + '.' : '';
+            message = 'Previous preparation attempt — ' +
+                (revision ? revision + version : 'saved revision unavailable') + '.' +
+                recordedAt + ' Current Namespace state has not been rechecked. ' +
+                (restoredPending
+                    ? 'The previous attempt was interrupted; completion is unconfirmed. Last recorded status: '
+                    : 'Previous report: ') + state.message;
+        }
+        host.append(document.createTextNode(message+' '));
         if (!state.pending && retryInput && state.reason !== 'namespace-unassigned') {
             const button=document.createElement('button');
             button.textContent='Retry simulation preparation';
@@ -59,6 +76,9 @@
         host.append(close);
     }
     function barrier(value) {
+        restoredNotice = false;
+        restoredPending = false;
+        if (value) value.recordedAt = new Date().toISOString();
         if (value && retryInput) value.retryInput = retryInput;
         root._savedLumpRealignment = value;
         try {
@@ -70,6 +90,8 @@
     try {
         root._savedLumpRealignment = JSON.parse(root.sessionStorage.getItem(storageKey) || 'null');
         if (root._savedLumpRealignment) {
+            restoredNotice = true;
+            restoredPending = root._savedLumpRealignment.pending === true;
             retryInput = root._savedLumpRealignment.retryInput || null;
             root._savedLumpRealignment.pending = false;
             // Refresh the wording of already-persisted successful statuses too.
