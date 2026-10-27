@@ -7,8 +7,18 @@ Run Alice and Mallory in different Threads for the protection demonstration.
 The user confirmed priming each Thread's respective actor entry capability
 in CR1, not the protected object's capability.
 
-The intended trial endpoint is Mallory's denied “steal” attempt, not a clean
-program halt.
+Mallory's denied “steal” attempt must be reported but must not halt the whole
+FPGA. This supersedes treating that denial as a whole-board stopping endpoint
+for the next Factory Build.
+
+**Why:** The user explicitly clarified: “The Mallory Fault should be reported
+but not HALT the hardware.”
+
+**How to apply:** Preserve denial enforcement and actor/instruction evidence,
+while allowing other authorized work under Amobea to continue. Resolve the
+faulted turn's disposition explicitly; do not infer instruction skipping,
+automatic retry/restart, added authority, or a general exemption for other
+faults. Distinguish a contained actor fault from global hardware halt.
 
 **Why:** The user explicitly confirmed that expected endpoint.
 

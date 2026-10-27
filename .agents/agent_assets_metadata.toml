@@ -1396,3 +1396,17 @@ mtime_ms = 1792763295016
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b99f08d7-541f-4d7b-9f2b-aab3528d9e41/1b72b8f2-1ea4-41ce-9a1d-fb9572434a88"
 storage_version_token = "1792763319296814"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "z7gAq9iNygf7L7nmpptEs"
+uri = "file://docs/phase-1/factory-build-verified-install-approval.md"
+type = "text"
+title = "Next Factory Build — Approval Specification"
+description = "Draft for review: hardware checks, fault-safe image installation, full readback verification, explicit Start, and Amobea-controlled LightningBolt turns. Binding and scheduling choices are explicitly marked for approval."
+logical_id = "38d96dab-7a25-4fd1-be7f-473887755f25"
+content_hash = "sha256:e04cd7fb77e17d159dab64fe0d95c135f123da57e0643689eb687858e7aee0eb"
+size = 9652
+mtime_ms = 1793098294240
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/38d96dab-7a25-4fd1-be7f-473887755f25/bfaf2323-69d2-4c03-a64a-56195ee9ed70"
+storage_version_token = "1793098322813317"
+content_type = "text/markdown"
