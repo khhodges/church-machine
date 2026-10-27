@@ -1,8 +1,8 @@
 # Next Factory Build — approval specification
 
-**Status: Scope approved to proceed. Detailed target bindings and faulted-turn
-disposition remain unresolved approval gates. No authorization to flash or
-activate hardware.**
+**Status: Scope and Mallory fault disposition approved to proceed. Detailed
+target bindings and normal turn scheduling remain unresolved approval gates.
+No authorization to flash or activate hardware.**
 
 ## 1. Purpose and operator boundary
 
@@ -138,16 +138,24 @@ Preserve the faulting instruction, actor/Thread identity, and denial reason
 as evidence; show the contained fault separately from board execution state.
 
 Amobea must retain control of scheduling so the other authorized work can
-continue. The exact disposition of Mallory's faulted turn (including whether
-and how it becomes eligible again) remains an approval detail. This requirement
-does not authorize silently skipping the faulting instruction, retrying it,
-restarting Mallory, or weakening capability enforcement. It supersedes a
+continue. **Approved disposition: the Mallory Abstraction remains faulted,
+not the Thread.** Do not mark the Thread faulted or remove it from scheduling
+because of Mallory's denied operation. Keep Mallory's fault evidence available
+and do not automatically re-enter the faulted Abstraction.
+Returning Mallory to eligibility requires an explicit operator action, not
+automatic recovery; the mechanism for that action is not specified here.
+This requirement does not authorize silently skipping the faulting instruction,
+retrying it, restarting Mallory, or weakening capability enforcement. It supersedes a
 whole-board halt as the required Mallory demonstration endpoint, not the
 handling of unrelated or uncontained hardware faults.
 
-Acceptance must demonstrate repeated A → B → A → B turns through the approved
-Amobea path, with trace evidence identifying the actual selected executable
-and relevant GT/context. Merely showing alternating UI labels is insufficient.
+Acceptance must demonstrate A → B → A → B turns while both targets are eligible
+through the approved Amobea path, with trace evidence identifying the actual
+selected executable and relevant GT/context. After Mallory faults, demonstrate
+that the faulted Mallory Abstraction is not re-entered, the Thread is not
+disabled, and other eligible work continues. Do not require
+Mallory to execute again merely to produce an alternating trace. Merely showing
+alternating UI labels is insufficient.
 
 ## 8. Operator presentation and installation receipt
 
@@ -181,8 +189,10 @@ Before a candidate build is accepted:
   bindings without bypassing normal runtime authority checks.
 - The Mallory denial is reported with matching instruction and Thread evidence,
   its forbidden effect does not occur, the FPGA does not enter a global halt,
-  and other authorized work demonstrably continues under Amobea. Verify the
-  approved faulted-turn disposition separately; a running badge alone is not
+  and other authorized work demonstrably continues under Amobea. Verify that
+  subsequent scheduling opportunities do not re-enter the Mallory Abstraction
+  or erase its fault state without explicit operator action. Verify the Thread
+  itself remains available for authorized work. A running badge alone is not
   proof of continued execution.
 - IDE tests cover both success and failure paths, explicit Start, and no
   false installed/verified/started claims.

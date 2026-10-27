@@ -15,10 +15,17 @@ for the next Factory Build.
 but not HALT the hardware.”
 
 **How to apply:** Preserve denial enforcement and actor/instruction evidence,
-while allowing other authorized work under Amobea to continue. Resolve the
-faulted turn's disposition explicitly; do not infer instruction skipping,
-automatic retry/restart, added authority, or a general exemption for other
-faults. Distinguish a contained actor fault from global hardware halt.
+while allowing other authorized work under Amobea to continue. The user chose
+“Keep Mallory faulted” applies to the Mallory Abstraction, NOT the Thread.
+The user explicitly corrected the mistaken Thread-fault interpretation.
+Do not fault or deschedule the Thread because Mallory was denied; preserve
+its availability for authorized work. Do not automatically re-enter the
+faulted Abstraction; require explicit operator action before restoring its
+eligibility.
+Do not infer instruction skipping, automatic retry/restart, added authority,
+or a general exemption for other faults. Distinguish a contained actor fault
+from global hardware halt. Normal alternation applies only while both targets
+are eligible; do not re-enter Mallory merely to maintain alternating evidence.
 
 **Why:** The user explicitly confirmed that expected endpoint.
 
