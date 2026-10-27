@@ -19,6 +19,8 @@
   Journal, measurement and Ethernet mechanisms remain approval items;
   UART-only success is not standalone completion.
   - [Current work sequence](factory-build-verified-install-approval.md#work-sequence-through-phase-1-completion)
+  - [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md) —
+    concrete register/state-machine proposal for approval, not implemented RTL.
   - [Standalone acceptance gates](factory-build-verified-install-approval.md#mandatory-phase-1-ethernet-and-standalone-completion-gates)
   - [Starting baseline](nfb1-starting-baseline.md) and
     [Mallory fault reconciliation](nfb1-mallory-fault-reconciliation.md) —

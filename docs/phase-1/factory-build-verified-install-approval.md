@@ -373,6 +373,11 @@ its cause, not masking it with retries or recovery claims.
 
 #### Fault entry into Boot.Thread — CHANGE save bypass
 
+Concrete design for approval:
+[Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md).
+Its register assignments, single-incident policy and terminal failure choices
+are proposed, not yet approved or implemented.
+
 **Agreed direction:** the fault handoff bypasses CHANGE's outgoing-context
 save and explicitly primes Boot.Thread's DRs and CRs. A separate attempt to
 save the faulting Thread's diagnostic context is not the CHANGE save and
