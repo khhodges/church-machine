@@ -39,6 +39,19 @@ or a general exemption for other faults. Distinguish a contained actor fault
 from global hardware halt. Normal alternation applies only while both targets
 are eligible; do not re-enter Mallory merely to maintain alternating evidence.
 
+The user subsequently authorized a security demonstration loop based on the
+default MTBF setting, repeated until the message is understood.
+
+**Why:** The example is educational: each cycle must pinpoint the instruction
+and RW object and explain security and containment, not hide the error.
+
+**How to apply:** Treat explicitly started demonstration mode as authorization
+for controlled repetitions without per-cycle approval, with a visible Stop.
+This is not blanket automatic recovery for ordinary faults. Preserve incident
+evidence, actual checks, and the Must Resolve rule; distinguish intentional
+demo events from operational MTBF. Do not invent a default value or assume an
+MTBF threshold is itself a retry interval; the mapping must be defined.
+
 **Why:** The user explicitly confirmed that expected endpoint.
 
 **How to apply:** Correlate the denial with Mallory's actual instruction and

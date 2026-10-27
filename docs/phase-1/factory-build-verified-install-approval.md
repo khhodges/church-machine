@@ -170,8 +170,9 @@ continue. **Approved disposition: the Mallory Abstraction remains faulted,
 not the Thread.** Do not mark the Thread faulted or remove it from scheduling
 because of Mallory's denied operation. Keep Mallory's fault evidence available
 and do not automatically re-enter the faulted Abstraction.
-Returning Mallory to eligibility requires an explicit operator action, not
-automatic recovery; the mechanism for that action is not specified here.
+Outside the explicitly enabled demonstration loop below, returning Mallory
+to eligibility requires an explicit operator action, not automatic recovery;
+the mechanism for that action is not specified here.
 This requirement does not authorize silently skipping the faulting instruction,
 retrying it, restarting Mallory, or weakening capability enforcement. It supersedes a
 whole-board halt as the required Mallory demonstration endpoint, not the
@@ -182,7 +183,8 @@ through the approved Amobea path, with trace evidence identifying the actual
 selected executable and relevant GT/context. After Mallory faults, demonstrate
 that the faulted Mallory Abstraction is not re-entered, the Thread is not
 disabled, and other eligible work continues. Do not require
-Mallory to execute again merely to produce an alternating trace. Merely showing
+Mallory to execute again merely to produce an alternating trace outside that
+authorized demonstration loop. Merely showing
 alternating UI labels is insufficient.
 
 ### Reliability basis: one Abstraction fault
@@ -242,6 +244,35 @@ Acceptance must check the strict less-than comparison (including equality
 and values on either side), per-object attribution, incident deduplication,
 and continued unaffected execution when containment is established.
 
+### Repeatable security demonstration
+
+The user explicitly authorizes the demonstration to loop based on the default
+MTBF setting until its message is understood. Provide an explicit demonstration
+start and a visible Stop control so the viewer decides when to finish.
+
+Each cycle must explain the affected RW data object, exact instruction at
+error, attempted access, failed security check, containment evidence, and
+continued unaffected execution. Keep prior incidents available across cycles.
+The loop must exercise the security checks, not merely animate a successful
+result or silently skip the offending instruction.
+
+Use the applicable configured default MTBF setting and display it with its
+units and role in the demonstration. Its numeric value and mapping to loop
+timing/eligibility have not yet been established here. Do not invent a value,
+treat an MTBF threshold as a retry timer without a defined mapping, or use a
+clean-run score as a time-based MTBF.
+
+Starting this mode authorizes controlled demonstration repetitions; it
+supersedes requiring a separate operator action for each demonstration cycle,
+not the ordinary fault policy. The implementation must define how each new
+cycle is prepared under existing authority without granting new rights,
+erasing evidence, faulting the Thread, or globally rebooting the FPGA.
+
+Retain the per-object Must Resolve queue rule during the demonstration, with
+intentional demonstration events clearly identified and kept separate from
+operational MTBF claims. Test repeated cycles, Stop, evidence retention, and
+that repetition does not become implicit recovery outside demonstration mode.
+
 ## 8. Operator presentation and installation receipt
 
 Use one progress view with distinct states:
@@ -276,7 +307,8 @@ Before a candidate build is accepted:
   its forbidden effect does not occur, the FPGA does not enter a global halt,
   and other authorized work demonstrably continues under Amobea. Verify that
   subsequent scheduling opportunities do not re-enter the Mallory Abstraction
-  or erase its fault state without explicit operator action. Verify the Thread
+  or erase its fault state outside an explicitly authorized demonstration
+  cycle or other explicit operator action. Verify the Thread
   itself remains available for authorized work. A running badge alone is not
   proof of continued execution.
 - IDE tests cover both success and failure paths, explicit Start, and no
