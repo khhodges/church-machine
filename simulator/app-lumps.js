@@ -1917,10 +1917,12 @@ function _syncSavedLumpIdentityVisibility() {
                 : anchor);
         }
     }
+    var showingSavedBytes = window._savedLumpEditorMode &&
+        !window._compiledCandidateEditorMode;
     if (panel) panel.style.display =
-        window._savedLumpEditorMode && !hidden ? '' : 'none';
+        showingSavedBytes && !hidden ? '' : 'none';
     if (button) {
-        button.style.display = window._savedLumpEditorMode ? 'inline-flex' : 'none';
+        button.style.display = showingSavedBytes ? 'inline-flex' : 'none';
         button.setAttribute('aria-expanded', String(!hidden));
         button.setAttribute('aria-label', (hidden ? 'Show' : 'Hide') + ' artifact identity');
         button.title = (hidden ? 'Show' : 'Hide') + ' artifact identity';
@@ -2309,6 +2311,10 @@ function _formatLumpHeaderDisassembly(word) {
 function _showCompiledCandidateBesideSource(words, details) {
     var binary = Array.from(words || [], function(word) { return Number(word) >>> 0; });
     if (!binary.length) return false;
+    window._binaryPresentationEpoch = (window._binaryPresentationEpoch || 0) + 1;
+    // This banner describes saved bytes, never the new compile candidate.
+    var savedIdentity = document.getElementById('savedLumpIdentityPanel');
+    if (savedIdentity) savedIdentity.style.display = 'none';
     details = details || {};
     var header = binary[0] >>> 0;
     var cw = (header >>> 10) & 0x1FFF;
@@ -2429,6 +2435,8 @@ function _showCompiledCandidateBesideSource(words, details) {
     if (typeof switchCodeTab === 'function') switchCodeTab('disassembly');
     _setDisassemblyPresentationStatus('Successful compile — UNSAVED authenticated candidate. Not a saved LUMP; later source edits do not change these bytes.');
     window._compiledCandidateEditorMode = true;
+    if (typeof _syncSavedLumpIdentityVisibility === 'function')
+        _syncSavedLumpIdentityVisibility();
     return true;
 }
 window._showCompiledCandidateBesideSource = _showCompiledCandidateBesideSource;
@@ -2616,6 +2624,12 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
 
 async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
     if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
+    var presentationEpoch = window._binaryPresentationEpoch =
+        (window._binaryPresentationEpoch || 0) + 1;
+    var stillOwnsPresentation = function() {
+        return _savedLumpPresentationStillOwnsSource(frozen) &&
+            (window._binaryPresentationEpoch || 0) === presentationEpoch;
+    };
     try {
         // A token may be reused by a later revision. Pin this read to the exact
         // filename acknowledged by Save so a delayed fetch cannot display a
@@ -2654,7 +2668,7 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
             throw new Error('the canonical response contained an invalid trailing-byte record');
         }
         var wordUsage = await _getSavedLumpWordUsageSummary(data.words);
-        if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
+        if (!stillOwnsPresentation()) return false;
         var exactText = _formatCanonicalSavedLumpWords(data.words, {
             abstraction: data.abstraction || descriptor.abstraction,
             token: resp.token,
@@ -2677,7 +2691,7 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
         }
         return true;
     } catch (error) {
-        if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
+        if (!stillOwnsPresentation()) return false;
         _showCanonicalSavedLumpBesideSource(
             (descriptor && descriptor.restoring
                 ? '; SAVED BINARY UNAVAILABLE\n'
@@ -5757,7 +5771,7 @@ function _commitSavedLumpClientState(resp, fallback, draftSource) {
         filename: resp.filename || resp.lump || base.filename,
         lump_version: resp.lump_version != null ? resp.lump_version : base.lump_version,
         compiled_at: resp.compiled_at != null ? resp.compiled_at : base.compiled_at,
-        binary_hash: resp.binary_hash || base.binary_hash || null,
+        binary_hash: resp.binary_hash || resp.digest || base.binary_hash || null,
         identity_hash: resp.identity_hash || base.identity_hash || null,
     });
     // Artifact publication never advertises an installation inherited from an
