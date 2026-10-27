@@ -180,6 +180,13 @@ and loads the Thread under the incoming Namespace; no following CHANGE is
 required. CR13 is reserved NULL and **never touched** in Phase 1: no IRQ role,
 load, restore or explicit clearing, including on SWITCH.
 
+**Machine-owned fault entry — approved 2026-10-27:** Directly stash the event
+into Boot.Thread and finish priming it before attempting one outgoing Thread
+save. Finalize save status, then reuse the shared LOAD NAMESPACE(CR15) and
+THREADLOAD machinery without another save. This is not an ordinary SWITCH
+instruction; its C-list operand and CR15.M rules remain unchanged. See
+[Namespace fault recovery](#namespace-fault-recovery) for the full contract.
+
 **Phase 1 fixed destinations — approved:** `CHANGE CRn` takes the incoming
 Thread GT from the selected source CRn and activates it into **CR12**; CRn
 is not a destination selector. Ordinary CHANGE leaves CR15 unchanged.
@@ -544,13 +551,15 @@ The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
 delivery gate or passed hardware-conformance claim is introduced here.
 
-**Watchdog fault evidence and recovery — Phase 1.1 approved:** Retain the
+**Watchdog fault evidence and recovery — approved 2026-10-27:** Retain the
 first-fault evidence, but do not save the faulted Thread as a resumable
-continuation. Use the responsible Namespace's trusted boot sequence under
+continuation. Stash directly into the configured Boot.Thread, prime Boot,
+attempt the outgoing save once as evidence, then enter Boot under
 the [Namespace recovery contract](#namespace-fault-recovery).
 No M-bit grant from the faulted program is required. Evidence retention is
 not an unrestricted RAM-write bypass or a new CR13 role. This supersedes
-the earlier save-first recovery direction, not ordinary CHANGE/SWITCH saves.
+the earlier Namespace-local reboot and save-first recovery directions, not
+ordinary CHANGE/SWITCH saves.
 Exact implementation and hardware evidence remain required.
 
 **Watchdog accepted-write boundary — approved:** Latch the watchdog fault at
@@ -1553,27 +1562,53 @@ slot-version change.
 
 ### Namespace fault recovery
 
-**Phase 1.1 recovery contract — approved:**
+**Phase 1 Boot fault-entry contract — approved 2026-10-27:**
 
-- A fault reboots only the responsible Namespace through its trusted boot
-  sequence. Do not save the faulted Thread as a resumable continuation.
-  No M-bit grant from the faulted program is required. Retain first-fault
-  evidence; recovery is not a successful SWITCH or a retry.
-- If that reboot itself faults before completing, restart **first Genesis**.
-  This is a double error: a fault during recovery, not two unrelated faults.
-- Reboot completes when the final boot `CALL CR0` succeeds. Reaching or issuing
-  the CALL is insufficient. A fault in that CALL is still a recovery fault;
-  a fault after its success starts a new Namespace-local recovery.
-- First Genesis is the original power-on boot context, fixed by the machine's
-  boot configuration—not the most recently active Namespace.
-- Preserve applicable boot validation and the existing write-completion
-  safeguards: outstanding accepted writes must complete before recovery uses
-  memory. No rollback, unaccepted instruction writes or unrestricted recovery
-  write bypass is authorized.
+- Freeze application execution and stash the original fault directly into
+  configured Boot.Thread homes. No intermediate event-register bank or separate
+  dump. Finish priming Boot before attempting the outgoing Thread save; preserve
+  the original live context until that attempt. Trusted machine configuration
+  establishes Boot Namespace, its slot-2 Boot.Thread and the handler binding,
+  not the faulting application's C-list.
+- Attempt the outgoing Thread save once using existing homes/frame geometry.
+  It is evidence, never a resumable continuation. Finalize Boot's save status
+  whether the save succeeds or fails, then enter the already-primed context
+  without a second save. No M-bit grant from the faulted program is required.
+- Reuse the shared SWITCH Namespace-load and Thread-load machinery: explicitly
+  load Boot Namespace into CR15 and activate Boot.Thread into CR12. Do not issue
+  ordinary SWITCH, bypass destination checks or resolve original references
+  against Boot's slot table. CR1 carries the existing faulting Thread GT and
+  CR2 its original Namespace capability. Hardware never refreshes GTs or changes
+  versions. Invalid references are evidence, not newly granted authority.
+- DR1 retains the original fault code, DR2 the issuer byte address, DR4 the
+  original instruction. DR3 starts at 0 and becomes 1 for complete save or 2
+  for failed/partial save; DR5 is zero or the actual secondary save-error code.
+  Use the full [approved register contract](../boot-fault-rtl-contract.md#3-approved-register-contract).
+  CR13 remains reserved and untouched, including no NULL write.
+- Enter the validated configured handler at word offset zero, with zero
+  condition flags and canonical poison root. Successful handler entry completes
+  this FPGA mechanism, not a final boot CALL CR0 or proof of useful service.
+  Useful-service restoration is the programmer's responsibility.
+- Any failed Boot stash, status store, priming or activation enters an indefinite
+  machine-controlled LED-flashing loop. No repeated stash, recursive entry,
+  first-Genesis fallback, alternate target or IDE acknowledgement. If Boot
+  aliases the outgoing context and direct stash cannot be safe, take that loop.
+  Indication must work without Boot code, working Boot memory or network service;
+  reuse active-low LED[1]'s one-second toggle (two-second full cycle).
+- Preserve applicable validation and accepted-write safeguards. Accepted writes
+  must settle before recovery uses memory; hold source state stable meanwhile.
+  No new application writes or retirement, rollback or unrestricted write bypass.
+  Failure to establish bounded completion must not permit recovery writes.
 
-This replaces the older Boot Thread → purgatory and save-first recovery
-directions. Ordinary CHANGE/SWITCH outgoing saves remain unchanged. Genesis
-remains the default for unfinished or unspecified behavior.
-These are architectural rules, not a claim of simulator, RTL or physical
-conformance, nor authorization to build or program hardware.
+This replaces Namespace-local reboot, recovery-fault first-Genesis fallback,
+boot-CALL completion, and older purgatory/save-first directions. Ordinary
+CHANGE/SWITCH semantics and normal power-on boot remain unchanged. No generic
+Genesis fallback overrides these explicit fault-entry outcomes.
+
+The [consolidated contract and RTL change map](../boot-fault-rtl-contract.md)
+records the approved sequencing and implementation boundaries. Exact trusted
+Boot inputs, finite memory-failure detection and safe cross-root loading of
+CR1/CR2 must be resolved before implementation; no numeric timeout is approved
+by this change. These are architectural rules, not simulator, RTL or physical
+conformance evidence, nor authorization to synthesize or program hardware.
 

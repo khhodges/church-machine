@@ -19,12 +19,12 @@
   Journal, measurement and Ethernet mechanisms remain approval items;
   UART-only success is not standalone completion.
   - [Current work sequence](factory-build-verified-install-approval.md#work-sequence-through-phase-1-completion)
-  - **[Current Boot fault contract and RTL change map](boot-fault-rtl-contract.md)** —
-    approval review for direct Boot stash, shared SWITCH phases including
-    explicit CR15 load, and catastrophic LED loop; lists Master ISA replacements.
+   - **[Approved Boot fault contract and RTL change map](boot-fault-rtl-contract.md)** —
+     approved 2026-10-27: direct Boot stash, shared SWITCH phases including
+     explicit CR15 load, and catastrophic LED loop; reconciled with the Master ISA.
   - [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md) —
     current saved-Thread-context decision and superseded separate-dump draft;
-    revised register and service-recovery contract remains under review, not implemented RTL.
+     register contract is approved in the consolidated document, not implemented RTL.
     Includes the proposed [minimal service-restoration sequence](boot-thread-fault-entry-proposal.md#proposed-minimal-service-restoration-sequence):
     stash directly into Boot first without intermediate registers, attempt the
     old Thread save, then enter Boot without a second save. Failed Boot stash

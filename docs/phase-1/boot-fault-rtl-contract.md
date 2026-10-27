@@ -1,9 +1,12 @@
 # Boot fault entry — consolidated contract and RTL change map
 
-**Status: for approval before RTL implementation.** This is the current review
-document for the new fault path. It consolidates the agreed direction and
-labels engineering selections still needing approval. No tests, synthesis,
-programming, activation or publication are claimed or authorized by this file.
+**Status: contract approved on 2026-10-27.** The user approved the consolidated
+replacement recovery contract, including its register table, entry form,
+shared-FSM approach and catastrophic LED disposition. Exact trusted Boot
+bindings, finite memory-failure detection and foreign-reference loading remain
+engineering prerequisites before RTL implementation. Approval is not evidence
+of implementation or tests and does not authorize synthesis, programming,
+activation or publication.
 
 ## 1. Agreed scope
 
@@ -49,16 +52,16 @@ extra event register bank, stop for design review rather than adding one.
 
 Boot destination and outgoing save writes must not overlap. A fault already
 in Boot.Thread must not overwrite its source context and claim a complete
-save. Proposed conservative disposition: if safe direct stash cannot be
+save. Approved disposition: if safe direct stash cannot be
 performed, use the same catastrophic LED loop.
 
-## 3. Register contract proposed for approval
+## 3. Approved register contract
 
 Boot's saved homes use the normative Thread geometry: DRn at word 1+n,
 CR0–CR11 GT homes at L−12+n for Thread body size L. These homes store GT words,
 not invented serialized three-word capability records.
 
-| Register at Boot entry | Proposed value |
+| Register at Boot entry | Approved value |
 | --- | --- |
 | CR0 | Configured handler E capability in Boot Namespace. |
 | CR1 | Existing faulting Thread GT, originally in CR12; belongs to CR2's Namespace. |
@@ -79,9 +82,9 @@ not invented serialized three-word capability records.
 | DR5 | Initially 0; actual secondary save-failure code if present. |
 | DR6–DR15 | Zero. |
 
-Propose zero condition flags and the configured handler's word-offset-0
+Use zero condition flags and the configured handler's word-offset-0
 entry with canonical poison root, not a return frame into the failed program.
-These entry choices remain part of the approval request.
+These entry choices are included in the contract approval.
 
 **Foreign-reference load requirement:** do not route saved CR1/CR2 through a
 generic Boot-root lookup. Preserve/reconstruct the Namespace capability through
@@ -95,16 +98,16 @@ The failed Thread's saved context is evidence, never an implicit resumable
 continuation. Keep the existing two-word frame format and relative NIA rules;
 do not add an executable-identity field or resume the denied instruction.
 
-## 4. Master ISA reconciliation — explicit changes to approve
+## 4. Master ISA reconciliation — approved replacements
 
-The current Master ISA is not silently edited by this proposal.
+The corresponding Master ISA passages are updated with this approval.
 
 | Existing rule | New contract / disposition |
 | --- | --- |
-| Namespace fault recovery reboots the responsible Namespace. | New path stashes into configured Boot.Thread and enters Boot Namespace, retaining responsible Namespace separately. **Replacement requires approval.** |
-| Watchdog recovery refers to the Namespace-local recovery contract. | Route covered watchdog faults through this same new contract, preserving first-fault attribution and accepted-write safeguards. **Replacement requires approval.** |
+| Namespace fault recovery reboots the responsible Namespace. | Stash into configured Boot.Thread and enter Boot Namespace, retaining responsible Namespace separately. **Replacement approved.** |
+| Watchdog recovery refers to the Namespace-local recovery contract. | Route covered watchdog faults through this same contract, preserving first-fault attribution and accepted-write safeguards. **Replacement approved.** |
 | Recovery failure restarts first Genesis. | Boot-stash failure enters the indefinite LED loop; no implicit first-Genesis restart. Other failure points must have explicit outcomes. |
-| Recovery completes on final boot CALL CR0 success. | Proposed endpoint is successful configured Boot handler entry using shared load machinery. This differs from the existing boot-CALL endpoint and requires approval. |
+| Recovery completes on final boot CALL CR0 success. | Approved endpoint is successful configured Boot handler entry using shared load machinery, replacing the boot-CALL endpoint for fault entry. |
 | Do not save a faulted Thread as a resumable continuation. | Preserve this restriction: the one save is evidence, not permission to resume. |
 | Ordinary CHANGE saves then loads; SWITCH saves, loads Namespace, then Thread. | Unchanged. Only a machine-owned fault entry bypasses their outgoing-save phase after its own attempt. |
 | CR13 is reserved and never touched. | Preserve it. Earlier proposal's “write NULL” is corrected to “do not write.” |
@@ -112,7 +115,7 @@ The current Master ISA is not silently edited by this proposal.
 
 Relevant Master sections: “Execution and watchdog,” “Watchdog fault evidence
 and recovery,” and “Namespace fault recovery” in `01-isa/instruction-set.md`.
-On approval, update those normative passages together; do not leave two
+Those normative passages must remain consistent; there must not be two
 competing active recovery contracts.
 
 ## 5. RTL change map from current source inspection
@@ -125,7 +128,7 @@ competing active recovery contracts.
 | `hardware/change.py` | Facade instantiates `OrdinaryChange`. Wire the internal fault-entry control through it; do not fake `active_thread_owned=false` to suppress saving and corrupt ownership accounting. |
 | `hardware/switch.py` | Keep public SWITCH decoding, C-list lookup and CR15.M rules unchanged. Fault entry uses trusted machine configuration, not a forged ordinary SWITCH operand. Its handoff connection identifies where shared machinery can be reused. |
 | `hardware/wukong_top.py`, `FaultRecoveryControl` and fetch/step gates | Current fault path holds execution for snapshot/bridge authorization and sets step-halted. Separate new local fault entry from those holds so they cannot deadlock Boot activation. Keep explicit installation hold and unrelated debug stops authoritative. |
-| `hardware/wukong_top.py`, LED mux | Give catastrophic state priority over normal LED/MMIO indications. Existing `hb_ctr`/`hb_blink` runs independently; propose reuse of its one-second toggle on active-low LED[1], meaning a two-second full blink cycle. No additional blink counter unless required by implementation. |
+| `hardware/wukong_top.py`, LED mux | Give catastrophic state priority over normal LED/MMIO indications. Reuse the independent `hb_ctr`/`hb_blink` one-second toggle on active-low LED[1], meaning a two-second full blink cycle. No additional blink counter unless required by implementation. |
 | `shared/thread_design.json`, `hardware/thread_design.py` | Reuse existing layout; no new dump format or Thread-body field. |
 
 The incoming pipeline already uses internal working registers. Reusing those
@@ -142,16 +145,17 @@ how the selected on-chip memory path detects an uncompleted write. Test
 injection alone must not be mistaken for deployed failure detection.
 Do not silently adopt the withdrawn 65,536-cycle watchdog proposal.
 
-For approval, propose all failures that prevent completing Boot priming or
-activation also converge on the same LED loop. No recursive fault entry,
+All failures that prevent completing Boot priming or activation also converge
+on the same LED loop. No recursive fault entry,
 repeated memory access or alternate recovery engine. The loop continues
 without application, bridge or network cooperation until external reset/power
 action; existing authorization for external controls is not changed.
 
 ## 6. Isolated validation and build sequence
 
-1. Approve the replacement rules, register table, Boot entry form and internal
-   shared-FSM approach. Bind exact trusted Boot inputs and failure detection.
+1. Replacement rules, register table, Boot entry form and internal shared-FSM
+   approach are approved. Before implementation, bind exact trusted Boot inputs,
+   failure detection and the foreign-reference loading mechanism.
 2. Implement direct stash and catastrophic indication, then connect one-save
    and shared Namespace/Thread activation. Keep ordinary instruction semantics.
 3. Unit/full-core tests: first store is Boot; no event scratch bank; original
@@ -169,10 +173,11 @@ action; existing authorization for external controls is not changed.
 7. Retain exact input/build/test identities; obtain separate physical-test
    authorization. No existing workflow result proves this new path.
 
-## 7. Approval requested
+## 7. Approval record and remaining boundary
 
-Approve this consolidated direction as the replacement recovery contract,
-including the explicit CR15 load through shared SWITCH internals. The finite
+The user approved this consolidated replacement recovery contract on
+2026-10-27, including the explicit CR15 load through shared SWITCH internals.
+The finite
 stash-failure detection and foreign-reference capability loading are concrete
 engineering items to resolve against the selected profile—not reasons to
 invent more diagnostic or service-recovery machinery.

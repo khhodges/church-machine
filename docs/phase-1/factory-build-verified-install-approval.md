@@ -375,11 +375,14 @@ its cause, not masking it with retries or recovery claims.
 
 Current design decision and superseded-draft record:
 [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md).
-The current approval review is the
+The approved replacement contract (2026-10-27) is the
 [consolidated contract and RTL change map](boot-fault-rtl-contract.md).
 It explicitly loads Boot Namespace into CR15 through shared SWITCH machinery,
-corrects CR13 to remain untouched, and lists normative recovery clauses
-requiring replacement. It takes precedence over earlier proposal sequencing.
+keeps CR13 untouched, and is reconciled with the Master ISA recovery clauses.
+It takes precedence over earlier proposal sequencing and pending-approval
+language for that contract. Exact Boot bindings, memory-failure detection and
+cross-root reference loading remain engineering prerequisites; no synthesis,
+flashing, activation or publication is authorized by the contract approval.
 The [minimal service-restoration sequence](boot-thread-fault-entry-proposal.md#proposed-minimal-service-restoration-sequence)
 requires Boot.Thread priming first, then one outgoing save attempt and
 entry into the already-primed Boot context for either save outcome. Immediately

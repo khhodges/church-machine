@@ -1,10 +1,14 @@
 # Boot.Thread fault entry — FPGA approval proposal
 
-**Current review contract:** [consolidated contract and RTL change map](boot-fault-rtl-contract.md).
+**Approved contract:** [consolidated contract and RTL change map](boot-fault-rtl-contract.md),
+approved by the user on 2026-10-27.
 Use that document for sequencing, shared SWITCH reuse, explicit CR15 loading
 and Master ISA reconciliation. This file retains examples and review history;
-where it differs, the consolidated proposal governs the current review.
-Neither document authorizes RTL implementation or hardware operations yet.
+where it differs, the approved consolidated contract governs. Approval requests
+below describe the prior review, not outstanding contract decisions. Exact Boot
+bindings, memory-failure detection and cross-root reference loading remain
+engineering prerequisites to RTL implementation. No hardware operations are
+authorized by this approval.
 
 ## Current Phase 1 decision — saved Thread context
 
