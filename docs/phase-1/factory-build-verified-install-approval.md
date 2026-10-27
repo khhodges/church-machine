@@ -15,6 +15,33 @@ Read back → Verify → Explicit Start**
 Include both LightningBolt options, controlled by **Amobea in round-robin
 turns using GTs in CR0 and CR1**.
 
+### Factory tutorial: fault handling and reliable LUMP development
+
+The Factory Build must include a tutorial that establishes fault handling,
+containment, and evidence-based reliability as part of developing software
+as LUMPs. It is not merely a loader demonstration.
+
+Teach the complete development cycle: pinpoint a fault in an individual
+object; explain the security check; contain its effects; evaluate reliability
+against Amoeba's configured minimum; place underperforming objects in Must
+Resolve; enforce version-defined OFFLINE; have Amoeba stop polling; correct
+the design; explicitly adopt the corrected LUMP; and demonstrate safe
+side-by-side evolution and eligible fallback.
+
+The goal is calibrated reliability that can meet or exceed the minimum
+required by the target fault-tolerant application. Use the user's PP250
+50-year software MTBF example as the high-reliability reference. This is not
+an independently verified historical claim or a measured result for the
+Factory Build, and does not set every object's threshold to 50 years.
+
+State the workload, exposure, fault definition, revision, estimation method,
+and uncertainty behind any reported MTBF. Keep object-level fault occurrence
+and application-level service failures distinct: meeting each object's
+threshold does not by itself establish the whole application's MTBF.
+Containment and intentional fault tests demonstrate behavior, not decades
+of measured reliability. Do not promise suitability for every fault-tolerant
+application without its own requirements and evidence.
+
 Routine operation requires no terminal, local application, or manual JTAG
 steps from the operator. The existing bridge communicates with the FPGA over
 UART. Initial installation of the upgraded Factory Build is a separate,

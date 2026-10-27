@@ -99,6 +99,18 @@ Queue membership is a corrective-work requirement, not automatic global halt
 or permission to resume a faulted Abstraction. Unconfirmed containment is not
 evidence of no harm outside the object.
 
+The Factory Build tutorial must set the development model for reliable LUMPs
+with calibrated MTBF against the application's required minimum.
+
+**Why:** The user explicitly framed the tutorial this way and cited PP250's
+50-year software MTBF as the high-reliability example.
+
+**How to apply:** Teach the full containment, diagnosis, correction, and
+controlled evolution cycle. Attribute the PP250 figure to the user's example,
+not verified Factory Build performance. Keep per-object reliability distinct
+from application service MTBF; do not infer either from an intentional demo
+or assume 50 years is a universally configured threshold.
+
 The assistant had overcomplicated the Namespace review with speculative
 recovery strategies and must not keep reopening those alternatives.
 
