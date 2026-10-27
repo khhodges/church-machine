@@ -3,6 +3,18 @@ name: Amobea Thread initialization ownership
 description: All Thread initialization belongs to Amobea; distinguish fixture prerequisites from an operational lifecycle.
 ---
 
+Mint completion is mandatory in Phase 1. Use Mint to initialize new Threads
+against templates for each application transaction used for clean recovery.
+
+**Why:** The user explicitly added this completion and operational-use
+requirement to the Phase 1 agreement.
+
+**How to apply:** Preserve Mint priming with Amoeba and Amoeba's application
+initialization role. Define transaction templates and the clean-recovery
+authority/interface before implementation; fixture priming does not close
+the requirement. A fresh context is not rollback of external effects or
+permission to revive OFFLINE code. Do not assume automatic retry authorization.
+
 Mint always primes a Thread with Amoeba (spelled Amobea in earlier notes).
 The supplied E-GT identifies the application abstraction Amoeba will start,
 not Amoeba itself or a routine Mint should call to format the Thread.

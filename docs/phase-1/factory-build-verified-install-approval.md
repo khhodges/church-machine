@@ -77,6 +77,35 @@ Standalone operation is not a claim of multi-FPGA coordination.
 
 ## 2. Hardware checks — before changing the board
 
+### Required Phase 1 Mint completion and transaction templates
+
+**Mint must be finished as part of Phase 1 and used to initialize new Threads
+against templates for each application transaction used for clean recovery.**
+Fixture-preinitialized Threads or host-side context construction do not satisfy
+this operational Mint requirement.
+
+Preserve the established division of responsibility: Mint primes new Threads
+with Amoeba; Amoeba performs the application initialization and handoff.
+The supplied application E-GT identifies the application Amoeba will start,
+not an alternative formatter called by Mint. The template contract must define
+how the exact transaction template supplies the authorized initial state
+through that path.
+
+Clean recovery means a new initialized Thread context, not silent resumption
+at the faulting instruction. It does not itself undo application data writes
+or external effects. Retain the original incident and exposure history, and
+do not revive OFFLINE Mallory or grant additional authority. This requirement
+does not reclassify the Mallory Abstraction fault as a Thread fault.
+
+Still requiring approval: template representation and exact revision identity;
+per-transaction inputs and capability bindings; protected initial state;
+Mint/Amoeba interface; who authorizes recovery and under what conditions;
+handling of prior transaction effects, old contexts and allocation failures.
+No automatic retry policy, rollback guarantee or new fault-continuation ABI
+is implied.
+
+### Installation preflight
+
 The IDE must check and display:
 
 - Exact board identity and a fresh, responsive bridge session.
@@ -578,6 +607,15 @@ Before a candidate build is accepted:
   proof of continued execution.
 - IDE tests cover both success and failure paths, explicit Start, and no
   false installed/verified/started claims.
+- Complete and validate Phase 1 Mint, including operational initialization of
+  new Threads through Mint/Amoeba from each selected application transaction
+  template. Identify the exact template, application revision, inputs and
+  authorized capabilities; fixture priming alone is insufficient.
+- Demonstrate authorized clean recovery into a newly initialized Thread
+  without reusing the faulting continuation, erasing incident/exposure history,
+  reviving OFFLINE code or claiming reversal of prior external effects.
+  Validate malformed/stale templates and unauthorized bindings against the
+  approved contract without weakening hard-fault rules.
 - A separately authorized physical acceptance run repeats the flow from
   running, halted, and faulted states using exact retained build/image bytes,
   then confirms both LightningBolt targets execute in the approved order.
@@ -642,9 +680,9 @@ to begin implementation or hardware operations.
 | --- | --- |
 | 1. Starting baseline — delivered | [Baseline report](nfb1-starting-baseline.md): retain the observed failures and evidence limits; delivery is not a green release baseline. |
 | 2. Mallory mechanism — delivered | [Reconciliation report](nfb1-mallory-fault-reconciliation.md): retained C-list bounds denial explained by isolated RTL evidence, not proof of target RW access or physical NFB1 acceptance. |
-| 3. Bindings and turns — approval pending | Define context ownership, exact targets/revisions, first turn, normal turn boundary, on-use GT validation and contained-fault handoff for both demonstrations. |
+| 3. Bindings, turns and transaction templates — approval pending | Define context ownership, exact targets/revisions, first turn, normal turn boundary, on-use GT validation and contained-fault handoff for both demonstrations. Define the Mint/Amoeba template initialization contract and authorized clean-recovery boundary. |
 | 4. Evidence and standalone contracts — approval pending | Resolve the journal/reboot/exposure/MTBF decisions above and Ethernet/standalone lifecycle. Design these before implementing a UART-dependent evidence system. |
-| 5. UART implementation and validation — future authorized work | Implement the approved hold/load/readback/explicit-Start flow and both demonstrations, including correction/adoption/fallback and evidence accounting. Resolve relevant baseline failures before claiming release gates pass. |
+| 5. Mint completion and UART implementation/validation — future authorized work | Finish Phase 1 Mint and prove new-Thread initialization from application-transaction templates through Amoeba, including authorized clean recovery. Implement the approved hold/load/readback/explicit-Start flow and both demonstrations, including correction/adoption/fallback and evidence accounting. Resolve relevant baseline failures before claiming release gates pass. |
 | 6. UART physical milestone — separate authorization | Validate exact retained builds/images through the published IDE. Preserve installation and demonstration receipts; this is intermediate Phase 1 acceptance only. |
 | 7. Ethernet and standalone implementation — future authorized work | Implement board-native reporting and independent operation using the approved evidence contract; a networked UART bridge is not the final deliverable. |
 | 8. Standalone physical acceptance — separate authorization | Complete the Ethernet/standalone gates above, with UART disconnected, browser closed, outages and reboot evidence. Only then may the transport/standalone portion of Phase 1 be declared complete. Other Phase 1 gates remain applicable. |

@@ -21,6 +21,21 @@ The intended model is common service code operating on each Thread's own
 state, not a single global heap shared by all Threads. The exact reference
 binding and calling convention still require review.
 
+### Phase 1 transaction-template requirement
+
+Mint must be completed in Phase 1 and used to initialize new Threads against
+templates for each application transaction used for clean recovery.
+Mint primes the Thread with Amoeba; Amoeba owns application initialization
+and handoff. This is an operational requirement, not satisfied by preinitialized
+test fixtures. The exact template representation, authority, initialization
+interface and recovery trigger remain subject to approval.
+
+This fresh-context path is distinct from the continuation rollback proposals
+below. It does not imply undoing external effects, retrying the faulting
+instruction, discarding fault history or restoring OFFLINE code.
+See the [Factory Build specification](factory-build-verified-install-approval.md#required-phase-1-mint-completion-and-transaction-templates)
+for the scope, work sequence and acceptance obligations.
+
 ## 2. Architectural direction
 
 - A program refers to Thread services by name, as it refers to `Self`.

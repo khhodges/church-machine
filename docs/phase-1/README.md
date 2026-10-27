@@ -13,6 +13,9 @@
   finish Phase 1 with Ethernet and standalone FPGA singletons. Includes both
   the Mallory Thread demonstration and CapabilityTest/SelfTest/CallHome loop,
   verified installation, fault/reboot evidence and MTBF accounting.
+  Phase 1 also requires completed Mint and operational new-Thread
+  initialization through Mint/Amoeba from application-transaction templates
+  for clean recovery; template and recovery contracts remain approval items.
   Journal, measurement and Ethernet mechanisms remain approval items;
   UART-only success is not standalone completion.
   - [Current work sequence](factory-build-verified-install-approval.md#work-sequence-through-phase-1-completion)
