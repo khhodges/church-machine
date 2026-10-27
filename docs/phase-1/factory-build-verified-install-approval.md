@@ -378,6 +378,15 @@ save and explicitly primes Boot.Thread's DRs and CRs. A separate attempt to
 save the faulting Thread's diagnostic context is not the CHANGE save and
 must not be repeated implicitly during handoff.
 
+**Agreed ownership and KISS rule:** microcode primes Boot.Thread's DRs and
+CRs for this fault entry. Keep this a minimal, deterministic mechanism using
+the approved initial values and trusted inputs, not a recovery-policy engine.
+Do not add retry loops, alternate targets, silent context repair or recursive
+re-priming. Hardware never changes Namespace versions. Fault inspection,
+reliability assessment and authorized Mint/Amoeba transaction recovery belong
+to software after entry. Failure of the defined entry path follows the
+specified hard-fault boundary rather than inventing another recovery path.
+
 This is a dedicated fault-entry contract, not a change to ordinary CHANGE.
 Exact register assignments, trusted sources, entry frame/NIA, ownership
 transition and commit ordering remain to be approved. Bypassing the save

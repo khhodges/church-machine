@@ -16,16 +16,19 @@ the requirement. A fresh context is not rollback of external effects or
 permission to revive OFFLINE code. Do not assume automatic retry authorization.
 
 Fault entry must bypass CHANGE's outgoing save and explicitly prime
-Boot.Thread's DRs and CRs.
+Boot.Thread's DRs and CRs. Microcode owns this priming under the KISS rule.
 
 **Why:** The user specified this while reviewing successful/failed fault-context
 saves and Boot.Thread dump inspection. The handoff must not repeat the save.
+The user explicitly agreed that microcode must perform Boot.Thread priming.
 
 **How to apply:** Separate diagnostic capture from the dedicated fault handoff.
 Define exact register values, authority sources and entry ordering before
 implementation; do not weaken ordinary CHANGE or destination validation.
 Keep normal prepared boot separate, and do not recursively prime an active
-or faulting Boot.Thread.
+or faulting Boot.Thread. Keep microcode minimal and deterministic: no retry
+loops, alternate targets, silent repair or hardware version changes. Software
+owns fault assessment and authorized transaction recovery after entry.
 
 Mint always primes a Thread with Amoeba (spelled Amobea in earlier notes).
 The supplied E-GT identifies the application abstraction Amoeba will start,
