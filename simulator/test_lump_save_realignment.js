@@ -122,6 +122,29 @@ function harness(fail, records=[artifact]) {
     assert.throws(()=>h.api.replacementRows([row,{...row,slot:11}],artifact,{},false),/Several/);
     const response={token:artifact.token,lump:artifact.filename,digest:artifact.binary_hash,
         lump_version:artifact.lump_version};
+    // Use the actual design dirty-state guard, rather than a mock rejection.
+    // A separate editor draft does not participate in this guard.
+    const dirty = harness();
+    const designSource = fs.readFileSync(__dirname+'/namespace-design-v1.js','utf8');
+    const advanceStart = designSource.indexOf('async function advanceSavedRevision(');
+    const advanceEnd = designSource.indexOf('async function newSelfTestRevision(',advanceStart);
+    assert(advanceStart >= 0 && advanceEnd > advanceStart);
+    dirty.context.state = {active:true,dirty:true,saving:false,document:{
+        rows:[{slot:10,name:row.name,selection:{filename:row.filename}}]}};
+    dirty.context._lumpEditorDraftText = {'uncompiled-A':'untouched draft'};
+    vm.runInContext(designSource.slice(advanceStart,advanceEnd),dirty.context);
+    dirty.context.NamespaceDesignV1 = {
+        state:dirty.context.state,
+        advanceSavedRevision:dirty.context.advanceSavedRevision
+    };
+    const beforeDirty = JSON.stringify(dirty.context.state.document);
+    await assert.rejects(dirty.api.realign(response,{}),
+        /Namespace design has unsaved edits/);
+    assert.equal(JSON.stringify(dirty.context.state.document),beforeDirty);
+    assert.equal(dirty.context._lumpEditorDraftText['uncompiled-A'],'untouched draft');
+    assert(!dirty.calls.includes('prepare') && !dirty.calls.includes('activate'));
+    assert(dirty.calls.some(c=>Array.isArray(c)&&c[0]==='tab'&&c[2]==='history'),
+        'committed History advances before the independent Namespace failure');
     await h.api.realign(response,{});
     assert.equal(h.context._savedLumpRealignment,null);
     assert.equal(h.context._nsState.abstractions[0].filename,artifact.filename);

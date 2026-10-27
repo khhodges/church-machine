@@ -241,6 +241,27 @@ vm.runInContext(
     context);
 
 (async () => {
+    // Incident reproduction: A has an uncompiled draft when B is selected.
+    // Browser state only: no request can leave this fixture's fake fetch.
+    const draftA = 'abstraction test.UncompiledA { method Start { IADD DR1, DR0, #9 } }';
+    context._DRAFT_LS_PREFIX = 'isolated-incident-draft:';
+    asmEditor.addEventListener = () => {};
+    asmEditor.removeEventListener = () => {};
+    vm.runInContext([
+        'function _lumpTokenIdentity(token)',
+        'function _draftLsKey(token)',
+        'function _draftLsSet(token, v)',
+        'function _restoreSavedLumpEditorOwnership(token, editor)',
+    ].map(marker => extractBlock(lumpsSource, marker)).join('\n'), context);
+    context._restoreSavedLumpEditorOwnership('incident-A', asmEditor);
+    asmEditor.value = draftA;
+    context.window._editorLumpDirtyListener();
+    const draftKeyA = context._draftLsKey('incident-A');
+    assert.strictEqual(localValues.get(draftKeyA), draftA,
+        'real editor dirty listener retains A before switching');
+    context._restoreSavedLumpEditorOwnership('incident-B', asmEditor);
+    asmEditor.value = sourceText;
+    context.window._editorNavigationEpoch = 2;
     const build = await context.compileAndBuild();
 
     assert.strictEqual(build.ok, true,
@@ -283,6 +304,9 @@ vm.runInContext(
         'Save did not open exactly one unified review and destination dialog');
 
     const pending = context.window._pendingLumpData;
+    assert.strictEqual(localValues.get(draftKeyA), draftA);
+    assert.strictEqual(memory.sourceText, sourceText,
+        'B compile and Save formatting must not consume A uncompiled draft');
     assert(pending && pending.candidates && pending.candidates.full,
         'hamburger Save Lump did not build a candidate after cancellation');
     assert.deepStrictEqual(Array.from(pending.words), codeWords,

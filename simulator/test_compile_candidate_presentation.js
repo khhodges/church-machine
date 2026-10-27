@@ -51,9 +51,20 @@ vm.runInContext([
 // Server candidate: header(cw=3), one exact dispatch word, then two code words.
 const header = ((0x1f << 27) | (3 << 10)) >>> 0;
 const words = [header, 2, 0x18000000, 0x08000001];
+// Characterization of the reported mixed screen, not an assertion that this
+// presentation is desirable. The real candidate renderer leaves the old
+// saved-identity panel visible and unchanged.
+const oldIdentity = dom.window.document.createElement('div');
+oldIdentity.id = 'savedLumpIdentityPanel';
+oldIdentity.textContent = 'Saved B revision 1 — old hash — 128 words';
+dom.window.document.getElementById('editor').prepend(oldIdentity);
+dom.window._savedLumpEditorMode = true;
 assert.equal(vm.runInContext(
     `_showCompiledCandidateBesideSource(${JSON.stringify(words)}, ` +
     `{abstraction:"RunAbstraction",methodCount:1})`, context), true);
+assert.equal(oldIdentity.textContent, 'Saved B revision 1 — old hash — 128 words');
+assert.notEqual(oldIdentity.style.display, 'none',
+    'REPRODUCED: old saved identity remains visible beside the new candidate');
 const panel = dom.window.document.getElementById('savedLumpDisassemblyPanel');
 const text = dom.window.document.getElementById('savedLumpDisassembly').textContent;
 assert.equal(panel.style.display, 'flex', 'successful CLOOMC compile shows candidate');
