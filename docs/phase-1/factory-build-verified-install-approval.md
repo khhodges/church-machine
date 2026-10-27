@@ -393,6 +393,9 @@ to software after entry. Failure of the defined entry path follows the
 specified hard-fault boundary rather than inventing another recovery path.
 
 This is a dedicated fault-entry contract, not a change to ordinary CHANGE.
+Boot.Thread runs in the Boot Namespace. Capture and retain the faulting
+Namespace before priming live CR15 with Boot Namespace authority; dump and
+execution identities must not be reinterpreted against Boot's slot table.
 Exact register assignments, trusted sources, entry frame/NIA, ownership
 transition and commit ordering remain to be approved. Bypassing the save
 does not bypass destination capability validation or authorize new GTs.

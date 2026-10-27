@@ -30,6 +30,18 @@ or faulting Boot.Thread. Keep microcode minimal and deterministic: no retry
 loops, alternate targets, silent repair or hardware version changes. Software
 owns fault assessment and authorized transaction recovery after entry.
 
+Boot.Thread fault entry runs in the Boot Namespace, not necessarily the
+faulting Namespace. Remember the faulting Namespace before replacing CR15.
+
+**Why:** During register review the user corrected the proposed preservation
+of the current Namespace: “Current Namespace is Boot, the faulting Namespace
+must be remembered!”
+
+**How to apply:** Keep captured Namespace identity and live Boot root distinct.
+Resolve destination bindings against Boot, retain original Namespace/Thread/
+executable attribution, and never reinterpret fault evidence using Boot slots.
+This correction does not approve the rest of the proposed register ABI.
+
 Mint always primes a Thread with Amoeba (spelled Amobea in earlier notes).
 The supplied E-GT identifies the application abstraction Amoeba will start,
 not Amoeba itself or a routine Mint should call to format the Thread.

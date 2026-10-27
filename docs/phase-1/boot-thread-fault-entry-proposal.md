@@ -5,6 +5,11 @@ that microcode primes Boot.Thread's DRs/CRs, bypassing CHANGE's outgoing save
 under the KISS rule. The concrete assignments below are new proposals.
 Approval of this document is not permission to flash, activate or publish.
 
+**Register-review correction:** Boot.Thread executes in the **Boot Namespace**.
+The faulting Namespace must be remembered independently before CR15 is replaced.
+This correction is agreed; the rest of the proposed register table remains
+under review, including DR3 and the complete-dump-only policy.
+
 ## 1. Scope and observed implementation
 
 Implement one dedicated fault-entry state machine, not a new executable
@@ -25,7 +30,10 @@ Source observations, not physical acceptance:
 - `shared/thread_design.json` defines Thread homes and protected geometry.
   Use that geometry, not a second Thread layout.
 
-This proposal applies only to a validated, resident Phase 1 Namespace.
+This proposal applies to validated, resident Phase 1 Namespace contexts.
+Fault entry activates the configured Boot Namespace, which need not be the
+Namespace in which the fault occurred. This dedicated transition is not a
+general-purpose SWITCH instruction or approval of broader networking tests.
 Faults during reset admission, installation hold, an uncommitted context
 transition, or Boot.Thread execution remain terminal. No speculative attempt
 to reconstruct a partially switched context is permitted.
@@ -34,16 +42,22 @@ to reconstruct a partially switched context is permitted.
 
 During separately authorized image preparation, select and retain:
 
-1. Exact Boot.Thread binding and geometry.
-2. Exact fault-handler executable binding and program-relative entry offset.
+1. Exact Boot.Thread binding and geometry within the Boot Namespace.
+2. Exact fault-handler executable binding in the Boot Namespace and
+   program-relative entry offset.
 3. One resident 96-word diagnostic data object, with a read-only capability
    explicitly granted to the handler and machine-only write ownership.
-4. The current Namespace authority used for validation.
+4. The trusted Boot Namespace authority and root used for destination
+   validation and CR15 priming. Capture the faulting Namespace's original
+   CR15 separately as incident evidence, not as the destination root.
 
 The configuration is machine-protected after admission. Revalidate live
 slot versions, type, seal, bounds and entry identity on every use; do not
 refresh GTs. Hold Namespace mutation and conflicting memory writers from
-validation through commit, excluding a validation/use race.
+validation through commit, excluding a validation/use race. Resolve the
+handler, Boot.Thread and diagnostic-object bindings against the configured
+Boot Namespace, never by applying their slot numbers to the faulting root.
+The diagnostic object belongs to the Boot Namespace.
 
 The new machine-write diagnostic object is an explicit authority addition
 requiring approval: it is not inferred from a user-supplied address. Its
@@ -77,6 +91,15 @@ All offsets are 32-bit words from the admitted diagnostic object base.
 | 16–31 | DR0–DR15, including architectural DR0=0. |
 | 32–79 | CR0–CR15, three words each: GT, location, cached authority/limit in the current architectural encoding. |
 | 80–95 | Reserved, zero. |
+
+**Remember the faulting Namespace:** words **77–79** are the original
+CR15 triple (GT, location, cached authority/limit), captured before any root
+or register changes. Retain it with the original CR12 and CR14 triples so
+Thread and executable identities are interpreted in the correct Namespace.
+A slot number or GT alone is not sufficient cross-Namespace identity.
+The dump contains evidence, not a live grant of the captured authority.
+Software must retain the incident's exact image/session association and must
+not reinterpret it using Boot's slots or silently refresh old GTs.
 
 Latch original metadata and both register banks into machine-private capture
 storage before any priming writes. Publish the record from that latch, not
@@ -114,11 +137,11 @@ Validate and stage all values before publishing any live register.
 | CR12 | Validated Boot.Thread capability. |
 | CR13 | NULL triple, preserving the Phase 1 reservation. |
 | CR14 | Validated handler executable capability, with normal executable bounds. |
-| CR15 | The validated current Namespace capability; no SWITCH and no elevation. |
+| CR15 | The validated, explicitly configured **Boot Namespace** capability. The faulting Namespace remains in dump words 77–79, not in live CR15. No additional privilege is inferred. |
 | Condition flags | All zero. |
 | Private stack/STO | Fresh canonical poison-root state for the admitted Boot.Thread geometry, using the existing frame encoding. No saved application return address. |
 | NIA | Handler code origin plus the validated configured entry offset, converted to byte address under the current ISA. |
-| Execution ownership | Boot.Thread becomes the active owner at the commit boundary; outgoing context is inactive, not marked as a faulted Thread. |
+| Execution ownership | Boot Namespace and Boot.Thread become the active root/owner at the commit boundary; outgoing context is inactive, not marked as a faulted Thread. |
 
 The handler obtains any other management authority through its explicitly
 declared C-list. No arbitrary application CR/DR survives into its live context.
@@ -147,11 +170,14 @@ Ordinary heap contents are not zeroed or represented as rolled back.
    or context ownership is uncertain, go terminal.
 4. **DUMP:** write the latched diagnostic record, zero reserved words, and
    write COMPLETE last. On failure, stop; do not retry.
-5. **STAGE:** validate and buffer the entire incoming register set and fresh
-   root geometry, retaining the mutation exclusion through commit.
+5. **STAGE:** validate and buffer the Boot Namespace root, entire incoming
+   register set and fresh Thread root-frame geometry, retaining the mutation
+   exclusion through commit. Destination validation uses the staged Boot
+   root without changing the live faulting root during validation.
 6. **PRIME:** write only Boot.Thread's required root/STO state and the staged
    live registers. Keep fetch disabled for the entire sequence.
-7. **COMMIT:** publish Boot.Thread ownership and handler NIA together; latch
+7. **COMMIT:** publish the Boot Namespace root/CR15, Boot.Thread ownership
+   and handler NIA as one execution-visible transition; latch
    `fault_entry_active=1`; release fetch only when all writes completed.
 8. **HANDLER:** software inspects, journals and disposes of the incident.
    Mint/Amoeba perform separately authorized template-based recovery.
@@ -218,6 +244,10 @@ history until the journal contract is implemented.
   DR/CR/flag/NIA/root value matching section 4.
 - Original instruction, issuer address and register values survive priming;
   delayed-instruction and denied-write cases retain correct attribution.
+- Use distinct Boot and faulting Namespace fixtures, including colliding
+  slot numbers. Prove live CR15/root become Boot while dump words 77–79 retain
+  the original Namespace triple; handler, dump and Thread validation must
+  never consult the wrong root. Also test a fault already within Boot.
 - Assert zero outgoing CHANGE-save requests and zero outgoing Thread-home
   writes; ordinary CHANGE regression tests retain their save behavior.
 - Inject dump, validation and priming errors at each boundary; prove no
