@@ -42,6 +42,8 @@ are eligible; do not re-enter Mallory merely to maintain alternating evidence.
 The user subsequently authorized a security demonstration loop based on the
 default MTBF setting, repeated until the message is understood.
 **Default MTBF belongs to Amoeba**, as explicitly clarified by the user.
+Its approved default minimum is **12 months**: MTBF must be at least
+12 months, with strict less-than triggering Must Resolve when assessable.
 The demonstration consumes Amoeba's configured value; do not invent a separate
 IDE or demonstration-owned default.
 
@@ -54,6 +56,8 @@ This is not blanket automatic recovery for ordinary faults. Preserve incident
 evidence, actual checks, and the Must Resolve rule; distinguish intentional
 demo events from operational MTBF. Do not invent a default value or assume an
 MTBF threshold is itself a retry interval; the mapping must be defined.
+Insufficient evidence is Unassessed, not threshold compliance; the approved
+12-month target is not a measured reliability claim.
 
 The affected object's slot version defines OFFLINE and requires a design
 change: in this example, removing Mallory's attack.

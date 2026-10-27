@@ -155,6 +155,14 @@ details must be approved before implementation:
 | Turn boundary | Specify the approved completion, yield, or scheduling event that advances Amobea to the other target. |
 | First turn | Specify initial target and fresh-start/reset behavior. |
 
+Every turn handoff must validate the GT when it is used against the live
+destination slot version and applicable runtime authority checks. A GT held
+in CR0/CR1 across turns is not exempt. Demonstrate rejection when the target
+version changes between turns. Revalidation must never silently refresh a
+stale GT; adopting corrected code uses the separate authorized binding path.
+The precise handoff and check sequencing must be resolved before implementation,
+including exclusion of a version-change/check/use race.
+
 The existing Amobea design leaves parts of bootstrap/CR0 binding unresolved.
 Do not treat historical Alice/Mallory startup assignments as implicit approval
 of this new pair, invent a timer quantum, or overwrite CRs to satisfy a display.
@@ -184,6 +192,22 @@ The operator-facing evidence must show:
 - What effect was blocked, whether any state changed, and the evidence that
   effects did not propagate outside the affected object.
 - What authorized work continues on the Thread and FPGA.
+
+**Fault-reason reconciliation gate:** The retained
+[physical reload report](installed-image-reload-result.md) records BOUNDS
+(`0x08`) at `0x2e08`, mapped to Mallory's `LOAD CR1, CR6, #2`, while source
+comments anticipated NO_CAPABILITY. Display that historical event as observed,
+not as the comment's expected fault. For each new build, derive the displayed
+code/reason from its own correlated board evidence; do not hardcode BOUNDS.
+
+Before building the tutorial's causal explanation, reconcile the exact
+instruction, operand GT, object geometry, and RTL check ordering for the
+retained image/build. Establish whether BOUNDS is enforcing that capability's
+object boundary or fires before another capability/permission check is reached.
+Record which checks actually participated and which were not exercised.
+Access denial alone does not settle this question. Keep exact fault-code
+conformance open until this evidence is reconciled; then cross-reference the
+result in the physical reload evidence and tutorial acceptance record.
 
 Keep the executing Abstraction, affected data object, capability, and Thread
 distinct in the report. Attribute per-object reliability evidence to the
@@ -254,8 +278,16 @@ Assess the full flow against that event and its containment.
   Mallory remains faulted as an Abstraction, the Thread is not disabled, and
   other authorized work continues under Amobea.
 
-No numerical MTBF target, observation duration, or statistical confidence
-requirement has yet been approved. Report those as unspecified, not passed.
+**Approved Amoeba default minimum MTBF: 12 months.**
+The default requirement is **measured MTBF ≥ 12 months**. Values strictly
+below 12 months trigger Must Resolve when the measurement is assessable;
+equality satisfies the numerical threshold. More demanding applications may
+require a higher approved minimum. The setting is a requirement, not a claim
+that an object's measured MTBF already meets it.
+
+Observation duration, statistical confidence, and the precise conversion of
+months to exposure units remain to be specified. Do not silently choose a
+30-day month or another conversion, or mark insufficient evidence as passed.
 The priority remains exposing the fault at its first occurrence and fixing
 its cause, not masking it with retries or recovery claims.
 
@@ -279,9 +311,14 @@ The queue records required corrective work; it does not itself authorize
 global halt, additional capabilities, automatic retry, or resumption of a
 faulted Abstraction.
 
-A missing threshold or insufficient evidence must remain explicitly
-unassessed, not silently treated as meeting the reliability requirement.
-The numerical thresholds and measurement policy remain to be specified.
+A per-object override is not required: inherit Amoeba's approved 12-month
+default minimum unless a different applicable minimum is explicitly approved.
+If the applicable setting is unavailable or measurement evidence is
+insufficient, label the object **Unassessed** and do not evaluate the MTBF
+escalation as passed. Its MTBF-based queue trigger remains inactive until
+those inputs are available; fault reporting and containment still operate.
+The queue and threshold enforcement remain implementation requirements,
+not claims of existing runtime functionality.
 Queue resolution must not erase the retained incident evidence.
 
 Acceptance must check the strict less-than comparison (including equality
@@ -303,8 +340,8 @@ result or silently skip the offending instruction.
 **Default MTBF is an Amoeba setting.** The demonstration must use Amoeba's
 configured value, not a separate IDE default or demonstration-only override.
 Display that value with its units and role in the demonstration.
-Its numeric value and mapping to loop
-timing/eligibility have not yet been established here. Do not invent a value,
+Its approved default minimum is **12 months**; the mapping to loop
+timing/eligibility remains to be defined. Do not invent that mapping,
 treat an MTBF threshold as a retry timer without a defined mapping, or use a
 clean-run score as a time-based MTBF.
 
@@ -404,6 +441,19 @@ Before a candidate build is accepted:
 - Exact-image tests cover immutable revision selection and byte order.
 - Amobea tests demonstrate the approved two-target turn sequence and GT
   bindings without bypassing normal runtime authority checks.
+- Change a destination slot version between turns and prove that a retained
+  CR0/CR1 GT is rejected on use without silent refresh or a check/use race.
+- Match the displayed fault code, reason, instruction, and object to the
+  actual correlated board evidence for the exact build. Resolve the historical
+  BOUNDS-versus-NO_CAPABILITY discrepancy and check ordering before claiming
+  that the tutorial has demonstrated a particular security mechanism.
+- Verify inheritance of Amoeba's 12-month minimum, strict less-than escalation,
+  equality at the threshold, and Unassessed behavior for unavailable settings
+  or insufficient measurement evidence.
+- With defined demonstration measurements and the applicable MTBF setting,
+  prove the attack stage reaches OFFLINE/Must Resolve and Amoeba stops polling.
+  It must not loop forever by reviving the attacking revision. This ends the
+  attack stage, not the corrected-Mallory and safe-upgrade/fallback stages.
 - The Mallory denial is reported with matching instruction and Thread evidence,
   its forbidden effect does not occur, the FPGA does not enter a global halt,
   and other authorized work demonstrably continues under Amobea. Verify that

@@ -94,7 +94,10 @@ minimum MTBF, add the object to a **Must Resolve** queue.
 per-object MTBF below the allowed value as the required correction-queue trigger.
 
 **How to apply:** Attribute incidents and exposure to the individual object;
-preserve the strict less-than rule and do not invent numerical thresholds.
+preserve the strict less-than rule. Amoeba's approved default minimum is
+12 months (required MTBF ≥ 12 months); inherit it unless a different
+applicable minimum is explicitly approved. Insufficient evidence remains
+Unassessed, not passed.
 Queue membership is a corrective-work requirement, not automatic global halt
 or permission to resume a faulted Abstraction. Unconfirmed containment is not
 evidence of no harm outside the object.
