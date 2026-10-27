@@ -1,5 +1,11 @@
 # Boot.Thread fault entry — FPGA approval proposal
 
+**Current review contract:** [consolidated contract and RTL change map](boot-fault-rtl-contract.md).
+Use that document for sequencing, shared SWITCH reuse, explicit CR15 loading
+and Master ISA reconciliation. This file retains examples and review history;
+where it differs, the consolidated proposal governs the current review.
+Neither document authorizes RTL implementation or hardware operations yet.
+
 ## Current Phase 1 decision — saved Thread context
 
 **Required first action:** immediately on fault, microcode stashes the event
@@ -82,7 +88,7 @@ These tables replace the separate-dump register table in the historical draft.
 | CR6 | Fault handler's C-list capability | Establish through normal executable-entry validation against Boot Namespace. |
 | CR7–CR11 | NULL triples | No unrelated application authority survives priming. |
 | CR12 | Boot.Thread capability | Active Thread identity, distinct from CR1. |
-| CR13 | NULL triple | Preserve Phase 1 reservation. |
+| CR13 | Reserved, untouched | No write, including a NULL write; preserve the Master ISA reservation. |
 | CR14 | Executing fault-handler capability | Establish actual handler identity and executable bounds. |
 | CR15 | Boot Namespace capability | Active Namespace/root, distinct from the faulting Namespace retained in CR2. |
 
