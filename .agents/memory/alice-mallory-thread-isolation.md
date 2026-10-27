@@ -55,6 +55,18 @@ evidence, actual checks, and the Must Resolve rule; distinguish intentional
 demo events from operational MTBF. Do not invent a default value or assume an
 MTBF threshold is itself a retry interval; the mapping must be defined.
 
+The affected object's slot version defines OFFLINE and requires a design
+change: in this example, removing Mallory's attack.
+
+**Why:** The user clarified that the security demonstration must force design
+correction, not restore the same attack through retries or resets.
+
+**How to apply:** Demo repetition is subject to version-defined eligibility.
+Do not clear OFFLINE, refresh stale GTs, or mint matching replacements just to
+continue the loop. Preserve the explanation while OFFLINE. Authorized software
+owns slot-version changes; hardware only checks them. Returning the object
+requires corrected design adoption, not merely operator acknowledgement.
+
 **Why:** The user explicitly confirmed that expected endpoint.
 
 **How to apply:** Correlate the denial with Mallory's actual instruction and

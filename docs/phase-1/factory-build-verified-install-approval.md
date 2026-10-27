@@ -170,9 +170,17 @@ continue. **Approved disposition: the Mallory Abstraction remains faulted,
 not the Thread.** Do not mark the Thread faulted or remove it from scheduling
 because of Mallory's denied operation. Keep Mallory's fault evidence available
 and do not automatically re-enter the faulted Abstraction.
-Outside the explicitly enabled demonstration loop below, returning Mallory
-to eligibility requires an explicit operator action, not automatic recovery;
-the mechanism for that action is not specified here.
+The affected object's OFFLINE state is defined through its Namespace slot
+version, not an independent UI flag. Authorized software management owns
+version changes; hardware validates versions and never changes them itself.
+Previously issued GTs become stale after the slot version changes. Do not
+silently refresh those GTs or mint matching replacements to bypass OFFLINE.
+
+OFFLINE requires a design correction. In this demonstration, the correction
+is **removing Mallory's attack**. A reset, retry, or operator acknowledgement
+alone is not that correction and must not restore the unchanged attack.
+Return to service requires the corrected design and explicit authorized
+adoption; the detailed admission procedure remains to be specified.
 This requirement does not authorize silently skipping the faulting instruction,
 retrying it, restarting Mallory, or weakening capability enforcement. It supersedes a
 whole-board halt as the required Mallory demonstration endpoint, not the
@@ -264,11 +272,13 @@ timing/eligibility have not yet been established here. Do not invent a value,
 treat an MTBF threshold as a retry timer without a defined mapping, or use a
 clean-run score as a time-based MTBF.
 
-Starting this mode authorizes controlled demonstration repetitions; it
-supersedes requiring a separate operator action for each demonstration cycle,
-not the ordinary fault policy. The implementation must define how each new
-cycle is prepared under existing authority without granting new rights,
-erasing evidence, faulting the Thread, or globally rebooting the FPGA.
+Starting this mode authorizes controlled demonstration repetitions while
+the relevant objects remain eligible; it does not bypass version-defined
+OFFLINE status. Once an object is OFFLINE, do not revive the unchanged
+attack to keep the loop running. Keep its explanation and evidence visible
+until the design is corrected. The implementation must define how each
+eligible cycle is prepared under existing authority without granting new
+rights, erasing evidence, faulting the Thread, or globally rebooting the FPGA.
 
 Retain the per-object Must Resolve queue rule during the demonstration, with
 intentional demonstration events clearly identified and kept separate from
@@ -309,8 +319,10 @@ Before a candidate build is accepted:
   its forbidden effect does not occur, the FPGA does not enter a global halt,
   and other authorized work demonstrably continues under Amobea. Verify that
   subsequent scheduling opportunities do not re-enter the Mallory Abstraction
-  or erase its fault state outside an explicitly authorized demonstration
-  cycle or other explicit operator action. Verify the Thread
+  or erase its fault state outside an eligible demonstration cycle or the
+  authorized corrected-design adoption path. Verify stale GTs cannot bypass
+  version-defined OFFLINE and a reset cannot restore the unchanged attack.
+  Verify the Thread
   itself remains available for authorized work. A running badge alone is not
   proof of continued execution.
 - IDE tests cover both success and failure paths, explicit Start, and no
