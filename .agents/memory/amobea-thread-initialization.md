@@ -35,6 +35,16 @@ reboot/first-Genesis fallback. Resolve exact Boot bindings, finite memory-failur
 detection and original-root reference loading before RTL implementation.
 Contract approval is not synthesis, flashing, activation or publication approval.
 
+Preserve the original full live Namespace/Thread pair until post-stash incoming
+staging; GT-only homes cannot establish a foreign root by themselves.
+
+**Why:** Resolving those homes under Boot would silently reinterpret colliding
+slot numbers. A zero-cache Inform capability is not a safe evidence substitute.
+
+**How to apply:** Keep ordinary CHANGE/SWITCH separate from the immediate fault
+handoff. Immediate reference transfer does not solve later ordinary suspension
+of a Boot context holding foreign references.
+
 **Ordering:** Prime Boot.Thread FIRST, before attempting to save the faulting
 Thread. Immediately stash the event directly into Boot.Thread without
 intermediate registers or a scratch event bank. Preserve the original live context while preparing the destination;

@@ -120,6 +120,11 @@ competing active recovery contracts.
 
 ## 5. RTL change map from current source inspection
 
+The [engineering resolution](boot-fault-engineering-resolution.md) specifies
+local-memory completion/readback, post-stash preservation of the original
+capability pair and the exact-image binding gate. It records remaining evidence
+and input requirements without claiming implemented RTL.
+
 | File / existing component | Reuse and required change |
 | --- | --- |
 | `hardware/core.py` | Own the fault-entry control and exclusive memory/register access. Prevent current fault-reset/clear logic from destroying source state before direct stash. Add only sequencing/state control, not an intermediate event bank. Preserve issuer signals through stalls. |
