@@ -2390,6 +2390,40 @@ function _showCompiledCandidateBesideSource(words, details) {
     } else {
         lines.push('; No embedded definition frame found; no PetNames inferred.');
     }
+    // Attribution is display-only and comes from this exact candidate's
+    // integrity-covered frame. A WORD/HARDFAULT alone is never CALL evidence.
+    if (expandedApi && expandedApi.symbolic_binding) {
+        try {
+            if (!window.SymbolicLumpGuard) throw new Error('Symbolic relocation validator unavailable');
+            var verified = window.SymbolicLumpGuard.validate(binary, {
+                planContract: expandedApi.symbolic_binding
+            });
+            if (!verified.symbolic) throw new Error('No matching embedded relocation evidence');
+            var calls = verified.contract.calls;
+            var dotName = /^[A-Za-z_][\w-]*(?:\.[\w-]+)+$/;
+            calls.forEach(function(call) {
+                var dependency = verified.contract.dependencies[call.row];
+                if (call.row >= 32 || !dotName.test(call.full_name) ||
+                        !dependency || !Array.isArray(dependency.rights) ||
+                        !dependency.rights.includes('E')) {
+                    throw new Error('Symbolic CALL name or capability evidence is invalid');
+                }
+            });
+            var conditions = ['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC',
+                'HI', 'LS', 'GE', 'LT', 'GT', 'LE', '', 'NV'];
+            calls.forEach(function(call) {
+                var offset = call.word_offset;
+                instructionLines[offset] = '[' + String(offset).padStart(4, '0') +
+                    ']  0x' + binary[offset].toString(16).padStart(8, '0').toUpperCase() +
+                    '  CALL' + conditions[call.condition] + ' ' + call.full_name +
+                    ' — pending binding (C-list row ' + call.row +
+                    '; faults only if referenced while unresolved)';
+            });
+        } catch (error) {
+            lines.push('; Symbolic CALL attribution unavailable: ' + error.message +
+                '; raw instruction decoding retained.');
+        }
+    }
     if (cc > 0) {
         lines.push('', '; C-list (exact authenticated words)');
         if (binary.slice(-cc).every(function(value) { return value === 0; })) {

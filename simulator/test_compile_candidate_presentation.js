@@ -34,6 +34,7 @@ stylesheet.textContent = fs.readFileSync(path.join(__dirname, 'styles-toolbar.cs
 dom.window.document.head.appendChild(stylesheet);
 const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 dom.window.LumpApiCodec = require('./lump-api-codec');
+dom.window.SymbolicLumpGuard = require('./symbolic-lump-guard');
 const context = vm.createContext({
     window: dom.window,
     document: dom.window.document,
@@ -180,3 +181,56 @@ assert.match(dom.window._compiledCandidateAuditText,
     /Row 1 <img src=x>: SYMBOLIC/);
 assert.equal(dom.window.document.getElementById('savedLumpDisassembly').querySelector('img'), null);
 assert.equal(JSON.stringify(secondNamed), beforeReport, 'report rendering never changes words');
+
+// Exact real-compiler relocation evidence, including conditional CALL and an
+// intentional HARDFAULT with the same raw word as an unconditional placeholder.
+const callDraft = `abstraction test.Caller {
+capabilities {
+ SELF E
+ test.Target E
+}
+method Run {
+ CALL test.Target.Run
+ CALLEQ test.Target.Other
+ HARDFAULT INTENTIONAL
+ RETURN
+}
+}`;
+const callCompile = spawnSync(process.execPath, ['server/compile_worker.js'], {
+    input: JSON.stringify({source: callDraft, language: 'assembly', tier: 2}),
+    encoding: 'utf8',
+});
+assert.equal(callCompile.status, 0, callCompile.stderr);
+const callResult = JSON.parse(callCompile.stdout);
+assert.equal(callResult.ok, true, JSON.stringify(callResult));
+const callWords = callResult.words;
+const guard = dom.window.SymbolicLumpGuard;
+const contract = guard.embedded(callWords);
+assert.equal(contract.calls.length, 2);
+const frozenCalls = JSON.stringify(callWords);
+const renderCalls = words => {
+    context._showCompiledCandidateBesideSource(words, {methodCount: 1});
+    return dom.window.document.getElementById('savedLumpDisassembly').textContent;
+};
+dom.window.document.getElementById('asmEditor').value = 'CALL mutable.Wrong';
+const callDisplay = renderCalls(callWords);
+assert.match(callDisplay, /CALL test.Target.Run — pending binding/);
+assert.match(callDisplay, /CALLEQ test.Target.Other — pending binding/);
+assert.doesNotMatch(callDisplay, /mutable.Wrong/);
+const faultOffset = contract.calls[1].word_offset + 1;
+assert.equal(callWords[faultOffset], 0xf7000000);
+assert.match(callDisplay, new RegExp('\\[' + String(faultOffset).padStart(4, '0') +
+    '\\]  0xF7000000  WORD_f7000000'));
+assert.equal(JSON.stringify(callWords), frozenCalls);
+const mismatch = callWords.slice();
+mismatch[contract.calls[0].word_offset] ^= 0x00800000;
+assert.doesNotMatch(renderCalls(mismatch), /pending binding/);
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
+    /Symbolic CALL attribution unavailable/);
+const absent = callWords.slice();
+absent[1 + ((absent[0] >>> 10) & 8191)] = 0;
+assert.doesNotMatch(renderCalls(absent), /pending binding|test.Target/);
+assert.match(renderCalls(absent), /WORD_f7000000/);
+assert.match(renderCalls(callWords), /pending binding/, 'fresh evidence restores attribution');
+assert.equal(dom.window.document.getElementById('asmEditor').value, 'CALL mutable.Wrong');
+console.log('PASS exact candidate CALL attribution, missing/mismatched evidence and HARDFAULT isolation');
