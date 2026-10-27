@@ -2205,7 +2205,9 @@ async function compileAndBuild(options) {
 
     // ── Pre-save audit — run on assembled binary BEFORE download or server save ──
     // Build LUMP-level lineNums: index 0 = header (null), indices 1..cw = per-word source lines.
-    const _lumpLineNums = [null, ...allLineNums];
+    const _lumpLineNums = typeof buildAuditSourceLines === 'function'
+        ? buildAuditSourceLines(result, lumpWords)
+        : new Array(cw + 1).fill(null);
 
     let _auditResults = [];
     let _auditErrors  = [];

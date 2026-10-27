@@ -11,6 +11,8 @@
 //   RCI7 — lumpAudit() with multiple RCI violations: each violation gets its own sourceLine
 'use strict';
 
+require('./test_branch_audit_source.js');
+
 // ── Load modules ─────────────────────────────────────────────────────────────
 // lump-audit.js has no module.exports in browser mode, so we load it via the
 // Node.js-appended export shim added to the file.

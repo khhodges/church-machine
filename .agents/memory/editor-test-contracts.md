@@ -28,3 +28,16 @@ Assert the refreshed History revision before execution can change the detail
 selection; then compare the complete localized artifact and execute through
 the normal boot-aware controls. Label in-memory restart simulation separately
 from a full server-process restart.
+
+Post-compile diagnostics must map the final artifact layout, including generated
+dispatch entries and shared alias bodies, back to the original editor source.
+Unknown or mismatched generated words must remain unlocated, never receive a
+guessed source line.
+
+**Why:** A branch audit used an obsolete displacement decoder while its location
+mapping omitted the dispatch prefix, presenting a binary error against header
+comments instead of the authored instruction.
+
+**How to apply:** Test both backward-branch decoding and actual gutter/overlay
+placement using the compiled layout. Distinguish stale test fixtures from
+regressions by checking their failures against the unchanged baseline.

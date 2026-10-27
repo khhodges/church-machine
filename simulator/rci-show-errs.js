@@ -41,6 +41,38 @@ function mapRciAuditErrorsToShowErrs(auditErrors) {
     return showErrs;
 }
 
+// Match the final LUMP layout, not concatenated method bodies: header,
+// dispatch entries (including aliases), then non-aliased bodies. Never give
+// generated dispatch words an invented editor line.
+function buildAuditSourceLines(result, words) {
+    const cw = (words[0] >>> 10) & 8191;
+    const lines = new Array(cw + 1).fill(null);
+    const methods = result.methods || [];
+    let cursor = 1 + methods.length;
+    if (methods.length + methods.reduce((n, m) =>
+        n + (m.aliasOf ? 0 : (m.code || []).length), 0) !== cw) return lines;
+    for (const method of methods) {
+        if (method.aliasOf) continue;
+        const mapping = ((result.manifest || []).find(m => m.name === method.name) || {}).mapping || [];
+        let mappedLine = null;
+        for (let i = 0; i < (method.code || []).length; i++, cursor++) {
+            // Later records at the same address replace labels with the
+            // actual emitting statement. Implicit code has no authored line.
+            for (const entry of mapping) {
+                if (entry.addr === i) mappedLine = /implicit|^label\b/i.test(entry.desc || '')
+                    ? null : entry.src;
+            }
+            const line = method.lineNums?.[i] ?? mappedLine;
+            // Metadata describes this compile, not arbitrary saved bytes.
+            // A relocated/otherwise different word is left unlocated rather
+            // than falsely highlighting unrelated source.
+            if ((words[cursor] >>> 0) === (method.code[i] >>> 0) &&
+                Number.isInteger(line) && line > 0) lines[cursor] = line;
+        }
+    }
+    return lines;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { mapRciAuditErrorsToShowErrs };
+    module.exports = { mapRciAuditErrorsToShowErrs, buildAuditSourceLines };
 }

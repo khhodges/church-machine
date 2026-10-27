@@ -601,7 +601,8 @@ function lumpAudit(words, manifest, lineNums, opts) {
     //   carries its own c-list (cc > 0) the slot must be in range 0..cc-1.
     //   When cc=0 the LUMP uses the ambient boot c-list at runtime, so no
     //   per-LUMP slot-bounds check is possible or meaningful — slots are exempt.
-    //   BRANCH (opcode 23, v2.0 ISA): sign-extended 15-bit offset must land in [0, cw-1].
+    //   BRANCH: DR0 plus signed-magnitude 18-bit displacement is statically
+    //   checkable. Nonzero DR indices require runtime target validation.
     //   Note: opcode 17 = DWRITE (device write) — not BRANCH — in v2.0.
     //
     // Skipped for Thread lumps (typ=10): words 1..sw are DR values (data registers),
@@ -673,8 +674,8 @@ function lumpAudit(words, manifest, lineNums, opts) {
             }
 
             if (op === _rciBranchOp) {
-                let off = ww & 0x7FFF;
-                if (off & 0x4000) off = off - 0x8000;   // sign-extend 15-bit
+                if (((ww >>> 19) & 15) !== 0) continue;
+                const off = (ww & 0x40000) ? -(ww & 0x3FFFF) : (ww & 0x3FFFF);
                 const target = codeIdx + off;
                 if (target < 0 || target >= cw) {
                     const _branchMsg = `Instruction ${wi} (BRANCH) jumps to position ${target}, ` +
