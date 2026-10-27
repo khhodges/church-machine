@@ -20,6 +20,17 @@ Factory Build acceptance. Verify return to Amoeba before the attack, the real
 fault/reboot path, and repetition from the beginning. Do not substitute a
 host-driven loop or treat this as authorization to flash or reboot hardware.
 
+The first milestone must also include the approved RTL fault-entry changes
+that stash the event directly in Boot.Thread, with corresponding simulation
+and RTL evidence. They are not deferred optional Factory Build work.
+
+**Why:** The user explicitly reminded us not to omit the RTL event stash when
+agreeing to the Boot Namespace simulation-first sequence.
+
+**How to apply:** A software-only restart loop does not satisfy this milestone.
+Keep Namespace simulation, RTL fault-entry verification and later physical
+acceptance distinct, and retain the fault evidence before restarting the demo.
+
 Phase 1 IDE setup means populating the Namespace LUMPs with the implemented
 source so the programmer can select each LUMP in the existing code editor,
 edit it, and recompile it. Do not reinterpret this as a request for a new
