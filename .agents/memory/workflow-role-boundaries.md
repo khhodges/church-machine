@@ -20,6 +20,18 @@ communication handled by the bridge. Distinguish the prerequisite firmware
 upgrade from routine image installation; this requirement does not authorize
 physical flashing or establish that readback is already supported.
 
+The next Factory Build is to include the combined installation improvements
+above and both LightningBolt options, controlled by Amobea in round-robin turns
+using GTs in CR0 and CR1. The Factory Build must be approved first.
+
+**Why:** The user explicitly requested this combined scope for the next build,
+not a separate later upgrade.
+
+**How to apply:** Carry both requirements into the build approval scope. Do not
+infer approval to flash, publish, or activate hardware from this scope agreement.
+Resolve exact target bindings and scheduling semantics in the approval details;
+do not silently replace Amobea control with hardware-selected targets.
+
 Each role must be able to work concurrently against exact approved upstream
 deliverables without changing another role's approved outputs. A new LUMP does
 not automatically replace a Namespace selection; a Namespace edit does not
