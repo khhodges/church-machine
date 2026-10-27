@@ -18,6 +18,18 @@ permission to revive OFFLINE code. Do not assume automatic retry authorization.
 Fault entry must bypass CHANGE's outgoing save and explicitly prime
 Boot.Thread's DRs and CRs. Microcode owns this priming under the KISS rule.
 
+Fault-entry review must explicitly include the Boot Namespace load into CR15
+and compare reuse of the existing SWITCH handoff machinery before adding a
+parallel activation engine.
+
+**Why:** The user called out the omitted LOAD CR15 and asked whether SWITCH
+would make better use of the FPGA. This is a design-review request, not approval
+to execute ordinary SWITCH or change its semantics.
+
+**How to apply:** Distinguish instruction execution from shared internal
+Namespace-load/Thread-load phases; preserve the no-second-save fault rule.
+Reconcile current ISA recovery rules with the new proposal before RTL edits.
+
 **Ordering:** Prime Boot.Thread FIRST, before attempting to save the faulting
 Thread. Immediately stash the event directly into Boot.Thread without
 intermediate registers or a scratch event bank. Preserve the original live context while preparing the destination;
