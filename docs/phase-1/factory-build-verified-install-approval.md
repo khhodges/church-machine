@@ -376,8 +376,9 @@ its cause, not masking it with retries or recovery claims.
 Current design decision and superseded-draft record:
 [Boot.Thread fault-entry FPGA proposal](boot-thread-fault-entry-proposal.md).
 The [minimal service-restoration sequence](boot-thread-fault-entry-proposal.md#proposed-minimal-service-restoration-sequence)
-now proposes one save attempt followed by validated Boot entry for either
-save outcome, then Mint/Amoeba clean-template execution. It is awaiting
+requires Boot.Thread priming first, then one outgoing save attempt and
+entry into the already-primed Boot context for either save outcome, then
+Mint/Amoeba clean-template execution. Detailed implementation is awaiting
 approval and is not an implementation or hardware acceptance claim.
 Phase 1 uses the **saved Thread context**, not a separate 96-word dump object.
 The context is remembered, not diagnosed as a prerequisite to restoring
@@ -395,9 +396,11 @@ not already retained by the saved context; their exact placement and
 Boot.Thread inspection authority remain review items.
 
 **Agreed direction:** the fault handoff bypasses CHANGE's outgoing-context
-save and explicitly primes Boot.Thread's DRs and CRs. The faulting Thread's
-protected context-save attempt precedes this handoff; it must not be repeated
-implicitly by CHANGE. In the matrix below, “dump” means this saved Thread
+save and explicitly primes Boot.Thread's DRs and CRs **before** attempting
+the faulting Thread save. Preserve the original live context while preparing
+Boot's destination context. Finalize save status, then activate the already-
+primed Boot context; do not repeat the save implicitly through CHANGE.
+In the matrix below, “dump” means this saved Thread
 context, not a separate diagnostic object. Treat these cases as catastrophic
 recovery: remember the event and restore service through the configured Boot
 path and Mint/Amoeba transaction templates. Diagnosis, IDE reporting and MTBF
@@ -444,10 +447,11 @@ Abstraction fault; it does not declare the Thread itself defective.
 | 9. Reporting disconnected | Local handling succeeds but UART/Ethernet delivery is unavailable. | Retain evidence under the approved durability contract; reporting delay must not retry application execution. |
 | 10. Mint initialization fails | Authorized fresh-Thread creation cannot complete. | Retain the initialization failure; never execute partial state or silently resume the faulting continuation. |
 
-Required design order: retain the original fault evidence; attempt any approved
-diagnostic save and mark its completion status; explicitly prime Boot.Thread's
-DRs/CRs and required entry state; transfer control **without CHANGE save**;
-inspect under normal authority; then decide the authorized disposition.
+Required design order: retain the original fault facts; **prime Boot.Thread
+first**, preserving the outgoing live context; attempt its protected save
+once and finalize the outcome fields; transfer to the already-primed Boot
+context **without CHANGE save**; remember the incident and restore clean
+service. Diagnosis is not a prerequisite.
 Capture failure, priming failure and nested faults need explicit outcomes.
 The minimum fault latch and diagnostic-save mechanism remain unresolved.
 

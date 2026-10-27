@@ -18,6 +18,20 @@ permission to revive OFFLINE code. Do not assume automatic retry authorization.
 Fault entry must bypass CHANGE's outgoing save and explicitly prime
 Boot.Thread's DRs and CRs. Microcode owns this priming under the KISS rule.
 
+**Ordering:** Prime Boot.Thread FIRST, before attempting to save the faulting
+Thread. Preserve the original live context while preparing the destination;
+after the save attempt, finalize outcome fields and activate the primed Boot
+context without a second CHANGE save.
+
+**Why:** The user corrected the save-first proposal: “The prime boot thread
+must come first!” Boot readiness must not depend on a successful old-context save.
+
+**How to apply:** Distinguish destination priming from activation. Test that
+priming precedes outgoing save writes, preserves their source state, and
+survives save failure. Do not reintroduce save-first ordering in diagrams or
+microcode. If source and destination alias, do not overwrite the source and
+claim it was preserved; the safe mechanism must be explicitly defined.
+
 **Why:** The user specified this while reviewing successful/failed fault-context
 saves and Boot.Thread dump inspection. The handoff must not repeat the save.
 The user explicitly agreed that microcode must perform Boot.Thread priming.

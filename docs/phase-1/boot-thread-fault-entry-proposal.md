@@ -2,6 +2,12 @@
 
 ## Current Phase 1 decision — saved Thread context
 
+**Required ordering: prime Boot.Thread first, then attempt the faulting
+Thread save, then enter the already-primed Boot.Thread without CHANGE save.**
+Priming prepares the destination context; it must not destroy the original
+live state before the save attempt. Boot readiness cannot depend on that
+attempt succeeding.
+
 **Current recovery policy:** treat the fault/save/handoff cases as catastrophic
 recovery: remember the event, then restore service. Do not diagnose the old
 context as a prerequisite to recovery. This supersedes diagnostic-first
@@ -20,12 +26,14 @@ authority, recursively retrying or claiming restored service.
 Thread context as retained evidence. Do not require Boot.Thread to inspect it
 before restoring service.
 
-- Save the faulting Thread's context through the defined protected save path.
-  Do not introduce a second 96-word diagnostic object or duplicate register
-  bank for this proposal.
-- Microcode primes Boot.Thread's DRs/CRs and enters the Boot Namespace.
-  This handoff bypasses CHANGE's outgoing save: it must not save the same
-  context again.
+- Microcode first primes Boot.Thread's destination DR/CR context and entry
+  state, preserving the original live registers and Namespace until saving
+  has been attempted. Initially DR3=0 and DR5=0.
+- Only then attempt the faulting Thread's protected context save. Do not
+  introduce a second 96-word diagnostic object or duplicate fault register
+  dump. Finalize Boot.Thread's save-status fields after the attempt.
+- Enter the already-primed Boot.Thread in Boot Namespace. This handoff
+  bypasses CHANGE's outgoing save; it must not save the same context again.
 - Remember the faulting Namespace before replacing live CR15. Existing
   Thread homes must not be assumed to contain CR15 or every fault fact:
   the exact minimal retained fault/Namespace information and its placement
@@ -150,6 +158,7 @@ The concrete sequence below is the proposal for approval. Diagnostic inspection
 is not a prerequisite. Condition flags start at zero; handler entry is offset
 zero in the exact prepared executable, with a fresh canonical poison root
 and no return continuation into the failed application.
+Boot.Thread is primed before the outgoing save attempt, not after it.
 Neither these tables nor the saved-context reference authorize resuming the
 denied instruction, changing Namespace versions or retrying the application.
 
@@ -179,10 +188,18 @@ Missing or invalid recovery inputs cannot be silently substituted.
 | --- | --- | --- |
 | 1. Stop and remember | Block application instruction fetch/retirement. Retain original CR12 and CR15 plus fault code, issuer byte address and instruction word. Keep these small handoff latches independent of the attempted Thread save. | Do not allocate a duplicate register dump. The original fault is never replaced by a save error. |
 | 2. Settle memory activity | Allow already accepted operations to finish or fail; issue no further operation from the faulting instruction. Exclude conflicting writers during save and Boot entry. | A failed old operation does not authorize retry or imply rollback of earlier effects. An unquiesceable memory interface cannot safely prime Boot and reports recovery unavailable. |
-| 3. Attempt the protected Thread save once | Validate original Thread geometry and save using the existing private homes and canonical frame encoding. Do not run a CHANGE instruction. | Complete: DR3=1, DR5=0. Save error: stop further save requests, DR3=2 and actual secondary code in DR5, then proceed to Boot validation. No retry and no complete-save prerequisite. |
-| 4. Validate Boot inputs | Validate the configured Boot root, Thread, handler and C-list under existing authority/type/version/seal/bounds rules. Stage the incoming values without changing the root used for the original save. | Failed save geometry is not reused as Boot geometry. Stale Boot authority is not refreshed. Boot validation failure means recovery unavailable, not a fallback target. |
-| 5. Prime Boot | Initialize Boot.Thread's canonical poison-root/STO state; write the active register table, including original Thread in CR1, original Namespace in CR2 and save outcome in DR3/DR5. | Fetch stays blocked until all writes complete. Do not save the outgoing context again or rewrite its Namespace. Do not zero Boot's ordinary heap or erase retained incident records. |
-| 6. Commit and enter | Make Boot Namespace/root, Boot.Thread ownership, handler CR14 and handler NIA visible as one execution boundary. Handler NIA is its validated code origin, offset 0. | Release fetch only after successful priming. No CALL return frame to the application, no boot-ROM execution over the old application image, no bridge/IDE acknowledgement. |
+| 3. Validate Boot inputs | Validate the configured Boot root, Thread, handler and C-list under existing authority/type/version/seal/bounds rules. Preserve the original live context. | No outgoing save is attempted before Boot is ready. Stale Boot authority is not refreshed. Boot validation failure means recovery unavailable, not a fallback target. |
+| 4. Prime Boot FIRST | Prepare Boot.Thread's destination register context and canonical root/STO entry state, with original Thread in CR1, original Namespace in CR2, DR3=0 and DR5=0. Keep the original live registers and root intact for saving. | Boot priming must complete before the first outgoing save write. Fetch remains blocked. Do not zero Boot's ordinary heap or erase retained incidents. Priming is preparation, not activation. |
+| 5. Attempt the protected Thread save once | Validate original Thread geometry and save using its existing private homes and canonical frame encoding. Do not run CHANGE. | Complete: finalize the primed DR3=1, DR5=0. Save error: stop further save requests, finalize DR3=2 and the actual secondary code in DR5. Proceed to the already-primed Boot context without retry, re-priming or a complete-save prerequisite. |
+| 6. Commit and enter | Activate the primed register context and publish Boot Namespace/root, Boot.Thread ownership, handler CR14 and handler NIA as one execution boundary. Handler NIA is its validated code origin, offset 0. | No second outgoing save. No CALL return frame to the application, old-image boot-ROM execution or bridge/IDE acknowledgement. Release fetch only after the prepared context and final status are installed successfully. |
+
+Primed destination storage and the outgoing save region must be distinct and
+protected from each other's writes. Use Boot.Thread's normal destination
+context/entry machinery, not a duplicate fault dump. If the faulting context
+is Boot.Thread itself or overlaps that destination, this sequence must not
+overwrite the source to pretend it saved it: retain the defined unavailable/
+nested-fault boundary until an explicit safe mechanism is approved.
+The detailed staging implementation must preserve these ordering invariants.
 
 **Save layout, not a new format:** for Thread body size L words, DR homes
 are body words 1–16, protected STO/indicator is word 17, and CR0–CR11 GT
@@ -246,6 +263,10 @@ service is unavailable. That result is not permission to bypass authority.
 
 ### Acceptance for this sequence
 
+- Prove Boot priming completes before any outgoing Thread-save write.
+  Check the original live context remains unchanged by priming and that a
+  save error cannot overwrite or invalidate the prepared Boot context.
+  Only outcome fields are finalized after saving; no second priming pass.
 - Inject the same original fault with successful save, rejected save setup
   and interrupted save. Where Boot inputs remain valid, all reach the same
   configured handler and clean-template service path with truthful DR3/DR5.
