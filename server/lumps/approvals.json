@@ -4316,6 +4316,74 @@
         "signature": "5071c32c4714639c01d9335afdc002244cb8a5335a2cfe7af004d31ce99d20a3"
       },
       "identity_hash": "d99a2bc1bdf8f9315bb31b192448055368b56b8bb02f45b956bd0e703a9ca803"
+    },
+    "77c842aafb8728355e279774931154ce886f90b1825463328431be7271ff7faa": {
+      "binary_hash": "77c842aafb8728355e279774931154ce886f90b1825463328431be7271ff7faa",
+      "dot_name": "ide.ActorManager",
+      "issue_n": 1,
+      "abstraction": "ide.ActorManager",
+      "filename": "ide.ActorManager.1.2e577784.lump",
+      "compiled_at": 1793134771.077952,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.Thread2",
+            "rights": [],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread3",
+            "rights": [],
+            "relocation_row": 2,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.ActorManager",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "77c842aafb8728355e279774931154ce886f90b1825463328431be7271ff7faa",
+        "source_hash": "988f0d1f14c9610f75257d32807c8a0672f6146112991a6032709f5d2ec23354",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "f4931d607032e6f111f19bef2357ff89f24e6a1aa1b9a2cfa0a4c1b35cf6b262",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "3856720551c4edf7799752e011bf685b9e71ab489972e9500f61c0042b2c011d"
+      },
+      "identity_hash": "8bab4488e3189b64ec248dfa557f16d76be99790db09c8376d093eb7fee867c1"
     }
   }
 }
