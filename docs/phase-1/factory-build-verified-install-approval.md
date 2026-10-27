@@ -371,6 +371,44 @@ its cause, not masking it with retries or recovery claims.
 
 ### Fault journal, reboot handoff and exposure accounting
 
+#### Fault entry into Boot.Thread — CHANGE save bypass
+
+**Agreed direction:** the fault handoff bypasses CHANGE's outgoing-context
+save and explicitly primes Boot.Thread's DRs and CRs. A separate attempt to
+save the faulting Thread's diagnostic context is not the CHANGE save and
+must not be repeated implicitly during handoff.
+
+This is a dedicated fault-entry contract, not a change to ordinary CHANGE.
+Exact register assignments, trusted sources, entry frame/NIA, ownership
+transition and commit ordering remain to be approved. Bypassing the save
+does not bypass destination capability validation or authorize new GTs.
+Boot.Thread priming must not inherit arbitrary application authority.
+Normal prepared boot behavior remains separate from this fault-entry path.
+
+The following matrix is a proposed disposition review, not implemented
+recovery. “Faulting Thread” identifies the execution context of the
+Abstraction fault; it does not declare the Thread itself defective.
+
+| Case | Diagnostic save and inspection | Boot.Thread entry and disposition |
+| --- | --- | --- |
+| 1. Save succeeds; inspection succeeds | Complete context saved without a second error; Boot.Thread validates and inspects the matching dump under its authorized capabilities. | Prime Boot.Thread DRs/CRs and enter without CHANGE save. Retain the incident; continue eligible work under the approved management contract. |
+| 2. Save succeeds; inspection fails | Complete dump retained, but inspection authority or validation fails. | Same save-bypass entry. Preserve the original evidence and separate inspection fault; no authority bypass or containment claim based on unread evidence. |
+| 3. Save fails; partial evidence inspectable | Second error leaves an explicitly incomplete dump; independently retained original fault evidence remains available. | Same save-bypass entry, without retrying the failed save. Record both errors in order; do not treat partial state as a resumable continuation. |
+| 4. Save fails; inspection fails | Neither a complete save nor safe inspection is available. | Do not depend on CHANGE save to reach fault management. If safe priming/entry or inspection cannot complete, use the defined hard-fault outcome, not recursive recovery. |
+| 5. Boot.Thread already active | A previous management operation owns its context. | Do not overwrite it with fresh DR/CR priming. Define bounded pending-incident handling and overflow disposition before implementation. |
+| 6. Boot.Thread faults | Management execution itself raises a fault. | Preserve the separate failure; no recursive re-priming. Keep the specified Boot.Thread hard-fault/purgatory boundary. |
+| 7. Stale dump | Otherwise valid bytes belong to another incident or session. | Reject the association using incident/context identity; never substitute it for the current dump. |
+| 8. Prior effects uncertain | Dump is complete but earlier application writes or external effects are unresolved. | Successful capture is not rollback or proof of containment. Apply the transaction's approved clean-recovery contract. |
+| 9. Reporting disconnected | Local handling succeeds but UART/Ethernet delivery is unavailable. | Retain evidence under the approved durability contract; reporting delay must not retry application execution. |
+| 10. Mint initialization fails | Authorized fresh-Thread creation cannot complete. | Retain the initialization failure; never execute partial state or silently resume the faulting continuation. |
+
+Required design order: retain the original fault evidence; attempt any approved
+diagnostic save and mark its completion status; explicitly prime Boot.Thread's
+DRs/CRs and required entry state; transfer control **without CHANGE save**;
+inspect under normal authority; then decide the authorized disposition.
+Capture failure, priming failure and nested faults need explicit outcomes.
+The minimum fault latch and diagnostic-save mechanism remain unresolved.
+
 **Required outcome; detailed mechanism pending approval.** Fault evidence and
 reliability history must not depend on an open IDE browser or a continuously
 connected UART host. A reboot must not erase the reason for the event, make
@@ -616,6 +654,11 @@ Before a candidate build is accepted:
   reviving OFFLINE code or claiming reversal of prior external effects.
   Validate malformed/stale templates and unauthorized bindings against the
   approved contract without weakening hard-fault rules.
+- Exercise the fault-entry matrix above. Prove Boot.Thread DR/CR priming
+  uses the approved inputs, preserves original fault evidence, and performs
+  no outgoing CHANGE save, including after a failed diagnostic save.
+  Verify normal CHANGE retains its existing save behavior and fault entry
+  does not bypass capability checks or recursively overwrite Boot.Thread.
 - A separately authorized physical acceptance run repeats the flow from
   running, halted, and faulted states using exact retained build/image bytes,
   then confirms both LightningBolt targets execute in the approved order.
