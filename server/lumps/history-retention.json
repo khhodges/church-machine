@@ -2021,5 +2021,26 @@
         "age_timestamp": 1790711639.6846077
       }
     }
+  ],
+  "07eae44c": [
+    {
+      "version": 1,
+      "filename": "ide.Alice_v1.lump",
+      "binary_hash": "c36f5d774a07b4d37230b68164484e41989f1c7a8ebba3fc16cb815b7e59b16f",
+      "deleted_at": 1793100773.3867419,
+      "compiled_at": 1790506439.9806974,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1790506439.9806974
+      }
+    }
   ]
 }

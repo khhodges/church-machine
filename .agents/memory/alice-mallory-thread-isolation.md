@@ -77,6 +77,18 @@ eligible work. Do not disable the Thread or substitute repeated stale-GT
 faults for caller compliance. Hardware version checks remain independent
 enforcement; this requirement does not specify a new notification ABI.
 
+Close the demonstration with a revised Mallory that removes the attack and
+performs its intended authorized work without error.
+
+**Why:** The user proposed the corrected Mallory to complete the security
+example, showing design correction rather than only exclusion.
+
+**How to apply:** Preserve the attacking revision and fault evidence, explain
+the correction, explicitly adopt the revised design through authorized
+bindings, and show Amoeba resuming requests successfully under unchanged
+security checks. Associate the corrective evidence with Must Resolve; do not
+silently restore stale GTs or claim operational MTBF from one clean run.
+
 **Why:** The user explicitly confirmed that expected endpoint.
 
 **How to apply:** Correlate the denial with Mallory's actual instruction and

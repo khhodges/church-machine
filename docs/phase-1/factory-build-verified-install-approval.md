@@ -294,6 +294,34 @@ intentional demonstration events clearly identified and kept separate from
 operational MTBF claims. Test repeated cycles, Stop, evidence retention, and
 that repetition does not become implicit recovery outside demonstration mode.
 
+### Close the example with corrected Mallory
+
+Include a revised Mallory with the attack removed as the final demonstration
+stage. Preserve the original attacking revision and its incident evidence;
+do not rewrite history or make the old GTs valid again.
+
+Show the complete sequence:
+
+1. Identify the RW object, attack instruction, failed check, and containment.
+2. Show the applicable MTBF analysis, Must Resolve entry, version-defined
+   OFFLINE state, and Amoeba stopping its polls of Mallory.
+3. Show the source/design change that removes the attack, with the original
+   and corrected revision identities clearly distinguished.
+4. Explicitly approve and adopt the corrected revision through the authorized
+   binding/admission path. Do not silently refresh stale GTs or weaken checks.
+5. Let Amoeba resume requests to the corrected Mallory and demonstrate its
+   intended authorized work completing without error under the same protection
+   rules. Other eligible work must continue.
+6. Attach the corrective revision and observed successful execution to the
+   Must Resolve item. Close it only through the defined resolution process,
+   preserving the original fault evidence.
+
+Success must be demonstrated by the expected work and execution evidence,
+not merely by absence of a fault badge or replacing Mallory with a no-op.
+Label the observed error-free run duration/cycles; it does not establish an
+unmeasured operational MTBF. This is a design correction and explicit adoption,
+not automatic recovery of the original attacking object.
+
 ## 8. Operator presentation and installation receipt
 
 Use one progress view with distinct states:
