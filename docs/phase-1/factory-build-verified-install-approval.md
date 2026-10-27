@@ -1,6 +1,8 @@
 # Next Factory Build — approval specification
 
-**Status: DRAFT FOR APPROVAL. Not approved for build, flashing, or activation.**
+**Status: Scope approved to proceed. Detailed target bindings and faulted-turn
+disposition remain unresolved approval gates. No authorization to flash or
+activate hardware.**
 
 ## 1. Purpose and operator boundary
 
