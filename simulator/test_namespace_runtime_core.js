@@ -1,4 +1,5 @@
 'use strict';
+require('./test_boot_fault_entry');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const Simulator = require('./simulator');

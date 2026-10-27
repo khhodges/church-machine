@@ -7,6 +7,8 @@
     let reportedMachine = null, reportedOutput = '', reportedFaults = 0;
     let previousSimulator = null;
     let pendingPreparation = null;
+    let faultHandlerSlot = null;
+    let faultHandlerOwner = null;
 
     function freezeRecord(value) {
         if (!value || typeof value !== 'object') return value;
@@ -99,12 +101,24 @@
     }
     function markup() {
         const ready = machine && owner && same(owner);
+        const rows = root.NamespaceDesignV1?.state.document?.rows || [];
         return '<strong>Selected design · private simulator</strong> ' +
+            '<label>Fault entry handler <select onchange="DesignSimulation.selectFaultHandler(this.value)"' +
+            (busy || running ? ' disabled' : '') + '><option value="">Stop on fault (not configured)</option>' +
+            rows.filter(row => row.kind === 'lump').map(row =>
+                '<option value="'+row.slot+'"'+(faultHandlerSlot===row.slot?' selected':'')+'>'+
+                esc((row.name || 'LUMP')+' · slot '+row.slot)+'</option>').join('')+
+            '</select></label> ' +
             '<button class="btn btn-sm" onclick="DesignSimulation.prepare()" title="Validate, approve and load this exact saved design for private simulation"' + (busy?' disabled':'') + '>Prepare fresh simulation</button> ' +
             ['Step','Run','Stop','Reset'].map(action =>
                 '<button class="btn btn-sm" onclick="DesignSimulation.'+action.toLowerCase()+'()"' +
                 (busy || !ready || (running && action!=='Stop') ? ' disabled' : '') + '>'+action+'</button>').join(' ') +
             '<p role="status" style="white-space:pre-wrap">'+esc(message)+'</p>'+
+            (machine?.bootFaultStatus?.state === 'catastrophic'
+                ? '<style>@keyframes bootFaultLed{0%,49.99%{opacity:1}50%,100%{opacity:.1}}</style>'+
+                  '<p role="alert"><span style="color:#ff4040;animation:bootFaultLed 2s steps(1) infinite">LED 1</span> '+
+                  'Catastrophic fault-entry loop. No execution or retry. '+
+                  esc(machine.bootFaultStatus.reason)+'</p>' : '')+
             (provenance && !ready ? '<p role="alert">The selected design has changed. These retained bytes are not current; prepare the selected design again before execution.</p>' : '')+
             (provenance ? '<details><summary>Exact simulation identity</summary><pre style="white-space:pre-wrap">'+
                 esc(JSON.stringify({profile:root.NamespaceProfileNames.label(provenance.designProfile), imageHash:provenance.imageHash,
@@ -163,6 +177,19 @@
         const rows = selected ? JSON.parse(selected.document).rows : [];
         const freshThreadSlots = rows.filter(row => row.kind === 'thread' &&
             Number.isInteger(row.preparedThread?.entryNia)).map(row => row.slot);
+        if (faultHandlerSlot !== null) {
+            if (JSON.stringify(selected) !== faultHandlerOwner)
+                throw Error('Namespace selection changed. Select its fault handler explicitly before preparing simulation.');
+            const handler = instance.readNSEntry(faultHandlerSlot);
+            const thread = instance.readNSEntry(2);
+            if (!handler || !thread) throw Error('Selected fault handler or Boot.Thread is unavailable');
+            instance.configureBootFaultEntry({
+                root: {...instance.cr[15]},
+                threadGT: instance.createGT(instance.parseNSWord1(thread.word1_limit).gtSeq, 2, {}, 1),
+                handlerGT: instance.createGT(instance.parseNSWord1(handler.word1_limit).gtSeq, faultHandlerSlot, {E:1}, 1),
+                imageIdentity: record.imageHash,
+            });
+        }
         instance.beginBoot({clearNonBootThreads:true, freshThreadSlots});
         instance.simulationConfiguration=freezeRecord(record);
         if(typeof instance.on==='function') {
@@ -426,7 +453,15 @@
             return false;
         }
     }
-    root.DesignSimulation={prepare,command,stop,invalidate,markup,render,run,reset,traceContext,traceIdentity,
+    function selectFaultHandler(value) {
+        stop();
+        faultHandlerSlot = value === '' ? null : Number(value);
+        faultHandlerOwner = faultHandlerSlot === null ? null : JSON.stringify(selection());
+        invalidate();
+        message = 'Fault handler selection changed. Prepare fresh simulation to bind it to the exact image. Saved Namespace and hardware are unchanged.';
+        render();
+    }
+    root.DesignSimulation={selectFaultHandler,prepare,command,stop,invalidate,markup,render,run,reset,traceContext,traceIdentity,
         step:()=>{if(!running) execute(1);}};
 
     // Verify the occurrence against the admitted image, never editor/registry

@@ -255,17 +255,43 @@ class NamespaceRuntimeCore extends Simulator {
         return super._threadLayoutAtBase(base);
     }
     step() {
-        try { return super.step(); }
+        try {
+            const result = super.step();
+            if (this._pendingBootFault) {
+                const event = this._pendingBootFault;
+                this._pendingBootFault = null;
+                return this._bootFaultEntry.enter(event);
+            }
+            return result;
+        }
         catch (error) {
             if (!(error instanceof view.NamespaceGeometryError)) throw error;
             // Invalid root geometry must not recurse through a fault renderer
             // that reads that same invalid Namespace.
             this.halted = true;
             this.running = false;
-            this.faultLog.push({type: error.fault, message: error.message,
-                rawDiagnosticReason: error.message, namespace: {...this.cr[15]}});
+            const event = {type: error.fault, message: error.message,
+                faultCode: Simulator.FAULT_CODES[error.fault],
+                pc: this.pc, physicalPC: this.physicalPC,
+                faultRawWord: this.memory[this.physicalPC] >>> 0,
+                rawDiagnosticReason: error.message, namespace: {...this.cr[15]}};
+            this.faultLog.push(event);
+            if (this._bootFaultEntry) return this._bootFaultEntry.enter(event);
             return null;
         }
+    }
+
+    configureBootFaultEntry(configuration) {
+        const Entry = typeof ChurchBootFaultEntry !== 'undefined'
+            ? ChurchBootFaultEntry : require('./boot-fault-entry');
+        this._bootFaultEntry = new Entry(this, configuration);
+    }
+    fault(type, message, meta = null) {
+        if (this._faultEntryBusy)
+            throw Object.assign(new Error(message), {fault: type});
+        super.fault(type, message, meta);
+        if (this._bootFaultEntry)
+            this._pendingBootFault = this.faultLog[this.faultLog.length - 1];
     }
 
     _execSwitch(d) {

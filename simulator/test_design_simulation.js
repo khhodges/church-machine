@@ -4,6 +4,8 @@ const {webcrypto}=require('node:crypto');
 const code=fs.readFileSync(__dirname+'/design-simulation.js','utf8');
 const scripts=[...fs.readFileSync(__dirname+'/index.html','utf8').matchAll(/<script src="([^"?]+)/g)].map(m=>m[1]);
 assert(scripts.indexOf('namespace-runtime-core.js') < scripts.indexOf('design-simulation.js'));
+assert(scripts.indexOf('boot-fault-entry.js') >= 0 &&
+    scripts.indexOf('boot-fault-entry.js') < scripts.indexOf('namespace-runtime-core.js'));
 assert(scripts.indexOf('design-simulation.js') < scripts.indexOf('namespace-design-v1.js'));
 function harness(defect) {
     const panel={innerHTML:''},calls=[],instances=[];
@@ -26,6 +28,11 @@ function harness(defect) {
             assert.equal(cr15.word2,255);
             const listeners={};
             const machine={pc:1,dr:Array(16).fill(0),faultLog:[],halted:false,
+                cr:Array.from({length:16},()=>({...cr15})),
+                readNSEntry:()=>({word1_limit:255}),
+                parseNSWord1:()=>({gtSeq:0}),
+                createGT:(seq,slot,rights)=>slot+(rights.E?0x4a000000:0x02000000),
+                configureBootFaultEntry(config){this.faultEntryConfiguration=config;},
                 listeners,on(name,callback){(listeners[name] ||= []).push(callback);},
                 beginBoot(){this.bootComplete=defect!=='boot';this.bootStep=0;},
                 _bootStep(){this.bootStep++;this.bootComplete=this.bootStep===3;return true;},
@@ -426,6 +433,16 @@ function harness(defect) {
         assert.equal(bad.instances.length,0);
         assert.match(bad.panel.innerHTML,/blocked/);
     }
+    const configured=harness();
+    configured.scope.NamespaceDesignV1.state.document.rows[0].kind='lump';
+    configured.api.selectFaultHandler('10');
+    await configured.api.prepare(true);
+    assert.equal(configured.instances[0].faultEntryConfiguration.handlerGT,0x4a00000a);
+    assert.equal(configured.instances[0].faultEntryConfiguration.threadGT,0x02000002);
+    assert(configured.instances[0].faultEntryConfiguration.imageIdentity);
+    assert.match(configured.api.markup(),/value="10" selected/);
+    configured.scope.NamespaceDesignV1.state.document.rows[0].name='changed';
+    await assert.rejects(configured.api.prepare(true),/Select its fault handler explicitly/);
     const pending=harness();
     const started=pending.api.prepare(true);
     pending.api.invalidate();

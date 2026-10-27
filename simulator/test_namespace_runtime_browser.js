@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 // Use the served ordering, not CommonJS or a separate hand-written load order.
 const dependencies = new Set(['abstract_gt_manager.js', 'thread_design.js',
     'architecture_contracts.js', 'idx1-runtime.js', 'simulator.js',
-    'namespace-runtime-view.js', 'namespace-runtime-core.js']);
+    'namespace-runtime-view.js', 'boot-fault-entry.js', 'namespace-runtime-core.js']);
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const scripts = [...html.matchAll(/<script\b[^>]*src="([^"?]+)(?:\?[^"]*)?"/g)]
     .map(match => match[1]).filter(name => dependencies.has(name));

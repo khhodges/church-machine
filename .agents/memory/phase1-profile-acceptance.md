@@ -31,6 +31,18 @@ agreeing to the Boot Namespace simulation-first sequence.
 Keep Namespace simulation, RTL fault-entry verification and later physical
 acceptance distinct, and retain the fault evidence before restarting the demo.
 
+The user owns Boot Namespace creation; simulator work must not choose their
+LUMPs or rewrite saved Namespace assignments. Fault handlers require explicit
+selection bound to the exact prepared image, never inference from mutable CR0.
+
+**Why:** The user divided the work: “You update the simulator and I will create
+the Boot Namespace.” The approved engineering contract separately prohibits
+discovering the fault handler from current editor/catalog or mutable homes.
+
+**How to apply:** Use disposable fixtures for simulator validation. Keep the
+user's Namespace and hardware untouched; final end-to-end acceptance waits for
+their exact Boot design and explicitly selected handler.
+
 Phase 1 IDE setup means populating the Namespace LUMPs with the implemented
 source so the programmer can select each LUMP in the existing code editor,
 edit it, and recompile it. Do not reinterpret this as a request for a new

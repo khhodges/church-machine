@@ -8935,7 +8935,9 @@ class ChurchSimulator {
         return null;
     }
 
-    _activateChangeThread(threadGT, d, continuationPC, allowRoot = false) {
+    _activateChangeThread(threadGT, d, continuationPC, allowRoot = false, faultEntry = null) {
+        if (faultEntry && faultEntry !== this._faultEntryActivation)
+            throw new Error('Fault activation requires machine-owned admission');
         const parsed = this.parseGT(threadGT);
         if (ChurchSimulator.isNullGT(threadGT) || parsed.malformed || parsed.type !== 1) {
             this.fault('TYPE', 'CHANGE requires a non-null Inform Thread GT');
@@ -8953,7 +8955,7 @@ class ChurchSimulator {
         }
         const targetIdx = threadCheck.index;
         const entry = threadCheck.entry;
-        const selfTarget = this._liveThreadOwned && targetIdx === this._currentThreadSlot;
+        const selfTarget = !faultEntry && this._liveThreadOwned && targetIdx === this._currentThreadSlot;
         const threadSwitch = true;
         // ── Thread CHANGE: incoming context (including the running Thread) ────────
         // DR0–DR15 and CR0–CR11 live in fixed homes. Resume identity, NIA,
@@ -8988,6 +8990,13 @@ class ChurchSimulator {
         }
         const restoredRegs = [];
         for (let i = 0; i < 12; i++) {
+            if (faultEntry && (i === 1 || i === 2)) {
+                const held = faultEntry.references[i];
+                if ((this.memory[tBase + targetLayout.capsStart + i] >>> 0) !== held.word0)
+                    throw new Error('Fault reference home differs from held authority');
+                restoredRegs[i] = {...held};
+                continue;
+            }
             const gtWord = selfTarget ? this.cr[i].word0 >>> 0
                 : this.memory[tBase + targetLayout.capsStart + i] >>> 0;
             if (gtWord === 0 || ChurchSimulator.isNullGT(gtWord)) {
@@ -9022,6 +9031,8 @@ class ChurchSimulator {
         }
         const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx, selfSuspend, allowRoot);
         if (!resume) return null;
+        if (faultEntry && resume.resumePC !== 0)
+            throw new Error('Fault handler must enter at word offset zero');
         // Validate the actual C-List backing the saved executable context before
         // suspending the outgoing Thread or publishing any incoming registers.
         const codeBase = resume.checked.entry.word0_location;
@@ -9076,7 +9087,7 @@ class ChurchSimulator {
         // admission before touching either Thread image. CHANGE is atomic:
         // a rejected target or source leaves every home word intact.
         let outgoingPrepared = null;
-        if (threadSwitch && this._liveThreadOwned && outSlot !== null) {
+        if (!faultEntry && threadSwitch && this._liveThreadOwned && outSlot !== null) {
             const outEntry = this.readNSEntry(outSlot);
             if (!outEntry) {
                 this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${outSlot} is unavailable`);
@@ -9101,7 +9112,7 @@ class ChurchSimulator {
         // must not overwrite a valid saved Thread with those zero registers.
         // Reset-bank state preceding boot is not a Thread context and is never
         // serialized.  This is an architectural boot-state rule.
-        if (threadSwitch && this._liveThreadOwned && outSlot !== null) {
+        if (!faultEntry && threadSwitch && this._liveThreadOwned && outSlot !== null) {
             if (!this._suspendLiveThread(outSlot, outgoingPrepared, continuationPC)) return null;
         }
 
@@ -9128,7 +9139,9 @@ class ChurchSimulator {
         // are rejected before any context is committed; only explicit boot
         // activation may initialize execution from a preformatted root.
         const resumePC = resume.resumePC;
-        const resumeSTO = resume.frame.savedSTO;
+        // Fault entry starts a root invocation, not a popped continuation.
+        // Keep the poison frame beneath the handler's future CALL frames.
+        const resumeSTO = resume.frame.savedSTO - (faultEntry ? 2 : 0);
         this.sto = resumeSTO;
         this.flags = resume.frame.flags;
         this.pc = resumePC;
