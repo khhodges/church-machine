@@ -41,6 +41,9 @@ are eligible; do not re-enter Mallory merely to maintain alternating evidence.
 
 The user subsequently authorized a security demonstration loop based on the
 default MTBF setting, repeated until the message is understood.
+**Default MTBF belongs to Amoeba**, as explicitly clarified by the user.
+The demonstration consumes Amoeba's configured value; do not invent a separate
+IDE or demonstration-owned default.
 
 **Why:** The example is educational: each cycle must pinpoint the instruction
 and RW object and explain security and containment, not hide the error.

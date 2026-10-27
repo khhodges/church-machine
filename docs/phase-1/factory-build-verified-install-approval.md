@@ -256,8 +256,10 @@ continued unaffected execution. Keep prior incidents available across cycles.
 The loop must exercise the security checks, not merely animate a successful
 result or silently skip the offending instruction.
 
-Use the applicable configured default MTBF setting and display it with its
-units and role in the demonstration. Its numeric value and mapping to loop
+**Default MTBF is an Amoeba setting.** The demonstration must use Amoeba's
+configured value, not a separate IDE default or demonstration-only override.
+Display that value with its units and role in the demonstration.
+Its numeric value and mapping to loop
 timing/eligibility have not yet been established here. Do not invent a value,
 treat an MTBF threshold as a retry timer without a defined mapping, or use a
 clean-run score as a time-based MTBF.
