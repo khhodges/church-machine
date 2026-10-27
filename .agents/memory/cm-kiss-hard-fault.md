@@ -80,6 +80,10 @@ production trust or infer intentional faults from identical WORD bytes.
 **Why:** The user's engineering rationale is that sound software construction
 exposes faults on first occurrence, they are fixed promptly, and removing
 their causes improves MTBF. Recovery machinery is not the design priority.
+The user also requires the full Factory Build picture to be based on “MTBF
+for a single event.” Define the event and observation boundary before choosing
+a reliability metric; do not assume this means a physical single-event upset
+or claim that one successful demonstration establishes MTBF.
 The assistant had overcomplicated the Namespace review with speculative
 recovery strategies and must not keep reopening those alternatives.
 
