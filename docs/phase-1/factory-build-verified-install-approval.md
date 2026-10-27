@@ -185,6 +185,35 @@ requirement has yet been approved. Report those as unspecified, not passed.
 The priority remains exposing the fault at its first occurrence and fixing
 its cause, not masking it with retries or recovery claims.
 
+### Per-object reliability and Must Resolve queue
+
+When corruption is confirmed contained within one Abstraction, unaffected
+authorized work continues; that incident alone must not halt the Thread or
+FPGA. Containment must include effects on other objects and shared state,
+not merely the location where the fault was reported. Unknown containment
+must not be reported as proof that nothing else was harmed.
+
+The approved escalation rule is:
+
+**Measured MTBF of an individual object < its allowed minimum MTBF →
+add that object to the Must Resolve queue.**
+
+Track object identity and revision alongside the qualifying incidents,
+measured exposure, measured MTBF, and applicable allowed minimum. Update an
+existing open queue entry rather than duplicating it for repeated telemetry.
+The queue records required corrective work; it does not itself authorize
+global halt, additional capabilities, automatic retry, or resumption of a
+faulted Abstraction.
+
+A missing threshold or insufficient evidence must remain explicitly
+unassessed, not silently treated as meeting the reliability requirement.
+The numerical thresholds and measurement policy remain to be specified.
+Queue resolution must not erase the retained incident evidence.
+
+Acceptance must check the strict less-than comparison (including equality
+and values on either side), per-object attribution, incident deduplication,
+and continued unaffected execution when containment is established.
+
 ## 8. Operator presentation and installation receipt
 
 Use one progress view with distinct states:

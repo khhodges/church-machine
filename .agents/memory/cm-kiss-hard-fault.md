@@ -86,6 +86,19 @@ fault**, not a physical single-event upset or a Thread failure. Define the
 observation boundary and exposure before reporting MTBF. Separate intentional
 Mallory denial/containment evidence from operational fault-rate evidence; one
 successful demonstration does not establish MTBF.
+For confirmed corruption contained to one Abstraction, unaffected authorized
+work continues. If an individual object's measured MTBF is below its allowed
+minimum MTBF, add the object to a **Must Resolve** queue.
+
+**Why:** The user explicitly set containment as the continuation boundary and
+per-object MTBF below the allowed value as the required correction-queue trigger.
+
+**How to apply:** Attribute incidents and exposure to the individual object;
+preserve the strict less-than rule and do not invent numerical thresholds.
+Queue membership is a corrective-work requirement, not automatic global halt
+or permission to resume a faulted Abstraction. Unconfirmed containment is not
+evidence of no harm outside the object.
+
 The assistant had overcomplicated the Namespace review with speculative
 recovery strategies and must not keep reopening those alternatives.
 
