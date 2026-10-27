@@ -3,6 +3,23 @@ name: Phase 1 Namespace acceptance boundary
 description: Historical Namespace save evidence is not acceptance of the approved Phase 1 design.
 ---
 
+## First Boot Namespace simulation milestone
+
+On 2026-10-27 the user specified the first step: finalize the Boot Namespace
+and simulate Amoeba calling a simplified CapabilityTest from Thread 1.
+CapabilityTest contains no CHANGE or SWITCH; it calls SelfTest, then
+WukongCallHome. Amoeba then starts the Alice/Mallory attack, which reaches a
+HardFault and reboots to repeat the entire sequence.
+
+**Why:** The user narrowed the immediate milestone after the broader Factory
+Build gates were listed. Earlier requirements for CHANGE coverage do not apply
+to this simplified first milestone.
+
+**How to apply:** Keep this simulation-first sequence distinct from full
+Factory Build acceptance. Verify return to Amoeba before the attack, the real
+fault/reboot path, and repetition from the beginning. Do not substitute a
+host-driven loop or treat this as authorization to flash or reboot hardware.
+
 Phase 1 IDE setup means populating the Namespace LUMPs with the implemented
 source so the programmer can select each LUMP in the existing code editor,
 edit it, and recompile it. Do not reinterpret this as a request for a new
