@@ -46,3 +46,13 @@ A failed selected revision must remain visibly failed rather than falling back.
 
 **Why:** Version numbers alone may be misleading after import or restoration.
 **How to apply:** Freshness is advisory until the programmer explicitly adopts it.
+
+For recompilation or prospective compatibility review, inspect the latest source
+before recommending replacements based on older installed/boot-selected bytes.
+
+**Why:** The user challenged a fault-handler recommendation based on historical
+Boot artifacts when newer source and saved revisions existed.
+
+**How to apply:** Distinguish latest source, latest saved compilation and exact
+installed image. Historical-byte findings do not establish current-source
+defects. This review rule does not authorize changing Namespace selections.
