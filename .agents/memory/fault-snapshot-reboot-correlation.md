@@ -11,10 +11,16 @@ Ethernet delivery options.
 IDE reporting to the reliability discussion.
 
 **How to apply:** Distinguish retaining evidence from authorizing reboot or
-resumption. Evaluate bridge-mediated versus board-native Ethernet delivery;
-neither transport selection nor a new persistence mechanism is approved yet.
-Preserve incident identity across retransmission and distinguish CPU reset,
-FPGA reconfiguration, and power loss when specifying retention.
+resumption. Phase 1 must start with IDE UART and finish with Ethernet and
+standalone FPGA singletons. A networked UART bridge is only an intermediate
+path, not the final standalone acceptance endpoint. The exact protocol and
+persistence mechanism remain unapproved. Preserve incident identity across
+retransmission and distinguish CPU reset, FPGA reconfiguration, and power loss
+when specifying retention.
+
+**Why:** The user explicitly required: “Phase 1 must start with the IDE UART
+and finish with Ethernet and stand alone FPGA singletons.” Do not defer
+standalone Ethernet to an optional later phase.
 
 When a hardware fault triggers an automatic reboot, the bridge must not treat
 an HTTP success for the snapshot transport as permission to reset. It must wait

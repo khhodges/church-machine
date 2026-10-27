@@ -48,6 +48,31 @@ UART. Initial installation of the upgraded Factory Build is a separate,
 explicitly authorized programming operation; this specification does not
 claim an existing UART bitstream-update facility.
 
+### Phase 1 transport progression — required endpoint
+
+**Phase 1 starts with the IDE UART connection and finishes with Ethernet
+and standalone FPGA singletons.** Ethernet is not optional follow-on work
+deferred beyond Phase 1.
+
+- **Starting stage:** use the IDE UART path for initial development,
+  diagnostics, and authorized hardware validation.
+- **Completion stage:** demonstrate each FPGA singleton operating independently
+  of an attached IDE UART host or external UART-to-network bridge, with
+  Ethernet delivery of fault and reliability evidence to the IDE server.
+  An open browser must not be required for evidence collection.
+- **Evidence continuity:** define how incident identity, exact executing
+  revision, reboot reason and operating-exposure records are retained across
+  reboot and delivered after disconnection without counting retransmissions
+  as new faults or adding exposure twice. Missing evidence must remain explicit.
+- **Acceptance boundary:** UART-only success or a networked UART bridge is
+  an intermediate result, not Phase 1 standalone completion.
+
+The storage medium, reset/power-loss retention guarantees, Ethernet protocol,
+authentication and acknowledgement contract remain design items to approve.
+This endpoint does not authorize automatic reboot, fault recovery, firmware
+programming, activation, publication, or a new remote-installation mechanism.
+Standalone operation is not a claim of multi-FPGA coordination.
+
 ## 2. Hardware checks — before changing the board
 
 The IDE must check and display:
