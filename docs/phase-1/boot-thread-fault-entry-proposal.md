@@ -48,7 +48,7 @@ These tables replace the separate-dump register table in the historical draft.
 | Register | Value at Boot.Thread handler entry | Source and meaning |
 | --- | --- | --- |
 | CR0 | Configured fault-handler E capability | Explicitly prepared Boot Namespace binding; not a replacement normal-boot application selection. |
-| CR1 | Existing GT/capability of the Thread executing at the original fault | Capture from original CR12 before priming. Identifies the saved Thread context in the Namespace supplied in CR2. No minting, refresh or conversion to a generic R capability. |
+| CR1 | Faulting Thread's existing GT/capability | Capture from original CR12 before priming. “Faulting Thread” means the Thread executing when the Abstraction fault occurred, not necessarily a defective Thread. Identifies the saved context in the Namespace supplied in CR2. No minting, refresh or conversion to a generic R capability. |
 | CR2 | Existing faulting Namespace capability | Capture from original CR15 before changing the live root. Retains the Namespace association of CR1. |
 | CR3–CR4 | NULL triples | All three words zero. |
 | CR5 | Boot.Thread heap capability | Derive through the existing validated Thread geometry; no access to protected context or stack is added. |
@@ -87,6 +87,48 @@ interpret DR3=0 or 2 as a valid resumable context. These status encodings
 do not approve handler execution after a failed save; that disposition remains
 part of failure-path review. If safe handler entry itself fails, do not imply
 that these registers were successfully delivered.
+
+### Register examples — original fault versus save failure
+
+The user agreed this clarification: **CR1 identifies the Faulting Thread**,
+copied from its original CR12. The term identifies the execution context
+of the Abstraction fault; it does not imply that the Thread is defective.
+**DR5 is a numeric machine fault code, not a comment.** Zero means no
+secondary save failure; a nonzero code describes the actual save failure
+without overwriting the original fault in DR1.
+
+These examples illustrate the proposed handoff, not completed FPGA tests.
+The original BOUNDS `0x08` matches the retained Mallory C-list denial;
+successful saving or a secondary stack failure is not established by that
+historical evidence.
+
+#### Example 1 — Mallory faults; Thread save succeeds
+
+| Register | Value and meaning |
+| --- | --- |
+| CR1 | Faulting Thread's existing capability. |
+| CR2 | Its existing Namespace capability. |
+| DR1 | BOUNDS `0x08`: Mallory's original fault. |
+| DR3 | `1`: protected Thread context saved completely. |
+| DR5 | `0`: no secondary save failure. |
+
+#### Example 2 — Mallory faults; Thread save also fails
+
+Suppose the protected save detects an invalid stack position. This is an
+illustrative second error, not an observed result.
+
+| Register | Value and meaning |
+| --- | --- |
+| CR1 | Faulting Thread's existing capability. |
+| CR2 | Its existing Namespace capability. |
+| DR1 | BOUNDS `0x08`: still Mallory's original fault. |
+| DR3 | `2`: save failed; context may be partial. |
+| DR5 | Actual machine fault code for the invalid stack condition, as produced by the implemented save check. No new numeric code is assigned here. |
+
+This distinguishes “Mallory attempted an invalid access” from “the Thread
+context could not be saved correctly.” Whether Boot.Thread can safely be
+entered after the second failure remains under review; these values do not
+assert that the handoff succeeded or authorize a retry.
 
 ### Entry ordering and remaining review
 

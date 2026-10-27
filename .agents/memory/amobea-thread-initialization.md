@@ -55,6 +55,18 @@ authority; do not assume CR15 is already in Thread homes. Diagnose blocking
 hard faults before adding recovery machinery. The separate 96-word dump and
 its proposed release interface are superseded, not implementation authority.
 
+Keep the original Abstraction fault separate from a secondary context-save
+failure; “Faulting Thread” identifies the executing context, not necessarily
+a defective Thread.
+
+**Why:** The user agreed the CR1 clarification and examples distinguishing
+the original fault in DR1 from a numeric secondary save-failure code in DR5
+(zero when none).
+
+**How to apply:** Preserve the first fault when saving fails; label hypothetical
+failure examples as illustrative. This agreement does not approve safe handler
+entry after an incomplete save or establish physical execution evidence.
+
 Boot.Thread is primed with both the existing GT of the Thread executing at
 the fault and its existing Namespace capability.
 
