@@ -9,6 +9,16 @@ Boot; selector-zero direct entry is not an alternative architecture.
 Public API index 0 maps to wire selector 1. Preserve historical artifacts;
 do not silently repair operands or grant permissions.
 
+When tightening dispatch, make private fixture ingress canonical before
+interpreting downstream security-test failures. A setup CALL rejected by the
+new rule proves nothing about the intended cleanup or RETURN assertion.
+
+**Why:** Legacy numeric-selector-zero calls and BRANCH tables prevented Mint
+regressions from reaching their actual authority checks.
+
+**How to apply:** Author numeric tables in fresh fixtures and assert exact
+entry words; retain the original downstream checks and immutable evidence.
+
 **Why:** On 2026-10-28 unchanged-image replay showed Boot fetching Amoeba's
 table word and a later CALL fetching CapabilityTest's table word. Conditional
 decoding masked the first error and exposed the second as a misleading LOAD
@@ -39,6 +49,14 @@ RETURN frames retain caller E authority, not a fabricated L-only identity.
 
 Verify the E token and CR6.M together at actual CALL completion and subsequent
 LOAD, rather than accepting a successful LOAD as sufficient evidence.
+
+For RETURN, a visible continuation fetch address alone is not the commit
+boundary. Observe restored descriptors at retirement or the completed return
+boundary, not on the first cycle that the new NIA appears.
+
+**Why:** In cycle-accurate replay the continuation address becomes visible
+while the leaf's CR6 still exists; treating address visibility as completion
+produces a false restoration failure.
 
 **Why:** An L-only token rewrite can conceal missing CR6.M and make an otherwise
 incorrect CALL appear functional.

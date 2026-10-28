@@ -85,16 +85,10 @@ def test_guarded_call_handoff(case, fault):
                     return
             elif ctx.get(core.retire_valid):
                 retired.append((ctx.get(core.retire_nia), ctx.get(core.retire_instr)))
-                if pc == (entry + 1)*4:
-                    # CALL selector zero is the existing direct-entry form.
-                    # Retain its exact first word; do not substitute a body PC.
-                    assert retired == [(4, rom[1]), (8, rom[2]),
-                                       ((entry + 1)*4, words[entry+1])]
-                elif pc >= 16:
+                if pc >= 16:
                     assert fault is None or case == "rom_after_handoff"
                     assert ctx.get(core.boot_complete)
                     assert retired == [(4, rom[1]), (8, rom[2]),
-                                       ((entry + 1)*4, words[entry+1]),
                                        ((entry + 2)*4, words[entry+2])]
                     assert all(ctx.get(w) == 0 for w in core.debug_cr_words[13])
                     assert not (ctx.get(core.dbg_m_bit_state) & (1 << 12))

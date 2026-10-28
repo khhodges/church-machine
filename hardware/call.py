@@ -156,7 +156,6 @@ class ChurchCall(Elaboratable):
         sub_fault_latched = Signal()
         # Method-table dispatch state
         method_entry_reg  = Signal(32)  # lump-base-relative word offset fetched from method table
-        use_method_table  = Signal()    # 1 = NIA derived from method_entry_reg, 0 = word 1 default
 
         local_cr_rd_addr = Signal(4)
         local_cr_wr_en = Signal()
@@ -376,15 +375,11 @@ class ChurchCall(Elaboratable):
         m.d.comb += ns_base_from_cr14.eq(cr14_lat_view.word1_location)
 
         # NIA: callee's entry point.
-        # imm=0  → fast path: NIA = lump_base + 4 (word 1, backward-compat entry).
-        # imm>0  → table dispatch: NIA = lump_base + entry*4 where entry = memory[lump_base + imm*4].
+        # Every CALL uses a checked numeric table offset, including Boot.
         # Layout: word 0 = lump header; word k = table entry for method k-1 (k = call_imm, k>=1).
         nia_computed = Signal(32)
         m.d.comb += nia_computed.eq(
-            Mux(call_imm_latched == 0,
-                ns_base_from_cr14 + 4,                       # fast path: word 1 byte address
-                ns_base_from_cr14 + (method_entry_reg << 2)  # table dispatch: entry is word offset
-            )
+            ns_base_from_cr14 + (method_entry_reg << 2)
         )
 
         # CR14 with M=1 AND corrected limit_offset — written in SET_CR14_LIMIT_WRITE
@@ -461,7 +456,7 @@ class ChurchCall(Elaboratable):
             with m.State("IDLE"):
                 m.d.sync += [phase.eq(0), fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
                 m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
-                m.d.sync += [use_method_table.eq(0), method_entry_reg.eq(0)]
+                m.d.sync += method_entry_reg.eq(0)
                 m.d.sync += rd_armed.eq(0)
                 with m.If(self.call_start):
                     m.d.sync += [
@@ -485,7 +480,10 @@ class ChurchCall(Elaboratable):
 
             with m.State("CHECK_SRC"):
                 m.d.comb += local_cr_rd_addr.eq(cr_src_latched)
-                with m.If(~indexed_source_latched & ~src_in_range):
+                with m.If((call_imm_latched == 0) | (call_imm_latched > 0x7FFF)):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.INVALID_OP)]
+                    m.next = "FAULT"
+                with m.Elif(~indexed_source_latched & ~src_in_range):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                     m.next = "FAULT"
                 with m.Else():
@@ -628,8 +626,7 @@ class ChurchCall(Elaboratable):
                         n_minus_6_reg.eq(_hdr.n_minus_6),
                         lumpSize_reg.eq(Const(1, 15) << (_hdr.n_minus_6 + 6)),
                     ]
-                    # If method index > 0, read the method table before setting CR14 limit.
-                    # Index 0 = single entry point (NIA = lump_base + 4); skip table fetch.
+                    # Validate the table before publishing descriptors or a frame.
                     with m.If((_hdr.magic != 0x1F) | (_hdr.typ != 0) |
                               (_hdr.n_minus_6 > 8) |
                               ((Const(1, 25) << (_hdr.n_minus_6 + 6)) >
@@ -641,28 +638,19 @@ class ChurchCall(Elaboratable):
                         m.next = "FAULT"
                     with m.Elif(_hdr.cw == 0):
                         m.next = "LAZY_LOAD_ABORT"
-                    with m.Elif(call_imm_latched > 0):
-                        m.next = "FETCH_METHOD_ENTRY"
                     with m.Else():
-                        m.next = "SET_CR14_LIMIT_WRITE"
+                        m.next = "FETCH_METHOD_ENTRY"
 
             with m.State("FETCH_METHOD_ENTRY"):
                 # Read method table entry at memory[lump_base + call_imm * 4].
                 # ns_base_from_cr14 = lump_base (byte address of lump word 0 = header).
                 # Keep the full runtime method index until the cw bounds check.
-                # Canonical BRANCH entries are relative to their table word;
-                # legacy bare entries are LUMP-base-relative WORD offsets.
+                # Entries are numeric LUMP-relative offsets, never instructions.
                 m.d.comb += [
                     self.mem_rd_addr.eq(ns_base_from_cr14 + (call_imm_latched.as_unsigned() << 2)),
                     self.mem_rd_en.eq(call_imm_latched <= cw_reg),
                 ]
                 m.d.sync += rd_armed.eq(1)
-                target = Signal(signed(34))
-                m.d.comb += target.eq(
-                    Cat(call_imm_latched, Const(0, 2)).as_signed()
-                    + Mux(self.mem_rd_data[18],
-                          -Cat(self.mem_rd_data[:18], Const(0, 16)).as_signed(),
-                          Cat(self.mem_rd_data[:18], Const(0, 16)).as_signed()))
                 with m.If(call_imm_latched > cw_reg):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
                     m.next = "FAULT"
@@ -672,25 +660,12 @@ class ChurchCall(Elaboratable):
                         # Table entry = 0 → private method or out-of-range index → FAULT.
                         m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                         m.next = "FAULT"
-                    with m.Elif(self.mem_rd_data[27:32] == 23):
-                        # A dispatch-table BRANCH is a static entry descriptor,
-                        # not an extra executed instruction with live DR inputs.
-                        with m.If((self.mem_rd_data[19:23] != 0) |
-                                  (self.mem_rd_data[23:27] != 14)):
-                            m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.INVALID_OP)]
-                            m.next = "FAULT"
-                        with m.Elif((target < 1) | (target > cw_reg)):
-                            m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
-                            m.next = "FAULT"
-                        with m.Else():
-                            m.d.sync += method_entry_reg.eq(target)
-                            m.next = "SET_CR14_LIMIT_WRITE"
-                    with m.Elif(self.mem_rd_data <= cw_reg):
-                        # Legacy bare offsets include the header word.
+                    with m.Elif((self.mem_rd_data > call_imm_latched) &
+                                (self.mem_rd_data <= cw_reg)):
                         m.d.sync += method_entry_reg.eq(self.mem_rd_data)
                         m.next = "SET_CR14_LIMIT_WRITE"
                     with m.Else():
-                        m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.INVALID_OP)]
+                        m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
                         m.next = "FAULT"
 
             with m.State("SET_CR14_LIMIT_WRITE"):

@@ -7,10 +7,9 @@
 // handoff after the shared ROM sequence.
 //
 // What is checked:
-//   • The software LUMP must contain exactly 74 instructions; the immutable ROM
-//     remains exactly 73 words.
+//   • Software has 74 instructions; resident has a table plus 73 body words.
 //   • Words [2..71] must be bit-for-bit identical.
-//   • Word 72 must CALL WukongCallHome.hw through runtime-only c-list row 7, selector 0.
+//   • Word 72 must CALL WukongCallHome.hw through c-list row 7, selector 1.
 //   • Word 73 must be the adjusted loop fallback (BRANCH -70).
 //   • Declared capabilities must materialize to the canonical Wukong tokens.
 //
@@ -105,11 +104,13 @@ if (assembled.length !== 74) {
     console.error(`FAIL: wukong_callhome.cloomc assembled to ${assembled.length} words; expected 74.`);
     failed = true;
 }
-if (nucProgram.length !== 73) {
-    console.error(`FAIL: WUKONG_NUC_PROGRAM has ${nucProgram.length} words; expected 73.`);
+if (nucProgram.length !== 74 || nucProgram[0] !== 2) {
+    console.error(`FAIL: resident requires 74 words with numeric startup table entry 2.`);
     failed = true;
 }
 if (failed) process.exit(1);
+// Compare authored bodies after independently checking the resident table.
+nucProgram = nucProgram.slice(1);
 
 // ── Normalise IADD/ISUB/DREAD/DWRITE imm fields before comparing ──────────────
 //
@@ -179,12 +180,12 @@ if (!diverged) {
 
 // The immutable ROM loops at word 72. The software LUMP directly CALLs
 // the selected CR6 capability without touching CR0. It is declaration row 6
-// before the builder inserts SELF, then physical row 7; selector stays zero.
-const EXPECTED_HW_CALL = 0x17030006;
+// before the builder inserts SELF, then physical row 7; wire selector is one.
+const EXPECTED_HW_CALL = 0x17040026;
 const EXPECTED_SW_LOOP = 0xBF040046; // sign bit 18, magnitude 70
 const EXPECTED_ROM_LOOP = 0xBF040045; // sign bit 18, magnitude 69
 if ((assembled[72] >>> 0) !== EXPECTED_HW_CALL) {
-    console.error(`  DIVERGED word[72]: expected indexed selector-0 CALL ` +
+    console.error(`  DIVERGED word[72]: expected indexed selector-1 CALL ` +
                   `0x${EXPECTED_HW_CALL.toString(16)}, got 0x${(assembled[72] >>> 0).toString(16)}.`);
     diverged = true;
 }
@@ -311,12 +312,12 @@ if (!diverged) {
         const raw = fs.readFileSync(path.join(catalog, active[0].filename));
         const header = raw.readUInt32BE(0);
         if (((header >>> 10) & 8191) !== 74 || (header & 255) !== 8 ||
-            raw.readUInt32BE(73 * 4) !== 0x17030007 ||
+            raw.readUInt32BE(73 * 4) !== 0x17040027 ||
             raw.readUInt32BE(74 * 4) !== EXPECTED_SW_LOOP ||
             raw.readUInt32BE(raw.length - 4) !== 0x4A000007) {
-            throw new Error('rebuilt handoff must use physical row 7, selector 0 and exact hardware GT');
+            throw new Error('rebuilt handoff must use physical row 7, selector 1 and exact hardware GT');
         }
-        console.log('  OK: rebuilt CALL selects physical row 7 after SELF insertion; selector remains 0.');
+        console.log('  OK: rebuilt CALL selects physical row 7 after SELF insertion; selector is 1.');
     } catch (err) {
         console.error('  DIVERGED builder output: ' + err.message);
         diverged = true;

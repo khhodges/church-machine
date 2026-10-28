@@ -10,8 +10,9 @@ def test_builtin_rom_loads_use_compact_literal_operands():
     from hardware.boot_rom import BOOT_PROGRAM, NUC_PROGRAM, WUKONG_NUC_PROGRAM
     assert BOOT_PROGRAM[0] & 0x7fff == 0
     assert NUC_PROGRAM[0] & 0x7fff == 0x50
-    assert WUKONG_NUC_PROGRAM[0] & 0x7fff == 0x50
-    assert WUKONG_NUC_PROGRAM[1] & 0x7fff == 0x60
+    assert WUKONG_NUC_PROGRAM[0] == 2
+    assert WUKONG_NUC_PROGRAM[1] & 0x7fff == 0x50
+    assert WUKONG_NUC_PROGRAM[2] & 0x7fff == 0x60
 
 
 @pytest.mark.parametrize("iot", [False, True])

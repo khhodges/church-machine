@@ -418,7 +418,7 @@ class ChurchCore(Elaboratable):
                 (guarded_call_error == 0) & ~clear_all &
                 self.boot_namespace_admitted & self.boot_thread_activated &
                 self.imem_from_reset_rom & (self.imem_fetch_address == 8) &
-                (nia_reg == 8) & (self.imem_data == 0x17000000))
+                (nia_reg == 8) & (self.imem_data == 0x17000001))
         namespace_error = Signal(5)
         if self.expected_boot_guard is not None:
             reader = AscendingNamespaceBootstrap(namespace_only=True)

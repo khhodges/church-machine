@@ -18,11 +18,16 @@ function compile(source) {
     if (/^\s*WORD\b/m.test(source)) throw new Error('Raw WORD is not accepted in protected service source');
     const operations = [];
     const emitted = [];
+    const entries = [];
     const placeholder = word => `WORD ${emitted.push(word >>> 0) - 1}`;
     // The legacy simulator already implements Mode 2 (imm15=0x7fff), but its
     // assembler only accepts preset TPERM. Lower the explicit register form in
     // this compiler alone; do not change legacy assembly or ISA semantics.
-    const attenuated = source.replace(
+    const tableSource = source.replace(/^\s*ENTRY\s+(\w+)\s*$/gm, (_, label) => {
+        entries.push({index: emitted.length, label});
+        return placeholder(0);
+    });
+    const attenuated = tableSource.replace(
         /^\s*TPERM\s+CR([0-9]|1[01])\s*,\s*CR([0-9]|1[01])\s*,\s*#32767\s*$/gm,
         (_, dst, src) => placeholder((6 << 27) | (14 << 23) |
             (Number(dst) << 19) | (Number(src) << 15) | 0x7fff));
@@ -36,6 +41,11 @@ function compile(source) {
     const assembler = new Assembler();
     const result = assembler.assemble(lowered);
     if (assembler.errors.length) throw new Error(JSON.stringify(assembler.errors));
+    for (const {index, label} of entries) {
+        if (!Object.hasOwn(assembler.labels, label))
+            throw new Error(`Unknown dispatch label ${label}`);
+        emitted[index] = assembler.labels[label] + 1;
+    }
     // WORD is a tagged 23-bit inline constant in this assembler, not a raw
     // 32-bit directive. Replace only our reserved placeholders after assembly.
     const words = Array.from(result.words, w => {
@@ -78,11 +88,11 @@ BRANCHNE denied
 HALT
 `;
     const mint = compile(`
-BRANCH create
-BRANCH reject_method
-BRANCH reject_method
-BRANCH reject_method
-BRANCH reject_method
+ENTRY create
+ENTRY reject_method
+ENTRY reject_method
+ENTRY reject_method
+ENTRY reject_method
 caller:
 LOAD CR2, CR6, #2
 LOAD CR3, CR6, #3
@@ -140,7 +150,7 @@ HALT`).join('\n')}
     // diff |= actual[i] ^ expected[i] bitwise using ordinary Turing operations.
     // (a-b)&1 = XOR for one-bit a/b; (a+b+1)>>1 = OR for one-bit a/b.
     // All four word pairs and all 128 bits execute before the sole decision.
-    const compare = ['BRANCH verify', 'verify:', 'MINT VERIFY_CONTEXT',
+    const compare = ['ENTRY verify', 'verify:', 'MINT VERIFY_CONTEXT',
         'LOAD CR3, CR6, #1', 'LOAD CR4, CR6, #2', 'IADD DR7, DR0, #0'];
     for (let word = 0; word < 4; word++) {
         compare.push(`DREAD DR2, CR3, #${word}`, `DREAD DR3, CR4, #${word}`);

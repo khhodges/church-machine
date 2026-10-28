@@ -378,6 +378,11 @@ def _thread_switch_core_image(decoded_change, corruption=None):
         dmem[source_word + 2] = encode_turing(
             TuringOpcode.BRANCH, CondCode.AL, imm=0)
 
+    # Startup CALL uses selector one. Relocate only this private source body;
+    # suspended target Thread PCs below are not CALL dispatch selectors.
+    dmem[source_word + 2:source_word + 6] = dmem[source_word + 1:source_word + 5]
+    dmem[source_word + 1] = 2
+    dmem[source_word] = pack_lump_header(3, 5, 2, 0)
     target_word = target_code_base // 4
     dmem[target_word] = pack_lump_header(6, 2, 1, 0)
     dmem[target_word + 1] = encode_turing(
@@ -403,12 +408,12 @@ def _thread_switch_core_image(decoded_change, corruption=None):
         dmem[source_word + 511] = 0x0200000B
     return (
         dmem,
-        source_code_base + (8 if decoded_change else 4),
         source_code_base + (12 if decoded_change else 8),
+        source_code_base + (16 if decoded_change else 12),
         target_code_base + 4,
         dmem[target_word + 1],
-        dmem[source_word + (3 if decoded_change else 1)],
-        dmem[source_word + 2] if decoded_change else None,
+        dmem[source_word + (4 if decoded_change else 2)],
+        dmem[source_word + 3] if decoded_change else None,
     )
 
 
@@ -827,8 +832,9 @@ def test_full_core_signed_overflow_branches_follow_live_arithmetic(
         mark_taken_vc,
         loop,
     ]
+    program = [2, *program]
     dmem[program_word] = pack_lump_header(
-        3, program_word + len(program), 2, 0)
+        3, len(program), 2, 0)
     dmem[program_word + 1:program_word + 1 + len(program)] = program
     prepare_synthetic_boot(dmem)
     dut = BootRomHarness(dmem)

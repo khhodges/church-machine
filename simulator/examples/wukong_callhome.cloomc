@@ -206,5 +206,5 @@ inner_off:
     BRANCHNE outer_off            ; [71] → [67]  (outer loop: -4)
 
 ; ── Hardware handoff + loop fallback (words 72-73) ────────────────────────────
-    CALL CR6[WukongCallHome.hw]   ; [72] explicit direct entry, physical row 7, selector 0
+    CALL CR6[WukongCallHome.hw], #0 ; [72] public method 0 => wire selector 1, physical row 7
     BRANCH loop_top               ; [73] → [3]   BRANCH AL, offset=-70

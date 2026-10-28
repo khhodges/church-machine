@@ -115,9 +115,8 @@ def test_wukong_rebuild_archives_displaced_bytes_without_deleting_them(tmp_path)
     raw = (catalog / active[0]["filename"]).read_bytes()
     words = list(struct.unpack(f">{len(raw) // 4}I", raw))
     assert (words[0] >> 10) & 0x1FFF == 74
-    # The hardware entry has no method table: selector 0 is explicit, not a
-    # guessed named method. SELF insertion moves declaration row 6 to row 7.
-    assert words[1 + 72] == 0x17030007
+    # Public method zero selects numeric table slot one; SELF shifts row 6 to 7.
+    assert words[1 + 72] == 0x17040027
     assert words[-1] == 0x4A000007
     assert all(row.get("archived", False) for row in after
                if row.get("abstraction") == "WukongCallHome"
@@ -165,7 +164,7 @@ def test_capability_rebuild_archives_displaced_bytes_and_approvals(tmp_path):
     assert not any(word >> 27 in (8, 9) for word in code)
     # SELF insertion moves WukongCallHome from declaration row 6 to row 7.
     # Method zero encodes as selector one in imm[14:5]; row is imm[4:0].
-    assert any(word >> 27 == 2 and (word >> 15) & 15 == 6
+    assert any(word >> 27 == 2 and (word >> 15) & 15 == 8
                and (word >> 19) & 15 == 0 and word & 0x7FFF == (1 << 5) | 7
                for word in code)
     assert all(row.get("archived", False) for row in after

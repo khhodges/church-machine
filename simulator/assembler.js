@@ -2132,7 +2132,7 @@ class ChurchAssembler {
                     }
                     opcode = 2;
                     crDst = 0; // unused by indexed CALL
-                    crSrc = 6;
+                    crSrc = 8; // bit18 selects implicit CR6 indexed CALL
                     imm = (method << 5) | (row & 0x1F);
                     break;
                 }

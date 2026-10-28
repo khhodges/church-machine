@@ -1,7 +1,7 @@
 const HW_BOOT_PROGRAM = [
     0x077F8000, // PC=0  LOAD   AL, CR15, CR15[0]   — refresh Namespace cap from slot 0 into CR15
     0x27678001, // PC=1  CHANGE AL, CR12, CR15, #1  — load Boot.Thread (slot 1); establishes CR0–CR11
-    0x17000000, // PC=2  CALL   AL, CR0,  CR0       — enter Thread.CR0 (IDE-configured Application LUMP)
+    0x17000001, // PC=2  CALL   AL, CR0,  #1        — dispatch Thread.CR0 startup method
 ];
 
 // HW_NAMESPACE: 4-word entries (loc, word1, word2, word3_reserved=0)

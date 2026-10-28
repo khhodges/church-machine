@@ -6591,8 +6591,8 @@ function _bootROMInspectionRows() {
           meaning: 'Refresh the Namespace capability from NS slot 0 into CR15.' },
         { op: 'CHANGE', operands: 'AL, CR12, CR15, #1',
           meaning: 'Restore Boot.Thread from NS slot 1, including its prepared CR0 home.' },
-        { op: 'CALL', operands: 'AL, CR0, CR0',
-          meaning: 'Consume the E-GT stored in Boot.Thread CR0.' },
+        { op: 'CALL', operands: 'AL, CR0, #1',
+          meaning: 'Dispatch startup method 1 through the E-GT stored in Boot.Thread CR0.' },
     ];
     return definitions.map(function(definition, pc) {
         return {

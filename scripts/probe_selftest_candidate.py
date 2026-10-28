@@ -39,11 +39,12 @@ def probe(directory, method=1):
     caller_gt = t.make_gt(t.GT_TYPE_INFORM, t.PERM_MASK_E, 7)
     memory[thread + b.WUKONG_THREAD_CAPS0_WORD - b.WUKONG_THREAD_BASE_WORD] = caller_gt
     memory[thread + 242] = caller_gt
-    memory[caller] = t._lump_header(n_minus_6=1, cw=3, cc=2)
+    memory[caller] = t._lump_header(n_minus_6=1, cw=4, cc=2)
+    memory[caller + 1] = 2
     # Compact LOAD index: DR0 + 1 (immediate occupies bits 13:4).
-    memory[caller + 1] = t.encode_church(t.ChurchOpcode.LOAD, t.CondCode.AL, cr_dst=0, cr_src=6, imm=1 << 4)
-    memory[caller + 2] = t.encode_church(t.ChurchOpcode.CALL, t.CondCode.AL, cr_src=0, imm=method)
-    memory[caller + 3] = t.encode_turing(t.TuringOpcode.BRANCH, t.CondCode.AL, imm=0)
+    memory[caller + 2] = t.encode_church(t.ChurchOpcode.LOAD, t.CondCode.AL, cr_dst=0, cr_src=6, imm=1 << 4)
+    memory[caller + 3] = t.encode_church(t.ChurchOpcode.CALL, t.CondCode.AL, cr_dst=0, imm=method)
+    memory[caller + 4] = t.encode_turing(t.TuringOpcode.BRANCH, t.CondCode.AL, imm=0)
     cc = words[0] & 255
     assert cc > 0, "candidate lacks SELF"
     memory[caller + 126] = caller_gt
@@ -62,11 +63,11 @@ def probe(directory, method=1):
                            fault=bool(ctx.get(dut.core.retire_fault_valid)),
                            fault_code=ctx.get(dut.core.retire_fault_code))
                 rows.append(row)
-                if row["fault"] or row["nia"] == (caller + 3) * 4:
+                if row["fault"] or row["nia"] == (caller + 4) * 4:
                     break
             await ctx.tick()
         report.update(cycles=cycle, retired_count=len(rows), first=rows[:8], last=rows[-10:],
-                      returned=bool(rows and rows[-1]["nia"] == (caller + 3) * 4),
+                      returned=bool(rows and rows[-1]["nia"] == (caller + 4) * 4),
                       faults=[r for r in rows if r["fault"]])
         failure_addresses = {
             (base + i) * 4 for i in range(1, ((words[0] >> 10) & 8191))

@@ -276,7 +276,7 @@ def test_recorder_keeps_failure_evidence():
         shutil.rmtree(evidence)
 
 def test_incompatible_method_consumer_is_rejected(tmp_path):
-    # Change only an isolated copy: disable canonical BRANCH table consumption.
+    # Change only an isolated copy: reject valid numeric table offsets.
     # The runner must fail its independent behavioral assertions even if RTL
     # faithfully replays the now-incompatible model. Never edit the live consumer.
     for directory in ("hardware", "scripts", "shared", "tests/hardware"):
@@ -289,17 +289,17 @@ def test_incompatible_method_consumer_is_rejected(tmp_path):
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     consumer = tmp_path / "hardware/call.py"
     text = consumer.read_text()
-    old = "with m.Elif(self.mem_rd_data[27:32] == 23):"
+    old = "self.mem_rd_data > call_imm_latched"
     assert text.count(old) == 1
-    consumer.write_text(text.replace(old, "with m.Elif(self.mem_rd_data[27:32] == 22):"))
-    command = [sys.executable, "-c",
-               "from scripts.replay_method_dispatch_rtl import replay_one; "
-               "print(replay_one(('case', (1, 0xBF000001, 2, None))))"]
+    consumer.write_text(text.replace(old, "self.mem_rd_data < call_imm_latched"))
+    command = [sys.executable, "-m", "pytest",
+               "tests/hardware/test_phase1_control.py",
+               "-k", "method_selection_before_frame_boundary", "-q"]
     result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True,
                             timeout=NEGATIVE_CONSUMER_TIMEOUT)
     (tmp_path / "negative-consumer.log").write_text(result.stdout + result.stderr)
     assert result.returncode != 0
-    assert 'assert result["returned"] and not result["faults"]' in result.stderr
+    assert "early CALL fault" in result.stdout
     assert "PASS release-Verilog" not in result.stdout
 
 @pytest.mark.parametrize("arguments", [

@@ -42,7 +42,10 @@ def test_h03_direct_immediate_call(target, method):
     sim.run()
 
 
-@pytest.mark.parametrize("method,entry", [(0, 1), (1, 2), (4, 4), (1, 0), (1, 5), (5, 2)])
+@pytest.mark.parametrize("method,entry", [
+    (0, 1), (1, 2), (4, 4), (1, 0), (1, 5), (5, 2),
+    (0xffffffff, 2), (32768, 2), (65537, 2), (1, 0xbf000001),
+])
 def test_h05_method_selection_before_frame_boundary(method, entry):
     """CALL unit wired to a deterministic validated-descriptor responder.
 
@@ -56,7 +59,7 @@ def test_h05_method_selection_before_frame_boundary(method, entry):
     header = 0xf8001001  # 64 words, cw=4, cc=1
     memory = {0x2000: header, 0x2000+4*method: entry}
     memory[0x2000] = header
-    valid = method <= 4 and (method == 0 or 1 <= entry <= 4)
+    valid = 1 <= method <= 4 and method < entry <= 4
     async def bench(ctx):
         ctx.set(dut.cr_src, 2)
         ctx.set(dut.call_imm, method)
@@ -76,9 +79,10 @@ def test_h05_method_selection_before_frame_boundary(method, entry):
             assert not ctx.get(dut.mem_wr_en), "frame writes before method validation"
             if ctx.get(dut.nia_set):
                 assert valid
-                assert ctx.get(dut.nia_value) == 0x2000 + 4 * (1 if method == 0 else entry)
+                assert ctx.get(dut.nia_value) == 0x2000 + 4 * entry
                 return
             if ctx.get(dut.cr_wr_en):
+                assert valid, "descriptor publication before dispatch validation"
                 crs[ctx.get(dut.cr_wr_addr)] = ctx.get(dut.cr_wr_data.as_value())
             pending = ctx.get(dut.mload_start)
             if pending:
@@ -90,7 +94,7 @@ def test_h05_method_selection_before_frame_boundary(method, entry):
             if valid and ctx.get(dut.cr_wr_en) and ctx.get(dut.cr_wr_addr) == 6:
                 cap = ctx.get(dut.cr_wr_data.as_value())
                 if (cap >> 32 & 0xffffffff) == 0x20fc:
-                    assert cap & 0xffffffff == 0x1a000002
+                    assert cap & 0xffffffff == 0x4a000002
                     assert cap >> 64 == 0
                     return
             await ctx.tick()

@@ -13,10 +13,7 @@ const {assembleLump} = require('../../simulator/lump_assembler');
 
 function fixture(protectedThread = false) {
     const sim = new Sim();
-    if (protectedThread) {
-        for (let i = 0; !sim.bootComplete && !sim.halted && i < 32; i++) sim._bootStep();
-        assert(sim.bootComplete && !sim.halted);
-    } else {
+    if (!protectedThread) {
         sim.bootComplete = true;
         sim.cr = Array.from({length: 16}, () =>
             ({word0: 0, word1: 0, word2: 0, word3: 0, m: 0}));
@@ -65,6 +62,20 @@ function fixture(protectedThread = false) {
         sim._installLumpHeaderContext(sim.parseGT(domain.gt), domain.slot,
             sim.readNSEntry(domain.slot), domain.hdr);
         sim.pc = 0;
+    }
+    if (protectedThread) {
+        // Private canonical startup, not the catalog's placeholder SelfTest.
+        // Still execute the real LOAD/CHANGE/CALL Boot sequence and root frame.
+        sim._bootStep();
+        const startup = install(29, [2, 0xbf000000]);
+        const binding = sim.inspectBootEntryBinding();
+        assert(binding.ok);
+        const threadBase = sim.readNSEntry(1).word0_location;
+        const layout = sim._threadLayoutAtBase(threadBase);
+        sim.memory[binding.homeAddress] = startup.gt;
+        assert(sim._formatThreadRootSentinel(threadBase, layout, startup.gt, {image: true}));
+        for (let i = 0; !sim.bootComplete && !sim.halted && i < 32; i++) sim._bootStep();
+        assert(sim.bootComplete && !sim.halted);
     }
     return {sim, install, compile, activate};
 }

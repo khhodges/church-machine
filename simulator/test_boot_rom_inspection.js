@@ -21,11 +21,11 @@ let binaryFetches = 0;
 let sourceLookups = 0;
 let editorOpens = 0;
 const context = {
-    window: {},
+    window: { NamespaceProfileNames: { label: () => 'Legacy' } },
     Array,
     String,
     Number,
-    sim: {},
+    sim: { readNSEntry: () => ({}) },
     _findSrcLump() {
         sourceLookups += 1;
         return { token: '00000000' };
@@ -36,8 +36,10 @@ const context = {
     },
     document: {
         getElementById() { return null; },
+        createElement() { return { style: {}, append() {}, remove() {} }; },
         body: {
             insertAdjacentHTML(_position, html) { inserted = html; },
+            append() {},
         },
     },
     fetch() {
@@ -64,7 +66,7 @@ assert.deepStrictEqual(
     [
         ['LOAD', 'AL, CR15, CR15[0]', 0x077F8000],
         ['CHANGE', 'AL, CR12, CR15, #1', 0x27678001],
-        ['CALL', 'AL, CR0, CR0', 0x17000000],
+        ['CALL', 'AL, CR0, #1', 0x17000001],
     ],
     'inspector renders the authoritative LOAD/CHANGE/CALL words and operands',
 );
@@ -74,7 +76,7 @@ assert(inserted.includes('not a saved LUMP identity'));
 assert(inserted.includes('not evidence of observed hardware execution'));
 assert(inserted.includes('0x077F8000'));
 assert(inserted.includes('0x27678001'));
-assert(inserted.includes('0x17000000'));
+assert(inserted.includes('0x17000001'));
 assert.strictEqual(binaryFetches, 0, 'opening slot zero performs no binary request');
 context._nsLabelOpen(0);
 assert.strictEqual(sourceLookups, 0,
@@ -85,8 +87,8 @@ assert.strictEqual(binaryFetches, 0,
     'slot-zero Namespace entry performs no binary fetch');
 
 assert(memorySource.indexOf('if (Number(slotIdx) === 0) {', memorySource.indexOf('function _nsLabelOpen')) <
-    memorySource.indexOf('_findSrcLump(slotIdx, rawLabel)', memorySource.indexOf('function _nsLabelOpen')),
-    'slot-zero label navigation intercepts before saved-LUMP lookup');
+    memorySource.indexOf('sim.symbolicEntryAt(slotIdx)', memorySource.indexOf('function _nsLabelOpen')),
+    'slot-zero label navigation intercepts before ordinary symbolic lookup');
 assert(memorySource.includes("if (Number(nsIdx) === 0) return null;"),
     'slot zero cannot resolve to an editor token');
 assert(memorySource.includes('title="Hardwired boot ROM; not a saved LUMP version"'),

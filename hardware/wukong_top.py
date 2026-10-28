@@ -616,8 +616,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         # WUKONG_DEMO_CLIST[0] and Thread.caps[0] carry the factory SelfTest E-GT.
         #
         # WukongCallHome LUMP (cc=0): uses CR6 to reach the boot c-list directly.
-        #   WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]  → LED_DEV (clist[5])
-        #   WUKONG_NUC_PROGRAM[1] = LOAD CR4, CR6[6]  → UART_DEV (clist[6])
+        #   WUKONG_NUC_PROGRAM[0] = 2 (numeric startup dispatch entry)
+        #   WUKONG_NUC_PROGRAM[1] = LOAD CR3, CR6[5]  → LED_DEV (clist[5])
+        #   WUKONG_NUC_PROGRAM[2] = LOAD CR4, CR6[6]  → UART_DEV (clist[6])
         #   clist_gt_addr LED  = 0x400 + 5*4 = 0x414 = word 261 = WUKONG_DEMO_CLIST[5] ✓
         #   clist_gt_addr UART = 0x400 + 6*4 = 0x418 = word 262 = WUKONG_DEMO_CLIST[6] ✓
         # ── DMEM initialisation data ──────────────────────────────────────────
@@ -658,7 +659,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # cc=8 → c-list tail at lump words 120-127 ([5]=LED, [6]=UART); the
         # hardware CALL derives CR6 from the called lump's own header, so a
         # malformed c-list would make its first LOAD fault NULL_CAP.
-        _wch_cw = len(WUKONG_NUC_PROGRAM)               # 73 — auto-tracks changes
+        _wch_cw = len(WUKONG_NUC_PROGRAM)  # table + body; auto-tracks changes
         for _i, _v in enumerate([wukong_wch_header(_wch_cw)] + list(WUKONG_NUC_PROGRAM)):
             dmem_init[WUKONG_CALLHOME_BASE_WORD + _i] = _v
         for _i, _v in enumerate(WUKONG_WCH_CLIST):

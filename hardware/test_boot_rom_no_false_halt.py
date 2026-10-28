@@ -864,7 +864,7 @@ def test_retired_xloadlambda_faults_without_clearing_namespace_g_bit():
 
 # ── Shared retire-collection helper for Tests 4/5 ─────────────────────────────
 
-_SELFTEST_ENTRY_NIA = 0x604
+_SELFTEST_ENTRY_NIA = (WUKONG_SELFTEST_BASE_WORD + WUKONG_SELFTEST_WORDS[1]) * 4
 _SELFTEST_CODE_LO   = 0x604
 _SELFTEST_CODE_HI   = 0x600 + 512 * 4
 

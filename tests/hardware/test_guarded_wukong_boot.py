@@ -44,8 +44,8 @@ def test_guarded_full_top_reaches_authored_load(verify_uart):
         for cycle in range(20000):
             if load_pending:
                 assert ctx.get(core.debug_cr_words[2][0]) == 0x0200000b
-                assert retired == [(4, 0x27000001), (8, 0x17000000),
-                                   (0x3504, 2), (0x3508, 0x07130010)]
+                assert retired == [(4, 0x27000001), (8, 0x17000001),
+                                   (0x3508, 0x07130010)]
                 load_pending = False
                 load_committed = True
                 if not verify_uart:

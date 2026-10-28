@@ -14,7 +14,10 @@ function fixture() {
     });
     s.memory[0] = header(32, 12, 2, 2);
     s.cr[12] = { word0: s.createGT(0, 1, {R: 1, W: 1}, 1), word1: 0, word2: 255, word3: 0, m: 0 };
-    for (let slot = 2; slot <= 4; slot++) s.memory[slot * 256] = header(8, 1);
+    for (let slot = 2; slot <= 4; slot++) {
+        s.memory[slot * 256] = header(8, 1);
+        s.memory[slot * 256 + 1] = 2; // selector 1 enters the body, never table data
+    }
     s.cr[14] = { word0: s.createGT(0, 2, {X: 1}, 1), word1: 512, word2: 63, word3: 0, m: 0 };
     s.cr[6] = { word0: s.createGT(0, 2, {E: 1}, 1), word1: 575, word2: 63, word3: 0, m: 1 };
     s.memory[17] = s._packProtectedIndicator(241, 1, {});
@@ -27,7 +30,7 @@ function fixture() {
 }
 function call(s, slot) {
     s.cr[0] = { word0: s.createGT(0, slot, {E: 1}, 1), word1: slot * 256, word2: 63, word3: 0, m: 0 };
-    assert.ok(s._execCall({crDst: 0, imm: 0}));
+    assert.ok(s._execCall({crDst: 0, imm: 1}));
 }
 function bindLambdaEntry(s) {
     // A LAMBDA X view names an instruction, not the LUMP header. Provision

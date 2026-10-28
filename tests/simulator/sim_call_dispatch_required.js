@@ -1,6 +1,26 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {fixture, checkContext} = require('./cr6_contract_fixture');
+const {assembleLump} = require('../../simulator/lump_assembler');
+
+{
+    const image = assembleLump([[0x1f000000], [0x1f000000, 0x1f000000]]);
+    assert.deepEqual(image.methodTable, [3, 4], 'numeric header-relative offsets');
+    for (const selector of [1, 2]) {
+        const {sim, install} = fixture();
+        const domain = install(30, image.buf.slice(1));
+        sim.cr[0].word0 = domain.gt;
+        assert(sim._execCall({crDst: 0, imm: selector}));
+        assert.equal(sim.pc, image.bodyOffsets[selector - 1]);
+        checkContext(sim, domain);
+    }
+    const {compile, programs} = require('../../simulator/mint/protected-programs');
+    const {mint, verifier} = programs();
+    assert.equal(mint.words[0], mint.labels.create + 1);
+    assert.deepEqual(mint.words.slice(1, 5), Array(4).fill(mint.labels.reject_method + 1));
+    assert.equal(verifier.words[0], verifier.labels.verify + 1);
+    assert.throws(() => compile('ENTRY missing\nHALT'), /Unknown dispatch label/);
+}
 
 for (const selector of [0, -1, 32768, 65537]) {
     const {sim, install} = fixture();

@@ -94,7 +94,7 @@ def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0):
 #         Hardware RESTORE_CALL FSM reads CR0–CR11 from thread caps zone
 #         (thread[+244..+255]).
 #         CR0 ← thread[+244] = IDE-configured Entry E-GT (set by setBootEntrySlot()).
-#   [2] CALL   AL, CR0,  CR0
+#   [2] CALL   AL, CR0,  #1
 #         Enter the IDE-chosen first abstraction (lightning bolt).
 #         Faults NULL_CAP if Thread.caps[0] has not been configured.
 #
@@ -104,7 +104,7 @@ def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0):
 BOOT_PROGRAM = [
     encode_church(ChurchOpcode.LOAD,   CondCode.AL, cr_dst=15, cr_src=15, imm=0),
     encode_church(ChurchOpcode.CHANGE, CondCode.AL, cr_dst=12, cr_src=15, imm=1),
-    encode_church(ChurchOpcode.CALL,   CondCode.AL, cr_dst=0,  cr_src=0),
+    encode_church(ChurchOpcode.CALL,   CondCode.AL, cr_dst=0,  cr_src=0, imm=1),
 ]
 
 while len(BOOT_PROGRAM) < 256:
@@ -943,7 +943,8 @@ WUKONG_WCH_BASE_WORD  = WUKONG_CALLHOME_BASE_WORD  # byte 0x1200
 WUKONG_WCH_ALLOC      = 128          # words (lim17=127 patched above)
 WUKONG_WCH_CC         = 8
 WUKONG_WCH_CLIST_WORD = WUKONG_WCH_BASE_WORD + WUKONG_WCH_ALLOC - WUKONG_WCH_CC  # 1272
-WUKONG_WCH_CLIST = [0, 0, 0, 0, 0,
+WUKONG_WCH_CLIST = [make_gt(GT_TYPE_INFORM, PERM_MASK_E, WUKONG_CALLHOME_NS_SLOT, 0),
+                    0, 0, 0, 0,
                     WUKONG_DEMO_CLIST[5],   # LED_DEV Inform GT
                     WUKONG_DEMO_CLIST[6],   # UART_DEV Inform GT
                     0]
@@ -1107,6 +1108,13 @@ assert _decoded_branch_offset == _expected_branch_offset, (
     f"New banner bytes were added (or _WUKONG_LOOP_TOP changed) without updating "
     f"the BRANCH AL offset at the end of WUKONG_NUC_PROGRAM."
 )
+
+
+# The resident code extent includes a numeric selector-one dispatch slot.
+# All producers consume this sequence plus wukong_wch_header(len(...)).
+# Branches inside the body are relative, so prepending the table preserves
+# their targets. This generates new images; no saved binary is translated.
+WUKONG_NUC_PROGRAM = [2, *WUKONG_NUC_PROGRAM]
 
 
 class BootRom(Elaboratable):

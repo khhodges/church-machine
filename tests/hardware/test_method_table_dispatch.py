@@ -8,18 +8,18 @@ from hardware import test_boot_rom_no_false_halt as t
 
 
 @pytest.mark.parametrize("method,entry,body,fault", [
-    (1, 0xBF000001, 2, None),  # canonical forward displacement
-    (3, 0xBF007FFF, 2, None),  # signed negative displacement
-    (1, 0xBF000003, 4, None),  # last executable word
-    (1, 2, 2, None),           # legacy includes the header
+    (1, 0xBF000001, 2, t.FaultType.BOUNDS),  # instructions are not offsets
+    (3, 0xBF007FFF, 2, t.FaultType.BOUNDS),
+    (1, 0xBF000003, 4, t.FaultType.BOUNDS),
+    (1, 2, 2, None),           # numeric LUMP-relative offset
     (1, 4, 4, None),
     (1, 0, 2, t.FaultType.PERM_E),
     (1, 0xBF007FFF, 2, t.FaultType.BOUNDS),  # target is header
     (1, 0xBF004000, 2, t.FaultType.BOUNDS),  # negative overflow
     (1, 0xBF003FFF, 2, t.FaultType.BOUNDS),
     (1, 0xBF000004, 2, t.FaultType.BOUNDS),
-    (1, 5, 2, t.FaultType.INVALID_OP),       # invalid legacy offset
-    (1, 0xAF084001, 2, t.FaultType.INVALID_OP),
+    (1, 5, 2, t.FaultType.BOUNDS),
+    (1, 0xAF084001, 2, t.FaultType.BOUNDS),
     (5, 2, 2, t.FaultType.BOUNDS),           # table index outside code
 ])
 def test_numbered_call(tmp_path, method, entry, body, fault):

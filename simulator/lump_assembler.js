@@ -1,23 +1,19 @@
 'use strict';
 // lump_assembler.js — Shared LUMP assembler logic
 //
-// Mirrors _assembleLumpFromCatalog in app-absdetail.js (browser source).
-// Used by test_catalog_lump.js and test_lump_roundtrip.js so the encoding
-// formula lives in exactly one place.
-//
-// Browser code (app-absdetail.js) cannot use require(), so it keeps its own
-// inline copy — but any change to the BRANCH-encoding formula or header
-// packing must be applied here and reflected there in the same commit.
+// Builds fresh private test images using mandatory numeric CALL dispatch.
+// Historical BRANCH table decoding below is inspection-only; it is not
+// an alternate encoding for newly assembled executable images.
 
 const BRANCH_OPCODE = 23; // ★ v2.0 ISA: BRANCH is opcode 23 (was 17)
 
-// Assemble a LUMP binary with a BRANCH-encoded method table.
+// Assemble a LUMP binary with a numeric method table.
 //
 // methodBodies — array of arrays of 32-bit unsigned words, one per method.
 //
 // Returns:
 //   buf          — Uint32Array of exactly totalWords elements (header + table + bodies)
-//   methodTable  — array of the assembled BRANCH words (one per method)
+//   methodTable  — header-relative body word offsets (one per method)
 //   bodies       — array of body word arrays (same references as input)
 //   bodyOffsets  — array of lump-relative PC of each method's first body word
 //   totalWords   — total number of words in buf
@@ -30,8 +26,8 @@ function assembleLump(methodBodies) {
     let bodyOffset = N;  // lump-relative PC of first body (table occupies PCs 0..N-1)
 
     for (let i = 0; i < N; i++) {
-        const branchOffset = bodyOffset - i;   // relative to this entry's lump PC (= i)
-        methodTable.push(((BRANCH_OPCODE << 27) | (branchOffset & 0x7FFF)) >>> 0);
+        // CALL uses header-relative offsets; simulator PCs exclude the header.
+        methodTable.push(bodyOffset + 1);
         bodies.push(methodBodies[i]);
         bodyOffsets.push(bodyOffset);
         bodyOffset += methodBodies[i].length;
@@ -60,7 +56,7 @@ function assembleLump(methodBodies) {
 
 // Decode the lump-relative body PC from a BRANCH method-table entry.
 //
-// Mirrors the CALL dispatcher formula used by the simulator:
+// Historical inspection only, NOT the current CALL dispatcher:
 //   tableEntryLumpPC = methodIndex - 1
 //   new pc = tableEntryLumpPC + branchOffset = bodyOffset
 //

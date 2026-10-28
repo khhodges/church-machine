@@ -41,6 +41,9 @@ _WUKONG_CALLHOME_FALLBACK_WORDS = (
     0xBF040045,
 )
 
+# Numeric selector-one table precedes the unchanged relative-branch body.
+_WUKONG_CALLHOME_FALLBACK_WORDS = (2, *_WUKONG_CALLHOME_FALLBACK_WORDS)
+
 try:
     from .boot_rom import (
         WUKONG_NUC_PROGRAM as _CANONICAL_WUKONG_WORDS,
@@ -50,7 +53,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     _CANONICAL_WUKONG_WORDS = _WUKONG_CALLHOME_FALLBACK_WORDS
     _CANONICAL_SELFTEST_WORDS = ()
-    _canonical_wch_header = lambda _cw: 0xF8812408
+    _canonical_wch_header = lambda cw: 0xF8800008 | (cw << 10)
 except RuntimeError as exc:
     # The web IDE consumes trace labels, not a factory image. Keep the hardware
     # build fail-closed in boot_rom.py, but do not take down the entire preview
@@ -60,13 +63,13 @@ except RuntimeError as exc:
         raise
     _CANONICAL_WUKONG_WORDS = _WUKONG_CALLHOME_FALLBACK_WORDS
     _CANONICAL_SELFTEST_WORDS = ()
-    _canonical_wch_header = lambda _cw: 0xF8812408
+    _canonical_wch_header = lambda cw: 0xF8800008 | (cw << 10)
 
 WUKONG_CALLHOME_WORDS = tuple(int(word) & 0xFFFFFFFF
                               for word in _CANONICAL_WUKONG_WORDS)
 WUKONG_SELFTEST_WORDS = tuple(int(word) & 0xFFFFFFFF
                               for word in _CANONICAL_SELFTEST_WORDS)
-assert len(WUKONG_CALLHOME_WORDS) == 73
+assert len(WUKONG_CALLHOME_WORDS) == 74
 if _CANONICAL_WUKONG_WORDS is not _WUKONG_CALLHOME_FALLBACK_WORDS:
     assert WUKONG_CALLHOME_WORDS == _WUKONG_CALLHOME_FALLBACK_WORDS, (
         "Wukong trace fallback is stale; update it from WUKONG_NUC_PROGRAM"
@@ -74,7 +77,7 @@ if _CANONICAL_WUKONG_WORDS is not _WUKONG_CALLHOME_FALLBACK_WORDS:
 
 _COND_NAMES = ("EQ", "NE", "CS", "CC", "MI", "PL", "VS", "VC",
                "HI", "LS", "GE", "LT", "GT", "LE", "", "NV")
-_BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000000)
+_BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000001)
 _BOOT_DISASSEMBLY = (
     "LOAD NAMESPACE CR15",
     "LOAD THREAD+HEAP CR12+, CR5",

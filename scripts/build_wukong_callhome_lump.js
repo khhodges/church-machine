@@ -80,8 +80,14 @@ if (result.errors.length > 0) {
 const words = result.words.map(word => {
     const op = (word >>> 27) & 0x1F, src = (word >>> 15) & 0xF;
     // SELF insertion shifts indexed CALL rows as well as LOAD/SAVE rows.
-    return src === 6 && [0, 1, 2, 8, 9].includes(op)
-        ? ((word & ~0x1F) | ((word + 1) & 0x1F)) >>> 0 : word;
+    if (op === 2 && (word & (1 << 18))) {
+        return ((word & ~0x1F) | ((word + 1) & 0x1F)) >>> 0;
+    }
+    if (src === 6 && [0, 1].includes(op)) {
+        // Compact row magnitude occupies bits13:4, not the DR selector.
+        return (word + (1 << 4)) >>> 0;
+    }
+    return word;
 });
 console.log(`Assembled ${words.length} instruction words.`);
 function contentFrame(name, text) {
