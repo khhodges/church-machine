@@ -1243,6 +1243,29 @@
     display: none;
 }
 
+.fixed-toolbar > .thread-identity-strip {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    flex: none;
+    padding: 0.2rem 0.5rem;
+}
+
+.thread-identity-summary {
+    color: #a9b8cb;
+    font: 0.7rem/1.2 monospace;
+}
+
+@media (max-width: 680px) {
+    .fixed-toolbar .thread-identity-card {
+        box-sizing: border-box;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas: "marker name lifecycle" ". values values";
+        row-gap: 0.2rem;
+    }
+}
+
 .thread-identity-card {
     display: grid;
     grid-template-columns: auto minmax(4.8rem, 0.55fr) auto minmax(0, 2fr);

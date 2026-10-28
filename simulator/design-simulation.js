@@ -28,10 +28,10 @@
         }
     }
     function refreshDisplays() {
-        if (!machine || typeof sim==='undefined' || sim!==machine) return;
-        machine.running=running;
-        if(typeof root.updateDashboard==='function') root.updateDashboard();
+        if (machine) machine.running=running;
         if(typeof root.updateThreadControl==='function') root.updateThreadControl();
+        if (!machine || typeof sim==='undefined' || sim!==machine) return;
+        if(typeof root.updateDashboard==='function') root.updateDashboard();
         if(typeof root.updateLedStrip==='function') root.updateLedStrip();
     }
 
@@ -478,8 +478,32 @@
         message = 'Fault handler selection changed. Prepare fresh simulation to bind it to the exact image. Saved Namespace and hardware are unchanged.';
         render();
     }
-    root.DesignSimulation={selectFaultHandler,prepare,command,stop,invalidate,bindingChanged,markup,render,run,reset,traceContext,traceIdentity,
+    root.DesignSimulation={selectFaultHandler,prepare,command,stop,invalidate,bindingChanged,markup,render,run,reset,traceContext,traceIdentity,threadDisplay,
         step:()=>{if(!running) execute(1);}};
+
+    // Inspection only: declared membership survives missing/revoked admission.
+    // Never read the legacy fallback machine as evidence for a selected design.
+    function threadDisplay() {
+        const state = root.NamespaceDesignV1?.state;
+        if (!state?.active) return null;
+        const current = !!(machine && same(owner) && typeof sim !== 'undefined' && sim === machine);
+        const runtime = current && typeof machine.threadStatusRows === 'function'
+            ? machine.threadStatusRows(10) : [];
+        const context = busy ? 'preparing' : state.dirty ? 'draft' : 'configured';
+        return {
+            current,
+            label: current ? (machine.bootComplete ? 'Simulation' : 'Preboot simulation') :
+                `${context} · runtime unavailable`,
+            rows: (state.document?.rows || []).filter(row => row.kind === 'thread').map(row => {
+                const live = runtime.find(item => item.slot === row.slot);
+                return live ? {...live, name: row.name || live.name} : {
+                    slot: row.slot, name: row.name || `Thread at slot ${row.slot}`,
+                    active: false, lifecycleStatus: context, runtimeUnavailable: true,
+                    nia: null, physicalAddress: null, indicatorFlags: null,
+                };
+            }),
+        };
+    }
 
     // Verify the occurrence against the admitted image, never editor/registry
     // selection or a post-CALL CR14. Mutable data is not executable identity.

@@ -499,6 +499,34 @@ function harness(defect) {
     assert.equal(await routed.api.command('step'),true);
     routed.api.invalidate();
     assert.equal(routed.scope.sim,originalSimulator,'leaving the selected runtime restores the prior observer');
+    // Selected membership never falls back to that unrelated observer.
+    const membership = harness('boot');
+    membership.scope.NamespaceDesignV1.state.document.rows.push(
+        ...[2,5,8,11,14,17].map(slot=>({kind:'thread',slot,name:`Actor.${slot}`})));
+    assert.equal(membership.api.threadDisplay().rows.length,6);
+    assert(membership.api.threadDisplay().rows.every(row=>row.runtimeUnavailable));
+    let releaseMembership;
+    const membershipFetch=membership.scope.fetch;
+    membership.scope.fetch=async (...args)=>{
+        await new Promise(resolve=>{releaseMembership=resolve;});
+        return membershipFetch(...args);
+    };
+    const preparingMembership=membership.api.prepare();
+    assert.match(membership.api.threadDisplay().label,/preparing/);
+    assert.equal(membership.api.threadDisplay().rows.length,6);
+    membership.api.stop(); releaseMembership(); await preparingMembership;
+    membership.scope.fetch=membershipFetch;
+    await membership.api.prepare();
+    const selectedMachine=membership.scope.sim;
+    membership.scope.sim.threadStatusRows=()=>[{slot:5,name:'runtime',active:true,
+        lifecycleStatus:'running',nia:7}];
+    assert.equal(membership.api.threadDisplay().rows[1].nia,7);
+    membership.api.reset();
+    assert.notEqual(membership.scope.sim,selectedMachine);
+    assert.equal(membership.api.threadDisplay().rows.length,6);
+    membership.api.invalidate();
+    assert.equal(membership.api.threadDisplay().current,false);
+    assert(membership.api.threadDisplay().rows.every(row=>row.nia===null));
     const rejected=harness('rejected');
     assert.equal(await rejected.api.command('run'),false);
     assert.equal(rejected.instances.length,0,'failed admission cannot run a legacy image');

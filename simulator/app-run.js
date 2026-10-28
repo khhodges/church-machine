@@ -1229,6 +1229,11 @@ function updateThreadControl() {
         if (status) status.textContent = 'Hardware target · ' + (target.ok ? 'selected' : 'unresolved');
         return;
     }
+    const selectedDisplay = window.DesignSimulation?.threadDisplay?.();
+    if (selectedDisplay && !selectedDisplay.current) {
+        if (status) status.textContent = selectedDisplay.label;
+        return;
+    }
     if (!sim || !sim.simulationConfiguration) {
         // A factory Thread can be scheduler-runnable without any approved image
         // or executed instruction. It is not an activated simulation.
@@ -1252,14 +1257,9 @@ function updateThreadControl() {
 function updateThreadIdentityStrip() {
     const strip = document.getElementById('threadIdentityStrip');
     if (!strip) return;
-    if (!sim || typeof sim.threadStatusRows !== 'function') {
-        strip.replaceChildren();
-        strip.hidden = true;
-        return;
-    }
-
-    const allRows = sim.threadStatusRows(10);
-    const executionLocked = Boolean(_simRunActive || sim.running || sim.walkActive);
+    const selectedDisplay = window.DesignSimulation?.threadDisplay?.();
+    const allRows = selectedDisplay ? selectedDisplay.rows :
+        sim && typeof sim.threadStatusRows === 'function' ? sim.threadStatusRows(10) : [];
     const pageSize = 4;
     const pageCount = Math.max(1, Math.ceil(allRows.length / pageSize));
     _threadIdentityPage = Math.min(_threadIdentityPage, pageCount - 1);
@@ -1267,7 +1267,12 @@ function updateThreadIdentityStrip() {
         _threadIdentityPage * pageSize,
         (_threadIdentityPage + 1) * pageSize);
     strip.replaceChildren();
-    strip.hidden = allRows.length === 0;
+    strip.hidden = false;
+    const summary = document.createElement('span');
+    summary.className = 'thread-identity-summary';
+    summary.textContent = selectedDisplay ? selectedDisplay.label : 'Simulator Threads';
+    if (!allRows.length) summary.textContent += ' · No configured Threads available';
+    strip.appendChild(summary);
     rows.forEach((row) => {
         const card = document.createElement('div');
         const selected = typeof _threadContextModalSlot !== 'undefined' &&
@@ -1281,15 +1286,15 @@ function updateThreadIdentityStrip() {
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-haspopup', 'dialog');
-        card.setAttribute('aria-disabled', 'false');
+        card.setAttribute('aria-disabled', String(!!row.runtimeUnavailable));
         if (row.active) card.setAttribute('aria-current', 'true');
         const niaText = Number.isInteger(row.nia)
             ? `0x${(row.nia >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
-            : '\u2014';
+            : 'unavailable';
         const physicalText = Number.isInteger(row.physicalAddress)
             ? `0x${(row.physicalAddress >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
-            : '\u2014';
-        const gtName = row.gtPetName || 'No entry GT';
+            : 'unavailable';
+        const gtName = row.gtPetName || (row.runtimeUnavailable ? 'unavailable' : 'No entry GT');
         const gtKeyText = row.active ? 'Current code' : 'Saved entry code';
         const flagsKeyText = row.active ? 'Current FLAGS' : 'Saved FLAGS';
         const indicatorFlags = row.indicatorFlags &&
@@ -1297,7 +1302,7 @@ function updateThreadIdentityStrip() {
         const flagText = indicatorFlags
             ? ['N', 'Z', 'C', 'V'].map((flag) =>
                 `${flag}${indicatorFlags[flag] ? 1 : 0}`).join(' ')
-            : '\u2014';
+            : 'unavailable';
         card.setAttribute('aria-label',
             `Thread context ${row.name}${row.active ? ', active' : ''}; ${lifecycleText}; ` +
             `LUMP-relative NIA ${niaText}; physical instruction address ${physicalText}; ` +
@@ -1312,10 +1317,12 @@ function updateThreadIdentityStrip() {
         // normal click can be lost when replacement occurs between pointer
         // down and pointer up, so activate while the current card still exists.
         card.addEventListener('pointerdown', (event) => {
+            if (row.runtimeUnavailable) return;
             if (event.button !== 0) return;
             openThreadContextModal(row.slot, card);
         });
         card.addEventListener('keydown', (event) => {
+            if (row.runtimeUnavailable) return;
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
             openThreadContextModal(row.slot, card);
@@ -1432,6 +1439,10 @@ function updateThreadIdentityStrip() {
 }
 
 function _threadModalRow() {
+    const selectedDisplay = window.DesignSimulation?.threadDisplay?.();
+    if (selectedDisplay && (!selectedDisplay.current ||
+            !selectedDisplay.rows.some(row => row.slot === _threadContextModalSlot &&
+                !row.runtimeUnavailable))) return null;
     if (!sim || _threadContextModalSlot === null ||
             typeof sim.threadStatusRows !== 'function') return null;
     return sim.threadStatusRows(10).find(row => row.slot === _threadContextModalSlot) || null;

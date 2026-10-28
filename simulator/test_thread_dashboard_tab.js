@@ -12,8 +12,8 @@ const misc = fs.readFileSync('simulator/app-misc.js', 'utf8');
 const css = fs.readFileSync('simulator/styles-toolbar.css', 'utf8');
 const lumpCss = fs.readFileSync('simulator/styles-lumps.css', 'utf8');
 
-assert.match(html, /class="flags-led-row"[\s\S]*id="flagsDisplay"[\s\S]*id="threadIdentityStrip"/,
-    'configured Threads stay visible as a right-side stack above the dashboard content');
+assert.match(html, /<\/header>\s*<div id="threadIdentityStrip"/,
+    'configured Threads belong to the shared toolbar, outside every view');
 assert.doesNotMatch(html, /id="dashTab-thread"|id="dashPanel-thread"/,
     'configured Thread cards do not consume a full-width dashboard tab');
 assert.strictEqual((html.match(/id="threadIdentityStrip"/g) || []).length, 1,
@@ -33,7 +33,7 @@ assert.match(tools, /ArrowLeft[\s\S]*ArrowRight[\s\S]*ArrowUp[\s\S]*ArrowDown[\s
     'arrow, Home, and End keys navigate dashboard tabs');
 assert.match(css, /\.thread-identity-strip\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*margin-left:\s*auto;/,
     'configured Thread cards form a compact vertical stack in the right-side status space');
-assert.match(css, /\.thread-identity-card\s*\{[\s\S]*grid-template-areas:\s*"marker name values";/,
+assert.match(css, /\.thread-identity-card\s*\{[\s\S]*grid-template-areas:\s*"marker name lifecycle values";/,
     'each Thread card stays on one compact row so code remains visible');
 assert.match(css, /@media \(max-width: 680px\)[\s\S]*\.flags-led-row\s*\{[\s\S]*flex-wrap:\s*wrap;[\s\S]*\.thread-identity-strip\s*\{[\s\S]*flex:\s*1 1 100%;/,
     'the Thread stack moves below status only when a narrow viewport cannot hold the right column');
@@ -47,8 +47,8 @@ assert.match(css, /\.crd-menu-dropdown\.dashboard-menu-dropdown\s*\{[\s\S]*right
     'the dashboard menu is left-anchored despite later generic dropdown rules');
 assert.match(html, /Inspect Machine[\s\S]*Context Registers[\s\S]*Data Registers[\s\S]*Gate Log[\s\S]*Machine State[\s\S]*Memory Status/,
     'machine inspection activities are grouped together in the dashboard menu');
-assert.match(html, /dashboard-heading-row[\s\S]*id="crdMenuActiveLabel"[\s\S]*dashboard-machine-row[\s\S]*id="hwLedBar"[\s\S]*id="threadIdentityStrip"/,
-    'the abstraction heading sits above Wukong A7 and aligns with the Thread stack');
+assert.match(html, /dashboard-heading-row[\s\S]*id="crdMenuActiveLabel"[\s\S]*dashboard-machine-row[\s\S]*id="hwLedBar"/,
+    'dashboard heading and board status retain their order');
 assert.match(memory, /Inspect Abstraction[\s\S]*data-tab="code"[\s\S]*data-tab="clist"[\s\S]*data-tab="api"[\s\S]*data-tab="lump"/,
     'abstraction inspection views are grouped in the shared menu');
 assert.match(memory, /Modify Abstraction|Deploy &amp; Share/,
@@ -62,7 +62,7 @@ assert.match(css, /\.dash-tab:focus-visible/,
     'keyboard focus remains clearly visible');
 assert.match(run, /function updateThreadIdentityStrip\(\)[\s\S]*replaceChildren\(\)[\s\S]*row\.active/,
     'live Thread updates and active highlighting still render through the original strip');
-assert.match(misc, /function observeToolbarHeight\(\)[\s\S]*new ResizeObserver[\s\S]*requestAnimationFrame\(function\(\) \{ setTimeout\(adjustViewTop, 0\); \}\)[\s\S]*observe\(toolbar\)/,
+assert.match(misc, /function observeToolbarHeight\(\)[\s\S]*new ResizeObserver[\s\S]*requestAnimationFrame[\s\S]*setTimeout[\s\S]*adjustViewTop\(\)[\s\S]*observe\(toolbar\)/,
     'dashboard content follows late toolbar height changes so Thread.1 cannot be covered');
 
 console.log('PASS: persistent right-side Thread stack contracts');
