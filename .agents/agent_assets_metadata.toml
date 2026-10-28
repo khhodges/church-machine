@@ -1452,3 +1452,17 @@ mtime_ms = 1793104938936
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/822e011f-bd54-4e0e-b499-09384d375319/20e32da2-500a-4844-ab1e-7bb4fb69e4a0"
 storage_version_token = "1793104970190810"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "eyt5btkk9G7gQH4VToYVn"
+uri = "file://.local/tasks/three-thread-attack-scenario-review.md"
+type = "text"
+title = "Three-Thread Attack and Progress — Scenario Review"
+description = "Review baseline covering the three Threads, retained actors and drivers, repeated Mallory faults, Alice’s counter, WCH output, acceptance evidence and future changes. No implementation or hardware acceptance is claimed."
+logical_id = "0d3c5513-a0f8-4d74-8cee-3ce4db903f1e"
+content_hash = "sha256:e135dfa18f90ac988113e10b02bd5fd85add34ff41ac87830495420a079c92b1"
+size = 14495
+mtime_ms = 1793219463110
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/0d3c5513-a0f8-4d74-8cee-3ce4db903f1e/43fd34fd-9fb1-44a9-b641-b12e93d12e06"
+storage_version_token = "1793219464930546"
+content_type = "text/markdown"
