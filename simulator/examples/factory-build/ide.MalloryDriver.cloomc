@@ -1,0 +1,9 @@
+abstraction ide.MalloryDriver {
+capabilities { SELF E, ide.Mallory E }
+method Run() {
+LOAD CR1, CR6, #1
+CALL CR1, #0
+; Missing-row LOAD must fault, never return here.
+HALT
+}
+}

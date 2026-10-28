@@ -103,6 +103,24 @@ def test_invalid_design_never_commits(store, change):
     assert not store.path.exists()
 
 
+def test_explicit_saved_fault_handler_is_resident_and_roundtrips(store):
+    current = store.read()
+    draft = copy.deepcopy(current["document"])
+    handler = next(r for r in draft["rows"] if r["kind"] == "lump" and r.get("selection"))
+    handler["policy"] = "Resident"
+    draft["faultHandlerSlot"] = handler["slot"]
+    store.save(dict(fingerprint=current["fingerprint"], document=draft))
+    assert store.read()["document"]["faultHandlerSlot"] == handler["slot"]
+    for invalid in (True, None, "7", 2, 63):
+        bad = copy.deepcopy(draft)
+        bad["faultHandlerSlot"] = invalid
+        with pytest.raises(ValueError, match="Saved fault handler"):
+            validate(bad)
+    handler["policy"] = "Lazy"
+    with pytest.raises(ValueError, match="Saved fault handler"):
+        validate(draft)
+
+
 def test_carries_other_design_members_without_silent_slot_collision():
     document = seed({"abstractions":[{"slot":14,"name":"ide.Mint","seq":3}]})
     row = next(r for r in document["rows"] if r["name"] == "ide.Mint")

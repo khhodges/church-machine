@@ -1443,7 +1443,8 @@
     "filename": "ide.WukongCallHome.1.8d0a25eb.lump",
     "lump_version": 1,
     "compiled_at": 1792426555.0428784,
-    "operation_id": "8536c6f2f9984cabb4a35aece98b2ce3"
+    "operation_id": "8536c6f2f9984cabb4a35aece98b2ce3",
+    "archived": true
   },
   {
     "token": "ff353b57",
@@ -1673,7 +1674,8 @@
     "filename": "ide.Alice.1.d5125806.lump",
     "lump_version": 3,
     "compiled_at": 1792541082.9121666,
-    "operation_id": "bddf1dfb65db4cdf82bcbbf2dfee134f"
+    "operation_id": "bddf1dfb65db4cdf82bcbbf2dfee134f",
+    "archived": true
   },
   {
     "token": "81c3e0ab",
@@ -1689,7 +1691,8 @@
     "filename": "ide.AliceDriver.1.947b2f4e.lump",
     "lump_version": 1,
     "compiled_at": 1792541087.2895026,
-    "operation_id": "a3fb140f74944557abff83bbe87eaef2"
+    "operation_id": "a3fb140f74944557abff83bbe87eaef2",
+    "archived": true
   },
   {
     "token": "e130670b",
@@ -1697,7 +1700,8 @@
     "filename": "ide.MalloryDriver.1.eecf23b5.lump",
     "lump_version": 1,
     "compiled_at": 1792541088.4785292,
-    "operation_id": "40c9b2aff5ba4bccb97b9187159b9614"
+    "operation_id": "40c9b2aff5ba4bccb97b9187159b9614",
+    "archived": true
   },
   {
     "token": "27e9e494",
@@ -4366,7 +4370,8 @@
     "filename": "ide.AmoebaStartup.1.e37d50bd.lump",
     "lump_version": 4,
     "compiled_at": 1793205874.5421438,
-    "operation_id": "8a791bc852774f4ea3414f1286951be0"
+    "operation_id": "8a791bc852774f4ea3414f1286951be0",
+    "archived": true
   },
   {
     "token": "205f25b2",
@@ -4745,5 +4750,53 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "30dbd3b2d55b41fa25399084af6e17cad2586f6b8615e507af5e856e07f8bacb"
     }
+  },
+  {
+    "token": "07eae44c",
+    "abstraction": "ide.Alice",
+    "filename": "ide.Alice.1.4f5f9b06.lump",
+    "lump_version": 7,
+    "compiled_at": 1793223084.7775772,
+    "operation_id": "254800088b284eebbe2d4ef070a9d166"
+  },
+  {
+    "token": "a14e4cc4",
+    "abstraction": "ide.AliceDriver",
+    "filename": "ide.AliceDriver.1.f17de966.lump",
+    "lump_version": 3,
+    "compiled_at": 1793223101.7865129,
+    "operation_id": "1028cad4e59b4f488ee4d951b7f43ab5"
+  },
+  {
+    "token": "e130670b",
+    "abstraction": "ide.MalloryDriver",
+    "filename": "ide.MalloryDriver.1.5977b04e.lump",
+    "lump_version": 3,
+    "compiled_at": 1793223120.3310962,
+    "operation_id": "18dbda2bf528453c9439d8462c255091"
+  },
+  {
+    "token": "eca30d09",
+    "abstraction": "ide.WukongCallHome",
+    "filename": "ide.WukongCallHome.1.dbfc5d76.lump",
+    "lump_version": 3,
+    "compiled_at": 1793223136.449717,
+    "operation_id": "166cf99673d44d9a89c88fb65bd83f3a"
+  },
+  {
+    "token": "3dbdb3c9",
+    "abstraction": "ide.CapabilityTest",
+    "filename": "ide.CapabilityTest.1.db5943df.lump",
+    "lump_version": 11,
+    "compiled_at": 1793223152.6275933,
+    "operation_id": "0bf2faf95ca54a28afd88eca511bb6b3"
+  },
+  {
+    "token": "dab21c16",
+    "abstraction": "ide.AmoebaStartup",
+    "filename": "ide.AmoebaStartup.1.379796a3.lump",
+    "lump_version": 5,
+    "compiled_at": 1793223168.5579479,
+    "operation_id": "3e19af9f22a24292a50c0369b2de706b"
   }
 ]

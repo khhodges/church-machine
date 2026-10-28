@@ -587,6 +587,18 @@ function harness(defect) {
         assert.equal(bad.instances.length,0);
         assert.match(bad.panel.innerHTML,/blocked/);
     }
+    const persistedHandler=harness();
+    persistedHandler.scope.NamespaceDesignV1.state.document.rows[0].kind='lump';
+    persistedHandler.scope.NamespaceDesignV1.state.document.faultHandlerSlot=10;
+    assert.match(persistedHandler.api.markup(),/value="10" selected/);
+    await persistedHandler.api.prepare(true);
+    assert.equal(persistedHandler.instances[0].faultEntryConfiguration.handlerGT,0x4a00000a);
+    await persistedHandler.api.command('reset');
+    assert.equal(persistedHandler.instances[1].faultEntryConfiguration.handlerGT,0x4a00000a);
+    persistedHandler.api.selectFaultHandler('');
+    await persistedHandler.api.prepare(true);
+    assert.equal(persistedHandler.instances[2].faultEntryConfiguration,undefined,
+        'explicit session stop-on-fault overrides saved handler');
     const configured=harness();
     configured.scope.NamespaceDesignV1.state.document.rows[0].kind='lump';
     configured.api.selectFaultHandler('10');

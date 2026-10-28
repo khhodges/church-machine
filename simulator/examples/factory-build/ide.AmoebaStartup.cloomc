@@ -1,0 +1,21 @@
+abstraction ide.AmoebaStartup {
+capabilities { SELF E, ide.CapabilityTest E, ide.WukongCallHome E }
+method Start() {
+; Fresh Threads have DR3=0. Existing fault entry supplies save status 1/2.
+; This executes once per entry, never on ordinary CapabilityTest turns.
+ISUB DR4, DR3, #0
+BRANCHEQ Init
+CALL CR6[ide.WukongCallHome], #2
+Init:
+CALL CR6[ide.CapabilityTest], #0
+HALT
+}
+method AliceStart() {
+CALL CR6[ide.CapabilityTest], #1
+HALT
+}
+method MalloryStart() {
+CALL CR6[ide.CapabilityTest], #2
+HALT
+}
+}

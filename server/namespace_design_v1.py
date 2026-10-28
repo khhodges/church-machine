@@ -127,7 +127,7 @@ def phase1_seed():
 
 
 def validate(document):
-    if not isinstance(document, dict) or set(document) != {
+    if not isinstance(document, dict) or set(document) - {"faultHandlerSlot"} != {
         "format", "capacityWords", "slotCount", "outputProfile", "rows"
     }:
         raise ValueError("Expected a complete Namespace design")
@@ -196,6 +196,12 @@ def validate(document):
                 if value and (not isinstance(value, str) or not re.fullmatch(rf"[0-9a-fA-F]{{{width}}}", value)):
                     raise ValueError(f"Invalid selection {field}")
     by_slot = {r["slot"]: r for r in rows}
+    if "faultHandlerSlot" in document:
+        handler_slot = document["faultHandlerSlot"]
+        handler = by_slot.get(handler_slot, {}) if type(handler_slot) is int else {}
+        if (handler.get("kind") != "lump" or handler.get("policy") != "Resident"
+                or not handler.get("selection")):
+            raise ValueError("Saved fault handler must select an exact Resident LUMP")
     for row in rows:
         binding = row.get("preparedThread", {})
         for slot in (binding[key] for key in ("entrySlot", "actorSlot") if key in binding):

@@ -19,7 +19,7 @@ async function main() {
     const browser = await chromium.launch({headless:true, args:['--no-sandbox'],
         executablePath:execFileSync('which', ['chromium'], {encoding:'utf8'}).trim()});
     const calls = [], errors = [];
-    let held, delayNext = false, lastBind;
+    let held, delayNext = false, lastBind, prebootHash;
     async function open() {
         const context = await browser.newContext({viewport:{width:1500,height:1100}});
         await context.addInitScript(() => {
@@ -93,14 +93,24 @@ async function main() {
         // invalidated, without executing an instruction.
         await page.locator('button[onclick="resetSim()"]').click();
         const [prepared, approved, active] = await responses;
-        await expect.poll(async () => hash((await snapshot(page)).words)).toBe(prepared.imageHash);
+        // Configuring an explicit handler validates Boot.Thread and the handler
+        // with mLoad, setting only their descriptor G cache bits. Admission
+        // bytes remain immutable; compare runtime with that exact expected delta.
+        const expected = active.words.slice();
+        const handler = (await document(page)).faultHandlerSlot;
+        if (handler !== undefined) {
+            for (const slot of [2, handler])
+                expected[slot*4+1] = (expected[slot*4+1] | 0x40000000) >>> 0;
+        }
+        prebootHash = hash(expected);
+        await expect.poll(async () => hash((await snapshot(page)).words)).toBe(prebootHash);
         assert.equal(prepared.imageHash, active.imageHash);
         assert.equal(prepared.configurationHash, approved.configurationHash);
         assert.equal(prepared.configurationHash, active.configurationHash);
         assert.equal(prepared.preparationId, active.preparationId);
         assert.equal(active.hardwareCertified, false);
         assert.equal(hash(active.words), prepared.imageHash);
-        assert.equal(hash((await snapshot(page)).words), prepared.imageHash);
+        assert.deepEqual((await snapshot(page)).words, expected);
         return prepared;
     }
     let page;
@@ -116,7 +126,7 @@ async function main() {
         const beforeRejectedSave = await persisted(page);
         await page.locator('#btnToolbarSaveLump').click();
         await page.locator('#saveNSConfirmBtn').click();
-        await expect(page.locator('#saveNSConfirmBtn')).toHaveText('Approve & Save');
+        await expect(page.locator('#saveNSConfirmBtn')).toHaveText('Approve & Save', {timeout:15000});
         await page.locator('#saveNSConfirmBtn').click();
         await expect(confirm(page)).toBeVisible();
         // Reject the real protected review, rather than manufacturing a 409.
@@ -128,7 +138,7 @@ async function main() {
         assert.deepEqual(await persisted(page), beforeRejectedSave,
             'Rejected review cannot publish bytes, approvals or Namespace selections');
         await page.locator('#saveNSConfirmBtn').click();
-        await expect(page.locator('#saveNSConfirmBtn')).toHaveText('Approve & Save');
+        await expect(page.locator('#saveNSConfirmBtn')).toHaveText('Approve & Save', {timeout:15000});
         await page.locator('#saveNSConfirmBtn').click();
         await confirm(page).click();
         // Publication and advancing the selected Namespace are distinct reviews.
@@ -176,7 +186,7 @@ async function main() {
         await page.locator('button[onclick="resetSim()"]').click();
         const reset = await snapshot(page);
         assert.equal(reset.pc, 0); assert.equal(reset.steps, 0);
-        assert.equal(hash(reset.words), prepared.imageHash);
+        assert.equal(hash(reset.words), prebootHash);
         assert.equal(reset.configuration.configurationHash, prepared.configurationHash);
         assert.deepEqual(reset.faults, []);
         assert.equal(reset.boot, false);

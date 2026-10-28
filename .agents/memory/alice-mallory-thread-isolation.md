@@ -187,6 +187,29 @@ access, or that this requires separate Namespaces or SWITCH.
 Isolated actor fixture provisioning is not adoption into the user's selected
 Namespace. Keep the evidence and user-facing claims distinct.
 
+Saved Factory Build adoption must retain its explicitly selected startup method
+entries and fault handler, not just its LUMP revisions.
+
+**Why:** A browser-only handler choice or an old common Thread entry can make
+the saved design behave differently from the reviewed combined demonstration.
+
+**How to apply:** Preserve Boot.Thread independently of AmoebaStartup changes.
+Publish source through ordinary compiler/save admission, bind the exact saved
+Namespace, and verify the admitted image through normal IDE controls. Never
+upload an offline localized candidate to substitute for that path.
+
+Fault-handler validation can set descriptor G cache bits before the first
+instruction; admitted-image identity and preboot runtime memory are distinct.
+
+**Why:** The existing handler constructor validates its targets through mLoad.
+An exact runtime hash can therefore differ even though executable bytes and
+authority are unchanged.
+
+**How to apply:** Verify the admitted image hash exactly. For preboot runtime
+comparison, permit only the specifically expected target descriptor G-bit
+changes and require all remaining words to match; never ignore arbitrary
+Namespace or program changes.
+
 The corrected-Mallory example also demonstrates side-by-side LUMPs, code
 evolution, and fallback when needed during an upgrade.
 

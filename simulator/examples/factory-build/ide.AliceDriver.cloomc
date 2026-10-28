@@ -1,0 +1,27 @@
+abstraction ide.AliceDriver {
+capabilities { SELF E, ide.AliceDriver RW, ide.Alice E }
+method Run() {
+LOAD CR1, CR6, #2
+CALL CR1, #1
+LOAD CR2, CR6, #1
+DREAD DR2, CR2, #21
+MCMP DR1, DR2
+BRANCHNE Failed
+; A mismatch stops before Stash; never repair lost state.
+IADD DR1, DR1, #1
+LOAD CR1, CR6, #2
+CALL CR1, #0
+LOAD CR1, CR6, #2
+CALL CR1, #1
+LOAD CR2, CR6, #1
+DREAD DR2, CR2, #21
+IADD DR2, DR2, #1
+MCMP DR1, DR2
+BRANCHNE Failed
+DWRITE DR1, CR2, #21
+RETURN
+Failed:
+HALT
+.word 41
+}
+}

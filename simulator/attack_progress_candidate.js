@@ -92,4 +92,4 @@ function start(candidate) {
     for(let i=0;i<3;i++) assert(sim._bootStep(), JSON.stringify(sim.faultLog));
     return sim;
 }
-module.exports = {create,start,sha,BASELINE};
+module.exports = {create,start,sha,BASELINE,resolved};

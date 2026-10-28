@@ -1,0 +1,102 @@
+abstraction ide.CapabilityTest {
+capabilities {
+SELF E, ide.SelfTest E, ide.LED_DEV RW, ide.UART_DEV RW,
+ide.BTN_DEV R, ide.TIMER_DEV RW, ide.M_BIT_DEV RW,
+ide.WukongCallHome E, ide.Thread2, ide.Thread3, ide.BootThread,
+ide.AliceDriver E, ide.MalloryDriver E
+}
+method Run() {
+Start:
+; Preserve the selected baseline's capability/arithmetic checks and calls.
+
+LOAD CR0, CR6, #1
+LOAD CR1, CR6, #2
+LOAD CR2, CR6, #3
+LOAD CR3, CR6, #4
+LOAD CR4, CR6, #5
+LOAD CR11, CR6, #6
+TPERM CR11, EXACT, CR4
+TPERM CR0, E
+TPERM CR1, RW
+TPERM CR2, RW
+TPERM CR4, RW
+TPERM CR0, L
+LOADEQ CR0, CR6, #2
+LOADNE CR0, CR6, #1
+IADD DR1, DR0, #42
+IADD DR2, DR1, #8
+ISUB DR3, DR2, DR1
+MCMP DR1, DR2
+IADD DR4, DR0, #1
+SHL DR4, DR4, 3
+SHR DR4, DR4, 1
+CALL CR6[ide.SelfTest], #0
+
+CALL CR6[ide.WukongCallHome], #0
+CHANGE CR6, #8
+BRANCH Start
+}
+method AliceRun() {
+AliceTurn:
+
+LOAD CR0, CR6, #1
+LOAD CR1, CR6, #2
+LOAD CR2, CR6, #3
+LOAD CR3, CR6, #4
+LOAD CR4, CR6, #5
+LOAD CR11, CR6, #6
+TPERM CR11, EXACT, CR4
+TPERM CR0, E
+TPERM CR1, RW
+TPERM CR2, RW
+TPERM CR4, RW
+TPERM CR0, L
+LOADEQ CR0, CR6, #2
+LOADNE CR0, CR6, #1
+IADD DR1, DR0, #42
+IADD DR2, DR1, #8
+ISUB DR3, DR2, DR1
+MCMP DR1, DR2
+IADD DR4, DR0, #1
+SHL DR4, DR4, 3
+SHR DR4, DR4, 1
+CALL CR6[ide.SelfTest], #0
+
+CALL CR6[ide.AliceDriver], #0
+CALL CR6[ide.WukongCallHome], #1
+CALL CR6[ide.WukongCallHome], #0
+CHANGE CR6, #9
+BRANCH AliceTurn
+}
+method MalloryRun() {
+MalloryTurn:
+
+LOAD CR0, CR6, #1
+LOAD CR1, CR6, #2
+LOAD CR2, CR6, #3
+LOAD CR3, CR6, #4
+LOAD CR4, CR6, #5
+LOAD CR11, CR6, #6
+TPERM CR11, EXACT, CR4
+TPERM CR0, E
+TPERM CR1, RW
+TPERM CR2, RW
+TPERM CR4, RW
+TPERM CR0, L
+LOADEQ CR0, CR6, #2
+LOADNE CR0, CR6, #1
+IADD DR1, DR0, #42
+IADD DR2, DR1, #8
+ISUB DR3, DR2, DR1
+MCMP DR1, DR2
+IADD DR4, DR0, #1
+SHL DR4, DR4, 3
+SHR DR4, DR4, 1
+CALL CR6[ide.SelfTest], #0
+
+CALL CR6[ide.WukongCallHome], #0
+CALL CR6[ide.MalloryDriver], #0
+; Unreachable on the deliberate attack. No skip or normal return is assumed.
+HALT
+}
+}

@@ -1,0 +1,15 @@
+abstraction ide.Alice {
+capabilities { SELF E, ide.Alice RW }
+method Stash() {
+LOAD CR1, CR6, #1
+DWRITE DR1, CR1, #9
+RETURN
+}
+method Reveal() {
+LOAD CR1, CR6, #1
+DREAD DR1, CR1, #9
+RETURN
+; Fresh-image initialization only. This data word is never executed.
+.word 41
+}
+}
