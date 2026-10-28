@@ -5107,6 +5107,267 @@
         "signature": "3734db38286d26c69945583b27551aa30761551df77db79c511aeba651d31e78"
       },
       "identity_hash": "ba1427c1973e591cf4956427bec9aaa336a9cfc8a7460adacca980be7e5fb543"
+    },
+    "b422e3525a54e7dd58c0f7fb027a3bf1d719b9bc98c490e03535f83da7a61ee0": {
+      "binary_hash": "b422e3525a54e7dd58c0f7fb027a3bf1d719b9bc98c490e03535f83da7a61ee0",
+      "dot_name": "ide.CapabilityTest",
+      "issue_n": 1,
+      "abstraction": "ide.CapabilityTest",
+      "filename": "ide.CapabilityTest.1.5b91e58e.lump",
+      "compiled_at": 1793209397.2842197,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.SelfTest",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.LED_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.UART_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 3,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.BTN_DEV",
+            "rights": [
+              "R"
+            ],
+            "relocation_row": 4,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.TIMER_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 5,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.M_BIT_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 6,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.WukongCallHome",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 7,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread2",
+            "rights": [],
+            "relocation_row": 8,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread3",
+            "rights": [],
+            "relocation_row": 9,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.BootThread",
+            "rights": [],
+            "relocation_row": 10,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.CapabilityTest",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "b422e3525a54e7dd58c0f7fb027a3bf1d719b9bc98c490e03535f83da7a61ee0",
+        "source_hash": "99437026f4be97133c5e1f2ad0dedf61aa390c8f5f152d52bf392927b389d42b",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "53339396c13d619347f28a050dd79e5d2378e847788a597cca94d92ced004d1e",
+          "inputs": {
+            "language": "auto",
+            "_resolved_call_api_authorities": {
+              "ide.SelfTest": {
+                "source": "embedded-binary",
+                "embedded": true,
+                "token": "bb1e4bed",
+                "selectedToken": "bb1e4bed",
+                "revision": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+                "selectedRevision": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+                "api": {
+                  "name": "ide.SelfTest",
+                  "capabilities": [
+                    {
+                      "name": "SELF",
+                      "rights": [
+                        "E"
+                      ],
+                      "grants": [
+                        "E"
+                      ]
+                    }
+                  ],
+                  "methods": [
+                    {
+                      "name": "Run",
+                      "index": 0,
+                      "branchOffset": 2,
+                      "inputs": [],
+                      "returns": {
+                        "name": "result",
+                        "register": "DR1"
+                      }
+                    }
+                  ]
+                }
+              },
+              "ide.WukongCallHome": {
+                "source": "embedded-binary",
+                "embedded": true,
+                "token": "7c9419b5",
+                "selectedToken": "7c9419b5",
+                "revision": "d7e8d3eed63a3346dd51eed9f45323e539b487702d029b74bf1970a2bec3c336",
+                "selectedRevision": "d7e8d3eed63a3346dd51eed9f45323e539b487702d029b74bf1970a2bec3c336",
+                "api": {
+                  "name": "ide.WukongCallHome",
+                  "capabilities": [
+                    {
+                      "name": "SELF",
+                      "rights": [
+                        "E"
+                      ],
+                      "grants": [
+                        "E"
+                      ]
+                    },
+                    {
+                      "name": "ide.LED_DEV",
+                      "canonical_leaf": "ide.LED_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "grants": [
+                        "R",
+                        "W"
+                      ]
+                    },
+                    {
+                      "name": "ide.UART_DEV",
+                      "canonical_leaf": "ide.UART_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "grants": [
+                        "R",
+                        "W"
+                      ]
+                    }
+                  ],
+                  "symbolic_binding": {
+                    "calls": [],
+                    "dependencies": [
+                      {
+                        "name": "SELF",
+                        "rights": [
+                          "E"
+                        ],
+                        "relocation_row": 0,
+                        "symbolic_self": true
+                      },
+                      {
+                        "name": "ide.LED_DEV",
+                        "rights": [
+                          "R",
+                          "W"
+                        ],
+                        "relocation_row": 1,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.UART_DEV",
+                        "rights": [
+                          "R",
+                          "W"
+                        ],
+                        "relocation_row": 2,
+                        "symbolic_self": false
+                      }
+                    ],
+                    "owner": "ide.WukongCallHome",
+                    "schema": "church.symbolic-lump-binding/v1"
+                  },
+                  "methods": [
+                    {
+                      "name": "Run",
+                      "index": 0,
+                      "branchOffset": 2,
+                      "inputs": [],
+                      "returns": {
+                        "name": "result",
+                        "register": "DR1"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "assembly"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "411ec69e7f645371b43d99b3b4798ff7773258c18f45f2cf86837066817e2190"
+      },
+      "identity_hash": "e34d95a87b1d5de3ea01d7c44b37f0801dbe44b7ff791d2a976640f61157e97e"
     }
   }
 }

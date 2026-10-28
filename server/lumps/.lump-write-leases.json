@@ -1,17 +1,5 @@
 {
-  "leases": {
-    "ide.CapabilityTest": {
-      "canonical_dot_name": "ide.CapabilityTest",
-      "owner_key": "bm_ERc53i4lHne_6gQajVKYuuXOH9zaK",
-      "holder": "Another IDE session",
-      "operation": "update",
-      "stage": "Approving",
-      "started_at": 1793207987.912701,
-      "expires_at": 1793208828.1487248,
-      "operation_id": "c87e1e04-36de-4dd6-adda-f5d970287aed",
-      "contact_thread_id": "thread-7piZtnaGZiVYrC86Dmi_vlJ5"
-    }
-  },
+  "leases": {},
   "waiters": {
     "CapabilityTest": [],
     "ide.AmoebaStartup": []

@@ -4367,5 +4367,194 @@
     "lump_version": 4,
     "compiled_at": 1793205874.5421438,
     "operation_id": "8a791bc852774f4ea3414f1286951be0"
+  },
+  {
+    "token": "205f25b2",
+    "abstraction": "ide.CapabilityTest",
+    "filename": "ide.CapabilityTest.1.5b91e58e.lump",
+    "lump_version": 9,
+    "compiled_at": 1793209397.2842197,
+    "operation_id": "fb8786af-2189-4f5a-bc0d-6a531afe823b",
+    "output_variants": {
+      "api": {
+        "sha256": "b422e3525a54e7dd58c0f7fb027a3bf1d719b9bc98c490e03535f83da7a61ee0",
+        "bytes": 2048,
+        "file_bytes": 558,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/c83c0e5978590b4dda3244fd9e2d045cbd86d2008569c5a893f85c0c8a232eef/api?compressed=1"
+      },
+      "compact": {
+        "sha256": "e8b4541e102a32cf96b324e24b3fc281951f137fcbea46265b52f81a1e8e7737",
+        "bytes": 4096,
+        "file_bytes": 873,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/c83c0e5978590b4dda3244fd9e2d045cbd86d2008569c5a893f85c0c8a232eef/compact?compressed=1"
+      },
+      "full": {
+        "sha256": "54ab2b5c320335349c0ec156d934a61cc3d54d650659a55ff40cb0d2354fc0ce",
+        "bytes": 8192,
+        "file_bytes": 2117,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/c83c0e5978590b4dda3244fd9e2d045cbd86d2008569c5a893f85c0c8a232eef/full?compressed=1"
+      }
+    },
+    "variant_primary_hash": "b422e3525a54e7dd58c0f7fb027a3bf1d719b9bc98c490e03535f83da7a61ee0",
+    "variant_bundle_id": "c83c0e5978590b4dda3244fd9e2d045cbd86d2008569c5a893f85c0c8a232eef",
+    "variant_compiler_record": {
+      "binary_hash": "b422e3525a54e7dd58c0f7fb027a3bf1d719b9bc98c490e03535f83da7a61ee0",
+      "source_hash": "99437026f4be97133c5e1f2ad0dedf61aa390c8f5f152d52bf392927b389d42b",
+      "language": "assembly",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "53339396c13d619347f28a050dd79e5d2378e847788a597cca94d92ced004d1e",
+        "inputs": {
+          "language": "auto",
+          "_resolved_call_api_authorities": {
+            "ide.SelfTest": {
+              "source": "embedded-binary",
+              "embedded": true,
+              "token": "bb1e4bed",
+              "selectedToken": "bb1e4bed",
+              "revision": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+              "selectedRevision": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+              "api": {
+                "name": "ide.SelfTest",
+                "capabilities": [
+                  {
+                    "name": "SELF",
+                    "rights": [
+                      "E"
+                    ],
+                    "grants": [
+                      "E"
+                    ]
+                  }
+                ],
+                "methods": [
+                  {
+                    "name": "Run",
+                    "index": 0,
+                    "branchOffset": 2,
+                    "inputs": [],
+                    "returns": {
+                      "name": "result",
+                      "register": "DR1"
+                    }
+                  }
+                ]
+              }
+            },
+            "ide.WukongCallHome": {
+              "source": "embedded-binary",
+              "embedded": true,
+              "token": "7c9419b5",
+              "selectedToken": "7c9419b5",
+              "revision": "d7e8d3eed63a3346dd51eed9f45323e539b487702d029b74bf1970a2bec3c336",
+              "selectedRevision": "d7e8d3eed63a3346dd51eed9f45323e539b487702d029b74bf1970a2bec3c336",
+              "api": {
+                "name": "ide.WukongCallHome",
+                "capabilities": [
+                  {
+                    "name": "SELF",
+                    "rights": [
+                      "E"
+                    ],
+                    "grants": [
+                      "E"
+                    ]
+                  },
+                  {
+                    "name": "ide.LED_DEV",
+                    "canonical_leaf": "ide.LED_DEV",
+                    "rights": [
+                      "R",
+                      "W"
+                    ],
+                    "grants": [
+                      "R",
+                      "W"
+                    ]
+                  },
+                  {
+                    "name": "ide.UART_DEV",
+                    "canonical_leaf": "ide.UART_DEV",
+                    "rights": [
+                      "R",
+                      "W"
+                    ],
+                    "grants": [
+                      "R",
+                      "W"
+                    ]
+                  }
+                ],
+                "symbolic_binding": {
+                  "calls": [],
+                  "dependencies": [
+                    {
+                      "name": "SELF",
+                      "rights": [
+                        "E"
+                      ],
+                      "relocation_row": 0,
+                      "symbolic_self": true
+                    },
+                    {
+                      "name": "ide.LED_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "relocation_row": 1,
+                      "symbolic_self": false
+                    },
+                    {
+                      "name": "ide.UART_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "relocation_row": 2,
+                      "symbolic_self": false
+                    }
+                  ],
+                  "owner": "ide.WukongCallHome",
+                  "schema": "church.symbolic-lump-binding/v1"
+                },
+                "methods": [
+                  {
+                    "name": "Run",
+                    "index": 0,
+                    "branchOffset": 2,
+                    "inputs": [],
+                    "returns": {
+                      "name": "result",
+                      "register": "DR1"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "assembly"
+      },
+      "hardfault_sites": [],
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "411ec69e7f645371b43d99b3b4798ff7773258c18f45f2cf86837066817e2190"
+    }
   }
 ]
