@@ -5,6 +5,19 @@ description: Historical Namespace save evidence is not acceptance of the approve
 
 ## First Boot Namespace simulation milestone
 
+The user now directs updating the code base and the New layout Namespace to run
+the simulator Factory Build, after the isolated Alice/Mallory progress scenario.
+
+**Why:** The user explicitly moved the work from private tests to the normal
+saved-source and Namespace simulator workflow.
+
+**How to apply:** This supersedes the older division reserving all Namespace
+updates to the user for this reviewed integration. Use normal authenticated
+compilation, immutable publication, explicit binding and admission; preserve
+Boot.Thread and unrelated selections. Do not directly upload private localized
+test binaries or infer permission to program hardware. Full-image RTL belongs
+to the later synthesis gate, not an unrelated prerequisite for IDE integration.
+
 The user designated **New layout** as the **Factory Build target** on
 2026-10-28. Use that named Namespace layout for Factory Build simulator testing.
 
