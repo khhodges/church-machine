@@ -38,7 +38,7 @@ vm.createContext(context);
 for (const name of ['_bootHasCommittedImage', '_ensureCommittedImageForBoot',
     '_requireCommittedImageForExecution', 'stepSim', 'runSimGo', 'runSim',
     'walkToggle', 'resetSim', '_applyPendingSimLoad', '_autoLoadDefaultProgram',
-    '_startBootLumpPrefetch', 'updateThreadControl']) {
+    '_startBootLumpPrefetch', '_threadDisplayStatus', '_threadModalState', 'updateThreadControl']) {
     vm.runInContext(fn(run, name), context);
 }
 for (const name of ['_probeBootImage', '_refreshCommittedBootImageCache', '_maybeApplyBootImage']) {
@@ -71,8 +71,21 @@ for (const name of ['_probeBootImage', '_refreshCommittedBootImageCache', '_mayb
 
     context.sim.simulationConfiguration = { configurationHash: 'approved' };
     context.updateThreadControl();
-    assert.strictEqual(threadBadge.textContent, 'Thread.1 · 1/1 · running',
-        'activated simulation keeps the architectural Thread lifecycle display');
+    assert.strictEqual(threadBadge.textContent, 'Thread.1 · 1/1 · current · stopped',
+        'activated simulation distinguishes current context from execution');
+    const row = { lifecycleStatus: 'running' };
+    context.sim.running = false;
+    context._simRunActive = true;
+    context.updateThreadControl();
+    assert.strictEqual(threadBadge.textContent, 'Thread.1 · 1/1 · current · running',
+        'normal Run remains active between machine batches');
+    assert.strictEqual(context._threadModalState(row), 'Current · running',
+        'opening or refreshing inspection between batches must report running');
+    context._simRunActive = false;
+    context.updateThreadControl();
+    assert.strictEqual(threadBadge.textContent, 'Thread.1 · 1/1 · current · stopped');
+    assert.strictEqual(context._threadModalState(row), 'Current · stopped',
+        'inspection reports stopped when the normal Run controller ends');
     context.sim.resetPreparedSimulation = () => {
         calls.push('retained-reset');
         context.sim.bootComplete = false;

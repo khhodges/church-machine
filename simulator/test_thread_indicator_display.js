@@ -38,7 +38,7 @@ check(
 );
 check(
   run.includes("lifecycle.textContent = lifecycleText") &&
-  run.includes("thread-status-${row.lifecycleStatus}") &&
+  run.includes("thread-status-${displayClass}") &&
   css.includes('.thread-status-suspended .thread-identity-marker') &&
   css.includes('.thread-status-halted .thread-identity-marker'),
   'every discovered Thread card renders its projected lifecycle state'
@@ -46,7 +46,7 @@ check(
 check(
   /LUMP-relative NIA/.test(run) &&
   /Physical address/.test(run) &&
-  /Executing code/.test(run) &&
+  /Current code/.test(run) &&
   /Thread context/.test(run),
   'Thread cards distinguish context, executing code, and address spaces'
 );

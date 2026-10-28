@@ -8,7 +8,7 @@ assert(scripts.indexOf('boot-fault-entry.js') >= 0 &&
     scripts.indexOf('boot-fault-entry.js') < scripts.indexOf('namespace-runtime-core.js'));
 assert(scripts.indexOf('design-simulation.js') < scripts.indexOf('namespace-design-v1.js'));
 function harness(defect) {
-    const panel={innerHTML:''},calls=[],instances=[];
+    const panel={innerHTML:''},status={textContent:''},calls=[],instances=[];
     const toolbar=[], timers=[];
     const words=[0xf8810100,0,2,0], profile='ascending', fingerprint='a'.repeat(64);
     const hash=require('node:crypto').createHash('sha256').update(Buffer.from(new Uint32Array(words).buffer)).digest('hex');
@@ -21,13 +21,16 @@ function harness(defect) {
         NamespaceDesignV1:{state:{active:true,profile,fingerprint,document:{rows:[
             {slot:10,boot:true,selection:{token:'961bfee3',filename:'exact.lump',binaryHash:'b'.repeat(64)}}
         ]},dirty:false}},
-        document:{getElementById:id=>id==='designSimulationPanel'?panel:null},
+        document:{getElementById:id=>id==='designSimulationPanel'?panel:id==='activeThreadStatus'?status:null},
         // Reject any accidental switch to the legacy machine.
         sim:{activateSimulationConfiguration(){throw Error('legacy activation forbidden');}},
         ChurchSimulator:{fromAscendingNamespaceImage(image,cr15){
             assert.equal(cr15.word2,255);
             const listeners={};
             const machine={pc:1,dr:Array(16).fill(0),faultLog:[],halted:false,
+                simulationConfiguration:{},
+                activeThreadStatus(){return {name:'Thread.1',position:1,count:1,
+                    lifecycleStatus:this.halted?'halted':'running'};},
                 cr:Array.from({length:16},()=>({...cr15})),
                 readNSEntry:()=>({word1_limit:255}),
                 parseNSWord1:()=>({gtSeq:0}),
@@ -57,9 +60,36 @@ function harness(defect) {
         }};
     if(defect==='boot') scope.setTimeout=callback=>timers.push(callback);
     scope.window=scope;vm.createContext(scope);vm.runInContext(code,scope);
-    return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar,timers};
+    const runCode=fs.readFileSync(__dirname+'/app-run.js','utf8');
+    vm.runInContext(runCode.slice(runCode.indexOf('function _threadDisplayStatus('),
+        runCode.indexOf('function updateThreadIdentityStrip(')),scope);
+    return {api:scope.DesignSimulation,scope,calls,instances,panel,status,toolbar,timers};
 }
 (async()=>{
+    // Fresh-session Prepare/Reset must report the displayed private machine,
+    // not architectural ownership or stale flags in the legacy controller.
+    const display=harness('boot');
+    display.scope._simRunActive=true;
+    await display.api.command('prepare');
+    assert.equal(display.status.textContent,'Thread.1 · 1/1 · current · stopped');
+    assert.equal(display.scope.sim.running,false);
+    assert.equal(display.scope.sim.bootStep,0);
+    await display.api.command('run');
+    assert.equal(display.status.textContent,'Thread.1 · 1/1 · current · running');
+    display.api.stop();
+    assert.equal(display.status.textContent,'Thread.1 · 1/1 · current · stopped');
+    await display.api.command('step');
+    assert.equal(display.status.textContent,'Thread.1 · 1/1 · current · stopped');
+    await display.api.command('reset');
+    assert.equal(display.status.textContent,'Thread.1 · 1/1 · current · stopped');
+    assert.equal(display.scope.sim.bootStep,0);
+    assert.equal(display.scope.sim.running,false);
+    display.timers.forEach(callback=>callback());
+    assert.equal(display.scope.sim.bootStep,0,'old Run timer cannot change reset status or execute');
+    assert.equal(display.status.textContent,'Thread.1 · 1/1 · current · stopped');
+    display.scope.sim.halted=true;
+    display.api.render();
+    assert.equal(display.status.textContent,'Thread.1 · 1/1 · halted');
     // Exercise the actual binding-result acceptance against the simulator,
     // not a manually invalidated stand-in. No live endpoints or artifacts.
     const designCode=fs.readFileSync(__dirname+'/namespace-design-v1.js','utf8');

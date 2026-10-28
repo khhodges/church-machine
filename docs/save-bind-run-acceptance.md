@@ -112,3 +112,19 @@ while the machine was stopped; a fault indicator also remained visible with an
 empty current fault log. These are separate display observations, not recorded
 program faults. Repeated 403s from hardware polling were expected from the
 disposable server's deny guard.
+
+### Stopped/current Thread display correction
+
+The Thread lifecycle's `running` value denotes architectural live-context
+ownership, not an executing Run/Walk loop. The UI now projects that value as
+`current · stopped` or `current · running` using the displayed machine's
+execution flags and, for the normal simulator only, its between-batch Run
+controller. Private-machine identity excludes stale normal-controller flags.
+The toolbar, Thread cards, and inspection status share this
+projection; halted, suspended, and unavailable lifecycle states remain distinct.
+No scheduler, saved design, runtime lifecycle, or fault-badge behavior changed.
+
+`node simulator/test_design_simulation.js` exercises fresh private Prepare,
+Run, Stop, Step, Reset, and a queued pre-Reset timer against the real status
+renderer, including a stale legacy controller flag. Prepare and Reset show
+stopped without executing boot; Run shows running; Step and Stop show stopped.

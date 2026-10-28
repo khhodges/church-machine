@@ -1205,6 +1205,19 @@ let _threadContextModalSlot = null;
 let _threadContextModalOrigin = null;
 const _threadRunOutcomes = new Map();
 
+// Architectural "running" means ownership of the live Thread context, not
+// instruction execution. Project that ownership using the displayed machine.
+// Normal Run owns the gaps between batches; its flags do not own the private
+// DesignSimulation machine. traceContext checks exact displayed-machine identity.
+function _threadDisplayStatus(row) {
+    if (!row) return 'unavailable';
+    if (row.lifecycleStatus !== 'running') return row.lifecycleStatus || 'unavailable';
+    const privateMachine = typeof window !== 'undefined' && !!window.DesignSimulation?.traceContext?.();
+    const normalRun = !privateMachine && typeof _simRunActive !== 'undefined' && _simRunActive;
+    return 'current · ' + (sim && !sim.halted && (normalRun || sim.running || sim.walkActive)
+        ? 'running' : 'stopped');
+}
+
 function updateThreadControl() {
     const status = document.getElementById('activeThreadStatus');
     if (typeof updateThreadIdentityStrip === 'function') updateThreadIdentityStrip();
@@ -1225,8 +1238,7 @@ function updateThreadControl() {
     if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     const state = sim.activeThreadStatus();
     if (status) {
-        const lifecycle = state.lifecycleStatus
-            ? ` · ${state.lifecycleStatus}` : '';
+        const lifecycle = ` · ${_threadDisplayStatus(state)}`;
         status.textContent =
             `${state.name} · ${state.position}/${state.count}${lifecycle}`;
     }
@@ -1260,7 +1272,9 @@ function updateThreadIdentityStrip() {
         const card = document.createElement('div');
         const selected = typeof _threadContextModalSlot !== 'undefined' &&
             row.slot === _threadContextModalSlot;
-        card.className = `thread-identity-card thread-status-${row.lifecycleStatus}` +
+        const lifecycleText = _threadDisplayStatus(row);
+        const displayClass = lifecycleText === 'current · stopped' ? 'stopped' : row.lifecycleStatus;
+        card.className = `thread-identity-card thread-status-${displayClass}` +
             `${row.active ? ' is-active' : ''}` +
             `${selected ? ' is-selected' : ''}`;
         card.dataset.threadSlot = String(row.slot);
@@ -1276,8 +1290,7 @@ function updateThreadIdentityStrip() {
             ? `0x${(row.physicalAddress >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
             : '\u2014';
         const gtName = row.gtPetName || 'No entry GT';
-        const lifecycleText = row.lifecycleStatus || 'unavailable';
-        const gtKeyText = row.active ? 'Executing code' : 'Saved entry code';
+        const gtKeyText = row.active ? 'Current code' : 'Saved entry code';
         const flagsKeyText = row.active ? 'Current FLAGS' : 'Saved FLAGS';
         const indicatorFlags = row.indicatorFlags &&
             typeof row.indicatorFlags === 'object' ? row.indicatorFlags : null;
@@ -1438,7 +1451,7 @@ function _latestThreadFault(slot) {
 
 function _threadModalState(row) {
     if (!row) return 'Unavailable';
-    const state = row.lifecycleStatus || 'unavailable';
+    const state = _threadDisplayStatus(row);
     return state.charAt(0).toUpperCase() + state.slice(1);
 }
 

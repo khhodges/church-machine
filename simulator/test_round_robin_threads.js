@@ -802,11 +802,12 @@ const uiContext = {
 vm.createContext(uiContext);
 vm.runInContext([
     'let _simRunActive = false;',
+    functionSource(appRunSource, '_threadDisplayStatus'),
     functionSource(appRunSource, 'updateThreadControl'),
     functionSource(appRunSource, 'selectThreadContext'),
 ].join('\n'), uiContext);
 uiContext.updateThreadControl();
-assert.strictEqual(status.textContent, 'Thread.1 · 1/3 · running',
+assert.strictEqual(status.textContent, 'Thread.1 · 1/3 · current · stopped',
     'active Thread status remains visible without a Next Thread button');
 uiSim.running = true;
 const runningSlot = uiSim.activeThreadStatus().slot;
@@ -886,7 +887,7 @@ assert.deepStrictEqual(uiSim.threadStatusRows().map(row => row.lifecycleStatus),
     'CHANGE moves running ownership to the selected Thread and canonically suspends the old owner');
 assert.strictEqual(openedCR, 12,
     'Thread row selection opens the selected Thread CR12 memory-map view');
-assert.strictEqual(status.textContent, 'Thread.3 · 3/3 · running',
+assert.strictEqual(status.textContent, 'Thread.3 · 3/3 · current · stopped',
     'toolbar status follows the newly active Thread LUMP');
 const dashboardAfterSwitch = dashboardUpdates;
 uiContext.selectThreadContext(12);
@@ -912,7 +913,7 @@ assert.strictEqual(uiSim.resetThreadToBaseline(11).ok, true,
 assert.strictEqual(uiSim.threadStatusRows()[1].lifecycleStatus, 'running',
     'secondary reset clears HALT and restores live running ownership');
 uiContext.updateThreadControl();
-assert.strictEqual(status.textContent, 'Thread.2 · 2/3 · running',
+assert.strictEqual(status.textContent, 'Thread.2 · 2/3 · current · stopped',
     'toolbar status follows the restored secondary Thread');
 assert.strictEqual(dashboardUpdates - dashboardUpdatesBeforeThreadClicks, 3,
     'each row selection refreshes the Thread strip and dashboard');
@@ -1008,6 +1009,7 @@ vm.createContext(pagingContext);
 vm.runInContext([
     'let _simRunActive = false;',
     'let _threadIdentityPage = 0;',
+    functionSource(appRunSource, '_threadDisplayStatus'),
     functionSource(appRunSource, 'updateThreadIdentityStrip'),
 ].join('\n'), pagingContext);
 
