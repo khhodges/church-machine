@@ -121,6 +121,8 @@
                 throw Error('Namespace changed while reloading. Your local changes are retained; nothing was replaced.');
             ++sourceRequest;
             accept(data);
+            const notice=document.getElementById('namespaceDesignDialog');
+            if(notice?.dataset.bindingFailure==='true') notice.remove();
         } catch(error) { state.error=error.message; }
         finally { state.loading=false; render(); }
     }
@@ -622,16 +624,15 @@
     }
     function showBindingFailure(message) {
         state.error=message;
-        if (root.NamespaceBindingWindows) {
-            const rows=state.document && state.document.rows || [];
-            root.NamespaceBindingWindows.show({
-                fingerprint:state.fingerprint, status:'blocked', installed:false,
-                lists:rows.filter(row=>row.kind==='lump').map(row=>({
-                    slot:row.slot, name:row.name, filename:row.selection && row.selection.filename,
-                    status:'blocked', rows:[], reason:message
-                }))
-            });
-        }
+        // A request-wide failure is not evidence that every C-list failed.
+        // Remove provisional results and present one actionable explanation.
+        root.NamespaceBindingWindows?.invalidate();
+        dialog('Namespace binding blocked',
+            `<p role="alert">${esc(message)}</p>`+
+            (/changed in another tab|Saved design changed/.test(message)
+                ? '<button class="btn" onclick="NamespaceDesignV1.reloadSaved()">Reload saved design</button><p>Reload does not save, bind, or run anything. Unsaved Namespace edits are never overwritten.</p>'
+                : ''));
+        document.getElementById('namespaceDesignDialog').dataset.bindingFailure='true';
     }
     function acceptSavedResult(result, bindNow = false) {
         accept(result);
@@ -679,10 +680,13 @@
             const result = await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document),bind:bindNow});
             acceptSavedResult(result, bindNow);
         }
-        catch(e) { const message=e.message+
+        catch(e) { const stale=/changed in another tab|Saved design changed/.test(e.message);
+            const message=stale
+            ? 'The saved Namespace changed after this tab loaded it. Binding did not run. Click Reload saved design, then Run to test the saved Factory Build, or Bind again if you intended to create new bindings. Your local draft is retained; no executable image or hardware was changed.'
+            : e.message+
             ' Check the IDE node status above: its save is separate and may already have completed. '+
             'No executable image was changed. Your Namespace draft is retained.';
-            if(bindNow) showBindingFailure(message); else state.error=message;
+            if(bindNow) showBindingFailure(stale ? e.message+'. '+message : message); else state.error=message;
         }
         finally { state.saving=false; render(); }
     }
