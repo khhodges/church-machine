@@ -217,8 +217,11 @@ const renderCalls = words => {
 };
 dom.window.document.getElementById('asmEditor').value = 'CALL mutable.Wrong';
 const callDisplay = renderCalls(callWords);
-assert.match(callDisplay, /CALL test.Target.Run — pending binding/);
-assert.match(callDisplay, /CALLEQ test.Target.Other — pending binding/);
+assert.doesNotMatch(callDisplay, /CALL.*test.Target/);
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
+    /CALL test.Target.Run — pending binding/);
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
+    /CALLEQ test.Target.Other — pending binding/);
 assert.doesNotMatch(callDisplay, /mutable.Wrong/);
 const faultOffset = contract.calls[1].word_offset + 1;
 assert.equal(callWords[faultOffset], 0xf7000000);
@@ -234,12 +237,15 @@ const absent = callWords.slice();
 absent[1 + ((absent[0] >>> 10) & 8191)] = 0;
 assert.doesNotMatch(renderCalls(absent), /pending binding|test.Target/);
 assert.match(renderCalls(absent), /WORD_f7000000/);
-assert.match(renderCalls(callWords), /pending binding/, 'fresh evidence restores attribution');
+renderCalls(callWords);
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
+    /pending binding/, 'fresh evidence restores metadata attribution');
 assert.equal(dom.window.document.getElementById('asmEditor').value, 'CALL mutable.Wrong');
 const savedCalls = context._formatCanonicalSavedLumpWords(callWords, {methodCount:1});
 const reopenedCalls = context._formatOpenedSavedLumpDisassembly(
     callWords, 'WORD 0x7000000', {abstraction:'test.Caller'});
-assert.match(reopenedCalls, /0xF7000000  CALL test.Target.Run — pending binding/);
+assert.match(reopenedCalls, /0xF7000000  WORD_f7000000 ; unresolved relocation/);
+assert.doesNotMatch(reopenedCalls, /^\[\d+\].*CALL.*test.Target/m);
 assert.doesNotMatch(reopenedCalls, /WORD 0x7000000|mutable.Wrong/);
 assert.doesNotMatch(context._formatOpenedSavedLumpDisassembly(
     mismatch, 'raw fallback', {}), /pending binding/);

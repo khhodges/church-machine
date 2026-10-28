@@ -11,7 +11,18 @@ tests because reopening used a different display path. Helper-level success
 does not establish that the user's navigation invokes the corrected renderer.
 
 **How to apply:** Trace the reported entry point, retain exact-byte provenance,
-and distinguish a symbolic CALL label from evidence of executable linking.
+and distinguish symbolic reference metadata from executable linking.
+
+Disassembled instruction operands must reflect the encoded words, not PetNames.
+Symbolic references belong in separately labeled metadata or comments, never
+as replacement CALL mnemonics for unresolved placeholder words.
+
+**Why:** The user explicitly corrected the attempted display fix: “The
+Disassebly cannot accept Pet names.” Showing a source-level CALL in place of
+a WORD placeholder obscures the actual compiled instruction.
+
+**How to apply:** Preserve raw opcode decoding in candidate, saved, and reopened
+views. Keep named references separate and display linked CALL operands numerically.
 
 After a successful LUMP save, the registry entry for the saved token must use
 the immutable server artifact as its authority. Evict any compile-time

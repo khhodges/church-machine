@@ -2413,11 +2413,10 @@ function _showCompiledCandidateBesideSource(words, details) {
                 'HI', 'LS', 'GE', 'LT', 'GT', 'LE', '', 'NV'];
             calls.forEach(function(call) {
                 var offset = call.word_offset;
-                instructionLines[offset] = '[' + String(offset).padStart(4, '0') +
-                    ']  0x' + binary[offset].toString(16).padStart(8, '0').toUpperCase() +
-                    '  CALL' + conditions[call.condition] + ' ' + call.full_name +
+                lines.push('; Symbolic reference at word ' + offset +
+                    ': CALL' + conditions[call.condition] + ' ' + call.full_name +
                     ' — pending binding (C-list row ' + call.row +
-                    '; faults only if referenced while unresolved)';
+                    '; not an encoded CALL instruction)');
             });
         } catch (error) {
             lines.push('; Symbolic CALL attribution unavailable: ' + error.message +
@@ -2562,6 +2561,10 @@ function _formatCanonicalSavedLumpWords(words, details) {
         _formatLumpHeaderDisassembly(header),
         '; ' + definitionStatus
     ];
+    Object.keys(symbolicAnnotations).forEach(function(offset) {
+        lines.push('; Embedded reference at word ' + offset + ': ' +
+            symbolicAnnotations[offset] + ' — metadata, not decoded instruction');
+    });
     for (var i = 1; i < words.length; i++) {
         var word = words[i] >>> 0;
         var annotation = embeddedMethods.length
@@ -2591,7 +2594,7 @@ function _formatCanonicalSavedLumpWords(words, details) {
         } else if (i > cw) {
             annotation = 'non-code data / embedded source / API frame';
         }
-        if (symbolicAnnotations[i]) annotation = symbolicAnnotations[i];
+        if (symbolicAnnotations[i]) annotation += ' ; unresolved relocation';
         lines.push('[' + String(i).padStart(4, '0') + ']  0x' +
             word.toString(16).padStart(8, '0').toUpperCase() +
             (annotation ? '  ' + annotation : ''));
