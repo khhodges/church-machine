@@ -12,3 +12,15 @@ keydown handler alone does not prevent that conflict.
 
 **How to apply:** Test nested dismissal with the underlying preview still open;
 the shared overlay handler must defer to native modal keyboard handling.
+
+Protected-change review must also be an explicit temporary input owner under
+the Save activity lock. Keep the rest of the IDE locked; restore the save's
+lock when the review closes rather than unlocking the whole operation.
+
+**Why:** The commit-stage lock intercepted even programmatic clicks at window
+capture before document listeners could observe them. This was mistaken for
+browser automation input failure until the user reproduced it.
+
+**How to apply:** Test the review renderer and activity lock together, including
+Confirm, Reject, Tab, Enter and Escape. When document event logs are empty,
+inspect window capture guards before attributing the failure to the browser.

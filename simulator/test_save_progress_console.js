@@ -1,4 +1,6 @@
 'use strict';
+// Keep the protected-review/activity-lock integration in the standard suite.
+require('./test_save_protected_review.js');
 // Focused tests: lock cleanup, ownership, approval handoff, unknown outcome.
 const assert = require('assert');
 const fs = require('fs');

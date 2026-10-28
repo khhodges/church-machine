@@ -90,11 +90,11 @@ async function waitForDialog(h) {
     // cancellation. Exercise the real wrapper, response parser and UI catch.
     const {_actionableJsonResponse} = require('./actionable_errors.js');
     const memory = fs.readFileSync(__dirname + '/app-memory.js', 'utf8');
-    const uiSource = memory.slice(memory.indexOf('function _nsTableSaveClick('),
+    const uiSource = memory.slice(memory.indexOf('async function _nsTableSaveClick('),
         memory.indexOf('// _findSrcLump(slotIdx, slotLabel)'));
-    const catchStart = memory.indexOf("        if (err.code === 'change_rejected') {",
-        memory.indexOf("const data = await _actionableJsonResponse(resp, 'Save the Namespace'"));
-    const cancellationCatch = memory.slice(catchStart, memory.indexOf('        try {', catchStart));
+    const catchStart = memory.indexOf("        if (error.code === 'change_rejected') {",
+        memory.indexOf('window._nsTableSave = async function(btn)'));
+    const cancellationCatch = memory.slice(catchStart, memory.indexOf('    } finally {', catchStart));
     for (const endpoint of ['/api/boot-image/save-ns', '/api/boot-config', '/api/boot-image/generate']) {
         for (const action of ['reject', 'escape', 'close']) {
             h = harness([challenge('namespace-review'), new Response('{"ok":true}')]);
@@ -119,14 +119,15 @@ async function waitForDialog(h) {
             const button = {style: {}};
             let saves = 0;
             const context = {window: {_nsTableDirty: true, _nsTableSaveError: null,
+                NamespaceIdeNode: {savePending: async () => true},
                 _nsTableSave: () => saves++}, document: {getElementById: () => button},
-                err: cancellation};
+                error: cancellation};
             vm.createContext(context);
             vm.runInContext(uiSource + '\n(function(){' + cancellationCatch + '})();', context);
             assert(button.textContent.includes('Save cancelled — no changes applied.'));
             assert(!/failed|HTTP|again|retry|⚠|✗/i.test(button.textContent + button.title));
             assert.strictEqual(context.window._nsTableDirty, true, 'staged edits retained');
-            vm.runInContext('_nsTableSaveClick();', context);
+            await vm.runInContext('_nsTableSaveClick();', context);
             assert.strictEqual(saves, 0, 'dismissing notice cannot save');
         }
     }
@@ -135,12 +136,11 @@ async function waitForDialog(h) {
     }), {status: 409}), 'Save the Namespace', {allowReviewCancellation: true}),
     error => error.code !== 'change_rejected' && /failed \(HTTP 409\)/.test(error.message));
     assert(memory.includes("response, 'Save the Namespace build configuration', {\n                allowReviewCancellation: true"));
-    assert(memory.includes("await window._ensureNamespaceBuildConfig(true)"));
-    assert(memory.includes("resp, 'Save the Namespace', {\n            allowReviewCancellation: true"));
-    const prefetchSource = memory.slice(
-        memory.indexOf('    window._nsPrefetchSaveClick = async function(btn) {'),
-        memory.indexOf('    for (let i = 0; i < _nsSnapshot.displayCount;',
-            memory.indexOf('    window._nsPrefetchSaveClick = async function(btn) {')));
+    assert(memory.includes("'/api/namespace/save-table'"));
+    assert(memory.includes("response, 'Save Namespace Table', {\n            allowReviewCancellation: true"));
+    const prefetchStart = memory.indexOf('    window._nsPrefetchSaveClick = async function(btn) {');
+    const prefetchSource = memory.slice(prefetchStart,
+        memory.indexOf('\n    };', prefetchStart) + '\n    };'.length);
     for (const rejected of [true, false]) {
         const error = new Error(rejected ? 'Save cancelled — no changes applied.' :
             'Save failed (HTTP 409). Reason: change_confirmation_invalid');

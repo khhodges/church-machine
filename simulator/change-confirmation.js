@@ -160,9 +160,11 @@
                 dialog.appendChild(button);
             });
             var settled = false;
+            var releaseReview = function () {};
             function finish(value, outcome) {
                 if (settled) return;
                 settled = true;
+                releaseReview();
                 if (window.removeEventListener) window.removeEventListener('pagehide', dismissed);
                 dialog.remove();
                 if (previous && previous.isConnected) previous.focus();
@@ -179,6 +181,8 @@
             dialog.addEventListener('close', function () { finish(false); });
             if (window.addEventListener) window.addEventListener('pagehide', dismissed);
             document.body.appendChild(dialog);
+            if (window.SaveProgressConsole && window.SaveProgressConsole.allowReview)
+                releaseReview = window.SaveProgressConsole.allowReview(dialog);
             // Browsers without a modal dialog implementation must fail closed.
             if (typeof dialog.showModal !== 'function') { finish(false); return; }
             try { dialog.showModal(); } catch (_) { finish(false); return; }

@@ -62,12 +62,16 @@
     }
     function allowed(target) {
         if (!session) return true;
+        if (session.review && session.review.isConnected !== false)
+            return within(target, session.review);
         if (within(target, panel)) return true;
         const conflict = doc.getElementById && doc.getElementById('lumpSaveStaleConflictDialog');
         if (visible(conflict) && within(target, conflict)) return true;
         return session.allowed.some(node => node === target || within(target, node));
     }
     function focusables() {
+        if (session && session.review && session.review.isConnected !== false)
+            return Array.from(session.review.querySelectorAll('button:not([disabled])'));
         const list = session ? session.allowed.slice() : [];
         const conflict = doc.getElementById && doc.getElementById('lumpSaveStaleConflictDialog');
         if (visible(conflict) && typeof conflict.querySelectorAll === 'function') {
@@ -103,7 +107,8 @@
                 !event.ctrlKey && !event.metaKey && !event.altKey;
             // Native button activation still occurs (default not prevented);
             // everything else, including Escape, F-keys and modifiers, is blocked.
-            if (!(permitted && activation)) event.preventDefault();
+            const dismissReview = session.review && key === 'Escape';
+            if (!(permitted && (activation || dismissReview))) event.preventDefault();
             return;
         }
         if (allowed(event.target)) return;
@@ -300,7 +305,17 @@
         });
     }
 
-    const api = { begin, stage, allow, end, current, owns, committed, yieldPaint,
+    // The protected-review renderer temporarily owns input, not the background
+    // save form. An old review cannot unlock a later save session.
+    function allowReview(dialog) {
+        const owner = session;
+        if (!owner || !dialog) return function () {};
+        owner.review = dialog;
+        return function () {
+            if (session === owner && owner.review === dialog) owner.review = null;
+        };
+    }
+    const api = { begin, stage, allow, end, current, owns, committed, yieldPaint, allowReview,
         hookDiagnostics, _onDiagnostic: onDiagnostic, _guard: guard, _allowed: allowed,
         _locked: () => listenersOn, _place: place };
     if (root) root.SaveProgressConsole = api;

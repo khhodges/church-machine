@@ -99,6 +99,18 @@ They are review material, not authorization to install or adopt a revision.
 
 ## Browser acceptance blocker
 
+### Subsequent diagnosis and repair
+
+The missing events were caused by the application's Save activity lock, not
+browser automation. Its window capture handler suppressed input outside the
+initial approval controls, but the protected-change dialog was never registered.
+The protected review now temporarily owns input without unlocking the rest of
+the IDE. A real-browser check on a disposable clone confirmed mouse Confirm
+commits a fresh LUMP and Reject leaves data unchanged. Combined renderer/lock
+regressions cover Tab, Enter, Escape, cancellation, and exact request replay.
+This closes the confirmation-button defect; it does not retroactively verify
+the entire original Compile-to-Sim browser journey described below.
+
 The disposable browser session compiled successfully and reached the normal
 protected-change save review. Its visible Confirm button was enabled, hit-testable,
 and had the expected handler. No click, pointer, or keyboard events reached the
