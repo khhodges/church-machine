@@ -17,6 +17,17 @@ successful candidate, and never guess selector zero or a method name. Preserve
 existing saved artifacts and their inspection/binding support; this rule does
 not authorize rewriting historical binaries or changing runtime permissions.
 
+Named-method syntax such as `CALL ide.CapabilityTest, Run` remains valid.
+Attempt method resolution before declaring a CALL unencodable.
+
+**Why:** The user corrected the blanket rejection of named CALLs: specifying
+an explicit method must be able to resolve to a real numeric CALL. The new
+compile-error policy concerns unresolved operands, not the use of PetNames in source.
+
+**How to apply:** Resolve the declared row and method from the selected target's
+API; absent browser API knowledge must not prevent the server authority lookup.
+Keep the resulting disassembly numeric and never invent a selector.
+
 Callable code LUMPs require explicit declarations of their own methods; labels
 and comments do not constitute an interface. The compiler generates the dispatch
 table, and must reject missing declarations during compilation rather than Format LUMP.

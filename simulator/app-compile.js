@@ -1812,7 +1812,7 @@ async function compileAndBuild(options) {
     let result = _compileWithActiveClist(source, [], _compileClistSlots);
 
     const _browserMethodAuthorityOnly = result.errors.length > 0 &&
-        result.errors.every(error => /not a known method|No method conventions/i.test(
+        result.errors.every(error => /not a known method|No method conventions|Cannot encode CALL.*unresolved/i.test(
             String(error && error.message || error)));
     if (result.errors.length > 0 && !_browserMethodAuthorityOnly) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');

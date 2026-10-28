@@ -557,6 +557,25 @@ class ChurchAssembler {
             return null;
         }
         const fullName = method === undefined ? token : `${token}.${method}`;
+        let objectName = token;
+        let methodName = method;
+        if (methodName === undefined && this._declaredRowFor(token) === null) {
+            const split = token.lastIndexOf('.');
+            objectName = token.slice(0, split);
+            methodName = token.slice(split + 1);
+        }
+        if (methodName !== undefined) {
+            const found = this._methodEntryFor(this._methodConventionsFor(objectName), methodName);
+            const entry = found && found.entry;
+            const index = typeof entry === 'object' && entry ? entry.index : entry;
+            if (found && Number.isInteger(index) && index >= 0 && index <= 126 &&
+                    !(entry && entry.visibility === 'private')) {
+                // CALL through the declared CR6 C-list row, with a real
+                // one-based method selector. Never default to direct entry.
+                return ((2 << 27) | ((cond & 15) << 23) | (6 << 15) |
+                    ((index + 1) << 5) | row) >>> 0;
+            }
+        }
         this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, token),
             message: `Cannot encode CALL ${fullName}: destination entry/method selector is unresolved. No CALL instruction was generated. Resolve the destination or specify a validated numeric C-list row and method selector before compiling.` });
         // Stop operand fallback. The error rejects this compilation, rather
