@@ -5,6 +5,16 @@ description: Historical Namespace save evidence is not acceptance of the approve
 
 ## First Boot Namespace simulation milestone
 
+The user designated **New layout** as the **Factory Build target** on
+2026-10-28. Use that named Namespace layout for Factory Build simulator testing.
+
+**Why:** The user explicitly selected the target after an exact saved-image
+replay; a generic latest snapshot must not silently stand in for that choice.
+
+**How to apply:** Confirm the tested image belongs to New layout and report its
+exact selected revision. This target designation alone does not authorize
+rewriting selected LUMPs, changing Namespace assignments, or programming hardware.
+
 On 2026-10-27 the user specified the first step: finalize the Boot Namespace
 and simulate Amoeba calling a simplified CapabilityTest from Thread 1.
 CapabilityTest contains no CHANGE or SWITCH; it calls SelfTest, then
