@@ -133,8 +133,8 @@ def bind(words, contract, owner, targets):
         for target in targets:
             if target["name"] != authorized or not set(dep["rights"]).issubset(set(target.get("rights", []))):
                 continue
-            if full == target["name"]:
-                choices.append((target, 0))
+            # Historical object-only relocations carry no method selection.
+            # Never manufacture the retired selector-zero direct entry.
             prefix = target["name"] + "."
             if full.startswith(prefix):
                 method = full[len(prefix):]
@@ -150,12 +150,14 @@ def bind(words, contract, owner, targets):
                 resolved = False
             else:
                 result[call["word_offset"]] = ((2 << 27) | (call["condition"] << 23) |
-                    (6 << 15) | (selector << 5) | row)
+                    (8 << 15) | (selector << 5) | row)
         calls.append({**call, "status": "bound" if resolved else "unresolved",
                       "object": choices[0][0]["name"] if resolved else None,
                       "method": full[len(choices[0][0]["name"]) + 1:] or None if resolved else None,
                       "methodSelector": choices[0][1] if resolved else None,
-                      "reason": None if resolved else
-                      "No unique authorized destination/method; HardFault only if referenced during execution."})
+                      "reason": None if resolved else (
+                      "Saved CALL has no declared method. Recompile the caller with an explicit method, save a new revision, and select it before binding. Historical bytes were not changed."
+                      if full == authorized else
+                      "No unique authorized destination/method; HardFault only if referenced during execution.")})
     return result, {"rows": rows, "calls": calls,
                     "status": "bound" if all(r["status"] == "bound" for r in rows + calls) else "unresolved"}

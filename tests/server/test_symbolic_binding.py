@@ -35,9 +35,36 @@ def test_named_method_resolves_only_at_bind():
     words, contract, owner, target = fixture()
     linked, report = bind(words, contract, owner, [owner, target])
     assert report["status"] == "bound"
-    assert linked[2] == (2 << 27) | (14 << 23) | (6 << 15) | (3 << 5) | 1
+    assert linked[2] == (2 << 27) | (14 << 23) | (8 << 15) | (3 << 5) | 1
     assert linked[-1] == 0x4A030011
     assert words[2] == FAULT
+
+
+def test_bare_historical_call_never_becomes_selector_zero():
+    words, contract, owner, target = fixture()
+    contract["calls"][0]["full_name"] = target["name"]
+    original = copy.deepcopy((words, contract))
+    linked, report = bind(words, contract, owner, [owner, target])
+    assert linked[2] == FAULT
+    assert report["status"] == "unresolved"
+    assert report["calls"][0]["methodSelector"] is None
+    assert "no declared method" in report["calls"][0]["reason"]
+    assert (words, contract) == original
+
+
+def test_first_named_method_matches_actual_assembler():
+    words, contract, owner, target = fixture()
+    target["methods"][0]["index"] = 0
+    linked, _ = bind(words, contract, owner, [owner, target])
+    result = subprocess.run(["node", "-e", """
+const A = require('./simulator/assembler');
+const a = new A({'ide.Target': {Run: {index: 0}}});
+a.setLocalClistSlots({'ide.Target': 1});
+const r = a.assemble('CALL ide.Target, Run');
+if(r.errors.length) throw Error(JSON.stringify(r.errors));
+console.log(r.words[0]);
+"""], capture_output=True, text=True, check=True)
+    assert linked[2] == int(result.stdout) == 0x17040021
 
 
 @pytest.mark.parametrize("failure", ["duplicate", "missing_method", "no_rights"])

@@ -2,6 +2,18 @@
 name: Instruction conformance fixtures
 description: Keep independent instruction oracles separate from boot and simulator setup behavior.
 ---
+Compiler-to-simulator regressions must execute the emitted instruction through
+the decoder, not merely feed extracted operands to a private execution helper.
+For New-layout acceptance, use the normal three-instruction Boot sequence.
+
+**Why:** A helper-level CALL test passed while normal stepping interpreted the
+indexed operand as a direct method selector. A shortcut entry initializer also
+left different M-window state from the real browser's Boot path.
+
+**How to apply:** Preserve emitted bytes, use normal instruction stepping, and
+assert the target slot, table-derived body PC, and CR6.M after transfer. Keep
+service-level evidence distinct from completion of the actual browser journey.
+
 Treat older instruction-driven test fixtures as historical examples, not as
 encoding authority when building new integration tests.
 

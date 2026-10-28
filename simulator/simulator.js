@@ -6291,7 +6291,7 @@ class ChurchSimulator {
             destinationSlot: null,
             destinationName: 'unknown',
             destinationMethod: isCall
-                ? `method#${d.crSrc === 6 ? ((d.imm >>> 5) & 0x7F) : (d.imm & 0x7FFF)}`
+                ? `method#${(d.crSrc & 8) !== 0 ? ((d.imm >>> 5) & 0x7F) : (d.imm & 0x7FFF)}`
                 : 'unknown',
             transfer: isCall,
         };
@@ -13014,7 +13014,7 @@ class ChurchSimulator {
         switch (d.opcode) {
             case 0: result = this._execLoad(d); break;
             case 1: result = this._execSave(d); break;
-            case 2: result = d.crSrc === 6 ? this._execIndexedCall(d) : this._execCall(d); break;
+            case 2: result = (d.crSrc & 8) !== 0 ? this._execIndexedCall(d) : this._execCall(d); break;
             case 3: result = this._execReturn(d); break;
             case 4: result = this._execChange(d, this.pc + 1); break;
             case 5: result = this._execSwitch(d); break;

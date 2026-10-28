@@ -63,6 +63,22 @@ assert.throws(() => new Compiler().encode(2, 14, 1, 0, 0), /nonzero dispatch-tab
 
 // Reload the exact compiled words in private RAM, not a rewritten fixture.
 {
+    const {sim, install, activate} = fixture();
+    const target = install(30, [2, 0x1f000000]);
+    const assembled = new Assembler().assemble(
+        'capabilities { SELF E, test.Target E }\nCALL CR6[test.Target], #0');
+    assert.deepEqual(assembled.errors, []);
+    assert.equal(assembled.words[0], 0x17040021);
+    const caller = install(31, [assembled.words[0], 0x1f000000], [target.gt]);
+    activate(caller);
+    sim.step();
+    assert.equal(sim.faultLog.length, 0, JSON.stringify(sim.faultLog));
+    checkContext(sim, target);
+    assert.equal(sim.pc, 1, 'step follows target dispatch word, not caller selector 33');
+}
+
+// Reload the exact compiled words in private RAM, not a rewritten fixture.
+{
     const {sim, install} = fixture();
     function compiledCode(body) {
         const result = new Compiler().compile(

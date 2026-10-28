@@ -163,7 +163,7 @@ def symbolic_snapshot_key(binding, rows, bindings):
     # Residency must not change the meaning of an already reviewed binding.
     # Pin the complete saved assignment context, including Lazy artifacts,
     # rather than the caller's (possibly resident-only) validated body subset.
-    return digest({"bindingVersion": 3, "source": binding["binaryHash"], "slot": binding["slot"],
+    return digest({"bindingVersion": 4, "source": binding["binaryHash"], "slot": binding["slot"],
         "namespaceLeaves": leaves, "naming": names,
         "destinations": _binding_destinations(rows)})
 

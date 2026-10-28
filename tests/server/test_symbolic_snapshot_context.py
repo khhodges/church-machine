@@ -44,3 +44,26 @@ def test_lazy_assignment_changes_invalidate_evidence(field, value, key_fn):
     before = key_fn(bindings[0], rows, bindings[:1])
     rows[1][field] = value
     assert key_fn(bindings[0], rows, bindings[:1]) != before
+
+
+def test_retired_selector_zero_cache_is_not_reused(tmp_path, monkeypatch):
+    import json
+    import struct
+    from server import simulation_preparation as preparation
+    from test_symbolic_binding import historical_words
+    rows, bindings = context()
+    original_digest = preparation.digest
+    with monkeypatch.context() as patch:
+        patch.setattr(preparation, "digest",
+                      lambda obj: original_digest({**obj, "bindingVersion": 3}))
+        old_key = symbolic_snapshot_key(bindings[0], rows, bindings)
+    assert symbolic_snapshot_key(bindings[0], rows, bindings) != old_key
+    folder = tmp_path / ".symbolic-bindings"
+    folder.mkdir()
+    # Even a retained v3 record must not be read after binding semantics change.
+    (folder / (old_key + ".json")).write_text(json.dumps({"bytes": "obsolete"}))
+    words = historical_words()
+    raw = struct.pack(f">{len(words)}I", *words)
+    with pytest.raises(ValueError, match="Bind explicitly first"):
+        preparation._localize_symbolic(
+            raw, bindings[0], rows, bindings, tmp_path, require_snapshot=True)
