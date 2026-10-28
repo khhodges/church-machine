@@ -3,6 +3,24 @@ name: Alice and Mallory thread isolation
 description: User-directed separate Thread setup for the NewLayout protection demonstration.
 ---
 
+## Current proposed combined-loop arrangement
+
+The user specifies Boot.Thread unchanged, Alice in Thread.2 incrementing her
+retained protected value each turn, and Mallory in Thread.3 repeatedly attacking
+while the other Threads continue without loss.
+
+**Why:** The user refined the running CapabilityTest/SelfTest/WCH demonstration
+to show continued useful work during repeated attack denials, rather than only
+a single denial.
+
+**How to apply:** Treat repeated attempts as the current proposed demo scope,
+superseding the assistant's one-shot suggestion. HARDFAULT is not an automatic
+retry mechanism: establish the authorized re-entry and containment path before
+claiming this arrangement works. This does not authorize silent OFFLINE/version
+clearing, hardware version changes, or blanket recovery for ordinary faults.
+Resolve any conflict with the older exclusion policy below explicitly before
+implementation; the proposed allocation is not implementation approval.
+
 Run Alice and Mallory in different Threads for the protection demonstration.
 The user confirmed priming each Thread's respective actor entry capability
 in CR1, not the protected object's capability.
