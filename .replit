@@ -231,6 +231,10 @@ args = "save-realignment-handoff-tests"
 task = "workflow.run"
 args = "mandatory-call-admission-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "save-bind-run-browser-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -1250,6 +1254,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node tests/simulator/sim_call_dispatch_required.js && node simulator/test_save_progress_console.js && python3 -m pytest tests/hardware/test_retired_eloadcall.py tests/server/test_named_call_save_attestation.py -q"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "save-bind-run-browser-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest tests/server/test_save_bind_run_browser.py -q"
 
 [workflows.workflow.metadata]
 isValidation = true

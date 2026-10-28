@@ -118,6 +118,8 @@ register_suite "protected-mint-path-tests" \
 
 register_suite "save-realignment-handoff-tests" \
     'bash scripts/run-save-realignment-tests.sh -q'
+register_suite "save-bind-run-browser-tests" \
+    'python3 -m pytest tests/server/test_save_bind_run_browser.py -q'
 
 register_suite "protected-mint-qualified-tests" \
     'python3 -m pytest tests/mint_phase1/test_qualified_runtime.py -q'

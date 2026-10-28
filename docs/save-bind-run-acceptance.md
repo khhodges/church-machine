@@ -86,6 +86,36 @@ browser/service executions.
 
 ## Evidence locations and limits
 
+### Repeatable regression
+
+Run from the repository root (requires installed Playwright and system Chromium):
+
+```sh
+python3 -m pytest tests/server/test_save_bind_run_browser.py -q
+```
+
+The wrapper launches `new_layout_call_browser_server.py --regression`, copies
+storage with the existing isolation helper, uses an ephemeral loopback port,
+and always shuts down the private server. It never attaches to a running IDE.
+The browser driver is `tests/server/save_bind_run_browser.cjs`.
+Live catalog/configuration/ownership hashes are checked even on failure.
+
+The check rejects a real Save review and compares persisted state, source and
+machine state, then approves Save and its separate selection review. It binds
+through the actual protected dialog, compares every resident C-list (including
+legacy SELF), verifies Prepare/Approve/Activate and memory hashes, runs through
+boot, resets, and repeats preparation in a new browser context. Reset is the
+current toolbar entry for preparation without execution; the old standalone
+design simulation panel is no longer rendered.
+
+The race holds a genuine Prepare HTTP response across another reviewed Bind.
+It checks revocation by preparation ID and absence of Approve/Activate requests,
+not by expecting unchanged-graph binding to change image bytes.
+The copied acceptance graph must still contain the 21 assigned members and nine
+resident LUMPs; fixture drift fails explicitly rather than repairing selections,
+source or membership. This is a regression of the retained acceptance graph,
+not a synthetic fixture that can silently replace it.
+
 Local raw captures (excluded from Git) are under
 `generated-artifacts/save-bind-run/`:
 `binding-ui-evidence.json`, `prepare-evidence.json`, and
@@ -112,7 +142,6 @@ while the machine was stopped; a fault indicator also remained visible with an
 empty current fault log. These are separate display observations, not recorded
 program faults. Repeated 403s from hardware polling were expected from the
 disposable server's deny guard.
-
 ### Stopped/current Thread display correction
 
 The Thread lifecycle's `running` value denotes architectural live-context
