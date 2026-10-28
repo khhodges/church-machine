@@ -1800,12 +1800,14 @@ function updateCRDetail() {
         codeHtml += '<th class="code-decompiled-hdr" title="Symbolic meaning, not recorded execution">Static meaning</th>';
         codeHtml += '</tr></thead><tbody>';
 
-        // Show boot preamble rows only while boot is in progress or has faulted.
-        if (nsIdx === bootEntrySlot && !(sim.bootComplete && !sim.halted)) {
+        // These are static Boot descriptions, not retired instruction history.
+        // Use the loaded machine's entry, never a separate pending UI selection;
+        // a later application fault must not prepend Boot to the current callee.
+        if (nsIdx === sim.bootEntrySlot && !sim.bootComplete) {
             const _bootPreamble = [
                 { addr: 'B:00', desc: 'LOAD CR15',   decomp: 'Boot ROM instruction: LOAD CR15 establishes Boot.NS.' },
                 { addr: 'B:01', desc: 'CHANGE CR12', decomp: 'Boot ROM instruction: CHANGE CR12 restores Boot.Thread, including its prepared CR0 home.' },
-                { addr: 'B:02', desc: 'CALL CR0',    decomp: 'Boot ROM instruction: CALL CR0 consumes the stored prepared E-GT. Reset/reporting are not boot instructions.' },
+                { addr: 'B:02', desc: 'CALL CR0, #1', decomp: 'Simulator Boot: CALL consumes the prepared E-GT and dispatches startup method #1. Static description, not execution history.' },
             ];
             const _arrowTd = _brArrows.hasBranches ? '<td class="br-arrow-col"></td>' : '';
             for (const bp of _bootPreamble) {

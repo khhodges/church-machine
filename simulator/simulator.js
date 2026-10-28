@@ -3709,7 +3709,7 @@ class ChurchSimulator {
         const instructions = [
             { mnemonic: 'LOAD', change: 'LOAD CR15, CR15[0]', destinationRegister: 15, opcode: 0 },
             { mnemonic: 'CHANGE', change: 'CHANGE CR12, CR15[1]', destinationRegister: 12, opcode: 4 },
-            { mnemonic: 'CALL', change: 'CALL CR0', destinationRegister: 0, opcode: 2 },
+            { mnemonic: 'CALL', change: 'CALL CR0, #1', destinationRegister: 0, opcode: 2 },
         ];
         return instructions.map((instruction, bootRomAddress) => ({
             attemptId,
@@ -3930,7 +3930,7 @@ class ChurchSimulator {
             this._resetAllMBits();
             this.mElevation = false;
             const result = this._execCall({
-                opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 0, mnemonic: 'CALL',
+                opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 1, mnemonic: 'CALL',
                 bootRootContext: true,
             });
             if (!result || this.halted) {
@@ -3958,7 +3958,7 @@ class ChurchSimulator {
             this.ledBits = 0b111111;
             this.ledMode = 'boot';
             this._bootCallHomeEvent();
-            this.output += 'BOOT CALL CR0 — root abstraction entered\n';
+            this.output += 'BOOT CALL CR0, #1 — startup method dispatched\n';
         }
 
         this._setBootProgressStatus(index, 'completed');
@@ -7541,9 +7541,14 @@ class ChurchSimulator {
     }
 
     _execCallCore(d) {
-        const methodSelector = (d.imm !== undefined) ? (d.imm & 0x7FFF) : 0;
+        const methodSelector = d.imm === undefined ? 0 : d.imm;
         // Establish the selector even when no target GT can be resolved.
         this._captureCallTarget(null, methodSelector);
+        if (!Number.isInteger(methodSelector) || methodSelector < 1 || methodSelector > 0x7FFF) {
+            this.fault('INVALID_OP',
+                'CALL requires a dispatch-table selector from 1 to 32767; selector 0 is not direct entry. Recompile the caller with an explicit declared method.');
+            return null;
+        }
         let sourceGT = d.indexedSourceGT !== undefined
             ? d.indexedSourceGT >>> 0
             : this.cr[d.crDst].word0;
@@ -7737,6 +7742,24 @@ class ChurchSimulator {
             this.fault('BOUNDS', 'CALL: malformed executable header or code/C-list outside allocation');
             return null;
         }
+        // Validate dispatch before pushing a frame or publishing callee CRs.
+        // Table words are offsets, never executable BRANCH instructions.
+        if (idx1TargetPC === null) {
+            if (methodSelector > entryHeader.cw) {
+                this.fault('BOUNDS', 'CALL dispatch selector exceeds executable extent');
+                return null;
+            }
+            const target = this.memory[entryBase + methodSelector] >>> 0;
+            if (target === 0) {
+                this.fault('PRIVATE_METHOD', 'CALL dispatch entry is private/zero');
+                return null;
+            }
+            if (target <= methodSelector || target > entryHeader.cw) {
+                this.fault('BOUNDS', 'CALL dispatch entry must point beyond its table slot into the executable body');
+                return null;
+            }
+            idx1TargetPC = target - 1;
+        }
         const savedSTO = this._readProtectedSto(callThreadBase);
         this.sto = savedSTO;
         if (callThreadBase !== null) {
@@ -7895,62 +7918,8 @@ class ChurchSimulator {
         const desc = `CALL CR${d.crDst} -> ${label}${cr14Desc}`;
         this.output += desc + '\n';
         const prevPC = this.pc;
-        // Hardware method-table dispatch.
-        // CALL imm15 = method index.
-        //   index=0 → NIA = lump_base + 1 (word 1, single-entry-point shortcut).
-        //   index>0 → read memory[lump_base + index]; 0 = private → FAULT.
-        //
-        // Method-table entries are BRANCH instructions (opcode 23 in v2.0 ISA, 15-bit signed
-        // offset in bits [14:0]).  The entry at lump word `methodIndex` sits at
-        // lump-relative PC = methodIndex - 1 (fetch formula: physAddr = base+1+pc).
-        // New PC = (methodIndex - 1) + branchOffset = bodyOffset.
-        //
-        // Backward compat: if the opcode field is not 23, the entry is treated as
-        // a direct lump-relative PC (legacy bare-address format from pre-task-1134
-        // LUMPs stored on disk).
-        const methodIndex = (d.imm !== undefined) ? (d.imm & 0x7FFF) : 0;
-        if (idx1TargetPC !== null) {
-            this.pc = idx1TargetPC;
-        } else if (methodIndex === 0) {
-            // Fetch is base + 1 + pc: logical zero enters physical word 1.
-            this.pc = 0;
-        } else {
-            const lumpBaseWord = nsEntry.word0_location;  // word index of lump_base in memory[]
-            if (methodIndex > hdr.cw) {
-                this.fault('BOUNDS', `CALL method index ${methodIndex} exceeds code words ${hdr.cw}`);
-                return null;
-            }
-            const tableEntry = this.memory[lumpBaseWord + methodIndex] >>> 0;
-            if (tableEntry === 0) {
-                this.fault('PRIVATE_METHOD', `CALL CR${d.crDst}: method index ${methodIndex} is private (table entry = 0)`);
-                return null;
-            }
-            const entryOpcode = (tableEntry >>> 27) & 0x1F;
-            if (entryOpcode === 23) {  // BRANCH-encoded method-table entry (v2.0: opcode 23)
-                // Decode 15-bit signed offset; table entry at lump PC (methodIndex - 1).
-                const soff = (tableEntry & 0x4000)
-                    ? ((tableEntry & 0x7FFF) | 0xFFFF8000)
-                    : (tableEntry & 0x7FFF);
-                const targetWord = methodIndex + soff;
-                if (targetWord < 1 || targetWord > hdr.cw) {
-                    this.fault('BOUNDS', `CALL method ${methodIndex} targets word ${targetWord} outside executable code`);
-                    return null;
-                }
-                this.pc = targetWord - 1;
-            } else if (tableEntry > 0 && tableEntry <= hdr.cw) {
-                // Legacy entries are physical lump-word offsets: 1 names the
-                // first word after the header.  The live PC is code-view
-                // relative (fetch = base + 1 + PC), so remove that header word.
-                // Treating the stored offset as an already-logical PC skipped
-                // the first instruction of old one-method LUMPs (for example a
-                // bare entry 2 incorrectly entered at lump word 3).
-                this.pc = tableEntry - 1;
-            } else {
-                this.fault('INVALID_OP',
-                    `CALL CR${d.crDst}: method index ${methodIndex} entry 0x${tableEntry.toString(16).padStart(8, '0')} is neither a BRANCH nor a valid legacy code offset`);
-                return null;
-            }
-        }
+        // Commit the dispatch target already validated before frame creation.
+        this.pc = idx1TargetPC;
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_PUSH, 0);

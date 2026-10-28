@@ -33,15 +33,14 @@ for (const limit of [3, 4, 62, 63]) {
     }
 }
 
-// Keep the original method-dispatch matrix: signed canonical displacements,
-// legacy offsets, private methods and both table/target bounds.
+// Mandatory dispatch offsets: executable BRANCH words are not table entries.
 for (const [method, entry, target, fault] of [
-    [1, 0xBF000001, 2, null], [3, 0xBF007FFF, 2, null],
-    [1, 0xBF000003, 4, null], [1, 2, 2, null], [1, 4, 4, null],
+    [1, 0xBF000001, null, 'BOUNDS'], [3, 0xBF007FFF, null, 'BOUNDS'],
+    [1, 0xBF000003, null, 'BOUNDS'], [1, 2, 2, null], [1, 4, 4, null],
     [1, 0, null, 'PRIVATE_METHOD'],
     [1, 0xBF007FFF, null, 'BOUNDS'], [1, 0xBF004000, null, 'BOUNDS'],
     [1, 0xBF003FFF, null, 'BOUNDS'], [1, 0xBF000004, null, 'BOUNDS'],
-    [1, 5, null, 'INVALID_OP'], [1, 0xAF084001, null, 'INVALID_OP'],
+    [1, 5, null, 'BOUNDS'], [1, 0xAF084001, null, 'BOUNDS'],
     [5, 2, null, 'BOUNDS'],
 ]) {
     const {sim} = fixture();
@@ -72,6 +71,7 @@ for (const cc of [2, 0]) {
     const {sim} = fixture();
     const slot = 30, base = 0x200, seq = 19;
     sim.memory[base] = sim.packLumpHeader(0, 3, cc, 0);
+    sim.memory[base + 1] = 2;
     sim.withNamespaceWrite('CALL path fixture', () =>
         sim.writeNSEntry(slot, base, 63, 0, 0, 1, seq, cc, 0));
     const gt = sim.createGT(seq, slot, {E: 1, B}, 1);
@@ -81,7 +81,7 @@ for (const cc of [2, 0]) {
     sim.cr[5] = {...heap};
     sim.cr[13] = {...window};
     sim.cr[4].m = 1;
-    assert(sim._execCall({crDst: 0, imm: 0}));
+    assert(sim._execCall({crDst: 0, imm: 1}));
     assert.equal(sim.cr[6].word0, gt);
     assert.equal(sim.cr[6].word1, cc ? base + 64 - cc : base);
     assert.equal(sim.cr[6].m, 1);
@@ -94,9 +94,10 @@ for (const cc of [2, 0]) {
 // Real fetch/decode/execute, with no post-CALL register repair.
 {
     const {sim, install, activate} = fixture();
-    const callee = install(31, [sim.encodeInstruction(3, 14, 0, 0, 0)]);
-    const caller = install(30, [sim.encodeInstruction(2, 14, 0, 0, 0)]);
+    const callee = install(31, [2, sim.encodeInstruction(3, 14, 0, 0, 0)]);
+    const caller = install(30, [2, sim.encodeInstruction(2, 14, 0, 0, 1)]);
     activate(caller);
+    sim.pc = 1;
     sim.cr[0].word0 = callee.gt;
     assert.equal(sim.step().instr.opcode, 2);
     checkContext(sim, callee);
@@ -112,7 +113,8 @@ console.log('PASS CALL: E-only identity, both reconstruction paths, dispatch bou
     const callee = {slot: 31, base: 0x300, clistBase: 0x33F};
     for (const [domain, seq] of [[caller, 19], [callee, 27]]) {
         sim.memory[domain.base] = sim.packLumpHeader(0, 3, 1, 0);
-        sim.memory[domain.base + 1] = sim.encodeInstruction(3, 14, 0, 0, 0);
+        sim.memory[domain.base + 1] = 2;
+        sim.memory[domain.base + 2] = sim.encodeInstruction(3, 14, 0, 0, 0);
         sim.withNamespaceWrite('nonzero generation fixture', () =>
             sim.writeNSEntry(domain.slot, domain.base, 63, 0, 0, 1, seq, 1, 0));
         domain.gt = sim.createGT(seq, domain.slot, {E: 1}, 1);
@@ -120,10 +122,12 @@ console.log('PASS CALL: E-only identity, both reconstruction paths, dispatch bou
     sim._installLumpHeaderContext(sim.parseGT(caller.gt), caller.slot,
         sim.readNSEntry(caller.slot), sim.parseLumpHeader(sim.memory[caller.base]));
     sim.cr[0].word0 = callee.gt;
-    sim.pc = 0;
-    assert(sim._execCall({crDst: 0, imm: 0}));
+    sim.pc = 1;
+    assert(sim._execCall({crDst: 0, imm: 1}));
     checkContext(sim, callee);
     assert.equal(sim.callStack.at(-1).companionGT, caller.gt);
     assert(sim.step());
     checkContext(sim, caller);
 }
+
+require('./sim_call_dispatch_required');
