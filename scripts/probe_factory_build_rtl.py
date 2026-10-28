@@ -61,4 +61,5 @@ def replay(directory, cycles=120000):
 
 if __name__ == "__main__":
     print(json.dumps(replay(Path(sys.argv[1]) if len(sys.argv) > 1 else
-                           ROOT / "generated-artifacts/factory-build"), indent=2))
+                           ROOT / "generated-artifacts/factory-build",
+                           int(sys.argv[2]) if len(sys.argv) > 2 else 120000), indent=2))

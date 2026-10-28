@@ -15,6 +15,11 @@ def validate_words(words, guard):
     if (type(guard) is not int or guard != 23971 or len(words) != 16384
             or any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words)):
         raise ValueError("Production runtime image requires the exact frozen guard and uint32 image")
+    if len(words) == 16384 and (
+            (words[5] & 0x1fffff) != (((words[0] >> 10) & 8191) * 4 - 1)
+            or (words[5] >> 21 & 511) != (guard >> 9 if type(guard) is int else -1)
+            or (words[9] >> 21 & 511) != (guard & 511 if type(guard) is int else -1)):
+        raise ValueError("Frozen candidate uses an incompatible Namespace authority layout; current RTL requires limit21/version9")
     if hashlib.sha256(struct.pack("<16384I", *words)).hexdigest() != IMAGE_SHA256:
         raise ValueError("Production runtime image differs from the approved candidate")
     return words

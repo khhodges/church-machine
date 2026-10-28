@@ -33,7 +33,7 @@ class AscendingNamespaceBootstrap(Elaboratable):
         self.mem_valid = Signal()
         self.slots = Signal(13)
         self.thread_base_byte = Signal(32)
-        self.thread_limit = Signal(17)
+        self.thread_limit = Signal(21)
         self.namespace_version = Signal(9)
         self.namespace_authority = Signal(32)
         self.thread_version = Signal(9)
@@ -91,7 +91,7 @@ class AscendingNamespaceBootstrap(Elaboratable):
                 # Admission compares those versions against retained constants
                 # separately; never infer expected versions from live memory.
                 with m.Elif((words[4] != 0) |
-                            ((words[5] & 0x8001ffff) != table_words - 1) |
+                            ((words[5] & 0x801fffff) != table_words - 1) |
                             (words[7] != 0)):
                     fail(2)
                 with m.Elif(words[6] != self_seal):
@@ -103,8 +103,8 @@ class AscendingNamespaceBootstrap(Elaboratable):
                     (words[8] < table_words) |
                     (words[8] >= self.capacity_words) |
                     words[9][31] |
-                    (words[9][:17] >= self.capacity_words) |
-                    (words[8] + words[9][:17] >= self.capacity_words)
+                    (words[9][:21] >= self.capacity_words) |
+                    (words[8] + words[9][:21] >= self.capacity_words)
                 )):
                     fail(4)
                 with m.Elif(Const(not self.namespace_only) & (words[10] != thread_seal)):
@@ -113,10 +113,10 @@ class AscendingNamespaceBootstrap(Elaboratable):
                     m.d.sync += [
                         self.slots.eq(slots),
                         self.thread_base_byte.eq(words[8] << 2),
-                        self.thread_limit.eq(words[9][:17]),
-                        self.namespace_version.eq(words[5][17:26]),
+                        self.thread_limit.eq(words[9][:21]),
+                        self.namespace_version.eq(words[5][21:30]),
                         self.namespace_authority.eq(words[5]),
-                        self.thread_version.eq(words[9][17:26]),
+                        self.thread_version.eq(words[9][21:30]),
                     ]
                     m.next = "DONE"
             with m.State("DONE"):

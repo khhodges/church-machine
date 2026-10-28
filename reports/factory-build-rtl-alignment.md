@@ -43,14 +43,38 @@ The shared architecture contract and image generator encode version 1 at bit
 21. The guarded RTL gate reads bit 17 and therefore sees version 16.
 This is not an instruction encoding failure or an absent permission.
 
-## Open alignment boundary
+## Namespace format decision and correction
 
-Historical guarded-profile documents explicitly specify a 17-bit stored
-limit, while the current shared contract/image generator specifies 21 bits.
-Do not add auto-detection, accept either version, reseal the input, or weaken
-the hard fault. A consistent profile change must cover bootstrap, Thread
-activation, mLoad, cLoad, CHANGE and stored/cache conversions, with nonzero
-version and independent limit tests. That migration is not implemented here.
+The user explicitly approved the current format. Guarded bootstrap, Thread
+validation/activation, mLoad, cLoad, CHANGE and stored/cache authority now use
+limit bits 0–20 and version bits 21–29, preserving G/F and original-word seals.
+There is no auto-detection or alternate version comparison. Historical
+17-bit-format bytes remain immutable; the frozen production-profile entry
+point now refuses them explicitly rather than building incompatible RTL.
+
+175 focused tests passed after this correction, covering the earlier handoff,
+operand and boot checks plus Namespace bootstrap, mLoad, cLoad, nonzero
+versions, high-limit rejection, and rejection of the historical guarded image.
+This is not a claim that all historical retained-profile suites pass against
+current RTL; those still encode the superseded profile.
+
+## Latest exact-image observation
+
+Command: `python3 scripts/probe_factory_build_rtl.py generated-artifacts/factory-build 2000000`
+
+The image hash is unchanged. The model retires **444 instructions**, then
+faults BOUNDS (8) at cycle **466716**, byte PC **0x1964**, raw word
+**0x87414198**, in WukongCallHome (NS[7]). This is not the intentional Mallory
+denial, and is not an end-to-end acceptance pass.
+
+The source is `DREAD DR8, CR2, #408`. The saved compiler/simulator encoding
+uses bit 14 as immediate mode and payload 408. The current documented compact
+data-access encoding/RTL reads this word as index DR8 minus magnitude 25.
+These interpretations cannot both apply to the same word. No test-local
+translation, instruction skip or saved-artifact rewrite was performed.
+
+Aligning compiler/simulator data-access encoding and publishing new immutable
+revisions is separate from the approved Namespace-field migration.
 
 The full image has NOT passed RTL execution. No synthesis, timing closure,
 bitstream build, upload or physical FPGA test was performed.

@@ -47,7 +47,7 @@ def test_changed_input_rejected():
 
 
 @pytest.mark.parametrize("changed_slot", [None, 1, 2])
-def test_retained_guarded_bytes_against_rtl_components(changed_slot):
+def test_historical_guarded_bytes_are_rejected_by_current_rtl(changed_slot):
     from amaranth import Module
     from amaranth.sim import Simulator
     from hardware.ascending_namespace import AscendingNamespaceBootstrap
@@ -78,31 +78,16 @@ def test_retained_guarded_bytes_against_rtl_components(changed_slot):
         await ctx.tick()
         ctx.set(reader.start, 0)
         for _ in range(100):
-            assert not ctx.get(reader.fault)
-            if ctx.get(reader.done):
-                break
+            assert not ctx.get(reader.done), "old 17-bit profile must not be accepted"
+            if ctx.get(reader.fault):
+                assert ctx.get(reader.error) == 2
+                assert ctx.get(reader.slots) == 0
+                return
             enabled, addr = ctx.get(reader.mem_rd_en), ctx.get(reader.mem_addr)
             await ctx.tick()
             ctx.set(reader.mem_valid, enabled)
             ctx.set(reader.mem_data, words[addr // 4] if enabled else 0)
         else:
-            pytest.fail("metadata read timed out")
-        assert ctx.get(reader.slots) == 64
-        assert ctx.get(reader.thread_base_byte) == 1024
-        for slot, version in [(1, reader.namespace_version), (2, reader.thread_version)]:
-            ctx.set(guard.thread_stage, slot == 2)
-            ctx.set(guard.observed_version, ctx.get(version))
-            ctx.set(guard.start, 1)
-            await ctx.tick()
-            ctx.set(guard.start, 0)
-            assert ctx.get(guard.done)
-            if changed_slot == slot:
-                assert ctx.get(guard.fault)
-                assert ctx.get(guard.fault_type) == FaultType.VERSION
-                assert ctx.get(guard.fault_slot) == slot
-                return
-            assert ctx.get(guard.accepted)
-            await ctx.tick()
-
+            pytest.fail("historical metadata was not rejected")
     sim.add_testbench(bench)
     sim.run()

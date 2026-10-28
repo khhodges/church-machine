@@ -42,7 +42,7 @@ class BootThreadValidation(Elaboratable):
             caps.eq(size - 12),
             stack_start.eq(caps - self.header[10:23]),
             guard.thread_stage.eq(1),
-            guard.observed_version.eq(d[1][17:26]),
+            guard.observed_version.eq(d[1][21:30]),
         ]
 
         def fail(code):
@@ -119,8 +119,8 @@ class BootThreadValidation(Elaboratable):
                 with m.If(computed != d[2]):
                     fail(FaultType.SEAL)
                 with m.Elif(d[1][31] | (d[0] < (slots << 2)) |
-                            (d[0] >= 16384) | (d[1][:17] >= 16384) |
-                            ((d[0] + d[1][:17]) >= 16384)):
+                            (d[0] >= 16384) | (d[1][:21] >= 16384) |
+                            ((d[0] + d[1][:21]) >= 16384)):
                     fail(FaultType.BOUNDS)
                 with m.Else():
                     m.d.sync += index.eq(4)
@@ -132,7 +132,7 @@ class BootThreadValidation(Elaboratable):
                     (self.header[23:27] < THREAD_MIN_N_MINUS_6) |
                     (self.header[23:27] > THREAD_MAX_N_MINUS_6) |
                     (self.header[10:23] == 0) | (self.header[10:23] >= size - 30) |
-                    (d[1][:17] != size - 1)
+                    (d[1][:21] != size - 1)
                 ):
                     fail(FaultType.BOUNDS)
                 with m.Else():

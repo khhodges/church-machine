@@ -13,7 +13,7 @@ IMAGE = (Path(__file__).resolve().parents[2] /
          "docs/phase-1/reload-evidence/new-layout/simulator-image-le.bin")
 
 
-def run(words):
+def run(words, expected_versions=None):
     dut = AscendingNamespaceBootstrap()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -25,6 +25,9 @@ def run(words):
         ctx.set(dut.start, 0)
         for _ in range(100):
             if ctx.get(dut.done) or ctx.get(dut.fault):
+                if ctx.get(dut.done) and expected_versions is not None:
+                    assert (ctx.get(dut.namespace_version),
+                            ctx.get(dut.thread_version)) == expected_versions
                 result.update(done=ctx.get(dut.done), error=ctx.get(dut.error),
                               slots=ctx.get(dut.slots),
                               base=ctx.get(dut.thread_base_byte),
@@ -55,7 +58,7 @@ def test_exact_new_layout_metadata_and_thread_address():
     words = image_words()
     result = run(words)
     assert result == dict(done=1, error=0, slots=64,
-                          base=words[8] * 4, limit=words[9] & 0x1ffff)
+                          base=words[8] * 4, limit=words[9] & 0x1fffff)
 
 
 @pytest.mark.parametrize("word,value,error", [
@@ -69,11 +72,20 @@ def test_reject_bad_metadata_without_publishing_boot_outputs(word, value, error)
     assert run(words) == dict(done=0, error=error, slots=0, base=0, limit=0)
 
 
-def test_geometry_reader_does_not_force_guard_versions_to_zero():
+@pytest.mark.parametrize("version", [1, 16, 256, 510])
+def test_geometry_reader_does_not_force_guard_versions_to_zero(version):
     from server.boot_image import integrity32
     words = image_words()
-    words[5] |= 7 << 17
-    words[9] |= 19 << 17
+    words[5] |= version << 21
+    words[9] |= (version ^ 1) << 21
     words[6] = integrity32(words[4], words[5])
     words[10] = integrity32(words[8], words[9])
-    assert run(words)["done"] == 1
+    assert run(words, (version, version ^ 1))["done"] == 1
+
+
+def test_high_limit_bits_are_not_discarded_as_old_reserved_bits():
+    from server.boot_image import integrity32
+    words = image_words()
+    words[9] |= 1 << 17
+    words[10] = integrity32(words[8], words[9])
+    assert run(words)["error"] == 4

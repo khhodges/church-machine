@@ -598,6 +598,19 @@ Verify state preservation and pre-recovery location capture before use.
 
 ### Namespace identity and software lifecycle
 
+**Guarded RTL format decision — 2026-10-28:** The programmer approved
+standardizing guarded RTL on the current simulator/shared architecture
+contract. Stored Namespace Word 1 has limit in bits **0–20**, generation in
+bits **21–29**, G in bit **30**, and F in bit **31**. Cached authority uses
+the same field layout. Resident locations still use the profile's word
+addresses and are converted to byte addresses only at the internal bus
+boundary. Integrity is checked against original stored words.
+
+This supersedes the historical guarded candidate's 17-bit-limit layout.
+There is no format auto-detection or alternate version comparison. Historical
+images stay immutable and are not authorized inputs to a current-format
+hardware build. This decision does not authorize flashing hardware.
+
 See [active geometry](#active-namespace-geometry) for the approved ascending
 256-slot starting table, slot map and half-FPGA-memory budget.
 GT and entry generations are **9 bits, 0–511**. Hardware checks equality and

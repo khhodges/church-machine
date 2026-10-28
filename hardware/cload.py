@@ -85,7 +85,7 @@ class ChurchCLoad(Elaboratable):
 
         m.submodules.u_ns_gate = u_ns_gate = ChurchNSGate(
             enable_seal_check=self.enable_seal_check,
-            authority_version_shift=17 if self.resident_word_locations else 21,
+            authority_version_shift=21,
         )
 
         e_gt_latched   = Signal(32)
@@ -213,7 +213,7 @@ class ChurchCLoad(Elaboratable):
                 with m.If(self.resident_word_locations &
                           ((e_gt_view.slot_id == 0) |
                            (((e_gt_view.slot_id << 2) + 3) >
-                            ns.word2_w2[:17]))):
+                            ns.word2_w2[:21]))):
                     m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
                     m.next = "FAULT"
                 with m.Else():
@@ -266,8 +266,8 @@ class ChurchCLoad(Elaboratable):
                         (self.mem_rd_data[8:10] != 0) |
                         (_hdr.n_minus_6 > 7) | (_hdr.cc == 0) |
                         (_hdr.cw == 0) | (_hdr.cw >= _caps) |
-                        ((raw_w2[:17] != _size - 1) &
-                         (raw_w2[:17] != _caps - 1)) |
+                        ((raw_w2[:21] != _size - 1) &
+                         (raw_w2[:21] != _caps - 1)) |
                         ((raw_base >> 2) + _size > 16384))
                     with m.If(self.resident_word_locations & _invalid):
                         m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)

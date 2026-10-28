@@ -44,7 +44,7 @@ class OrdinaryChange(Elaboratable):
         m = Module()
         m.submodules.gate = gate = ChurchNSGate(
             enable_seal_check=True,
-            authority_version_shift=17 if self.resident_word_locations else 21)
+            authority_version_shift=21)
         m.submodules.home_load = home_load = ChurchMLoad(
             enable_seal_check=True, resident_word_locations=self.resident_word_locations)
         resolved_base = Signal(32)
@@ -57,7 +57,7 @@ class OrdinaryChange(Elaboratable):
                 resolved_base.eq(gate.raw_base << 2),
                 resolved_authority.eq(cached_authority(gate.raw_w2)),
                 invalid_descriptor.eq((gate.raw_base >= 16384) |
-                    (gate.raw_base + gate.raw_w2[:17] >= 16384)),
+                    (gate.raw_base + gate.raw_w2[:21] >= 16384)),
             ]
         else:
             m.d.comb += [resolved_base.eq(gate.raw_base),

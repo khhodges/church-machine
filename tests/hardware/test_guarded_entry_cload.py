@@ -36,7 +36,7 @@ def test_guarded_entry_uses_original_seal_and_word_location(case, expected_fault
     elif case == "header":
         words[base] = 0
     elif case == "limit":
-        words[slot*4+1] = (authority & ~0x1ffff) | 1
+        words[slot*4+1] = (authority & ~0x1fffff) | 1
         words[slot*4+2] = integrity32(base, words[slot*4+1])
     elif case == "free":
         words[slot*4+1] |= 1 << 31
@@ -46,14 +46,14 @@ def test_guarded_entry_uses_original_seal_and_word_location(case, expected_fault
         gt = (gt & ~65535) | 64
     elif case == "nonzero_version":
         gt = (gt & ~(511 << 16)) | (46 << 16)
-        words[slot*4+1] = (authority & ~(511 << 17)) | (46 << 17)
+        words[slot*4+1] = (authority & ~(511 << 21)) | (46 << 21)
         words[slot*4+2] = integrity32(base, words[slot*4+1])
     elif case == "legacy_profile":
         # Separate synthetic historical-format fixture, never a conversion
         # offered for installation of New Layout.
         gt = (gt & ~(511 << 16)) | (46 << 16)
         words[slot*4] = base * 4
-        words[slot*4+1] = (authority & 0x1ffff) | (46 << 21)
+        words[slot*4+1] = (authority & 0x1fffff) | (46 << 21)
         words[slot*4+2] = integrity32(base * 4, words[slot*4+1])
     dut = ChurchCLoad(resident_word_locations=case != "legacy_profile")
     sim = Simulator(dut)
@@ -75,8 +75,7 @@ def test_guarded_entry_uses_original_seal_and_word_location(case, expected_fault
             ctx.set(dut.mem_rd_data, words[addr//4] if en else 0)
 
         ns_gt, ns_authority = (0x1a000000, 255) if case == "legacy_profile" else (
-            0x1a2e0001, (words[5] & 0x1ffff) |
-            (((words[5] >> 17) & 511) << 21) | (words[5] & 0xc0000000))
+            0x1a2e0001, 255 | (46 << 21))
         ctx.set(dut.cr15_namespace.as_value(), ns_gt | (ns_authority << 64))
         ctx.set(dut.e_gt, gt)
         ctx.set(dut.cload_start, 1)

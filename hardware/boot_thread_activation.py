@@ -115,14 +115,14 @@ class BootThreadActivation(Elaboratable):
                     with m.Else():
                         m.d.sync += part.eq(part + 1)
             with m.State("CHECK"):
-                with m.If(gt[16:25] != descriptor[1][17:26]):
+                with m.If(gt[16:25] != descriptor[1][21:30]):
                     fail(FaultType.VERSION)
                 with m.Elif(seal != descriptor[2]):
                     fail(FaultType.SEAL)
                 with m.Elif(descriptor[1][31]):
                     fail(FaultType.BOUNDS)
                 with m.Elif(descriptor[0] < 16384):
-                    with m.If(descriptor[0] + descriptor[1][:17] >= 16384):
+                    with m.If(descriptor[0] + descriptor[1][:21] >= 16384):
                         fail(FaultType.BOUNDS)
                     with m.Else():
                         m.d.sync += caps[row].eq(Cat(

@@ -10,7 +10,7 @@ from hardware.integrity32 import integrity32
 def test_nonzero_generation_and_stored_integrity(version, defect):
     dut = ChurchChange(resident_word_locations=True)
     location = 16384 if defect == "outside" else 16380 if defect == "extent" else 2304
-    authority = 255 | ((version ^ 1 if defect == "stale" else version) << 17)
+    authority = 255 | ((version ^ 1 if defect == "stale" else version) << 21)
     if defect == "free":
         authority |= 1 << 31
     seal = integrity32(location, authority) ^ int(defect == "seal")

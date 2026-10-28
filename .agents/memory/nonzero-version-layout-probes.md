@@ -5,6 +5,17 @@ description: Zero-version success can conceal incompatible descriptor field layo
 Use independently resealed nonzero-version fixtures when testing Namespace
 descriptor consumers, including both matching and mismatching tokens.
 
+On 2026-10-28 the user explicitly chose “Use current format” for guarded RTL:
+limit bits 0–20, version bits 21–29, G/F bits 30/31. This supersedes historical
+guarded 17-bit-limit candidates, not the preservation of their immutable bytes.
+
+**Why:** The saved simulator Factory Build uses the shared current contract;
+the old guarded interpretation mistook a nonzero version for a different one.
+**How to apply:** Align all guarded consumers together. Never accept both
+layouts heuristically or convert an immutable image to make a replay pass.
+Historical build inputs must fail clearly rather than silently select old
+semantics.
+
 **Why:** A zero version can pass two incompatible authority layouts. Version
 bits may also be misread as limit bits, silently enlarging the apparent bounds.
 Successful address conversion or seal checking alone does not prove field

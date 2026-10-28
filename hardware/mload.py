@@ -108,7 +108,7 @@ class ChurchMLoad(Elaboratable):
 
         m.submodules.u_ns_gate = u_ns_gate = ChurchNSGate(
             enable_seal_check=self.enable_seal_check,
-            authority_version_shift=17 if self.resident_word_locations else 21,
+            authority_version_shift=21,
         )
 
         cr_src_reg = Signal(4)
@@ -166,7 +166,7 @@ class ChurchMLoad(Elaboratable):
                 invalid_descriptor.eq(
                     u_ns_gate.raw_w2[31] |
                     Mux(u_ns_gate.raw_base < 16384,
-                        u_ns_gate.raw_base + u_ns_gate.raw_w2[:17] >= 16384,
+                        u_ns_gate.raw_base + u_ns_gate.raw_w2[:21] >= 16384,
                         (u_ns_gate.raw_base[30:32] != 1) &
                         (u_ns_gate.raw_base != M_BIT_PORT))),
             ]
