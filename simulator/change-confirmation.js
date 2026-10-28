@@ -172,7 +172,11 @@
                 resolve(value);
             }
             function dismissed() { finish(false, 'dismissed'); }
-            reject.onclick = function () { finish(false, 'rejected'); };
+            reject.onclick = function () {
+                if (settled) return;
+                if (typeof details.onReject === 'function') details.onReject();
+                finish(false, 'rejected');
+            };
             confirm.onclick = function () { finish(true); };
             dialog.addEventListener('cancel', function (event) {
                 event.preventDefault();
@@ -199,8 +203,10 @@
         var before = editor.value;
         var epoch = window._editorNavigationEpoch;
         if (before === after) return true;
+        var rejected = false;
         var approved = await window.confirmProtectedChange({
             title: 'Replace editor source',
+            onReject: function () { rejected = true; },
             reason: reason,
             comparisonLabels: labels ? {
                 before: labels.before + ' (' + splitLines(before).length + ' lines, ' + before.length + ' characters)',
@@ -212,6 +218,14 @@
                     : []),
                 'This review does not save or compile the replacement.'],
         });
+        // Reject the proposed bytes, not the user's intent to edit. Navigate
+        // without reopening a LUMP or writing either side of the comparison.
+        // A review from an older document must not steal the current view.
+        if (rejected && window._editorNavigationEpoch === epoch &&
+                (editor.isConnected === undefined || editor.isConnected)) {
+            if (typeof window.switchView === 'function') window.switchView('editor');
+            if (typeof editor.focus === 'function') editor.focus();
+        }
         return approved && editor.value === before &&
             (editor.isConnected === undefined || editor.isConnected) &&
             window._editorNavigationEpoch === epoch;

@@ -169,6 +169,25 @@ async function waitForDialog(h) {
     dialog.handlers.cancel({preventDefault() {}});
     assert.strictEqual(await pending, false, 'Escape rejects');
 
+    // Explicit source rejection opens Code Edit but never adopts After bytes.
+    for (const changedDocument of [false, true]) {
+        h = harness([]);
+        const views = [];
+        let focused = false;
+        const retained = {value: 'before', isConnected: true, focus() { focused = true; }};
+        h.window._editorNavigationEpoch = 7;
+        h.window.switchView = view => views.push(view);
+        pending = h.window.confirmSourceReplacement(retained, 'after', 'Replace source');
+        dialog = await waitForDialog(h);
+        if (changedDocument) h.window._editorNavigationEpoch++;
+        dialog.children[3].onclick();
+        assert.strictEqual(await pending, false, 'Reject never authorizes replacement');
+        assert.strictEqual(retained.value, 'before', 'Before source is retained verbatim');
+        assert.deepStrictEqual(views, changedDocument ? [] : ['editor']);
+        assert.strictEqual(focused, !changedDocument, 'only the reviewed document receives focus');
+        assert.strictEqual(h.calls.length, 0, 'opening Code Edit does not save or fetch After');
+    }
+
     // A failed audit notification must not turn cancellation into mutation.
     for (const failedAudit of [new Error('network credentials must not be logged'),
         new Response('unavailable', {status: 503})]) {

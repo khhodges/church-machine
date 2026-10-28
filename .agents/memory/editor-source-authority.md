@@ -1,4 +1,14 @@
 ---
+
+Rejecting a source-replacement comparison should open Code Edit with the
+existing editor text and ignore the proposed After copy, not leave the user
+on the originating inspection page.
+
+**Why:** The user explicitly requested that Reject continue into code editing
+without adopting the proposed replacement.
+
+**How to apply:** Keep rejection false for callers, preserve source and owner,
+and do not let a stale review redirect a newer document.
 name: Editor source authority
 description: Rules for preserving user-owned editor bytes while offering newer authoritative source explicitly.
 ---
