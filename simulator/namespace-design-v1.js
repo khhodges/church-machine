@@ -618,6 +618,7 @@
             state.error='Placement saved. Portable LUMPs unchanged; no GTs were bound. Click Bind Namespace Design to create local bindings. Nothing was activated.';
             return;
         }
+        root.DesignSimulation?.bindingChanged();
         if (result.bindingReport && root.NamespaceBindingWindows) {
             root.NamespaceBindingWindows.show(result.bindingReport);
             const st=result.bindingReport.status;
@@ -639,6 +640,9 @@
     async function save(bindNow = false) {
         if(state.saving || !state.document) return;
         bindNow = bindNow === true;
+        // Stop old execution before the first await. Failed or partial binds
+        // must not leave a pre-bind image available for reuse either.
+        if (bindNow) root.DesignSimulation?.bindingChanged();
         state.saving=true; state.bindingNow=bindNow; state.error=''; render();
         try {
             if(bindNow){

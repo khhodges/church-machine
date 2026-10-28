@@ -199,6 +199,8 @@ function harness(fail, records=[artifact]) {
     await design.api.realign(response,{});
     assert(design.calls.includes('design-admission'));
     assert.equal(design.context._savedLumpRealignment.privateReady,true);
+    assert.match(design.context._savedLumpRealignment.message,/Admission does not certify complete C-list binding/);
+    assert.match(design.context._savedLumpRealignment.message,/Run and Step do not bind/);
     assert(!design.calls.includes('activate'),'legacy simulation must remain separate');
     console.log('PASS save realignment: exact revision, history, Namespace preservation, ordered activation, failure barrier, and design boundary');
 })().catch(e=>{console.error(e);process.exitCode=1;});

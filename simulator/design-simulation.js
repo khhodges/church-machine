@@ -9,6 +9,7 @@
     let pendingPreparation = null;
     let faultHandlerSlot = null;
     let faultHandlerOwner = null;
+    let bindingEpoch = 0;
 
     function freezeRecord(value) {
         if (!value || typeof value !== 'object') return value;
@@ -93,7 +94,9 @@
         const state = root.NamespaceDesignV1 && root.NamespaceDesignV1.state;
         if (!state || !state.active || state.dirty || !state.document || !state.fingerprint)
             throw Error('Save the selected Namespace design before private simulation.');
-        return {profile:state.profile, designId:state.designId || '', fingerprint:state.fingerprint, document:JSON.stringify(state.document)};
+        if (state.saving && state.bindingNow)
+            throw Error('Namespace binding is pending. Wait for Bind to finish before preparing simulation.');
+        return {profile:state.profile, designId:state.designId || '', fingerprint:state.fingerprint, document:JSON.stringify(state.document), bindingEpoch};
     }
     function same(selected) {
         try { return JSON.stringify(selection()) === JSON.stringify(selected); }
@@ -162,6 +165,20 @@
         message='Saved revision changed. Prepare a fresh private simulation; previous execution is stopped.';
         render();
     }
+    function bindingChanged() {
+        // Binding evidence can change without changing the saved document.
+        // Revoke queued execution as well as the old image and HTTP chain.
+        stop();
+        bindingEpoch++;
+        invalidate();
+        message='Namespace binding changed. Prepare a fresh private simulation before execution; no image was patched.';
+        render();
+    }
+    function handlerOwner(selected) {
+        // Handler choice belongs to the design, not a particular Bind attempt.
+        const {bindingEpoch: ignored, ...design} = selected;
+        return JSON.stringify(design);
+    }
     async function request(selected, action, payload) {
         const response = await fetch('/api/simulation/design/'+selected.profile+'/'+action+
             (selected.designId?'?design='+encodeURIComponent(selected.designId):''), {
@@ -178,7 +195,7 @@
         const freshThreadSlots = rows.filter(row => row.kind === 'thread' &&
             Number.isInteger(row.preparedThread?.entryNia)).map(row => row.slot);
         if (faultHandlerSlot !== null) {
-            if (JSON.stringify(selected) !== faultHandlerOwner)
+            if (handlerOwner(selected) !== faultHandlerOwner)
                 throw Error('Namespace selection changed. Select its fault handler explicitly before preparing simulation.');
             const handler = instance.readNSEntry(faultHandlerSlot);
             const thread = instance.readNSEntry(2);
@@ -456,12 +473,12 @@
     function selectFaultHandler(value) {
         stop();
         faultHandlerSlot = value === '' ? null : Number(value);
-        faultHandlerOwner = faultHandlerSlot === null ? null : JSON.stringify(selection());
+        faultHandlerOwner = faultHandlerSlot === null ? null : handlerOwner(selection());
         invalidate();
         message = 'Fault handler selection changed. Prepare fresh simulation to bind it to the exact image. Saved Namespace and hardware are unchanged.';
         render();
     }
-    root.DesignSimulation={selectFaultHandler,prepare,command,stop,invalidate,markup,render,run,reset,traceContext,traceIdentity,
+    root.DesignSimulation={selectFaultHandler,prepare,command,stop,invalidate,bindingChanged,markup,render,run,reset,traceContext,traceIdentity,
         step:()=>{if(!running) execute(1);}};
 
     // Verify the occurrence against the admitted image, never editor/registry

@@ -15,6 +15,16 @@ iterations and requested a deep investigation first.
 proven facts, inferred action ordering and remaining uncertainty separately.
 Task creation or status changes do not override the approval requirement.
 
+On 2026-10-28 the user explicitly approved the scoped stale pre-binding
+simulation fix: revoke older loaded/pending simulation inputs around explicit
+Bind and retain the existing fresh prepare/approve/activate path. This approval
+does not authorize source rewrites, automatic binding during Run, fallback
+grants, live Namespace reassignment, or hardware changes.
+
+**Why:** Binding completion can change execution bytes without changing the
+saved design fingerprint; the user approved invalidation, not runtime repair.
+**How to apply:** Keep other fault hypotheses behind separate explicit approval.
+
 For diagnostic replay limits, see
 [mixed binding replay evidence](mixed-binding-replay-evidence.md): partial
 localization can create downstream faults absent from a complete bound image.

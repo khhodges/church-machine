@@ -60,6 +60,102 @@ function harness(defect) {
     return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar,timers};
 }
 (async()=>{
+    // Exercise the actual binding-result acceptance against the simulator,
+    // not a manually invalidated stand-in. No live endpoints or artifacts.
+    const designCode=fs.readFileSync(__dirname+'/namespace-design-v1.js','utf8');
+    function bindResult(h, status='complete') {
+        const state=h.scope.NamespaceDesignV1.state;
+        Object.assign(h.scope, {root:h.scope,state,clone:value=>JSON.parse(JSON.stringify(value)),
+            invalidatePreview(){}, showBindingFailure(){},
+            NamespaceBindingWindows:{show(){}}});
+        vm.runInContext(designCode.slice(designCode.indexOf('    function accept(data)'),
+            designCode.indexOf('    async function load()'))+
+            designCode.slice(designCode.indexOf('    function acceptSavedResult('),
+                designCode.indexOf('    async function save(')),h.scope);
+        h.scope.acceptSavedResult({document:state.document,fingerprint:state.fingerprint,
+            bindingReport:{status}},true);
+    }
+    for(const action of ['step','run','reset']) {
+        const h=harness();
+        await h.api.prepare(true);
+        const old=h.instances[0], fingerprint=h.scope.NamespaceDesignV1.state.fingerprint;
+        bindResult(h);
+        assert.equal(h.scope.NamespaceDesignV1.state.fingerprint,fingerprint);
+        // Direct low-level controls cannot resurrect the old frozen image.
+        h.api.reset();
+        assert.equal(h.instances.length,1);
+        assert.equal(await h.api.command(action),true);
+        assert.equal(h.calls.filter(url=>url.endsWith('/prepare')).length,2,action);
+        assert.equal(h.calls.filter(url=>url.endsWith('/approve')).length,2,action);
+        assert.equal(h.calls.filter(url=>url.endsWith('/activate')).length,2,action);
+        assert.equal(old.dr[1],0,'pre-bind machine must never execute');
+        assert(h.instances.length>=2);
+        h.api.stop();
+    }
+    for(const stage of ['prepare','approve','activate']) {
+        const h=harness(), originalFetch=h.scope.fetch;
+        let release;
+        h.scope.fetch=async (...args)=>{
+            const response=await originalFetch(...args);
+            if(args[0].endsWith('/'+stage))
+                await new Promise(resolve=>{release=resolve;});
+            return response;
+        };
+        const obsolete=h.api.command('step');
+        while(!release) await new Promise(resolve=>setImmediate(resolve));
+        bindResult(h);
+        h.scope.fetch=originalFetch;
+        assert.equal(await h.api.command('step'),true);
+        const latest=h.instances[0];
+        release();
+        assert.equal(await obsolete,false);
+        assert.equal(h.instances.length,1,'late response must not replace new machine');
+        assert.equal(latest.dr[1],1);
+        assert.equal(await h.api.command('step'),true,'late failure must not stop new ownership');
+        assert.equal(latest.dr[1],2);
+        assert.equal(h.calls.length,({prepare:4,approve:5,activate:6})[stage]);
+    }
+    for(const status of ['complete','partial','blocked']) {
+        const h=harness();
+        await h.api.prepare(true);
+        bindResult(h,status);
+        h.scope.fetch=async()=>({ok:false,json:async()=>({error:'Review rejected'})});
+        for(const action of ['step','run','reset']) assert.equal(await h.api.command(action),false);
+        assert.equal(h.instances.length,1,'rejected preparation cannot reuse old bytes');
+        assert.equal(h.instances[0].dr[1],0);
+    }
+    const bindingPending=harness();
+    await bindingPending.api.prepare(true);
+    Object.assign(bindingPending.scope.NamespaceDesignV1.state,{saving:true,bindingNow:true});
+    assert.equal(await bindingPending.api.command('step'),false);
+    assert.equal(bindingPending.instances[0].dr[1],0);
+    assert.equal(bindingPending.calls.length,3,'execution does not bind or prepare during Bind');
+    const failedBind=harness();
+    await failedBind.api.prepare(true);
+    bindResult(failedBind); // install the actual acceptance helpers
+    await failedBind.api.prepare(true);
+    let releaseBind;
+    Object.assign(failedBind.scope,{
+        render(){},paintBindingProgress:async()=>{},
+        NamespaceBindingWindows:{progress(){}},
+        NamespaceIdeNode:{savePending:async()=>true},
+        request:async()=>new Promise((resolve,reject)=>{
+            releaseBind=()=>reject(Error('Binding request rejected'));
+        })
+    });
+    vm.runInContext(designCode.slice(designCode.indexOf('    async function save('),
+        designCode.indexOf('    function capacity(')),failedBind.scope);
+    const saving=failedBind.scope.save(true);
+    while(!releaseBind) await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(await failedBind.api.command('reset'),false);
+    releaseBind();
+    await saving;
+    assert.equal(failedBind.scope.state.saving,false);
+    const beforeRetry=failedBind.calls.length;
+    assert.equal(await failedBind.api.command('step'),true);
+    assert.equal(failedBind.calls.length,beforeRetry+3,'failed Bind also revokes old admission');
+    assert(failedBind.instances.slice(0,-1).every(machine=>machine.dr[1]===0));
+
     // Run/Step must join a save-triggered preparation, not cancel it with a
     // busy error. Only the latest execution intent runs after admission.
     const joined = harness();

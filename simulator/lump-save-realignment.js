@@ -3,7 +3,7 @@
 (function(root) {
     const storageKey = 'savedLumpRealignment';
     const dismissalKey = 'savedLumpRealignmentDismissedNotice';
-    const readyMessage = 'Saved revision ready. Use Run or Step in Namespace.';
+    const readyMessage = 'LUMP saved and exact bytes admitted for private simulation. Admission does not certify complete C-list binding. Use Bind Namespace Design explicitly when binding is needed, then prepare fresh simulation. Run and Step do not bind references.';
     const unassignedMessage = 'LUMP saved successfully. Not prepared for simulation: no destination Namespace slot selected. Select a destination in Namespace before preparing for simulation.';
     let retryInput = null;
     let dismissedNotice = null;
