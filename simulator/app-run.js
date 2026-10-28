@@ -13756,7 +13756,10 @@ function _confirmSavePlanInDialog(plan) {
         const consequence = typeof _formatLumpSavePlan === 'function'
             ? _formatLumpSavePlan(plan)
             : String((plan && plan.message) || 'Review the prepared save plan.');
+        const spc = window.SaveProgressConsole;
+        const spcToken = spc && spc.current();
         const restore = function() {
+            if (spcToken) spc.allow(spcToken, []);
             button.onclick = beginSaveToNamespace;
             cancelButton.onclick = closeSaveDialog;
             button.textContent = 'Save LUMP';
@@ -13768,13 +13771,22 @@ function _confirmSavePlanInDialog(plan) {
         cancelButton.textContent = 'Cancel';
         button.onclick = function() {
             restore();
+            if (spcToken) spc.stage(spcToken, 'Approved; continuing save', 'the repository');
             resolve(true);
         };
         cancelButton.onclick = function() {
             restore();
+            if (spcToken) {
+                spc.stage(spcToken, 'Approval cancelled; nothing was committed');
+                window._saveNSApprovalCancelled = true;
+            }
             closeSaveDialog();
             resolve(false);
         };
+        if (spcToken) {
+            spc.allow(spcToken, [button, cancelButton]);
+            spc.stage(spcToken, 'Waiting for approval of the prepared save plan', 'your approval');
+        }
         button.focus();
     });
 }
@@ -13921,12 +13933,19 @@ async function beginSaveToNamespace() {
         _setSaveNSFeedback('error', 'Open Save LUMP to review a frozen candidate before publishing.');
         return;
     }
-    if (_saveNSRequestInFlight) return;
+    if (_saveNSRequestInFlight) return { ok: false, busy: true };
+    const spc = window.SaveProgressConsole;
+    const spcToken = spc ? spc.begin('commit', 'Save LUMP: commit') : null;
+    // Another owner holds the save console: refuse without mutating state.
+    if (spc && !spcToken) return { ok: false, busy: true };
     _saveNSRequestInFlight = true;
+    window._saveNSApprovalCancelled = false;
+    let spcOutcome = null;
     if (window._saveNSLeaseStop) window._saveNSLeaseStop();
     window._saveNSLeaseStop = null;
     _setSaveNSFeedback('loading',
         'Preparing… Your private draft remains unchanged while the update is prepared.');
+    if (spcToken) spc.stage(spcToken, 'Save requested; preparing the update', 'preparation');
     const progressTimer = setTimeout(() => {
         const status = document.getElementById('saveNSStatus');
         if (_saveNSRequestInFlight && status && status.dataset.feedbackKind === 'loading') {
@@ -13935,14 +13954,17 @@ async function beginSaveToNamespace() {
         }
     }, 120);
     try {
+        if (spc) await spc.yieldPaint();
         await confirmSaveToNamespace();
     } catch (err) {
         if (err && err.kind === 'lease-wait' && err.response) {
+            spcOutcome = 'error';
             _saveNSLeasePanel(err.response);
             _setSaveNSFeedback('error', 'Another update is active. Your draft is safe while you wait.');
             return;
         }
         console.error('[SaveNS] unexpected save failure:', err);
+        spcOutcome = 'unknown';
         _setSaveNSFeedback('incident',
             'The IDE could not complete its save process, and the commit outcome is unknown. Your source and settings remain preserved. Reload the IDE to check the saved operation before retrying.');
         const status = document.getElementById('saveNSStatus');
@@ -13951,6 +13973,31 @@ async function beginSaveToNamespace() {
             status.dataset.incident = 'true';
         }
     } finally {
+        if (spcToken) {
+            try {
+                const st = document.getElementById('saveNSStatus');
+                const dlg = document.getElementById('saveNSDialog');
+                const kind = st && st.dataset ? st.dataset.feedbackKind : '';
+                if (!spcOutcome) {
+                    if (st && st.dataset && st.dataset.incident === 'true' || kind === 'incident') spcOutcome = 'unknown';
+                    else if (window._saveNSApprovalCancelled) spcOutcome = 'cancelled';
+                    else if (kind === 'error') spcOutcome = 'error';
+                    else if (spc.committed()) spcOutcome = 'success';
+                    else spcOutcome = 'ended';
+                }
+                const text = {
+                    success: 'Repository confirmed the commit.',
+                    cancelled: 'Cancelled before commit. No LUMP was saved.',
+                    error: 'Save did not complete. See the Save dialog for details and recovery.',
+                    unknown: 'Commit outcome is UNKNOWN. Do not assume it was saved; use the incident/recovery guidance in the Save dialog.',
+                    ended: (dlg && dlg.style.display !== 'none')
+                        ? 'Save process stopped without a confirmed commit. See the Save dialog.'
+                        : 'Save process ended without a repository commit confirmation in this console; check the saved LUMP list.',
+                }[spcOutcome];
+                spc.end(spcToken, spcOutcome, text);
+            } catch (_) { try { spc.end(spcToken, 'unknown'); } catch (__) {} }
+            window._saveNSApprovalCancelled = false;
+        }
         if (window._saveNSLeaseHeartbeatStop) {
             window._saveNSLeaseHeartbeatStop();
             window._saveNSLeaseHeartbeatStop = null;

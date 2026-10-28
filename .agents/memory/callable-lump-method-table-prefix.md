@@ -10,6 +10,17 @@ the table. Historical BRANCH-entry formats and bare-offset formats exist;
 inspect the current producer and consumer rather than assuming which encoding
 is active.
 
+Do not confuse source method ordinal zero (`CALL CR1, #0`) with encoded
+dispatch selector zero. The former selects the first declared method and
+encodes selector one; the latter is obsolete direct entry.
+
+**Why:** Rejecting the source ordinal would break valid callers rather than
+enforcing mandatory dispatch. Historical inspection does not authorize new
+direct-entry compilation or automatic rebinding.
+
+**How to apply:** Validate the emitted selector, require a method operand,
+and use the canonical offset-table builder for new positive execution tests.
+
 **Why:** The user explicitly corrected work on Mint: “The LUMP starts with a
 method rounting table ALWAYS, the CALL instruction expects it. Start there!”
 Undefined TODO targets had distracted from this already-solved structural

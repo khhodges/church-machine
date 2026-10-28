@@ -134,7 +134,7 @@
 //   Numeric selectors use 1-based encoding (selector+1 stored in imm15):
 //     CALL SlideRule, 0              → imm=1  (method 0, table slot 1)
 //     CALL CR11, 0                   → imm=1  (method 0, table slot 1)
-//     CALL CR11 (no selector)        → imm=0  (fast-path, NIA = lump word 1)
+//     CALL CR11 (no selector)        → compile error; dispatch is mandatory
 //   Supported range: 0–16383 (imm15 slots 1–16384).
 //   If the method name is not found a clear error lists the known methods.
 //
@@ -572,7 +572,7 @@ class ChurchAssembler {
                     !(entry && entry.visibility === 'private')) {
                 // CALL through the declared CR6 C-list row, with a real
                 // one-based method selector. Never default to direct entry.
-                return ((2 << 27) | ((cond & 15) << 23) | (6 << 15) |
+                return ((2 << 27) | ((cond & 15) << 23) | (8 << 15) |
                     ((index + 1) << 5) | row) >>> 0;
             }
         }
@@ -1839,6 +1839,8 @@ class ChurchAssembler {
                 role0 = { register: 0, magnitude: Math.abs(imm), subtract: imm < 0 };
             }
         } else if (op === 2) {
+            if (!args[1])
+                throw new Error('CALL requires an explicit method: use #0 for the first declared method. Direct-entry selector zero is obsolete.');
             const bracket = /^CR6\s*\[\s*(.*?)\s*\]$/i.exec(args[0] || '');
             if (bracket) {
                 b = 6;
@@ -1860,6 +1862,8 @@ class ChurchAssembler {
                     if (ordinal < 0) throw new Error('Negative IDX1 method ordinal');
                     role1 = codec.parseExpression(String(ordinal + 1));
                 }
+                if (role1 && role1.register === 0 && (role1.subtract || role1.magnitude === 0))
+                    throw new Error('CALL requires a positive dispatch-table selector; selector(0) is obsolete. Use #0 for the first declared method.');
                 if (role1 && role1.register === 0 && !role1.subtract &&
                         role1.magnitude <= (bracket ? 127 : 32767)) {
                     imm |= role1.magnitude << (bracket ? 5 : 0);
@@ -1985,6 +1989,14 @@ class ChurchAssembler {
         }
 
         if (opcode === 2) {
+            // Tokenization splits CR6[PetName] into two parts. Count that
+            // canonical indexed target as one operand, not a legacy CALL.
+            const indexedOperands = /^CALL\s+CR6\s*\[\s*[A-Za-z_][\w.]*\s*\]\s*(?:,\s*(?:[A-Za-z_][\w]*|#?(?:0x[0-9a-f]+|0b[01]+|\d+)))?\s*$/i.test(line);
+            if (parts.length > 3 && !indexedOperands) {
+                this.errors.push({line: lineNum, message:
+                    'CALL requires one target and one method. Replace obsolete three-operand CALL syntax with CALL CRn, #0 or CALL CR6[PetName], Method.'});
+                return null;
+            }
             const symbolic = this._symbolicCallSite(parts, lineNum, addr, cond);
             if (symbolic !== null) return symbolic;
         }
@@ -2983,6 +2995,12 @@ class ChurchAssembler {
             }
         }
 
+        if ((opcode === 2 || opcode === 8) &&
+                ((opcode === 2 ? (crSrc & 8) !== 0 : crSrc === 6) ? ((imm >>> 5) & 0x7F) === 0 : imm === 0)) {
+            this.errors.push({ line: lineNum,
+                message: 'CALL requires an explicit declared method or zero-based method index (for example CALL CR1, #0). Direct-entry selector zero is obsolete; no CALL instruction was generated.' });
+            return null;
+        }
         return (
             ((opcode & 0x1F) << 27) |
             ((cond & 0xF) << 23) |
@@ -3521,7 +3539,7 @@ class ChurchAssembler {
             }
             // CALL CRd[, MethodName]  — invoke capability via method-table dispatch
             case 2: {
-                if (crSrc === 6) {
+                if ((crSrc & 8) !== 0) {
                     const row = imm & 0x1F;
                     const method = (imm >>> 5) & 0x7F;
                     const ref = cdNamed(row);

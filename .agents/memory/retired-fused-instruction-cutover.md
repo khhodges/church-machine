@@ -13,6 +13,17 @@ The user explicitly approved enforcing retirement even when saved post-flash
 test artifacts still use ELOADCALL. Leave those artifacts intact and inspectable;
 do not translate or replace them automatically.
 
+Enforce retirement at raw executable admission and at independently callable
+hardware units, not just mnemonic parsing and the top-level decoder.
+
+**Why:** Raw-ISA method bodies bypass mnemonic rejection, and a directly
+started execution unit can bypass decoder rejection. Either boundary alone
+can leave an obsolete direct-entry implementation reachable.
+
+**How to apply:** Reject new raw retired opcodes before signing/save, and
+require unit-level refusal before architectural side effects. Preserve
+historical inspection; never repair old bytes through silent translation.
+
 **Why:** Keeping an older test executable is not an exception to the hard cutover.
 Programmer source correction and rebuilding remain explicit actions.
 

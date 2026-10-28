@@ -295,6 +295,11 @@ class CLOOMCCompiler {
     }
 
     encode(opcode, cond, dst, src, imm) {
+        if (opcode === this.opcodes.CALL &&
+                (!Number.isInteger(imm) || imm < 0 || imm > 0x7FFF ||
+                 ((src & 8) !== 0 ? ((imm >>> 5) & 0x7F) === 0 : imm === 0))) {
+            throw new Error('CALL requires a nonzero dispatch-table selector. Replace the direct-entry call with CALL CRn, #0 for the first declared method, or a named method resolved from the destination API.');
+        }
         if (opcode === 23) {
             if (!Number.isInteger(imm) || Math.abs(imm) > 0x3FFFF)
                 throw new Error('BRANCH displacement must be -262143..262143 words');
@@ -364,6 +369,10 @@ class CLOOMCCompiler {
                 this._reserveCompilerSelfRow = true;
                 result = this.compileJS(cleanSource, capabilities, compileOptions);
             }
+        } catch (error) {
+            if (!/CALL requires a nonzero dispatch-table selector/.test(error.message)) throw error;
+            result = { methods: [], capabilities: [], errors: [{ line: null, message: error.message }],
+                source_parse_failed: true, language: 'auto' };
         } finally {
             this._reserveCompilerSelfRow = previousReserveSelfRow;
             this.methodConventions = previousMethodConventions;
@@ -1865,7 +1874,19 @@ class CLOOMCCompiler {
                     if (t === '}') { i++; break; }
                     if (t && !t.startsWith('//')) {
                         for (const tok of t.split(/\s+/)) {
-                            if (/^0x[0-9a-fA-F]{1,8}$/.test(tok)) rawWords.push(parseInt(tok, 16) >>> 0);
+                            if (/^0x[0-9a-fA-F]{1,8}$/.test(tok)) {
+                                const word = parseInt(tok, 16) >>> 0;
+                                const opcode = word >>> 27;
+                                const selector = word & (1 << 18)
+                                    ? (word >>> 5) & 127 : word & 0x7FFF;
+                                if (opcode === 8 || opcode === 9) {
+                                    errors.push({line: i + 1, message:
+                                        'RAW ISA contains retired ELOADCALL/XLOADLAMBDA. Replace it with supported instructions and an explicit declared method before compiling.'});
+                                } else if (opcode === 2 && selector === 0) {
+                                    errors.push({line: i + 1, message:
+                                        'RAW ISA CALL requires a nonzero dispatch-table selector. Correct the method operand before compiling.'});
+                                } else rawWords.push(word);
+                            }
                             else errors.push({line: i + 1, message: `Invalid RAW ISA word: ${tok}.`});
                         }
                     }

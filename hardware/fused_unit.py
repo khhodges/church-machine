@@ -18,7 +18,7 @@ class ChurchELoadCall(Elaboratable):
         self.cr_dst = Signal(4)
         self.index = Signal(16)
         self.mask = Signal(16)
-        self.call_imm = Signal(15)    # method-table slot (1-based; 0 = fast-path)
+        self.call_imm = Signal(15)    # retained port; all ELOADCALL requests fault
         self.busy = Signal()
         self.complete = Signal()
         self.fault = Signal()
@@ -309,7 +309,14 @@ class ChurchELoadCall(Elaboratable):
                         call_imm_latched.eq(self.call_imm),
                         index_latched.eq(self.index),
                     ]
-                    m.next = "CHECK_SRC"
+                    # ELOADCALL is retired. Defense in depth: the decoder
+                    # rejects opcode 8, and direct unit requests must also
+                    # fault before any mLoad, frame write, or control transfer.
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.INVALID_OP),
+                    ]
+                    m.next = "FAULT"
 
             with m.State("CHECK_SRC"):
                 with m.If(~src_in_range):

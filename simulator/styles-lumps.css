@@ -7231,3 +7231,32 @@ td.lump-hex-reg-other { text-decoration: underline dotted; }
 .lump-hex-reg-key { display: inline-flex; align-items: center; gap: 4px; color: rgb(var(--reg)); }
 .lump-hex-reg-swatch { width: 10px; height: 10px; border-radius: 2px; background: rgba(var(--reg), 0.35); border: 1px solid rgb(var(--reg)); }
 td.lump-hex-reg.lump-hex-diff-changed { background: rgba(245, 158, 11, 0.14); box-shadow: inset 3px 0 0 rgb(var(--reg)), inset 0 -2px 0 rgba(var(--reg), 0.55); }
+
+/* Save LUMP progress console (save-progress-console.js) */
+.spc-panel { position:fixed; right:16px; bottom:16px; z-index:100000; width:min(420px,calc(100vw - 32px)); max-height:45vh; display:flex; flex-direction:column; background:#0d0d18; border:1px solid #2a2a4a; border-left:3px solid #daa520; border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,.5); color:#c8c8e0; font-size:.78rem; }
+.spc-panel[hidden] { display:none; }
+.spc-head { display:flex; align-items:center; gap:.6rem; padding:.5rem .75rem; background:#151526; border-bottom:1px solid #2a2a4a; }
+.spc-title { color:#daa520; font-family:Georgia,serif; font-weight:700; flex:1; }
+.spc-state { color:#a5b4fc; font-size:.72rem; }
+.spc-close { background:#1a1a2e; color:#c8c8e0; border:1px solid #3a3a5a; border-radius:4px; padding:1px 8px; cursor:pointer; font-size:.72rem; }
+.spc-wait { padding:.4rem .75rem; color:#fde68a; font-family:'Courier New',monospace; font-size:.72rem; border-bottom:1px solid #1c1f35; }
+.spc-log { list-style:none; margin:0; padding:.35rem .75rem .5rem; overflow-y:auto; font-family:'Courier New',monospace; font-size:.72rem; }
+.spc-entry { display:flex; gap:.6rem; padding:2px 0; }
+.spc-at { color:#55557a; min-width:4.2em; text-align:right; }
+.spc-ok .spc-msg { color:#86efac; } .spc-error .spc-msg { color:#fca5a5; } .spc-unknown .spc-msg { color:#fbbf24; font-weight:700; }
+.spc-panel[data-state="pending"] .spc-state::before { content:""; display:inline-block; width:6px; height:6px; margin-right:5px; border-radius:50%; background:#daa520; animation:app-pulse 1.4s ease-in-out infinite; }
+.spc-panel[data-state="approval"] { border-left-color:#7ec8e3; }
+.spc-panel[data-state="error"] { border-left-color:#f87171; } .spc-panel[data-state="unknown"] { border-left-color:#fbbf24; } .spc-panel[data-state="success"] { border-left-color:#3fb950; }
+html.spc-locked body { cursor:progress; }
+html.spc-locked #saveNSDialog button, html.spc-locked #lumpSaveStaleConflictDialog button, html.spc-locked .spc-panel { cursor:auto; }
+
+/* Placement: never cover review/conflict controls (see place()). */
+.spc-panel[data-dock="top"], .spc-panel[data-dock="top-mini"] { top:8px; bottom:auto; left:50%; right:auto; transform:translateX(-50%); width:min(560px,calc(100vw - 16px)); max-height:min(150px,22vh); }
+.spc-panel[data-dock="top"] .spc-log { max-height:72px; }
+.spc-panel[data-dock$="-mini"] .spc-log { display:none; }
+.spc-panel[data-dock$="-mini"] .spc-head { padding:.25rem .6rem; }
+.spc-panel[data-dock="bottom-mini"] { max-height:64px; }
+@media (max-width:600px), (max-height:520px) {
+  .spc-panel { right:8px; bottom:8px; width:calc(100vw - 16px); max-height:30vh; }
+  .spc-panel[data-dock="top"] .spc-log { max-height:44px; }
+}

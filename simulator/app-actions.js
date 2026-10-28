@@ -262,6 +262,12 @@
     }
     async function save(options) {
         if (activeOperation) return reportSaveFailure(operationBusy('save'));
+        const spc = window.SaveProgressConsole;
+        const spcToken = spc ? spc.begin('review', 'Save LUMP: build and review') : null;
+        // Another save session owns the console/lock: refuse before touching
+        // shared state so the pending owner is not disturbed.
+        if (spc && !spcToken) return { ok: false, action: 'save', busy: true,
+            error: 'Cannot save: another Save LUMP operation is in progress.' };
         activeOperation = 'save';
         const saveButtons = ['btnHamSaveLump', 'btnToolbarSaveLump', 'btnSaveNS']
             .map(id => document.getElementById(id)).filter(Boolean);
@@ -274,6 +280,8 @@
             });
         };
         setProgress('Building for save…');
+        if (spcToken) spc.stage(spcToken, 'Building a frozen candidate from the editor', 'the compiler');
+        let spcOutcome = 'error';
         try {
         // Let the browser paint feedback before synchronous assembly starts.
         if (typeof requestAnimationFrame === 'function') {
@@ -296,6 +304,7 @@
             return reportSaveFailure({ ok: false, error: 'The Format LUMP dialog is unavailable.' });
         }
         setProgress('Preparing review…');
+        if (spcToken) spc.stage(spcToken, 'Build finished; preparing the review dialog', 'the review');
         const review = await showFormatLump();
         if (review && review.ok === false) return reportSaveFailure(review);
         const dialog = document.getElementById('saveNSDialog');
@@ -303,6 +312,7 @@
             return reportSaveFailure({ ok: false,
                 error: 'The review dialog did not open. Build the current source and try again.' });
         }
+        spcOutcome = 'handoff';
         return { ok: true, action: 'save', candidate: built.token };
         } catch (error) {
             console.error('Save LUMP review failed:', error);
@@ -310,6 +320,9 @@
                 (error && error.name ? error.name + ': ' : '') +
                 (error && error.message ? error.message : 'An internal error interrupted review preparation.') });
         } finally {
+            if (spcToken) spc.end(spcToken, spcOutcome, spcOutcome === 'handoff'
+                ? 'Review opened. Nothing has been saved yet.'
+                : 'Review did not open. No LUMP was saved.');
             activeOperation = null;
             saveButtons.forEach(button => {
                 button.textContent = button.dataset.saveIdleLabel;

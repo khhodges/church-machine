@@ -180,6 +180,28 @@ if (isMainThread) {
         return;
     }
 
+    // All language entry points must obey mandatory dispatch before signing or
+    // packaging a new candidate. This is not a validator for historical bytes.
+    if (!executionLayout) {
+        for (const method of compileResult.methods || []) {
+            for (const word of method.code || []) {
+                if ([8, 9].includes(word >>> 27)) {
+                    compileResult.errors = [...(compileResult.errors || []), {
+                        line: null, message: `Method ${method.name} contains retired ELOADCALL/XLOADLAMBDA. Replace it with supported instructions before compiling or saving.`,
+                    }];
+                    continue;
+                }
+                if ((word >>> 27) !== 2) continue;
+                const imm = word & 0x7FFF;
+                const selector = (word & (1 << 18)) !== 0 ? (imm >>> 5) & 127 : imm;
+                if (selector !== 0) continue;
+                compileResult.errors = [...(compileResult.errors || []), {
+                    line: null, message: `CALL in method ${method.name} has obsolete direct-entry selector zero. Specify a declared method or #0 for the first method and recompile.`,
+                }];
+            }
+        }
+    }
+
     // Portable dependency locks are caller-supplied canonical metadata, not
     // destination Namespace hints. Validate them in the compiler process and
     // preserve them byte-for-byte for save/install. The compiler never resolves
