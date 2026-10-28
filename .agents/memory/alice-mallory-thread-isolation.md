@@ -9,6 +9,16 @@ The user specifies Boot.Thread unchanged, Alice in Thread.2 incrementing her
 retained protected value each turn, and Mallory in Thread.3 repeatedly attacking
 while the other Threads continue without loss.
 
+Include Alice's actual stored value in the WukongCallHome output string.
+
+**Why:** The user explicitly requested this diagnostic disclosure to make
+continued progress visible across Mallory faults.
+
+**How to apply:** Report the value read back from Alice's protected object via
+authorized program execution, not a host-generated counter. Preserve the
+call-home protocol and do not grant Mallory the object's capability. This
+demonstrates access-control enforcement, not secrecy from the UART observer.
+
 **Why:** The user refined the running CapabilityTest/SelfTest/WCH demonstration
 to show continued useful work during repeated attack denials, rather than only
 a single denial.
