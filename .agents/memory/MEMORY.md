@@ -1,4 +1,5 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
+- [Runtime fault change approval](runtime-fault-change-approval.md) — recurring NS21 CALL investigation requires explicit user approval before any fix or live-state change.
 - [Mint DESTROY scope](mint-destroy-scope.md) — releases the Namespace slot and object memory; does not collect or erase GT copies.
 - [NULL capability loading](null-capability-loading.md) — loading NULL must discard destination authority; distinguish NULL as loaded data from NULL used to authorize access.
 - [Thread home restoration](thread-home-restoration-authority.md) — zeroed caches do not neutralize unresolved authority; unadmitted Outforms must fault rather than acquire address-zero access.
