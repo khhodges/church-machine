@@ -24,6 +24,7 @@ class ChurchChange(Elaboratable):
         self.change_start = Signal()
         # Explicit decoded programmatic operation; not a scheduler request.
         self.ordinary = Signal()
+        self.cr6_m = Signal()
         self.namespace_handoff = Signal()
         self.incoming_namespace = Signal(CAP_REG_LAYOUT)
         self.cr_src = Signal(4)

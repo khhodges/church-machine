@@ -41,7 +41,7 @@ def fixture(root=False):
         mem[base] = 0xF900020C | (32 << 10)
         mem[base + 68] = 0x10F1
         mem[base + 242 * 4] = 0x4A000003
-        mem[base + 243 * 4] = 0x10F3 | (((code + 4) // 4) << 13)
+        mem[base + 243 * 4] = 0x10F3  # code-relative NIA zero
         mem[base + 244 * 4] = 0x4A000003
         mem[code] = 0xF8000002 | (48 << 10)
         mem[code + 62 * 4] = 0x4A000003
@@ -52,7 +52,8 @@ def fixture(root=False):
     return mem
 
 
-def run(switch=True, mutate=None, root=False, self_target=False, poison=True):
+def run(switch=True, mutate=None, root=False, self_target=False, poison=True,
+        indexed=False, lookup_row=0, source_m=False):
     change, sw = ChurchChange(), ChurchSwitch()
     m = Module()
     m.submodules.change, m.submodules.switch = change, sw
@@ -77,6 +78,9 @@ def run(switch=True, mutate=None, root=False, self_target=False, poison=True):
     crs[12] = cap(0x02000002, 0x1000, 255)
     crs[13] = 0x12345678  # canary: reserved means no writes, not clearing
     crs[15] = cap(0x02000001, 0, 63)
+    if indexed:
+        crs[6] = cap(0x4A000003 if source_m else 0x1A000003, 0x20D0, 9)
+        mem[0x20D0 + lookup_row * 4] = crs[1]
     if self_target:
         mem[0x1000 + 68] = 0x10F3
     if mutate:
@@ -89,12 +93,16 @@ def run(switch=True, mutate=None, root=False, self_target=False, poison=True):
         ctx.set(change.mem_wr_done, 1)
         ctx.set(change.active_thread_owned, 1)
         ctx.set(change.active_thread_base, 0x1000)
+        ctx.set(change.code_base, 0x2004)
         ctx.set(sw.cr_src, 7)
         ctx.set(sw.target_m, 1)
         ctx.set(sw.nia_current, 0x2004)
         if not switch:
             ctx.set(change.ordinary, 1)
-            ctx.set(change.cr_src, 1)
+            ctx.set(change.cr_src, 6 if indexed else 1)
+            ctx.set(change.cr_dst, 12 if indexed else 0)
+            ctx.set(change.index, lookup_row if indexed else 0)
+            ctx.set(change.cr6_m, source_m)
             ctx.set(change.nia_current, 0x2004)
         for cycle in range(2000):
             ctx.set(sw.switch_start, switch and cycle == 0)
@@ -143,6 +151,8 @@ def run(switch=True, mutate=None, root=False, self_target=False, poison=True):
                 ctx.set(sw.nia_current, 0xDEAD)
                 if not switch:
                     crs[1] = 0xFFFFFFFF
+                    if indexed:
+                        ctx.set(change.cr6_m, 0)
                     ctx.set(change.cr_src, 13)
                     ctx.set(change.cr_dst, 13)
                     ctx.set(change.index, 99)
@@ -168,7 +178,7 @@ def test_combined_handoff_destination_table_and_save_before_root_commit():
     assert 0x4020 in r["reads"] and 0x4030 in r["reads"]
     midpoint = r["writes"].index(("cr", 15))
     assert all(kind == "mem" for kind, _ in r["writes"][:midpoint])
-    assert r["mem"][0x1000 + 243 * 4] >> 13 & 0x7FFF == 0x802
+    assert r["mem"][0x1000 + 243 * 4] >> 13 & 0x7FFF == 1
 
 
 @pytest.mark.parametrize("mutate", [
@@ -188,13 +198,50 @@ def test_change_self_target_captures_new_continuation():
     r = run(switch=False, self_target=True)
     assert r["fault"] == 0
     assert r["nia"] == [0x2008]
+
+
+@pytest.mark.parametrize("row", [0, 8, 9])
+@pytest.mark.parametrize("source_m", [False, True])
+def test_indexed_change_single_gt_self_target_and_captured_source(row, source_m):
+    r = run(switch=False, self_target=True, indexed=True,
+            lookup_row=row, source_m=source_m)
+    assert r["fault"] == 0
+    assert r["nia"] == [0x2008]
+    assert 0x20D0 + row * 4 in r["reads"]
+    # No scratch CR or incoming context write before the outgoing save.
+    assert r["writes"][0][0] == "mem"
+
+
+@pytest.mark.parametrize("mutate,expected", [
+    (lambda mem, cr: cr.__setitem__(6, cap(0x4A000003, 0x3000, 9)), 4),
+    (lambda mem, cr: cr.__setitem__(6, cap(0x1A000003, 0x3000, 7)), 8),
+    (lambda mem, cr: cr.__setitem__(6, cap(0x1A000003, 0xFFFFFFFC, 9)), 8),
+    (lambda mem, cr: cr.__setitem__(6, cap(0x1A000003, 0x3001, 9)), 8),
+])
+def test_indexed_change_denied_lookup_has_no_effects(mutate, expected):
+    r = run(switch=False, self_target=True, indexed=True,
+            lookup_row=8, mutate=mutate)
+    assert r["fault"] == expected
+    assert not r["reads"]
     assert not any(kind == "cr" and addr == 15 for kind, addr in r["writes"])
+
+
+def test_indexed_change_rejects_revoked_source_before_row_read():
+    def revoke(mem, cr):
+        authority = 63 | (1 << 21)
+        mem[0x34] = authority
+        mem[0x38] = integrity32(0x2000, authority)
+    r = run(switch=False, self_target=True, indexed=True,
+            lookup_row=8, mutate=revoke)
+    assert r["fault"] == 0x1D
+    assert 0x20F0 not in r["reads"]
+    assert not r["writes"]
 
 
 def test_switch_root_preserves_poison_frame():
     r = run(root=True)
     assert r["fault"] == 0
-    assert r["nia"] == [0]
+    assert r["nia"] == [0x6004]  # NIA 0 is relative to the entry code body
     assert r["mem"][0x5000 + 68] == 0x10F1
 
 
@@ -217,7 +264,7 @@ def test_ordinary_change_rejects_permissions_and_poison_continuation():
     assert run(switch=False, mutate=poison)["fault"] == 0x1D
 
 
-@pytest.mark.parametrize("word", [0x20068000, 0x28068000, 0x287FFFFF])
+@pytest.mark.parametrize("word", [0x20068000, 0x28068000, 0x287FFFFF, 0x20637FFF])
 def test_false_predicate_skips_reserved_operands_and_m_checks(word):
     from hardware.core import ChurchCore
     from hardware.sim_boot_helpers import boot_core
@@ -270,7 +317,8 @@ def test_core_rejects_without_any_transition_write(word, fault):
     sim.run()
 
 
-def test_core_switch_retires_once_then_executes_destination_instruction():
+@pytest.mark.parametrize("indexed", [False, True])
+def test_core_switch_retires_once_then_executes_destination_instruction(indexed):
     from hardware.core import ChurchCore
     from hardware.sim_boot_helpers import boot_core
     from hardware.test_phase1_independent_execution import execute_data
@@ -318,7 +366,7 @@ def test_core_switch_retires_once_then_executes_destination_instruction():
 
         await issue(0x077B0000)  # LOAD CR15, CR6, row 0
         await issue(0x070B0010)  # LOAD CR1, CR6, row 1
-        await issue(0x27008000)  # CHANGE CR1, ordinary permissionless activation
+        await issue(0x27008000)
         assert ctx.get(dut.active_thread_owned)
         assert ctx.get(dut.imem_addr) == 0x2004
         # Seed every writable DR, then self-target the active Thread. Neither
@@ -326,7 +374,11 @@ def test_core_switch_retires_once_then_executes_destination_instruction():
         for reg in range(1, 16):
             await execute_data(ctx, dut, 0xAF004000 | (reg << 19) | (reg + 100))
         expected_drs = [0] + [reg + 100 for reg in range(1, 16)]
-        await issue(0x27060000)  # CHANGE CR12, self-target
+        if indexed:
+            mem[0x20FC] = 0x02000002  # current executable's bounded row
+        # Exact documented indexed word, through decoder and core wiring.
+        await issue(0x27630001 if indexed else 0x27060000)
+        mem[0x20FC] = 0x02000004
         assert [ctx.get(dr) for dr in dut.debug_dr_words] == expected_drs
         ctx.set(dut.cr15_m_set, 1)
         await ctx.tick()

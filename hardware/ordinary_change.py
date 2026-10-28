@@ -8,7 +8,8 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .layouts import CAP_REG_LAYOUT, GT_LAYOUT, WORD2_LAYOUT
-from .hw_types import FaultType, GT_TYPE_INFORM, GT_TYPE_ABSTRACT
+from .hw_types import FaultType, GT_TYPE_INFORM, GT_TYPE_ABSTRACT, PERM_L
+from .perm_check import perm_bit
 from .ns_gate import ChurchNSGate
 from .mload import ChurchMLoad
 from .thread_design import THREAD_MIN_N_MINUS_6, THREAD_MAX_N_MINUS_6
@@ -21,7 +22,7 @@ class OrdinaryChange(Elaboratable):
         "cr15_namespace", "active_thread_base", "active_thread_owned",
         "mem_rd_data", "mem_rd_valid", "mem_wr_done", "dr_rd_data",
         "flags_in", "nia_current", "code_base",
-        "namespace_handoff", "incoming_namespace",
+        "namespace_handoff", "incoming_namespace", "cr6_m",
     )
     OUTPUTS = (
         "change_busy", "change_complete", "change_fault", "fault_type",
@@ -72,6 +73,16 @@ class OrdinaryChange(Elaboratable):
         drs = Array(Signal(32, name=f"incoming_dr{i}") for i in range(16))
         saved_drs = Array(Signal(32, name=f"outgoing_dr{i}") for i in range(16))
         operand = Signal(4)
+        lookup_source = Signal(CAP_REG_LAYOUT)
+        lookup_row = Signal(15)
+        lookup_m = Signal()
+        lookup_pending = Signal()
+        lookup_view = View(CAP_REG_LAYOUT, lookup_source)
+        lookup_gt = View(GT_LAYOUT, lookup_view.word0_gt)
+        lookup_w2 = View(WORD2_LAYOUT, lookup_view.word2_w2)
+        lookup_address = Signal(33)
+        indexed_form = (self.cr_dst == 12) & (self.cr_src == 6) & ~self.index[15]
+        m.d.comb += lookup_address.eq(lookup_view.word1_location + (lookup_row << 2))
         gt = Signal(32)
         gv = View(GT_LAYOUT, gt)
         tv, ev = View(CAP_REG_LAYOUT, thread), View(CAP_REG_LAYOUT, entry)
@@ -156,6 +167,10 @@ class OrdinaryChange(Elaboratable):
                     m.d.comb += self.cr_rd_addr.eq(self.cr_src)
                     m.d.sync += [
                         operand.eq(self.cr_src),
+                        lookup_source.eq(self.cr_rd_data),
+                        lookup_row.eq(self.index[:15]),
+                        lookup_m.eq(self.cr6_m),
+                        lookup_pending.eq(0),
                         namespace.eq(Mux(self.namespace_handoff,
                                          self.incoming_namespace, self.cr15_namespace)),
                         handoff.eq(self.namespace_handoff), root_entry.eq(0),
@@ -170,12 +185,40 @@ class OrdinaryChange(Elaboratable):
                         phase.eq(0), row.eq(0), armed.eq(0), code.eq(0),
                     ]
                     with m.If(~self.namespace_handoff &
-                              ((self.cr_dst != 0) | (self.index != 0) |
-                               (self.cr_src == 13))):
+                              (~indexed_form & ((self.cr_dst != 0) | (self.index != 0) |
+                               (self.cr_src == 13)))):
                         m.d.sync += code.eq(FaultType.INVALID_OP)
                         m.next = "FAULT"
+                    with m.Elif(~self.namespace_handoff & indexed_form):
+                        m.next = "LOOKUP_CHECK"
                     with m.Else():
                         m.next = "CHECK"
+            with m.State("LOOKUP_CHECK"):
+                # This is a bounded C-list read, never elevated Namespace
+                # authority and never a temporary architectural CR write.
+                with m.If(lookup_gt.gt_type != GT_TYPE_INFORM):
+                    m.d.sync += code.eq(FaultType.NULL_CAP)
+                    m.next = "FAULT"
+                with m.Elif(~perm_bit(lookup_view.word0_gt, PERM_L) & ~lookup_m):
+                    m.d.sync += code.eq(FaultType.PERM_L)
+                    m.next = "FAULT"
+                with m.Elif((lookup_row > lookup_w2.limit_offset) |
+                            lookup_address[32] | (lookup_address[:2] != 0) |
+                            lookup_w2.f_flag | (lookup_gt.slot_id == 0) |
+                            (((lookup_gt.slot_id << 2) + 3) > nw.limit_offset)):
+                    m.d.sync += code.eq(FaultType.BOUNDS)
+                    m.next = "FAULT"
+                with m.Else():
+                    # Validate the source identity too: a cached C-list view
+                    # must not confer authority after its Namespace revocation.
+                    m.d.sync += [gt.eq(lookup_view.word0_gt),
+                                 lookup_pending.eq(1)]
+                    m.next = "GATE"
+            with m.State("LOOKUP_READ"):
+                read(lookup_address[:32])
+                with m.If(armed & self.mem_rd_valid):
+                    m.d.sync += [gt.eq(self.mem_rd_data), armed.eq(0)]
+                    m.next = "CHECK"
             with m.State("CHECK"):
                 with m.If(gv.gt_type != GT_TYPE_INFORM):
                     fail(FaultType.NULL_CAP)
@@ -217,6 +260,14 @@ class OrdinaryChange(Elaboratable):
                 with m.Elif(gate.ns_gate_done):
                     with m.If(invalid_descriptor | rw.f_flag | (resolved_base[:2] != 0)):
                         fail(FaultType.BOUNDS)
+                    with m.Elif(lookup_pending):
+                        with m.If((lookup_address < resolved_base) |
+                                  (lookup_address > resolved_base + (rw.limit_offset << 2))):
+                            m.d.sync += code.eq(FaultType.BOUNDS)
+                            m.next = "FAULT"
+                        with m.Else():
+                            m.d.sync += lookup_pending.eq(0)
+                            m.next = "LOOKUP_READ"
                     with m.Elif(phase == 0):
                         m.d.sync += [
                             thread.eq(resolved), armed.eq(0),

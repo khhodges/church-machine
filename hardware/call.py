@@ -21,6 +21,7 @@ class ChurchCall(Elaboratable):
         self.reset_root = Signal()
         self.cr_src = Signal(4)
         self.indexed_source = Signal()
+        self.cr6_m = Signal()
         self.index = Signal(32)
         self.call_imm = Signal(32)  # checked runtime selector; retain width until bounds checks
         self.mask = Signal(16)   # bits [0:12] → null-GT write mask for CR0–CR11
@@ -135,6 +136,7 @@ class ChurchCall(Elaboratable):
         # after decode, including the short-lived boot/root request.
         cr_src_latched = Signal(4)
         indexed_source_latched = Signal()
+        cr6_m_latched = Signal()
         cr5_heap_latched = Signal(CAP_REG_LAYOUT)
         cr12_thread_latched = Signal(CAP_REG_LAYOUT)
         cr15_namespace_latched = Signal(CAP_REG_LAYOUT)
@@ -462,6 +464,7 @@ class ChurchCall(Elaboratable):
                     m.d.sync += [
                         cr_src_latched.eq(self.cr_src),
                         indexed_source_latched.eq(self.indexed_source),
+                        cr6_m_latched.eq(self.cr6_m & (self.cr_src == 6)),
                         cr5_heap_latched.eq(self.cr5_heap),
                         cr12_thread_latched.eq(self.cr12_thread),
                         cr15_namespace_latched.eq(self.cr15_namespace),
@@ -502,7 +505,7 @@ class ChurchCall(Elaboratable):
                 with m.If(indexed_clist_gt.gt_type == GT_TYPE_NULL):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
                     m.next = "FAULT"
-                with m.Elif(~indexed_clist_has_l):
+                with m.Elif(~indexed_clist_has_l & ~cr6_m_latched):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
                     m.next = "FAULT"
                 with m.Elif(index_latched > indexed_clist_w2.limit_offset[:16]):

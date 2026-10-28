@@ -164,12 +164,14 @@ def test_bitfield_index_and_invalid_no_effects(word, index, expected):
 
 
 @pytest.mark.parametrize("row,expected_fault", [(6, None), (0x10006, 8)])
-def test_call_row_is_latched_and_not_truncated(row, expected_fault):
+@pytest.mark.parametrize("source_m", [False, True, None])
+def test_call_row_is_latched_and_not_truncated(row, expected_fault, source_m):
     dut = ChurchCall()
-    cap = 0x1A000004 | (0x200 << 32) | (7 << 64)
+    cap = (0x1A000004 if source_m is False else 0x4A000004) | (0x200 << 32) | (7 << 64)
 
     async def bench(ctx):
         ctx.set(dut.cr_src, 6)
+        ctx.set(dut.cr6_m, bool(source_m))
         ctx.set(dut.indexed_source, 1)
         ctx.set(dut.index, row)
         ctx.set(dut.call_imm, 3)
@@ -177,6 +179,7 @@ def test_call_row_is_latched_and_not_truncated(row, expected_fault):
         ctx.set(dut.call_start, 1)
         await ctx.tick()
         ctx.set(dut.call_start, 0)
+        ctx.set(dut.cr6_m, 0)
         # Poison every live selector after acceptance. The accepted source
         # remains CR6 and the accepted row must not become 0 or truncated6.
         ctx.set(dut.cr_src, 1)
@@ -194,6 +197,10 @@ def test_call_row_is_latched_and_not_truncated(row, expected_fault):
             assert not ctx.get(dut.cr_wr_en)
             assert not ctx.get(dut.mem_wr_en)
             if ctx.get(dut.call_fault):
+                if source_m is None:
+                    assert ctx.get(dut.fault_type) == 4
+                    assert not reads
+                    return
                 # The valid-row case stops at target admission. Its NULL/E
                 # fault priority is outside this address/capture fixture.
                 if expected_fault is not None:

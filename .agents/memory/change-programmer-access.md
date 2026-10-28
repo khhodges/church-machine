@@ -7,6 +7,16 @@ CHANGE consumes one Thread GT. Distinguish that semantic operand count from
 the syntax used to refer to its location; an indexed reference does not by
 itself mean two GT operands or establish an approved addressing-mode encoding.
 
+On 2026-10-28 the user requested RTL alignment with the ISA and working
+simulator after reporting a run beyond 8K instructions. This authorizes
+implementing the documented indexed CHANGE form in RTL, superseding the
+earlier simulator-only implementation restriction for this work.
+
+**Why:** The user explicitly said “lets fix the RTL to match the ISA and the simulator”.
+**How to apply:** Preserve the documented one-GT encoding and runtime checks.
+This is not authority to rewrite the working saved image, waive validation,
+or program the physical FPGA.
+
 **Why:** The user reiterated “Change requires one GT” after an explanation
 conflated the rejected indexed encoding with the number of GTs consumed.
 

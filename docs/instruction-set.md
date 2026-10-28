@@ -1076,6 +1076,15 @@ This special initialization path does not add operands to programmatic CHANGE.
 
 ### Indexed CHANGE — simulator extension
 
+**RTL implementation update — 2026-10-28:** The programmer subsequently
+requested RTL alignment with the ISA and working simulator. The exact
+indexed form below now has an RTL implementation and focused model tests;
+the original approval date and encoding remain unchanged. This does not
+establish full-image compatibility, synthesis or physical FPGA acceptance.
+See [Factory Build RTL evidence](../reports/factory-build-rtl-alignment.md)
+for the unresolved stored Namespace format conflict. The historical support
+boundary below describes the original simulator-only approval.
+
 **Decision and support boundary — 2026-10-19:** The programmer explicitly
 authorized indexed CHANGE as one simulator instruction. This changes simulator
 semantics for the form defined here. FPGA support for this extension is **not

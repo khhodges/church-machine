@@ -749,7 +749,8 @@ class ChurchCore(Elaboratable):
                 # to lazily install the lump, then promotes to Inform before the CALL.
                 hw_perm_gt_view = View(GT_LAYOUT, perm_gt_sig)
                 with m.If(u_decoder.call_indexed):
-                    m.d.comb += required_perms.eq(PERM_MASK_L)
+                    m.d.comb += required_perms.eq(
+                        Mux(u_regs.m_bit_device_state[CR_CLIST], 0, PERM_MASK_L))
                 with m.Elif((hw_perm_gt_view.gt_type == GT_TYPE_ABSTRACT) |
                           (hw_perm_gt_view.gt_type == GT_TYPE_OUTFORM)):
                     m.d.comb += required_perms.eq(0)
@@ -1552,6 +1553,7 @@ class ChurchCore(Elaboratable):
             u_call.reset_root.eq(guarded_call_ready),
             u_call.cr_src.eq(cr_src),
             u_call.indexed_source.eq(u_decoder.call_indexed),
+            u_call.cr6_m.eq(u_regs.m_bit_device_state[CR_CLIST]),
             u_call.index.eq(Mux(u_decoder.call_indexed, call_row[:32], 0)),
             u_call.call_imm.eq(call_method[:32]),
             u_call.mask.eq(u_decoder.call_mask),
@@ -2062,6 +2064,7 @@ class ChurchCore(Elaboratable):
             ))
             m.d.comb += [
                 u_change.change_start.eq(change_start_sig),
+                u_change.cr6_m.eq(u_regs.m_bit_device_state[CR_CLIST]),
                 u_change.ordinary.eq(u_switch.handoff_start |
                                     (~thread_switch_start_sig & ~boot_microcode_active)),
                 u_change.namespace_handoff.eq(u_switch.handoff_start),
