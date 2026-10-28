@@ -520,9 +520,8 @@ class ChurchAssembler {
     // Returns { slot, key } so callers can retain the canonical spelling used
     // by the source maps.  The old _resolveNSName API below still returns only
     // the numeric value for existing register/immediate callers.
-    // Static dot-name CALL sites become symbolic relocations. The canonical
-    // word is the permanent INVALID_OP placeholder; destination binding alone
-    // may patch it to a real CALL. No API, method table or selector is consulted.
+    // Legacy symbolic placeholder helpers remain for inspecting saved artifacts.
+    // New compilations must reject unresolved CALLs rather than emit these words.
     static get SYMBOLIC_CALL_PLACEHOLDER() { return 0xF7000000; }
     _declaredRowFor(name) {
         for (const map of [this._capBlockSlots, this._localClistSlots]) {
@@ -557,13 +556,12 @@ class ChurchAssembler {
                 message: `CALL ${token} resolves to declared C-list row ${row}; symbolic CALL rows must be 1-31.` });
             return null;
         }
-        if (!this._symbolicCalls) this._symbolicCalls = [];
         const fullName = method === undefined ? token : `${token}.${method}`;
-        this._symbolicCalls.push({ word_offset: addr, full_name: fullName, row,
-            source_line: lineNum, condition: cond & 15 });
-        // Existing WORD opcode with zero operand: INVALID_OP when executed,
-        // skipped by the ordinary condition check when its condition is false.
-        return ChurchAssembler.symbolicCallPlaceholder(cond);
+        this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, token),
+            message: `Cannot encode CALL ${fullName}: destination entry/method selector is unresolved. No CALL instruction was generated. Resolve the destination or specify a validated numeric C-list row and method selector before compiling.` });
+        // Stop operand fallback. The error rejects this compilation, rather
+        // than reporting success with a WORD placeholder.
+        return 0;
     }
     static symbolicCallPlaceholder(cond) {
         return (((0x1E << 27) | ((cond & 15) << 23)) >>> 0);

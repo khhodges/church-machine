@@ -1,23 +1,21 @@
 ---
 name: Compile CALL API authority
-description: Dot-name compilation is independent of destination API availability; the linking loader owns resolution.
+description: Unencodable CALLs are compile errors; never substitute WORD placeholders or guess a selector.
 ---
 
-The compiler needs the declared dot-name to form the LUMP; the linking loader
-does the rest. Preserve unresolved references rather than requiring destination
-APIs or method conventions at compilation. Missing destination evidence is a
-linking concern, not a reason to reject LUMP formation.
+An unresolved CALL that cannot be encoded as a real CALL is a compile error.
+Do not emit a successful candidate containing a WORD placeholder and do not
+present symbolic metadata as an encoded instruction.
 
-**Why:** On 2026-10-16 the user explicitly corrected the agent: “The dot.name is
-all the compiler needs to do to form the LUMP the linking loader does the rest.”
-This supersedes the earlier policy of compile-time destination API warnings
-and method validation. It is an architectural requirement, not a claim that
-the current implementation already satisfies it.
+**Why:** On 2026-10-28 the user explicitly corrected the earlier deferred-binding
+policy: “Then the case must be flaged as a compile error ! That is the correct
+compiler action.” This supersedes the previous allowance for unresolved CALL
+placeholders in newly compiled artifacts.
 
-**How to apply:** Move destination-dependent resolution and validation to the
-linking loader, retaining symbolic evidence in compiler output. Never guess
-a numeric selector or suppress errors while emitting guessed executable bytes.
-Local source syntax and structural validation remain compiler responsibilities.
+**How to apply:** Report the source line and unresolved target, return no
+successful candidate, and never guess selector zero or a method name. Preserve
+existing saved artifacts and their inspection/binding support; this rule does
+not authorize rewriting historical binaries or changing runtime permissions.
 
 Callable code LUMPs require explicit declarations of their own methods; labels
 and comments do not constitute an interface. The compiler generates the dispatch
@@ -41,14 +39,14 @@ output cannot independently establish that the compiler consumed the whole sourc
 **How to apply:** Include negative syntax and partial-parse tests alongside valid
 multi-method save/reload tests; never equate compiler authentication with semantic completeness.
 
-An unresolved binding is a HardFault only when referenced during execution.
+For existing artifacts, an unresolved binding is a HardFault only when referenced during execution.
 Its presence alone must not block loading or starting execution.
 
 **Why:** The user rejected the agent's proposed all-bindings-resolved execution
 gate. Unused unresolved references are valid.
 
-**How to apply:** Keep unresolved references explicit through compile, save,
-binding and load; fault on actual execution-time reference, never guess a
+**How to apply:** Preserve historical unresolved references during binding
+and load; new unencodable CALLs fail compilation under the rule above. Fault on actual execution-time reference, never guess a
 target or silently rebind from Run, Step or Walk.
 
 Missing/nonresident named LUMPs must not impose an all-resident precondition
