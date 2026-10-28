@@ -151,11 +151,13 @@
             show({status:'binding',lists:[],installed:false});
             bar.querySelector('span').textContent='Checking selected artifacts…';
             bar.lastChild.textContent='Waiting for the first C-list…';
+            bar.classList.add('nsbw-bar-progress'); bar.setAttribute('aria-live','polite');
             return;
         }
         if(!event.item) return;
         if(!layer) show({status:'binding',lists:[],installed:false});
         if(!wins.length && bar.lastChild.tagName==='SPAN') bar.lastChild.remove();
+        bar.classList.remove('nsbw-bar-progress');
         var lists=currentReport.lists, index=lists.findIndex(function(l){return l.slot===event.item.slot;});
         if(index<0) index=lists.length;
         lists[index]=event.item;

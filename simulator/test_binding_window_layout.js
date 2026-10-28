@@ -15,3 +15,7 @@ for (const width of [400, 768, 1280]) {
     assert(new Set(wins.map(w=>w.style.top)).size===8,'all headers remain staggered');
 }
 console.log('Binding window cascade fits narrow and wide screens: PASS');
+const css=fs.readFileSync(__dirname+'/namespace-binding-windows.css','utf8');
+assert(/\.nsbw-bar\.nsbw-bar-progress\{[^}]*left:50%;top:50%/.test(css),'progress panel centered');
+assert(source.includes("bar.classList.add('nsbw-bar-progress')")&&source.includes("bar.classList.remove('nsbw-bar-progress')"),'centered only until first window');
+console.log('Binding progress panel centered, reverts once windows arrive: PASS');
