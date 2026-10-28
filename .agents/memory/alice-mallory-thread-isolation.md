@@ -14,12 +14,14 @@ to show continued useful work during repeated attack denials, rather than only
 a single denial.
 
 **How to apply:** Treat repeated attempts as the current proposed demo scope,
-superseding the assistant's one-shot suggestion. HARDFAULT is not an automatic
-retry mechanism: establish the authorized re-entry and containment path before
-claiming this arrangement works. This does not authorize silent OFFLINE/version
-clearing, hardware version changes, or blanket recovery for ordinary faults.
-Resolve any conflict with the older exclusion policy below explicitly before
-implementation; the proposed allocation is not implementation approval.
+superseding the assistant's one-shot suggestion and the older stop-polling
+demonstration below. The user clarifies that Mallory's fault already restarts
+Boot.Thread, work continues, and normal rescheduling brings Thread.3 back to
+work until its next attack. Reuse that existing fault-to-Boot path rather than
+proposing a new scheduler or recovery mechanism. This is user-reported current
+behavior, not independent FPGA acceptance evidence. It does not authorize
+silent OFFLINE/version clearing, hardware version changes, or blanket recovery
+for ordinary faults. The proposed allocation is not implementation approval.
 
 Run Alice and Mallory in different Threads for the protection demonstration.
 The user confirmed priming each Thread's respective actor entry capability
