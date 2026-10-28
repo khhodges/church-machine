@@ -4731,6 +4731,382 @@
         "signature": "bda888f5a5a83bb490965b3275e04cef79af31b79eef15d1f6c8f4911e425efc"
       },
       "identity_hash": "e34d95a87b1d5de3ea01d7c44b37f0801dbe44b7ff791d2a976640f61157e97e"
+    },
+    "96e1ef3d5659107d68290011f883ca7589446064a85a85f15d00fb6d58255d83": {
+      "binary_hash": "96e1ef3d5659107d68290011f883ca7589446064a85a85f15d00fb6d58255d83",
+      "dot_name": "ide.AmoebaStartup",
+      "issue_n": 1,
+      "abstraction": "ide.AmoebaStartup",
+      "filename": "ide.AmoebaStartup.1.e37d50bd.lump",
+      "compiled_at": 1793205874.5421438,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.CapabilityTest",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.ActorManager",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread2",
+            "rights": [],
+            "relocation_row": 3,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.AmoebaStartup",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "96e1ef3d5659107d68290011f883ca7589446064a85a85f15d00fb6d58255d83",
+        "source_hash": "894e2af58aa474f94fe613f236ee6cfe1d1e95d8a157ca0f970171d64381f567",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "45c52cdd52c676ddffebcf1088429f35d34ec0c4ee2d73b1655e73534be5c0cd",
+          "inputs": {
+            "language": "auto",
+            "_resolved_call_api_authorities": {
+              "ide.CapabilityTest": {
+                "source": "embedded-binary",
+                "embedded": true,
+                "token": "a24c23ae",
+                "selectedToken": "a24c23ae",
+                "revision": "8238cf774a67e80356d752ea0ff2e019798ad396e2fd9684d69b84009ce39038",
+                "selectedRevision": "8238cf774a67e80356d752ea0ff2e019798ad396e2fd9684d69b84009ce39038",
+                "api": {
+                  "name": "ide.CapabilityTest",
+                  "capabilities": [
+                    {
+                      "name": "SELF",
+                      "rights": [
+                        "E"
+                      ],
+                      "grants": [
+                        "E"
+                      ]
+                    },
+                    {
+                      "name": "ide.SelfTest",
+                      "canonical_leaf": "ide.SelfTest",
+                      "rights": [
+                        "E"
+                      ],
+                      "grants": [
+                        "E"
+                      ]
+                    },
+                    {
+                      "name": "ide.LED_DEV",
+                      "canonical_leaf": "ide.LED_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "grants": [
+                        "R",
+                        "W"
+                      ]
+                    },
+                    {
+                      "name": "ide.UART_DEV",
+                      "canonical_leaf": "ide.UART_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "grants": [
+                        "R",
+                        "W"
+                      ]
+                    },
+                    {
+                      "name": "ide.BTN_DEV",
+                      "canonical_leaf": "ide.BTN_DEV",
+                      "rights": [
+                        "R"
+                      ],
+                      "grants": [
+                        "R"
+                      ]
+                    },
+                    {
+                      "name": "ide.TIMER_DEV",
+                      "canonical_leaf": "ide.TIMER_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "grants": [
+                        "R",
+                        "W"
+                      ]
+                    },
+                    {
+                      "name": "ide.M_BIT_DEV",
+                      "canonical_leaf": "ide.M_BIT_DEV",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "grants": [
+                        "R",
+                        "W"
+                      ]
+                    },
+                    {
+                      "name": "ide.WukongCallHome",
+                      "canonical_leaf": "ide.WukongCallHome",
+                      "rights": [
+                        "E"
+                      ],
+                      "grants": [
+                        "E"
+                      ]
+                    },
+                    {
+                      "name": "ide.Thread2",
+                      "canonical_leaf": "ide.Thread2",
+                      "rights": [],
+                      "grants": []
+                    },
+                    {
+                      "name": "ide.Thread3",
+                      "canonical_leaf": "ide.Thread3",
+                      "rights": [],
+                      "grants": []
+                    },
+                    {
+                      "name": "ide.BootThread",
+                      "canonical_leaf": "ide.BootThread",
+                      "rights": [],
+                      "grants": []
+                    }
+                  ],
+                  "symbolic_binding": {
+                    "calls": [],
+                    "dependencies": [
+                      {
+                        "name": "SELF",
+                        "rights": [
+                          "E"
+                        ],
+                        "relocation_row": 0,
+                        "symbolic_self": true
+                      },
+                      {
+                        "name": "ide.SelfTest",
+                        "rights": [
+                          "E"
+                        ],
+                        "relocation_row": 1,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.LED_DEV",
+                        "rights": [
+                          "R",
+                          "W"
+                        ],
+                        "relocation_row": 2,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.UART_DEV",
+                        "rights": [
+                          "R",
+                          "W"
+                        ],
+                        "relocation_row": 3,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.BTN_DEV",
+                        "rights": [
+                          "R"
+                        ],
+                        "relocation_row": 4,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.TIMER_DEV",
+                        "rights": [
+                          "R",
+                          "W"
+                        ],
+                        "relocation_row": 5,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.M_BIT_DEV",
+                        "rights": [
+                          "R",
+                          "W"
+                        ],
+                        "relocation_row": 6,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.WukongCallHome",
+                        "rights": [
+                          "E"
+                        ],
+                        "relocation_row": 7,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.Thread2",
+                        "rights": [],
+                        "relocation_row": 8,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.Thread3",
+                        "rights": [],
+                        "relocation_row": 9,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.BootThread",
+                        "rights": [],
+                        "relocation_row": 10,
+                        "symbolic_self": false
+                      }
+                    ],
+                    "owner": "ide.CapabilityTest",
+                    "schema": "church.symbolic-lump-binding/v1"
+                  },
+                  "methods": [
+                    {
+                      "name": "Run",
+                      "index": 0,
+                      "branchOffset": 2,
+                      "inputs": [],
+                      "returns": {
+                        "name": "result",
+                        "register": "DR1"
+                      }
+                    }
+                  ]
+                }
+              },
+              "ide.ActorManager": {
+                "source": "embedded-binary",
+                "embedded": true,
+                "token": "543193a9",
+                "selectedToken": "543193a9",
+                "revision": "77c842aafb8728355e279774931154ce886f90b1825463328431be7271ff7faa",
+                "selectedRevision": "77c842aafb8728355e279774931154ce886f90b1825463328431be7271ff7faa",
+                "api": {
+                  "name": "ide.ActorManager",
+                  "capabilities": [
+                    {
+                      "name": "SELF",
+                      "rights": [
+                        "E"
+                      ],
+                      "grants": [
+                        "E"
+                      ]
+                    },
+                    {
+                      "name": "ide.Thread2",
+                      "canonical_leaf": "ide.Thread2",
+                      "rights": [],
+                      "grants": []
+                    },
+                    {
+                      "name": "ide.Thread3",
+                      "canonical_leaf": "ide.Thread3",
+                      "rights": [],
+                      "grants": []
+                    }
+                  ],
+                  "symbolic_binding": {
+                    "calls": [],
+                    "dependencies": [
+                      {
+                        "name": "SELF",
+                        "rights": [
+                          "E"
+                        ],
+                        "relocation_row": 0,
+                        "symbolic_self": true
+                      },
+                      {
+                        "name": "ide.Thread2",
+                        "rights": [],
+                        "relocation_row": 1,
+                        "symbolic_self": false
+                      },
+                      {
+                        "name": "ide.Thread3",
+                        "rights": [],
+                        "relocation_row": 2,
+                        "symbolic_self": false
+                      }
+                    ],
+                    "owner": "ide.ActorManager",
+                    "schema": "church.symbolic-lump-binding/v1"
+                  },
+                  "methods": [
+                    {
+                      "name": "Run",
+                      "index": 0,
+                      "branchOffset": 2,
+                      "inputs": [],
+                      "returns": {
+                        "name": "result",
+                        "register": "DR1"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "3734db38286d26c69945583b27551aa30761551df77db79c511aeba651d31e78"
+      },
+      "identity_hash": "ba1427c1973e591cf4956427bec9aaa336a9cfc8a7460adacca980be7e5fb543"
     }
   }
 }

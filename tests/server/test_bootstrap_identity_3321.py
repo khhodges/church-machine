@@ -18,18 +18,38 @@ isolate_application()
 _ROOT = Path(__file__).resolve().parents[2]
 
 
-def _tracked_boot_artifact_snapshot():
+def _tracked_boot_artifact_snapshot(root=_ROOT):
     tracked = subprocess.run(
         ["git", "ls-files", "server/boot-config.json", "server/lumps"],
-        cwd=_ROOT, check=True, capture_output=True, text=True,
+        cwd=root, check=True, capture_output=True, text=True,
     ).stdout.splitlines()
-    return {
-        name: hashlib.sha256((_ROOT / name).read_bytes()).hexdigest()
-        for name in tracked
-    }
+    snapshot = {}
+    for name in tracked:
+        try:
+            snapshot[name] = hashlib.sha256((root / name).read_bytes()).hexdigest()
+        except FileNotFoundError:
+            # A normal Bind may already have removed a tracked derived cache.
+            # Preserve absence as evidence: creation or deletion during this
+            # suite must still make the before/after snapshots differ.
+            snapshot[name] = None
+    return snapshot
 
 
 _TRACKED_BOOT_ARTIFACTS_BEFORE = _tracked_boot_artifact_snapshot()
+
+
+def test_snapshot_preserves_absence_and_detects_creation(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(subprocess, "run",
+                        lambda *args, **kwargs: SimpleNamespace(stdout="derived.json\n"))
+    absent = _tracked_boot_artifact_snapshot(tmp_path)
+    assert absent == {"derived.json": None}
+    path = tmp_path / "derived.json"
+    path.write_text("{}")
+    present = _tracked_boot_artifact_snapshot(tmp_path)
+    assert present != absent
+    path.unlink()
+    assert _tracked_boot_artifact_snapshot(tmp_path) == absent
 
 
 def _select_fixture_boot_marker(lumps: Path, *, slot: int) -> None:

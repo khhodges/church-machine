@@ -4359,5 +4359,13 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "bda888f5a5a83bb490965b3275e04cef79af31b79eef15d1f6c8f4911e425efc"
     }
+  },
+  {
+    "token": "dab21c16",
+    "abstraction": "ide.AmoebaStartup",
+    "filename": "ide.AmoebaStartup.1.e37d50bd.lump",
+    "lump_version": 4,
+    "compiled_at": 1793205874.5421438,
+    "operation_id": "8a791bc852774f4ea3414f1286951be0"
   }
 ]

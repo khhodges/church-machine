@@ -1,7 +1,33 @@
 {
   "leases": {},
   "waiters": {
-    "CapabilityTest": []
+    "CapabilityTest": [],
+    "ide.AmoebaStartup": [
+      {
+        "owner_key": "EwB2srPUGzm9lr8mOcYTe1U3BOo8zKjw",
+        "operation_id": "c6259c7dce294bba98aaf9453db7013f",
+        "requested_at": 1793205748.8313491,
+        "expires_at": 1793206048.8313491
+      },
+      {
+        "owner_key": "d1jyqkk43Nxm_LA-UF-7Bz5HmvzA2CxA",
+        "operation_id": "6e1bfffd1fda482d8fc854822dea6ad1",
+        "requested_at": 1793205804.4924133,
+        "expires_at": 1793206104.4924133
+      },
+      {
+        "owner_key": "lVY-mzAV5SaatSQmoC1N9s1agb1zFX1G",
+        "operation_id": "c568c59222834ea88b9efa95a1193c3a",
+        "requested_at": 1793205827.579441,
+        "expires_at": 1793206127.579441
+      },
+      {
+        "owner_key": "MFsAjk1ptZ7rbhalvEKKNb-2Fk9ddrAz",
+        "operation_id": "cac74e5521d74adf9e9d5e69f47d2dce",
+        "requested_at": 1793205835.0526383,
+        "expires_at": 1793206135.0526383
+      }
+    ]
   },
   "messages": {}
 }

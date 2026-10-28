@@ -2,9 +2,16 @@
 
 ## Status
 
-The service/byte execution divergence is corrected and reproduced in disposable
-storage. The complete browser acceptance journey remains **blocked**, not passed.
-No live Namespace selection, historical LUMP, installed image, or FPGA was changed.
+The service/byte execution divergence is corrected. Following explicit user
+approval, AmoebaStartup revision 4 was saved and adopted into live New layout
+NS[21] through the normal protected server endpoints, including review and
+approval-intent checks. All other Namespace rows and prepared Thread states
+remain identical. Historical LUMPs, installed boot images, and FPGA were not changed.
+
+The complete browser acceptance journey remains **blocked**, not passed. A fresh
+live browser reproduced the missing-input problem at the protected-change dialog.
+Even authorized DOM-button activation did not complete it. The browser was closed
+and its write lease was allowed to expire naturally; no lock was stolen.
 
 ## Evidence chain
 
@@ -47,6 +54,15 @@ prepared-Thread slots, and the real three-instruction Boot sequence. It runs 30
 steps including Boot, with no fault and without halting. This is a bounded
 result, not full Factory Build acceptance.
 
+After live adoption, replay of the actual activated image verified the same
+image hash and target entry. Extending the bound to 1,000 steps halted at step 63:
+NS[10] CapabilityTest, PC 24, physical word 1817, unresolved word `0xF7000000`.
+Its authenticated contract identifies word offset 25/source line 109 as bare
+`CALL ide.SelfTest`. The next word/source line 110 is bare
+`CALL ide.WukongCallHome`. Neither declares a method. They were not guessed,
+rewritten, or silently adopted. This is the next distinct program fault,
+not failure of the now-correct outgoing Amoeba CALL.
+
 An intermediate harness used a shortcut entry initializer, and another omitted
 prepared-Thread slots. Their M-window/empty-Thread faults are not results of the
 normal workflow and must not be reported as subsequent product failures.
@@ -58,11 +74,15 @@ normal workflow and must not be reported as subsequent product failures.
 - Mandatory CALL dispatch suite passed, including a new test that steps the
   actual assembled indexed word through the decoder.
 - CALL CR6 permission suite passed.
-- Existing RETURN CR6 suite fails at its direct helper invocation with selector
-  zero (`sim_return_cr6_l_perm.js`, line 103). This is the prior mandatory-selector
-  rejection, not a failure through the changed indexed decoder. That unrelated
-  fixture was not rewritten here.
+- RETURN CR6 fixtures were subsequently updated to include explicit dispatch
+  tables and selector one. The suite now passes, retaining keep-mask, M-bit,
+  generation/seal, protected-frame, and authority checks without relaxing runtime
+  validation.
 - Main development workflow restarted and served the landing page.
+- Final completion checks exposed a snapshot-helper collection error when normal
+  rebinding had removed old Git-tracked derived cache files. The helper now records
+  absence explicitly, preserving before/after creation/deletion detection. All 49
+  bootstrap identity/migration tests and the browser-identity Node checks pass.
 
 Reproduce the real service chain without changing live data:
 
@@ -86,8 +106,10 @@ DOM; Tab did not move focus. No handler exception was observed. Neither handler
 invocation nor API approval was used to bypass the browser review.
 
 Consequently browser Save completion, reopen, Namespace adoption, Bind/Build,
-simulation, and fresh-session persistence remain unverified. The service probe
-above is separate evidence, not a replacement claim for those UI checks.
+simulation, and fresh-session persistence remain unverified. Server-side
+completion after explicit user approval is separate evidence, not a replacement
+claim for those UI checks. Live adoption and replay records are retained as
+`live-adoption.json` and `live-replay.json` in the excluded review directory.
 
 For a future isolated browser continuation:
 
@@ -96,6 +118,6 @@ python3 tests/server/new_layout_call_browser_server.py
 ```
 
 This serves a disposable clone on port 5127 with hardware endpoints blocked.
-Do not run acceptance writes against port 5000. The live caller remains revision
-3; any adoption of corrected source requires the normal explicit Save and
-Namespace selection review.
+Do not run future acceptance writes against port 5000 without separate approval.
+The live caller is now revision 4. Further program repairs require exact declared
+methods, normal compilation/publication, and explicit selection adoption.
