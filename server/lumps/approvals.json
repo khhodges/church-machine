@@ -4391,7 +4391,7 @@
       "issue_n": 1,
       "abstraction": "ide.AmoebaStartup",
       "filename": "ide.AmoebaStartup.1.6695f7d8.lump",
-      "compiled_at": 1793141872.8382025,
+      "compiled_at": 1793142412.4718769,
       "portable_binding": {
         "calls": [
           {
@@ -4447,7 +4447,7 @@
         "compiler_identity": "Trusted Home IDE compiler",
         "compiler_version": "server-compile-v1",
         "compact_compile_context": {
-          "compiler_sha256": "0be3e99d6e13193d3811a6dddb65669e655dca2ce457fb1b088b982b21b9a63f",
+          "compiler_sha256": "e83e0bc08c6188345fbeeaedb0bfd24cd743a20cdac13d0369c0dd155fd95fa5",
           "inputs": {
             "language": "auto",
             "_ide_hierarchy": {
@@ -4467,7 +4467,7 @@
         "hardfault_sites": [],
         "signing_scheme": "church-compiler-hmac-sha256/v2",
         "signing_key_id": "compiler-signing-secret/v1",
-        "signature": "bcceaf675d44bed0708c231acb4123a709c27c38012bc9898395037462f30c67"
+        "signature": "92b21e0787b281a20dd5703b4043c3831696fd637619e6b8facf902038b61f88"
       },
       "identity_hash": "ba1427c1973e591cf4956427bec9aaa336a9cfc8a7460adacca980be7e5fb543"
     }
