@@ -22109,6 +22109,27 @@ def _compile_call_api_authorities(bindings):
                         "token": ns_token,
                     }
                     token, binary_hash = ns_token, ns_hash
+            elif not ns_matches:
+                # Compilation may reference a saved library object before it is
+                # assigned to a Namespace. Never substitute for an explicit pin
+                # or an existing (even invalid/ambiguous) Namespace assignment.
+                candidates = [
+                    row for row in manifest
+                    if isinstance(row, dict) and row.get("archived") is not True
+                    and str(row.get("abstraction") or "").casefold() == petname.casefold()
+                ]
+                def revision(row):
+                    try:
+                        return int(row.get("lump_version") or 0)
+                    except (TypeError, ValueError):
+                        return -1
+                if candidates:
+                    newest = max(revision(row) for row in candidates)
+                    candidates = [row for row in candidates if revision(row) == newest]
+                    if len(candidates) == 1 and newest >= 0:
+                        selected = candidates[0]
+                        token = str(selected.get("token") or "").lower()
+                        binary_hash = binary_hash or str(selected.get("binary_hash") or "").lower()
         filename = selected.get("filename") if isinstance(selected, dict) else None
         if not isinstance(filename, str) or os.path.basename(filename) != filename:
             continue

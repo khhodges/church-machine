@@ -1,0 +1,34 @@
+; Minimal startup prototype, not an installed Thread service.
+; Priming contract: fresh zeroed Thread, canonical entry frame at Start,
+; CR1 = application's E-GT; c-list Boot.Thread = supervisor Thread GT.
+; Application entry is first public method (CLOOMC selector #0).
+; No heap allocator/checkpoint ABI.
+; Mint-side protected-frame priming is a fixture prerequisite, not implemented here.
+abstraction ide.AmoebaStartup {
+capabilities {
+    SELF E,
+    ide.CapabilityTest E,
+    ide.ActorManager E,
+    Thread.2
+}
+method Start {
+    ; Boot starts Amoeba in Thread 1.
+    ; Amoeba calls the simplified CapabilityTest—no CHANGE or SWITCH.
+    ; CapabilityTest calls SelfTest, which returns, then WukongCallHome, which returns.
+    ; CapabilityTest returns to Amoeba, rather than looping internally.
+    ; Amoeba starts the Alice/Mallory attack.
+    ; The attack triggers the expected HardFault.
+    ; The fault/reboot path restarts the entire sequence.
+    Init:
+    ; Initialize application-visible startup status in the current Thread.
+    IADD DR1, DR0, #0
+    ; Ordinary CALL checks the supplied application's Enter authority.
+    CALL ide.CapabilityTest, Run
+    ; Application returns here; preserve its DR1 result and yield to supervisor.
+    ; CALL/RETURN does not preserve scratch CR2: reload declared authority.
+    ; LOAD CR2, CR6, #1
+    CHANGE Thread.2
+    ; A completed startup must not restart the application if resumed.
+    BRANCH Init
+}
+}

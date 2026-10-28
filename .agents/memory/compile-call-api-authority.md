@@ -28,6 +28,21 @@ compile-error policy concerns unresolved operands, not the use of PetNames in so
 API; absent browser API knowledge must not prevent the server authority lookup.
 Keep the resulting disassembly numeric and never invent a selector.
 
+For compile-time API lookup, explicit artifact pins take precedence, then exact
+Namespace assignments. Only an otherwise unbound name may use its unambiguous
+latest non-archived saved library definition; ambiguous latest revisions fail.
+An invalid or ambiguous existing assignment must never fall through to library
+selection. This does not install or change any runtime binding.
+
+**Why:** A saved target exposed its declared method when addressed by token but
+not by name because it was not assigned under that name in the committed
+Namespace. Requiring installation just to compile against a saved API incorrectly
+conflates source compilation with runtime placement.
+
+**How to apply:** Retain exact token/hash API evidence in the compile response,
+preserve explicit choices, and verify actual CALL encoding separately from
+whether the destination program is ready to run.
+
 Callable code LUMPs require explicit declarations of their own methods; labels
 and comments do not constitute an interface. The compiler generates the dispatch
 table, and must reject missing declarations during compilation rather than Format LUMP.

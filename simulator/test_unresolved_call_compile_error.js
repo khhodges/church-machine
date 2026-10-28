@@ -43,6 +43,17 @@ assert.match(nativeResult.error, /Cannot encode CALL.*unresolved/);
 const explicit = new Assembler().assemble('CALL CR1, #1');
 assert.equal(explicit.errors.length, 0, JSON.stringify(explicit.errors));
 assert.equal(explicit.words[0] >>> 27, 2);
+const exactUserSource = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '../tests/fixtures/amoeba-named-call.cloomc'), 'utf8');
+assert.match(exactUserSource.split('\n')[24], /^\s*;/);
+assert.match(exactUserSource.split('\n')[25], /^\s*CALL ide.CapabilityTest, Run$/);
+const userErrors = new Compiler().compile(exactUserSource, []).errors;
+assert(userErrors.some(e => e.line === 26 && /Cannot encode CALL/.test(e.message)));
+const userCompiled = new Compiler().compile(exactUserSource, [], {callApiAuthorities: {
+    'ide.CapabilityTest': {embedded:true, api:{methods:[{name:'Run',index:0}]}}
+}});
+assert.deepEqual(userCompiled.errors, []);
+assert(userCompiled.methods[0].code.includes(0x17030021));
 for (const syntax of ['CALL test.Target, Run', 'CALL test.Target.Run', 'CALLEQ test.Target, Run']) {
     const asm = new Assembler({'test.Target': {Run: {index:0}}});
     asm.setLocalClistSlots({'test.Target':1});
