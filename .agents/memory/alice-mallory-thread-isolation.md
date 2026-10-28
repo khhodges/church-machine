@@ -19,6 +19,15 @@ authorized program execution, not a host-generated counter. Preserve the
 call-home protocol and do not grant Mallory the object's capability. This
 demonstrates access-control enforcement, not secrecy from the UART observer.
 
+The user also requests HARDFAULT date/time in the call-home message.
+
+**Why:** Fault events should be visible alongside Alice's continuing progress.
+
+**How to apply:** Include the requirement in the combined scenario. Identify
+the clock source explicitly; host receipt time is not exact FPGA event time.
+The proposed last-event field must survive fault restart and must not be
+restamped on each ordinary call-home emission.
+
 **Why:** The user refined the running CapabilityTest/SelfTest/WCH demonstration
 to show continued useful work during repeated attack denials, rather than only
 a single denial.
