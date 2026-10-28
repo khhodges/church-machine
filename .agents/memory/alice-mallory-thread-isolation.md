@@ -208,3 +208,17 @@ x+1 on each turn to show that useful work continues across Mallory's denial.
 check continuity before updating, rather than reinitializing or reconstructing
 the value from an external counter. Treat this as the proposed demonstration,
 not proof of fault containment or permission to implement it.
+
+The user approved review-only acceptance refinements: resolve initialization
+ownership first and prove no reinitialization across multiple fault restarts;
+complete each Alice update through read-back verification within one cooperative
+turn; and bound the run's actual update count below value overflow.
+
+**Why:** Otherwise an apparent progress demonstration could conceal repeated
+initialization, an interleaved read/write sequence, or counter wraparound.
+
+**How to apply:** Require trace evidence, not a new scheduler or transaction
+mechanism. Fresh-image initialization is preferred but must be checked against
+the exact selected artifacts. Preserve UART-disclosure and HARDFAULT timestamp
+requirements. This review approval does not authorize implementation or a
+separate cross-document reconciliation.
