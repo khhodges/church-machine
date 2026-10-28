@@ -6,6 +6,17 @@ description: User-designated main objective and separation of release stages.
 Align the approved red-ISA, simulator, bitstream and physical FPGA as the primary
 project objective. The next corrected candidate is provisionally called B.1.1+.
 
+Do not let incidental IDE repairs generate a continuing sequence of UI or test
+maintenance tasks ahead of the new bitstream.
+
+**Why:** The user reiterated that the new bitstream is the priority when shown
+follow-up suggestions for selected-design reboot and Thread-control checks.
+
+**How to apply:** Recommend such work ahead of the bitstream only when evidence
+demonstrates that it blocks building or validating the exact release candidate.
+Otherwise defer it; do not describe speculative test maintenance as a release
+prerequisite.
+
 Standalone HARDFAULT FPGA snapshot verification is superseded by Phase 1
 bitstream work.
 
