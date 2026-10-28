@@ -77,6 +77,15 @@ class TestGreetingParser:
     def test_exact_greeting_string(self):
         assert is_greeting("CM:WUKONG")
 
+    @pytest.mark.parametrize("line", [
+        "CM:WUKONG Alice=unavailable HF=none\r\n",
+        "CM:WUKONG Alice=42 HF=none\r\n",
+        "CM:WUKONG Alice=45 HF=unavailable\r\n",
+    ])
+    def test_actor_progress_preserves_greeting(self, line):
+        assert is_greeting(line)
+        assert _GREETING_MARKER in line.encode("ascii")
+
     def test_greeting_future_version(self):
         assert is_greeting("WUKONG\r\n")
 

@@ -130,8 +130,8 @@
         }
         if (sim.halted) {
             const evidence = sim.lastStepEvidence;
-            check(sim.faultLog.length === 1 && sim.faultLog[0].type === 'NO_CAPABILITY',
-                'Expected exactly Mallory NO_CAPABILITY, got ' + JSON.stringify(sim.faultLog));
+            check(sim.faultLog.length === 1 && sim.faultLog[0].type === 'BOUNDS',
+                'Expected exactly Mallory BOUNDS, got ' + JSON.stringify(sim.faultLog));
             check(owner === 12 && sim.parseGT(sim.cr[14].word0).index === roles[1].slot,
                 'Expected fault inside Mallory on Thread.3');
             check(state.secretBeforeAttack && state.secretBeforeAttack.every(

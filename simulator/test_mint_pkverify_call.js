@@ -117,7 +117,7 @@ for (const method of [0, 1]) {
                 variant === 'null' ? 'TODO_DESTROY_INPUT_CREDENTIAL_NULL' : 'TODO_DESTROY_PKVERIFY_NOT_APPROVED';
         assert.equal(fault.base, service.base, JSON.stringify(fault));
         if (variant === 'missing-reference') {
-            assert.equal(fault.type, 'NO_CAPABILITY');
+            assert.equal(fault.type, 'BOUNDS');
             assert.match(fault.message, /index 7 is out of bounds/);
         } else assert.equal(fault.pc, mint.labels.get(expected), `${method}/${variant}: ${JSON.stringify(fault)}`);
         assert.equal(trace.some(t => t.base === verifier.base), !['null', 'missing-reference'].includes(variant));

@@ -45,7 +45,6 @@
 - [T7 freespace self-definition format](t7-freespace-format.md) — embedded API JSON must never carry token/issue (circular hash / identity rule); Mint validates framing only
 - [Lump V1.3 self-defining freespace](lump-v13-self-definition.md) — 0xAB frame at word cw+1 (API JSON + optional source); JS/Python emitters must stay in lockstep; compile cache key must include tier
 - [Boot-suite test isolation](boot-suite-triage-clusters.md) — destructive tests on shared live dirs need a cross-process write lock or temp-dir isolation, not snapshot/restore alone; bulk-failure triage needs reconciled per-cluster F/E counts
-- [Declared C-list B-flag rule](declared-clist-b-flag-rule.md) — declared capability rows must use B=0; browser and server validators must reject B-set Inform tokens consistently
 - [Canonical T vs lookup aliases](canonical-t-vs-lookup-aliases.md) — historical LUMP tokens may locate bytes, but only recomputed canonical T may populate W3 or drive promotion
 - [boot_resident manifest-only](boot-resident-manifest-only.md) — generator reads boot_resident from manifest.json only; sidecar-only flag = NS descriptor with zero-filled body
 - [Namespace reissue generation](boot-entry-generation-minting.md) — every GT minted for a reused slot must inherit the live/retained Word-1 sequence
@@ -53,7 +52,6 @@
 - [Latched multi-cycle hardware inputs](latched-multicycle-hardware-inputs.md) — capture operands, control-flow state, and security decisions at acceptance; never consume live inputs later
 - [SelfTest caller-return flow](selftest-next-lightningbolt.md) — no Next capability; CapabilityTest calls SelfTest and WukongCallHome, with CHANGE to Thread.2 each iteration.
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
-- [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
 - [Fault telemetry constraints](fault-telemetry-index.md) — snapshot/reboot correlation, retained incidents, delivery blocking and serial isolation.
@@ -85,7 +83,6 @@
 - [LUMP save vs boot rebuild](lump-save-boot-rebuild-boundary.md) — an approved LUMP save must not roll back because an unchanged boot-image dependency cannot rebuild
 - [Save advances the IDE](save-leading-revision.md) — successful saves advance the exact working revision; preserve history, stop stale execution, and keep hardware untouched.
 - [SelfTest dynamic allocation](selftest-dynamic-allocation.md) — SelfTest authority comes from one active manifest+NS binding; size, slot, sequence, and resident layout are never legacy constants
-- [C-List picker programmer authority](clist-picker-programmer-authority.md) — capability declarations may use live, committed, library-only, or not-yet-created pet names
 - [Compile CALL API authority](compile-call-api-authority.md) — unencodable CALLs must fail compilation, never become WORD placeholders; preserve historical artifacts.
 - [Saved LUMP binary authority](saved-lump-binary-authority.md) — after save, evict code-only memory words so the immutable server binary supplies embedded source
 - [Saved-LUMP browser authorization E2E](saved-lump-browser-auth-e2e.md) — use the real Load into Sim control with a canonical binary fixture while isolating stale boot-image availability
@@ -95,7 +92,6 @@
 - [Resident image binding validation](resident-image-binding-validation.md) — compare immutable artifact payload plus slot/sequence/allocation; c-list rows are destination-localized
 - [Localized c-list provenance](localized-clist-provenance.md) — bind generated images to both selected artifact hashes and resulting localized capability rows
 - [Editor source authority](editor-source-authority.md) — preserve owned drafts; authority refresh is advisory and replacement requires explicit preview and acceptance
-- [C-list row zero SELF boundary](clist-row-zero-advisory-self.md) — compiler output must establish SELF at row zero; immutable historical bytes remain inspectable without rewriting
 - [LUMP selection and catalog](latest-saved-lump-selection.md) — explicit choices outrank latest defaults; links to catalog grouping and compilation-time safety rules.
 - [Actionable error reports](actionable-error-reporting.md) — visible errors must state what failed, the real reason, whether data changed, and a concrete next action
 - [Bootstrap migration validation boundary](bootstrap-migration-validation-boundary.md) — validate staged catalog and boot graph before swap; published RTL freshness is a separate release gate
@@ -106,7 +102,6 @@
 - [LUMP History active selection](lump-history-active-selection.md) — selection or bootstrap correction creates a new approved live revision; immutable evidence is never edited
 - [Permanent history retention](history-retention.md) — delete only archives older than 30 days and outside the three newest versions; protect current and referenced artifacts.
 - [Bootstrap repair archive discovery](bootstrap-repair-archive-discovery.md) — repair must accept both manifest-recorded archives and exact files discovered from the active LUMP's standard history filename pattern
-- [Compiler C-list normalization](compiler-clist-normalization.md) — finalized metadata drives operand rows; preserve concrete positions and investigate row-zero reports separately
 - [Embedded source frame sizing](embedded-source-frame-sizing.md) — allocate LUMPs for the complete API/source frame before placing the relocated c-list
 - [Prepared boot authority](prepared-boot-authority.md) — explicit preparation owns CR0; boot/import/Run never repair it; ROM evidence stays separate from Namespace data
 - [Shared served-script dependencies](shared-served-script-dependencies.md) — declare shared UI modules explicitly and test consumers in manifest order; avoid runtime script injection

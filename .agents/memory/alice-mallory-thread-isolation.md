@@ -5,6 +5,22 @@ description: User-directed separate Thread setup for the NewLayout protection de
 
 ## Current proposed combined-loop arrangement
 
+Use the inspected AmoebaStartup saved design as the combined-loop baseline.
+The user explicitly selected this rather than a different working design.
+
+**Why:** Historical ActorManager examples are not the selected startup.
+
+**How to apply:** Preserve that baseline's immutable artifacts and Boot.Thread;
+test isolated candidate revisions before any explicit adoption. This choice
+does not approve changing fault classification or recovery semantics.
+
+The user subsequently approved verifying and correcting the specific
+missing-C-list-row LOAD classification against hardware, without changing
+other NO_CAPABILITY cases or the fault-entry mechanism.
+
+**Why:** This scoped compatibility correction is distinct from granting a new
+recovery policy; software-only custody denials must not acquire hardware codes.
+
 The user specifies Boot.Thread unchanged, Alice in Thread.2 incrementing her
 retained protected value each turn, and Mallory in Thread.3 repeatedly attacking
 while the other Threads continue without loss.

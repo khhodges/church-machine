@@ -45,7 +45,7 @@ for (const word of [0x07230020, 0x07230002]) {
         sim.step(); // Real fetch, decode, operand access, and fault recording.
         if (!fixed && dr2 === 9) {
             const fault = sim.faultLog.at(-1);
-            assert.equal(fault.type, 'NO_CAPABILITY');
+            assert.equal(fault.type, 'BOUNDS');
             assert.match(fault.rawDiagnosticReason, /index 9 is out of bounds/);
             assert.equal(fault.faultRawWord, word);
             assert.deepEqual(sim.cr[4], before);

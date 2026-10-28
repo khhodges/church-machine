@@ -7020,16 +7020,13 @@ class ChurchSimulator {
             clistSize = (hdr.valid && hdr.cc > 0) ? hdr.cc : 1;
         }
         if (clistLoc + d.imm > 0xFFFFFFFF || d.imm >= clistSize) {
-            this.fault('NO_CAPABILITY', `LOAD: c-list index ${d.imm} is out of bounds`);
+            // Match indexed mLoad's inclusive-limit BOUNDS (0x08), rather
+            // than the software-only NO_CAPABILITY used for custody policy.
+            this.fault('BOUNDS', `LOAD: c-list index ${d.imm} is out of bounds`);
             return null;
         }
         const absAddr = clistLoc + d.imm;
         const clistRange = { base: clistLoc, upperBound: (clistLoc + clistSize - 1) >>> 0 };
-        if (d.crSrc === 6 && d.imm >= clistSize) {
-            this.fault('NO_CAPABILITY',
-                `LOAD: c-list has no capability at row ${d.imm} (declared rows: 0–${Math.max(0, clistSize - 1)})`);
-            return null;
-        }
         // Preserve the pre-existing bootstrap row-access allowance separately.
         const check = this.mLoad(clistGT, !this.bootComplete ? null : loadPerm, d.crSrc, absAddr, clistRange);
         if (!check.ok) {

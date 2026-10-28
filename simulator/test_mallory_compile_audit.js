@@ -10,7 +10,7 @@ const result = lumpAudit(words, {capabilities:[
     {name:'SELF', rights:['E']}, {name:'ide.Mallory', rights:['R','W']},
 ]}, []);
 assert.equal(lumpAuditHasErrors(result), false, JSON.stringify(result));
-assert.match(result.find(r => r.ruleId === 'CAP_RANGE').detail, /NO_CAPABILITY/);
+assert.match(result.find(r => r.ruleId === 'CAP_RANGE').detail, /BOUNDS/);
 assert.deepEqual(words, before, 'audit must not rewrite instructions or extend the C-list');
 assert.equal(words[0] & 255, 2);
 assert.equal(words[2], 0x070b0020);

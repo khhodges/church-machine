@@ -28,7 +28,7 @@ for (let i=0; i<150 && !sim.halted && !sim.faultLog.length; i++) {
 assert(revealed, 'Alice did not return the stashed value');
 assert(visited.has(16) && visited.has(17), JSON.stringify([...visited]));
 assert.equal(sim.faultLog.length, 1, JSON.stringify(sim.faultLog));
-assert.equal(sim.faultLog[0].type, 'NO_CAPABILITY', JSON.stringify(sim.faultLog));
+assert.equal(sim.faultLog[0].type, 'BOUNDS', JSON.stringify(sim.faultLog));
 assert.equal(sim.faultLog[0].threadSlot, 12);
 assert.equal(sim.faultLog[0].faultingAbstractionSlot, 17);
 assert.equal(sim.faultLog[0].faultingMnemonic, 'LOAD');

@@ -126,7 +126,7 @@ const evidence = sim.lastStepEvidence;
 const fault = sim.faultLog.at(-1);
 assert.strictEqual(faultResult, null, 'faulting LOAD cannot retire');
 assert.strictEqual(sim.faultLog.length, 1, 'first and only fault');
-assert.strictEqual(fault.type, 'NO_CAPABILITY');
+assert.strictEqual(fault.type, 'BOUNDS');
 assert.strictEqual(fault.threadSlot, malloryBody.slot);
 assert.strictEqual(fault.pc, 1);
 assert.strictEqual(fault.physicalPC, malloryRole.base + 2);
@@ -134,7 +134,7 @@ assert.strictEqual(fault.faultRawWord, sim.memory[malloryRole.base + 2],
     'fault log captures the exact fixture Mallory LOAD word');
 assert.match(fault.rawDiagnosticReason, /LOAD: c-list index 2 is out of bounds/);
 assert.strictEqual(evidence.outcome, 'fault');
-assert.strictEqual(evidence.fault.type, 'NO_CAPABILITY');
+assert.strictEqual(evidence.fault.type, 'BOUNDS');
 assert.strictEqual(evidence.pre.artifact.slot, malloryRole.slot);
 assert.strictEqual(evidence.pre.pc, 1);
 assert.strictEqual(evidence.instruction.physicalPC, malloryRole.base + 2);
@@ -169,5 +169,5 @@ console.log('[MALLORY] fault ' + JSON.stringify({
     instruction: evidence.instruction.decoded, outcome: evidence.outcome,
     halted: sim.halted, secretBeforeMallory, secretAtFault: sim.memory[aliceRole.base + 9],
 }));
-console.log('[PASS] first Mallory Steal LOAD row 2 faults NO_CAPABILITY; ' +
+console.log('[PASS] first Mallory Steal LOAD row 2 faults BOUNDS; ' +
     'DREAD unattempted; Alice secret unchanged; no recovery or following instruction.');

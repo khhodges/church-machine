@@ -78,10 +78,10 @@ function stepUntilReturned(sim, maxSteps = 20) {
   callMethod(sim, slot, 1);
   sim.step();
   const fault = sim.faultLog[sim.faultLog.length - 1];
-  if (!fault || fault.type !== 'NO_CAPABILITY') {
-    throw new Error(`Mallory.Steal expected NO_CAPABILITY, got ${fault ? fault.type : 'no fault'}`);
+  if (!fault || fault.type !== 'BOUNDS') {
+    throw new Error(`Mallory.Steal expected BOUNDS, got ${fault ? fault.type : 'no fault'}`);
   }
-  console.log('[PASS] Mallory.Steal deterministically faults NO_CAPABILITY');
+  console.log('[PASS] Mallory.Steal deterministically faults BOUNDS');
 })();
 
 (function testReturnDataRegisterAbi() {

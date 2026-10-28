@@ -120,7 +120,7 @@
         if (scenario === 'mallory') {
             const fault = sim.faultLog.at(-1);
             const evidence = state.evidence.at(-1);
-            if (sim.faultLog.length !== 1 || fault?.type !== 'NO_CAPABILITY' ||
+            if (sim.faultLog.length !== 1 || fault?.type !== 'BOUNDS' ||
                 fault.threadSlot !== bodies[2].slot ||
                 fault.pc !== 1 || sim.lastStepEvidence?.outcome !== 'fault' ||
                 sim.lastStepEvidence?.instruction?.decoded?.opcode !== 0 ||
@@ -132,8 +132,8 @@
                 state.evidence.some(e => e.instruction.decoded.opcode === 16) ||
                 !state.aliceBeforeAttack?.every((word, i) => word === sim.memory[roles[0].base + i]) ||
                 sim.memory[roles[0].base + 9] !== secret)
-                throw new Error('Mallory boundary did not match NO_CAPABILITY at LOAD before DREAD');
-            return 'PASS: NO_CAPABILITY on Mallory LOAD; DREAD not attempted; Alice secret intact. Stopped at first fault.';
+                throw new Error('Mallory boundary did not match BOUNDS at LOAD before DREAD');
+            return 'PASS: BOUNDS on Mallory LOAD; DREAD not attempted; Alice secret intact. Stopped at first fault.';
         }
         if (sim.faultLog.length || !sim._liveThreadOwned || sim._currentThreadSlot !== bodies[0].slot ||
             !state.initialMallory.every((word, i) => word === sim.memory[bodies[2].base + i]) ||

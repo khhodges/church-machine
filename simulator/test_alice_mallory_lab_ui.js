@@ -100,7 +100,7 @@ async function main() {
         step(); run();
         assert.strictEqual(element('trace').textContent, trace, 'bounded controls do not execute again');
         if (name === 'mallory') {
-            assert.match(element('trace').textContent, /FAULT: NO_CAPABILITY/);
+            assert.match(element('trace').textContent, /FAULT: BOUNDS/);
             assert.match(element('execution').textContent, /bounded test boundary/);
             assert.doesNotMatch(element('trace').textContent, /opcode 16/);
             assert.match(element('trace').textContent, /c-list index 2 is out of bounds/);
