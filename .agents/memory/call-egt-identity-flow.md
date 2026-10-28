@@ -3,6 +3,21 @@ name: CALL E-GT identity flow
 description: How ordinary cross-domain CALL and RETURN preserve executable identity across transient CR6 and CR14 capability views.
 ---
 
+Every CALL, including Boot, must use the target dispatch table. The user
+explicitly requires one authoritative ISA CALL rule followed by compiler and
+Boot; selector-zero direct entry is not an alternative architecture.
+Public API index 0 maps to wire selector 1. Preserve historical artifacts;
+do not silently repair operands or grant permissions.
+
+**Why:** On 2026-10-28 unchanged-image replay showed Boot fetching Amoeba's
+table word and a later CALL fetching CapabilityTest's table word. Conditional
+decoding masked the first error and exposed the second as a misleading LOAD
+permission fault. The user explicitly settled the dispatch-table requirement.
+
+**How to apply:** Align compiler, Boot, simulator and RTL with the master CALL
+contract. Keep specification approval distinct from implementation completion;
+verify actual method-body entry and CR6.M, not merely absence of faults.
+
 Both CALL resolution phases consume E-GT identity directly: the source CR's
 E-GT builds the callee CR6 view, and the latched callee E-GT builds CR14.
 Neither phase may index through the resolved LUMP capability, because its base

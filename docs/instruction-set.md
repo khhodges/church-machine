@@ -31,6 +31,34 @@ Existing encoding tables and repeated instruction descriptions elsewhere in
 this document remain baseline records pending reconciliation; they do not
 override these corrections or establish a new encoding layout.
 
+## CALL: mandatory dispatch-table entry
+
+**Authoritative clarification — 2026-10-28:** Every CALL enters through the
+target LUMP's dispatch table. This rule applies to direct and indexed CALL,
+including the Boot CALL. There is no Boot exception or selector-zero
+single-entry shortcut that executes word 1 as an instruction.
+
+The compiler must emit a dispatch table and a valid selector for the declared
+method. Existing zero-based public API method indices are not direct-entry
+addresses: public method index 0 corresponds to wire selector 1, the first
+dispatch-table slot. For selector n > 0, read table word n as a LUMP-relative
+method-body word offset. Reject selector zero, private/zero entries, invalid
+table indices and targets outside the executable method body; never execute
+the table entry itself or guess a replacement method.
+
+Boot must select the declared startup method through this same operation.
+Simulator and RTL must implement the same dispatch and validation rules.
+Normal CALL protection remains in force: validate E authority, establish the
+callee's CR6 and CR14, and set CR6.M for its C-list access without adding L
+permission to the GT.
+
+This clarification supersedes descriptions of selector-zero direct entry in
+the historical ISA, condensed references and implementation comments.
+Historical saved artifacts remain immutable; incompatible callers require an
+explicit corrected revision, not silent operand translation or new permissions.
+Compiler, Boot, simulator and RTL conformance must be demonstrated separately;
+this specification change does not claim they have already been updated.
+
 ## RETURN: CALL versus LAMBDA
 
 **Programmer clarification, 2026-10-19:** Capability clearing on RETURN is a

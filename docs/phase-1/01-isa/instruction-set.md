@@ -103,9 +103,12 @@ This does not change the separately approved signed-offset/index formats.
 | 23 BRANCH | Approved checked PC-relative indexed branch below. |
 
 CALL's ordinary saved frame has caller E-GT plus packed NIA/indicators, not a
-hidden CR/DR snapshot. Method zero enters word 1; method n>0 reads word n
-as a lump-relative word offset. Zero/private entries and header execution are
-invalid. Check method-table and executable bounds before entry.
+hidden CR/DR snapshot. Every CALL, including Boot, uses the dispatch table:
+method n>0 reads word n as a lump-relative method-body word offset.
+Selector zero is invalid, not a direct-entry shortcut. Public API index 0 maps
+to wire selector 1. Zero/private entries, table execution and header execution
+are invalid. Check method-table and executable-body bounds before entry.
+See the authoritative [master CALL contract](../../instruction-set.md#call-mandatory-dispatch-table-entry).
 
 RETURN uses opcode 3, condition [26:23], zero [22:12], keep mask [11:0].
 Mask bits 0–4 and 7–11 retain their corresponding CR when set, otherwise clear
