@@ -1079,14 +1079,14 @@ content_type = "text/markdown"
 id = "g_tgiD7aKLQhEPSau-YzP"
 uri = "file://docs/phase-1/CTMM_W7_Threat_Test_Plan.xlsx"
 type = "table"
-title = "CTMM tracker — approved Phase 1 Namespace target"
-description = "Adds the confirmed target Namespace and corrects IDE-03 to Needs verification for that target. Original requirement IDs and historical evidence are preserved."
+title = "CTMM W7 Threat Test Plan — updated 28 October 2026"
+description = "Updated 37 requirement reviews with evidence references and remaining acceptance work. Original threat sheets preserved; summary formula results refreshed. Evidence links are relative to the project repository."
 logical_id = "d39713d1-b9c8-4bee-9c41-0d032e8da1a6"
-content_hash = "sha256:fa4322c40ce26808b8a2770f5bba22787439a19e2dfa8baeba8798a63c247254"
-size = 48488
-mtime_ms = 1792254450882
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/d4200ade-4e25-44da-9170-d69350ff9e92"
-storage_version_token = "1792254463074675"
+content_hash = "sha256:61effa0520f8296912ee3cc4385a7f21127193c89001f2a39ad14996a66725ea"
+size = 53145
+mtime_ms = 1793190111476
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/6046386b-84fe-4949-8c1a-7feffe0008f9"
+storage_version_token = "1793190120173945"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 [[outputs]]
