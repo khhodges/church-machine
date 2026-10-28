@@ -11418,6 +11418,17 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
         raise ValueError("IDX1 browser candidate must be assembly")
     compile_input = {"source": source,
                      "language": "assembly" if execution is not None else "auto", "tier": 2}
+    # Browser declarations are lookup requests, never method authority.
+    # Resolve against repository bytes just as /api/compile does; the checks
+    # below still compare source declarations, API and every executable word.
+    compile_input["_resolved_call_api_authorities"] = _compile_call_api_authorities([
+        {"petname": str(cap.get("name") or "").rsplit("#", 1)[0],
+         "token": cap.get("T") or cap.get("token"),
+         "binary_hash": cap.get("binary_hash")}
+        for cap in (metadata.get("capabilities") or [])
+        if isinstance(cap, dict) and cap.get("name") not in ("SELF", "__SELF__")
+        and not cap.get("null_row")
+    ])
     from server.ide_leaf_policy import configuration as _ide_configuration
     compile_input["_ide_hierarchy"] = _ide_configuration()
     if execution is not None:

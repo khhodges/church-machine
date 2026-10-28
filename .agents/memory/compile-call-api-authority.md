@@ -43,6 +43,18 @@ conflates source compilation with runtime placement.
 preserve explicit choices, and verify actual CALL encoding separately from
 whether the destination program is ready to run.
 
+Compiler reproduction during Save must resolve destination APIs through the
+same trusted-binary lookup as ordinary Compile, and freeze those inputs for
+later rebuilds. Browser declarations select targets; browser method metadata
+never supplies authority. Keep exact code/API/declaration comparisons.
+
+**Why:** Ordinary compilation succeeded while Save's independent recompile
+omitted method authority and rejected the same named CALL. A successful compile
+request alone did not verify the user's save workflow.
+
+**How to apply:** Exercise save-plan, approval and publication in an isolated
+repository, including missing targets, forged method metadata and altered code.
+
 Callable code LUMPs require explicit declarations of their own methods; labels
 and comments do not constitute an interface. The compiler generates the dispatch
 table, and must reject missing declarations during compilation rather than Format LUMP.
