@@ -1,4 +1,6 @@
 'use strict';
+// ISA data-access cutover v2: bit14 subtract, magnitude10, DR index4.
+// Worker-content stamp invalidates cached legacy DREAD/DWRITE compilations.
 // Canonical object names permit numeric dotted components, e.g. ide.Thread.2.
 // Embedded API return ABI: DR1 (DR0 is constant zero). Keep the worker stamp
 // changed with this correction so cached pre-correction candidates are evicted.

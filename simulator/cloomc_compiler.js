@@ -307,9 +307,9 @@ class CLOOMCCompiler {
                 (imm < 0 ? 0x40000 : 0) | Math.abs(imm)) >>> 0;
         }
         // Compiler-generated LOAD/SAVE indices are immediate-only (DR0).
-        if (opcode === 0 || opcode === 1) {
+        if (opcode === 0 || opcode === 1 || opcode === 16 || opcode === 17) {
             if (!Number.isInteger(imm) || Math.abs(imm) > 1023)
-                throw new Error('LOAD/SAVE immediate magnitude must be 0–1023');
+                throw new Error('Indexed memory immediate magnitude must be 0–1023');
             imm = (imm < 0 ? 0x4000 : 0) | (Math.abs(imm) << 4);
         }
         return (
@@ -2364,9 +2364,9 @@ class CLOOMCCompiler {
         if (readMatch) {
             const crIdx = this._parseCRFull(readMatch[1]);
             const offsetExpr = readMatch[2].trim();
-            const offset = parseInt(offsetExpr) || 0;
+            const offset = Number(offsetExpr);
             const dr = this._allocTemp(locals);
-            code.push(this.encode(this.opcodes.DREAD, 14, dr, crIdx, offset & 0x7FFF));
+            code.push(this.encode(this.opcodes.DREAD, 14, dr, crIdx, offset));
             return dr;
         }
 
@@ -2623,13 +2623,13 @@ class CLOOMCCompiler {
             return;
         }
 
-        const writeMatch = text.match(/^(?:write|DWRITE)\s*\(\s*(\w+)\s*,\s*(\w+)\s*,\s*(.+)\s*\)$/);
+        const writeMatch = text.match(/^(?:write|DWRITE)\s*\(\s*(\w+)\s*,\s*([^,]+)\s*,\s*(.+)\s*\)$/);
         if (writeMatch) {
             const crIdx = this._parseCRFull(writeMatch[1]);
-            const offset = parseInt(writeMatch[2]) || 0;
+            const offset = Number(writeMatch[2].trim());
             const valDR = this._resolveExpr(writeMatch[3], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `DWRITE CR${crIdx}, ${offset}` });
-            code.push(this.encode(this.opcodes.DWRITE, 14, valDR, crIdx, offset & 0x7FFF));
+            code.push(this.encode(this.opcodes.DWRITE, 14, valDR, crIdx, offset));
             return;
         }
 

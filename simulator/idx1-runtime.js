@@ -152,8 +152,9 @@
             }
             if (op === 18 || op === 19) magnitude = (imm >>> 5) & 31;
             if (op === 16 || op === 17) {
-                if (imm & 0x4000) magnitude = imm & 0x3fff;
-                else { register = imm & 15; magnitude = (imm >>> 4) & 1023; }
+                register = imm & 15;
+                magnitude = (imm >>> 4) & 1023;
+                subtract = !!(imm & 0x4000);
             }
             packet = { opcode: op, condition: (words[at] >>> 23) & 15,
                 a: d.crDst, b: d.crSrc, immediate: imm,

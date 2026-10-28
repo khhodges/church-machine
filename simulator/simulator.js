@@ -10361,8 +10361,22 @@ class ChurchSimulator {
 
     _mmioDeviceSlot(index) { return index; }
 
+    _dataOffset(d) {
+        const magnitude = (d.imm >>> 4) & 1023;
+        const index = (d.imm & 15) === 0 ? 0 : this.dr[d.imm & 15] >>> 0;
+        const offset = Number.isInteger(d.idx1Offset) ? d.idx1Offset :
+            index + ((d.imm & 0x4000) ? -magnitude : magnitude);
+        if (offset < 0 || offset > 0xFFFFFFFF) {
+            this.fault('BOUNDS', 'Data offset underflow/overflow; recompile older data-access instructions.');
+            return null;
+        }
+        return offset;
+    }
+
     _execDread(d) {
         const drIdx = d.crDst;
+        const offset = this._dataOffset(d);
+        if (offset === null) return null;
         const dataGT = this.cr[d.crSrc].word0;
         if (dataGT === 0) {
             this.fault('NULL_CAP', `DREAD: CR${d.crSrc} is NULL`);
@@ -10375,24 +10389,11 @@ class ChurchSimulator {
         }
         const srcCR = this.cr[d.crSrc];
         const loc = srcCR.word1;
-        // Decode mode bit: imm[14]=1 → immediate; imm[14]=0 → indexed
-        let offset;
-        if (Number.isInteger(d.idx1Offset)) {
-            offset = d.idx1Offset;
-        } else if (d.imm & 0x4000) {
-            offset = d.imm & 0x3FFF;
-        } else {
-            const dreadBase = (d.imm >> 4) & 0x3FF;
-            const dreadDRx  = d.imm & 0xF;
-            // Use plain JS Number (no >>> 0) so the sum is not truncated to 32 bits.
-            // Saturate at 0xFFFFFFFF to prevent wrap-around past the bounds check:
-            // base=1, DRx=0xFFFFFFFF would otherwise give (1+4294967295)>>>0 = 0,
-            // which could appear in-bounds. Saturating gives 0xFFFFFFFF which always
-            // exceeds any 17-bit lump limit and correctly raises BOUNDS.
-            const rawOff = dreadBase + (this.dr[dreadDRx] >>> 0);
-            offset = rawOff > 0xFFFFFFFF ? 0xFFFFFFFF : rawOff;
+        const absAddr = loc + offset;
+        if (!Number.isInteger(absAddr) || absAddr < 0 || absAddr > 0xFFFFFFFF) {
+            this.fault('BOUNDS', 'DREAD address overflow');
+            return null;
         }
-        const absAddr = (loc + offset) >>> 0;
         // CR14 exception: code register is X-only; permit DREAD with X permission in place of R.
         const dreadPerm = (d.crSrc === 14) ? 'X' : 'R';
         const check = this.mLoad(dataGT, dreadPerm, d.crSrc, absAddr);
@@ -10451,6 +10452,8 @@ class ChurchSimulator {
 
     _execDwrite(d) {
         const drIdx = d.crDst;
+        const offset = this._dataOffset(d);
+        if (offset === null) return null;
         const dataGT = this.cr[d.crSrc].word0;
         if (dataGT === 0) {
             this.fault('NULL_CAP', `DWRITE: CR${d.crSrc} is NULL`);
@@ -10463,20 +10466,11 @@ class ChurchSimulator {
         }
         const srcCR = this.cr[d.crSrc];
         const loc = srcCR.word1;
-        // Decode mode bit: imm[14]=1 → immediate; imm[14]=0 → indexed
-        let offset;
-        if (Number.isInteger(d.idx1Offset)) {
-            offset = d.idx1Offset;
-        } else if (d.imm & 0x4000) {
-            offset = d.imm & 0x3FFF;
-        } else {
-            const dwriteBase = (d.imm >> 4) & 0x3FF;
-            const dwriteDRx  = d.imm & 0xF;
-            // Saturating sum prevents 32-bit wrap before bounds check (see _execDread).
-            const rawOff = dwriteBase + (this.dr[dwriteDRx] >>> 0);
-            offset = rawOff > 0xFFFFFFFF ? 0xFFFFFFFF : rawOff;
+        const absAddr = loc + offset;
+        if (!Number.isInteger(absAddr) || absAddr < 0 || absAddr > 0xFFFFFFFF) {
+            this.fault('BOUNDS', 'DWRITE address overflow');
+            return null;
         }
-        const absAddr = (loc + offset) >>> 0;
 
         // IO_PORT_PET_NAME_WR intercept (Tasks #1531/#1532): a DWRITE whose computed address
         // equals 0xFFFFFF38 registers c-list slot (DR value & 0x3F) as named.  Named slots
