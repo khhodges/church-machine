@@ -47,6 +47,7 @@ vm.runInContext([
     extractFunction(source, '_formatLumpHeaderDisassembly'),
     extractFunction(source, '_isExactSavedLumpWordArray'),
     extractFunction(source, '_formatCanonicalSavedLumpWords'),
+    extractFunction(source, '_formatOpenedSavedLumpDisassembly'),
     extractFunction(source, '_showCompilerOutputBesideSource'),
     extractFunction(source, '_showCompiledCandidateBesideSource'),
 ].join('\n'), context);
@@ -236,6 +237,15 @@ assert.match(renderCalls(absent), /WORD_f7000000/);
 assert.match(renderCalls(callWords), /pending binding/, 'fresh evidence restores attribution');
 assert.equal(dom.window.document.getElementById('asmEditor').value, 'CALL mutable.Wrong');
 const savedCalls = context._formatCanonicalSavedLumpWords(callWords, {methodCount:1});
+const reopenedCalls = context._formatOpenedSavedLumpDisassembly(
+    callWords, 'WORD 0x7000000', {abstraction:'test.Caller'});
+assert.match(reopenedCalls, /0xF7000000  CALL test.Target.Run — pending binding/);
+assert.doesNotMatch(reopenedCalls, /WORD 0x7000000|mutable.Wrong/);
+assert.doesNotMatch(context._formatOpenedSavedLumpDisassembly(
+    mismatch, 'raw fallback', {}), /pending binding/);
+assert.equal(context._formatOpenedSavedLumpDisassembly(
+    words, 'legacy disassembly', {}), 'legacy disassembly');
+assert.match(source, /_compiledDisasm = _formatOpenedSavedLumpDisassembly\(\s*serverWords/);
 assert.match(savedCalls, /C-list\[0\] "SELF"/);
 assert.match(savedCalls, /C-list\[1\] "test.Target"/);
 assert.doesNotMatch(savedCalls, /PetName unavailable|mutable.Wrong/);

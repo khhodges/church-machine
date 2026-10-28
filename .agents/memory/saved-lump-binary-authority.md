@@ -3,6 +3,16 @@ name: Saved LUMP binary authority
 description: Why the registry must switch from compile-time words to the complete server artifact after a successful save.
 ---
 
+Disassembly verification must cover opening a saved artifact as well as the
+immediate compile and save presentations.
+
+**Why:** Repeated reports of CALL appearing as WORD survived passing formatter
+tests because reopening used a different display path. Helper-level success
+does not establish that the user's navigation invokes the corrected renderer.
+
+**How to apply:** Trace the reported entry point, retain exact-byte provenance,
+and distinguish a symbolic CALL label from evidence of executable linking.
+
 After a successful LUMP save, the registry entry for the saved token must use
 the immutable server artifact as its authority. Evict any compile-time
 code-only memory source for that token rather than treating it as the complete

@@ -2603,6 +2603,18 @@ function _formatCanonicalSavedLumpWords(words, details) {
     return lines.join('\n');
 }
 
+function _formatOpenedSavedLumpDisassembly(words, legacyText, details) {
+    if (!_isExactSavedLumpWordArray(words) || !words.length ||
+            !window.SymbolicLumpGuard) return legacyText;
+    try {
+        var contract = window.SymbolicLumpGuard.embedded(words);
+        if (!contract || !Array.isArray(contract.calls) || !contract.calls.length) return legacyText;
+    } catch (_error) {
+        // Malformed evidence must remain raw and carry the decoder diagnostic.
+    }
+    return _formatCanonicalSavedLumpWords(words, details);
+}
+
 function _reconstructSavedLumpInstructionSource(words, details) {
     if (!_isExactSavedLumpWordArray(words) || words.length === 0) return '';
     details = details || {};
@@ -9084,6 +9096,8 @@ async function openLumpInEditor(token, options) {
         // Keep the legacy name for compatibility with draft/discard paths;
         // its value is now the original source buffer, not disassembly.
         window._editorOriginalDisasm = _recoveredSource;
+        _compiledDisasm = _formatOpenedSavedLumpDisassembly(
+            serverWords, _compiledDisasm, {abstraction: lumpName, token: token});
         window._editorCompiledDisasm = _compiledDisasm;
 
         // ── Check for a saved draft from a previous session ───────────────
