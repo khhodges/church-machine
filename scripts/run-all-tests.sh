@@ -414,6 +414,9 @@ register_suite "version-telemetry-tests" \
 register_suite "compile-api-tests" \
     'python3 -m pytest tests/server/test_compile_api.py -v'
 
+register_suite "unresolved-call-compatibility-tests" \
+    'node simulator/test_unresolved_call_compile_error.js && node simulator/test_symbolic_call_binding.js && node simulator/test_compile_candidate_presentation.js && python3 -m pytest tests/server/test_symbolic_binding.py tests/server/test_symbolic_save_flow.py tests/server/test_named_call_save_attestation.py -q'
+
 register_suite "docs-artifact-link-tests" \
     'python -m pytest tests/server/test_docs_artifact_links.py -v'
 
@@ -514,7 +517,7 @@ register_suite "check-build-lump-embedded-content" \
     'node scripts/test_build_lump_embedded_content.js'
 
 register_suite "check-wukong-callhome-divergence" \
-    'node scripts/check_wukong_callhome_divergence.js'
+    'node scripts/check_wukong_callhome_divergence.js && node scripts/test_wukong_callhome_divergence.js'
 
 register_suite "check-build-lump-clist" \
     'node scripts/check-build-lump-clist.js'
@@ -550,6 +553,8 @@ ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabiliti
 
 ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt wukong-boot-rom-guard wukong-fault-sentinel check-ila-probe-names test-check-ila-probe-names wukong-preflight-launcher-tests boot-change-validation"
 
+ALL_GROUPS["simulator"]+=" unresolved-call-compatibility-tests"
+ALL_GROUPS["lump"]+=" unresolved-call-compatibility-tests"
 ALL_GROUPS["protected-mint"]="protected-mint-path-tests protected-mint-qualified-tests"
 ALL_GROUPS["e2e"]="e2e-tests"
 

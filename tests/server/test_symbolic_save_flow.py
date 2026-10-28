@@ -1,53 +1,48 @@
-"""Real signed compile and save planning; all storage is isolated by fixtures."""
+"""Reject new unresolved CALLs; reopen/bind historical saved bytes in isolation."""
 from test_idx1_save_endpoint import client, isolated_lumps
+from test_symbolic_binding import historical_words
 
 
-def test_missing_target_compiles_and_reaches_signed_save_plan(client, isolated_lumps, monkeypatch):
+def test_missing_target_compile_does_not_issue_save_evidence(client, isolated_lumps):
     source = ("abstraction test.SymbolicCaller {\n"
               "capabilities { SELF E, ide.SelfTest E, ide.WukongCallHome E, ide.LED_DEV RW, ide.Thread.2, ide.Thread.3 }\n"
               "method Run() {\nCALL ide.SelfTest.Run\nCALL ide.WukongCallHome.Run\nRETURN\n}\n}\n")
     response = client.post("/api/compile", json={
         "source": source, "language": "javascript", "tier": 2})
     compiled = response.get_json()
-    assert response.status_code == 200 and compiled["ok"], compiled
-    assert compiled["binding_status"] == "unresolved"
-    assert compiled["warnings"] == []
-    # Format LUMP publishes compact portable rows as zero, including SELF.
-    # Retain the compiler's original marker-bearing pair separately.
-    compiler_words = compiled["words"][:]
-    cc = compiler_words[0] & 255
-    compiled["words"] = compiler_words[:-cc] + [0] * cc
-    response = client.post("/api/lumps/save-plan", json={
-        "binary": compiled["words"],
-        "metadata": {
-            "abstraction": "test.SymbolicCaller", "language": compiled["language"],
-            "content_type": "code", "artifact_only": True,
-            "capabilities": compiled["capabilities"],
-            "original_source": source, "submitted_source": source, "output_profile": "full",
-            "issue_number": 1,
-        },
-    })
-    planned = response.get_json()
-    assert response.status_code == 201 and planned.get("compiler_record"), planned
-    from tests.server.test_idx1_save_endpoint import save
-    from server import app as app_module
+    assert not compiled["ok"], compiled
+    assert "Cannot encode CALL" in compiled["error"]
+    assert "words" not in compiled
+    assert not compiled.get("compiler_record")
+
+
+def test_historical_saved_lump_bind_and_reopen(client, isolated_lumps, monkeypatch):
     from server.symbolic_binding import embedded
+    from server.lump_integrity import compute_number
+    from server.lump_approvals import (
+        configured_compiler_tcb_key, sign_compiler_record, write_approvals)
+    import hashlib
     import struct
-    saved, _ = save(client, {
-        "binary": compiled["words"],
-        "metadata": {
-            "abstraction": "test.SymbolicCaller", "language": compiled["language"],
-            "content_type": "code", "artifact_only": True,
-            "capabilities": compiled["capabilities"], "original_source": source,
-            "submitted_source": source, "issue_number": 1,
-        },
-    })
-    raw = (isolated_lumps / saved["filename"]).read_bytes()
-    words = list(struct.unpack(f">{len(raw)//4}I", raw))
+    words = historical_words()
+    raw = struct.pack(f">{len(words)}I", *words)
+    token = compute_number("ide.Probe", raw)
+    saved = {"filename": f"ide.Probe.1.{token}.lump", "token": token}
+    (isolated_lumps / saved["filename"]).write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    # Model an already admitted historical artifact, not a new compile/save.
+    # Sign only with the private fixture key; production verification stays real.
+    write_approvals(str(isolated_lumps / "approvals.json"), {digest: {
+        "binary_hash": digest, "filename": saved["filename"],
+        "dot_name": "ide.Probe", "issue_n": 1,
+        "portable_binding": embedded(words),
+        "trust_origin": "trusted-home-ide",
+        "compiler_identity": "historical-test-fixture", "compiler_version": "legacy",
+        "compiler_record": sign_compiler_record(
+            {"binary_hash": digest}, signing_key=configured_compiler_tcb_key()),
+    }})
     assert embedded(words)["calls"][0]["full_name"] == "ide.SelfTest.Run"
     from server.simulation_preparation import artifact_bindings, _localize_symbolic
-    import hashlib
-    row = {"slot": 16, "seq": 1, "name": "test.SymbolicCaller", "type": "Inform",
+    row = {"slot": 16, "seq": 1, "name": "ide.Probe", "type": "Inform",
            "resident": True, "boot_resident": True, "load_policy": "Resident",
            "filename": saved["filename"], "binary_hash": hashlib.sha256(raw).hexdigest(),
            "token": saved["token"]}
@@ -62,7 +57,7 @@ def test_missing_target_compiles_and_reaches_signed_save_plan(client, isolated_l
     bound, _ = _localize_symbolic(raw, bindings[0], [row], bindings, isolated_lumps, bind_now=True)
     assert bindings[0]["symbolicReport"]["status"] == "unresolved"
     from server.namespace_binding_report import binding_report
-    document = {"rows": [dict(slot=16, sequence=1, name="test.SymbolicCaller", kind="lump",
+    document = {"rows": [dict(slot=16, sequence=1, name="ide.Probe", kind="lump",
         selection=dict(filename=saved["filename"], token=saved["token"],
                        binaryHash=hashlib.sha256(raw).hexdigest()))]}
     report = binding_report(document, isolated_lumps, "selected")

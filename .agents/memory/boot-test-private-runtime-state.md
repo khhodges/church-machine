@@ -153,3 +153,13 @@ Factory placeholders also do not necessarily contain resumable continuations.
 geometry, boot before saving a live context, and prove retired CALL/CHANGE/RETURN
 with protected-frame and caller-continuation assertions. Use a non-handler
 callee so a native service dispatch cannot masquerade as a real CALL frame.
+
+When copying a catalog with Node's filesystem API, preserve relative symlink
+targets verbatim rather than accepting the default link rewriting.
+
+**Why:** Node's default recursive copy can turn an internal relative alias into
+an absolute link back to the original catalog. The offline-write guard correctly
+rejects that supposedly private copy as escaping its output directory.
+
+**How to apply:** Use `verbatimSymlinks: true` for faithful private catalog copies;
+retain the production guard rather than bypassing it for tests.

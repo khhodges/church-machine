@@ -185,7 +185,7 @@ assert.match(dom.window._compiledCandidateAuditText,
 assert.equal(dom.window.document.getElementById('savedLumpDisassembly').querySelector('img'), null);
 assert.equal(JSON.stringify(secondNamed), beforeReport, 'report rendering never changes words');
 
-// Exact real-compiler relocation evidence, including conditional CALL and an
+// Frozen historical relocation evidence, including conditional CALL and an
 // intentional HARDFAULT with the same raw word as an unconditional placeholder.
 const callDraft = `abstraction test.Caller {
 capabilities {
@@ -205,8 +205,17 @@ const callCompile = spawnSync(process.execPath, ['server/compile_worker.js'], {
 });
 assert.equal(callCompile.status, 0, callCompile.stderr);
 const callResult = JSON.parse(callCompile.stdout);
-assert.equal(callResult.ok, true, JSON.stringify(callResult));
-const callWords = callResult.words;
+assert.equal(callResult.ok, false, JSON.stringify(callResult));
+assert.match(callResult.error, /Cannot encode CALL.*unresolved/);
+assert(!callResult.words, 'unresolved compile must not issue a candidate');
+const previousDisplay = dom.window.document.getElementById('savedLumpDisassembly').textContent;
+context._showCompilerOutputBesideSource();
+assert.equal(dom.window.document.getElementById('savedLumpDisassembly').textContent, previousDisplay);
+assert.match(dom.window.document.getElementById('disassemblyPresentationStatus').textContent,
+    /Previous successful compile.*Not the result/);
+assert.equal(dom.window.document.getElementById('asmEditor').value,
+    'method Run() { return(1) }', 'unresolved compile preserves draft');
+const callWords = require('../tests/fixtures/legacy-symbolic-calls').presentation;
 const guard = dom.window.SymbolicLumpGuard;
 const contract = guard.embedded(callWords);
 assert.equal(contract.calls.length, 2);
@@ -225,6 +234,8 @@ assert.match(dom.window.document.getElementById('compiledLumpMetadataText').text
 assert.doesNotMatch(callDisplay, /mutable.Wrong/);
 const faultOffset = contract.calls[1].word_offset + 1;
 assert.equal(callWords[faultOffset], 0xf7000000);
+assert(!contract.calls.some(c => c.word_offset === faultOffset),
+    'intentional HARDFAULT has no relocation attribution');
 assert.match(callDisplay, new RegExp('\\[' + String(faultOffset).padStart(4, '0') +
     '\\]  0xF7000000  WORD_f7000000'));
 assert.equal(JSON.stringify(callWords), frozenCalls);

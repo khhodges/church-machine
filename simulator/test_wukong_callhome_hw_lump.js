@@ -442,7 +442,7 @@ console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct en
 
     const assembled = new ChurchAssembler().assemble(
         'capabilities { Other E, WukongCallHome.hw E }\n' +
-        'CALL wukongcallhome.HW'
+        'CALL CR6[wukongcallhome.HW]'
     );
     const callWord = assembled.words[0] >>> 0;
     check('WCH-HW-11c: assembler emits one CR6-indexed CALL for the direct entry',
@@ -458,7 +458,7 @@ console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct en
     const sourceResult = new ChurchAssembler().assemble(
         fs.readFileSync(sourcePath, 'utf8'));
     const sourceCallWord = sourceResult.words[sourceResult.words.length - 2] >>> 0;
-    check('WCH-HW-11d: canonical source keeps CALL WukongCallHome.hw as one direct instruction',
+    check('WCH-HW-11d: canonical source uses explicit indexed hardware entry as one direct instruction',
         sourceResult.errors.length === 0 &&
         ((sourceCallWord >>> 27) & 0x1F) === 2 &&
         ((sourceCallWord >>> 15) & 0xF) === 6 &&
@@ -558,10 +558,11 @@ console.log('\n--- WCH-HW-13: code view, compile ownership, and popup guards ---
 
     check('WCH-HW-13a: code view reserves BRANCH rendering for opcode 23',
         appMemory.includes('if (((_w >>> 27) & 0x1F) !== 23) continue;') &&
-        appMemory.includes('} else if (((word >>> 27) & 0x1F) === 23) {'));
+        appMemory.includes('} else if (((word >>> 27) & 0x1F) === 23 && !((word >>> 19) & 15)) {'));
     check('WCH-HW-13b: method-start banners decode opcode-23 table entries',
-        appMemory.includes('const offset = pointerOpcode === 23') &&
-        appMemory.includes('? i + signedOffset'));
+        appMemory.includes('function _codeViewMethodEntries(codeWords, methods)') &&
+        appMemory.includes('} else if (opcode === 23) {') &&
+        appMemory.includes('targetIndex = i + signedOffset;'));
     check('WCH-HW-13c: both high-level Load into Sim paths emit opcode 23',
         appRun.includes('(((23 << 27) | (branchOffset & 0x7FFF))') &&
         appCompile.includes('(((23 << 27) | (branchOffset & 0x7FFF))') &&

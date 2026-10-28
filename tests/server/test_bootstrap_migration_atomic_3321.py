@@ -112,6 +112,13 @@ def test_wukong_rebuild_archives_displaced_bytes_without_deleting_them(tmp_path)
     active = [row for row in after if row.get("abstraction") == "WukongCallHome"
               and not row.get("archived", False)]
     assert len(active) == 1
+    raw = (catalog / active[0]["filename"]).read_bytes()
+    words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+    assert (words[0] >> 10) & 0x1FFF == 74
+    # The hardware entry has no method table: selector 0 is explicit, not a
+    # guessed named method. SELF insertion moves declaration row 6 to row 7.
+    assert words[1 + 72] == 0x17030007
+    assert words[-1] == 0x4A000007
     assert all(row.get("archived", False) for row in after
                if row.get("abstraction") == "WukongCallHome"
                and row["filename"] != active[0]["filename"])

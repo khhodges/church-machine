@@ -14,6 +14,7 @@ const contract = require('./lump-api-contract.js');
 const guard = require('./symbolic-lump-guard.js');
 const ph = cond => guard.placeholder(cond);
 const { lumpDecodeContentFrameApi } = require('./lump-content-frame.js');
+const historical = require('../tests/fixtures/legacy-symbolic-calls');
 
 const PLACEHOLDER = 0xF7000000;
 const NATIVE = 'abstraction ide.Probe {\n capabilities {\n  SELF E\n  ide.SelfTest E\n  ide.WukongCallHome E\n }\n' +
@@ -23,7 +24,7 @@ const ASM = 'abstraction ide.Probe {\ncapabilities {\n SELF E,\n ide.SelfTest E,
 
 function artifact(src) {
     const r = new CLOOMCCompiler().compile(src, []);
-    assert.deepStrictEqual(r.errors, [], 'no destination API/method convention needed');
+    assert.deepStrictEqual(r.errors, [], 'valid source compiles without errors');
     assert.deepStrictEqual(r.warnings || [], [], 'no unresolved-only warnings');
     const L = buildLump(r);
     let api = buildApiDefinition(r, L.words);
@@ -31,9 +32,17 @@ function artifact(src) {
     return { r, api, words: embedSelfDefinition(L.words, api, src, 2, r.language) };
 }
 
-// 1. Compile with missing targets/API: both frontends, placeholder words, metadata.
-const native = artifact(NATIVE);
-const asm = artifact(ASM);
+// 1. New unresolved CALLs fail; historical artifacts remain inspectable.
+for (const src of [NATIVE, ASM]) {
+    const r = new CLOOMCCompiler().compile(src, []);
+    assert(r.errors.some(e => /Cannot encode CALL.*unresolved/.test(e.message)));
+}
+function savedArtifact(words) {
+    const api = lumpDecodeContentFrameApi(words);
+    return { words, api, capabilities: codec.expand(api, words).capabilities };
+}
+const native = savedArtifact(historical.native);
+const asm = savedArtifact(historical.assembly);
 // LOAD-only dependencies require the same integrity-covered linker contract,
 // even though there are no CALL relocations.
 {
@@ -64,7 +73,8 @@ for (const [label, a, expect] of [
         .symbolic_binding, sb);
 }
 // No numeric selector or default entry is guessed for any symbolic site.
-assert(!native.r.methods[0].code.some(w => (w >>> 27) === 2), 'no guessed CALL words');
+assert(!native.words.slice(1, 1 + ((native.words[0] >>> 10) & 8191))
+    .some(w => (w >>> 27) === 2), 'historical artifact contains no guessed CALL words');
 
 // 2. Strict contract rejects malformed metadata.
 {
@@ -77,17 +87,15 @@ assert(!native.r.methods[0].code.some(w => (w >>> 27) === 2), 'no guessed CALL w
     assert.throws(() => contract.validate(extra, hdr), /unknown field/);
 }
 
-// 3. Server worker path produces identical canonical bytes and no warnings.
+// 3. Server worker rejects the same source rather than issuing new placeholders.
 {
     const out = spawnSync(process.execPath, [path.join(__dirname, '..', 'server', 'compile_worker.js')],
         { input: JSON.stringify({ source: NATIVE, language: 'javascript' }), encoding: 'utf8', timeout: 30000 });
     const res = JSON.parse(out.stdout);
-    assert.strictEqual(res.ok, true, res.error);
-    assert.deepStrictEqual(res.warnings, []);
-    const api = lumpDecodeContentFrameApi(res.words);
-    assert.deepStrictEqual(api.symbolic_binding.calls.map(c => c.full_name),
-        ['ide.SelfTest.Run', 'ide.WukongCallHome.Run']);
-    for (const c of api.symbolic_binding.calls) assert.strictEqual(res.words[c.word_offset] >>> 0, ph(c.condition));
+    assert.strictEqual(out.status, 0, out.stderr);
+    assert.strictEqual(res.ok, false);
+    assert.match(res.error, /Cannot encode CALL.*unresolved/);
+    assert(!res.words, 'failed compilation cannot issue candidate bytes');
 }
 
 // 4. Runtime: unused unresolved site does not fault; executed one HardFaults
@@ -126,7 +134,7 @@ function run(words, steps) {
     sim.memory.set(native.words, base);
     sim.nsCount = 1;
     sim.readNSEntry = () => ({word0_location: base});
-    sim.programCapabilities = native.r.capabilities;
+    sim.programCapabilities = native.capabilities;
     sim.resolveCapabilityName = () => { throw Error('Runtime must not bind a saved symbolic row'); };
     let fault;
     sim.fault = (code, message) => { fault = {code, message}; };
@@ -154,30 +162,25 @@ function run(words, steps) {
     }
 }
 
-// 4c. Explicit "CALL obj, Method" and named LOAD->CALL defer identically,
-//     without destination method information; numeric CR calls unchanged.
+// 4c. Named calls without method evidence fail; numeric CR calls stay valid.
 {
     const src = 'abstraction ide.Probe {\ncapabilities {\n SELF E,\n ide.Target E\n}\nmethod Run() {\n' +
         'CALL ide.Target, Run\nLOAD CR3, ide.Target\nCALL ide.Target.Run\nCALLNE ide.Target, Stop\nCALL CR3, 2\nRETURN\n}\n}';
     const r = new CLOOMCCompiler().compile(src, []);
-    assert.deepStrictEqual(r.errors, []);
-    assert.deepStrictEqual(r.warnings || [], []);
-    const m = r.methods[0];
-    assert.deepStrictEqual(m.symbolicCalls.map(c => [c.addr, c.full_name, c.row, c.condition]),
-        [[0, 'ide.Target.Run', 1, 14], [2, 'ide.Target.Run', 1, 14], [3, 'ide.Target.Stop', 1, 1]]);
-    assert.strictEqual(m.code[4] >>> 27, 2, 'numeric CR CALL keeps real CALL encoding');
-    assert.strictEqual(m.code[4], new ChurchAssembler().assemble('CALL CR3, 2').words[0]);
+    assert(r.errors.some(e => /Cannot encode CALL.*unresolved/.test(e.message)));
+    const numeric = new ChurchAssembler().assemble('CALL CR3, 2');
+    assert.deepStrictEqual(numeric.errors, []);
+    assert.strictEqual(numeric.words[0] >>> 27, 2, 'numeric CR CALL keeps real CALL encoding');
     const nat = new CLOOMCCompiler().compile('abstraction ide.Probe {\n capabilities {\n  SELF E\n  ide.Target E\n }\n' +
         ' method Run() {\n  CALL ide.Target, Run\n }\n}', []);
-    assert.deepStrictEqual(nat.errors, []);
-    assert.deepStrictEqual(nat.methods[0].symbolicCalls.map(c => c.full_name), ['ide.Target.Run']);
+    assert(nat.errors.some(e => /Cannot encode CALL.*unresolved/.test(e.message)));
 }
 
 // 4d. Browser save guard: canonical zero/SELF accepted from exact bytes;
 //     tampering, local GTs and divergent plan contracts are rejected.
 {
     const ok = guard.validate(native.words, { planContract: native.api.symbolic_binding,
-        capabilities: native.r.capabilities });
+        capabilities: native.capabilities });
     assert.strictEqual(ok.symbolic, true);
     assert.deepStrictEqual(ok.contract, native.api.symbolic_binding);
     const cc = native.words[0] & 255;
@@ -194,7 +197,8 @@ function run(words, steps) {
     assert.throws(() => guard.validate(plain, { planContract: plan }), /absent/);
 }
 
-// 5. Canonical bytes are deterministic (recompile → identical words).
-assert.deepStrictEqual(artifact(NATIVE).words, native.words);
+// 5. Legacy bytes are frozen evidence, never reproduced by a new compilation.
+assert(Object.isFrozen(native.words));
+assert(Object.isFrozen(asm.words));
 
 console.log('symbolic CALL binding regressions passed');

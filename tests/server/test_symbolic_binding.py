@@ -1,9 +1,6 @@
 import copy
-import hashlib
 import json
-import struct
 import subprocess
-from pathlib import Path
 
 import pytest
 
@@ -67,19 +64,33 @@ def test_invalid_relocations_are_rejected(field, value):
         validate(contract, 2, words)
 
 
-def test_real_compiler_emits_integrity_covered_symbolic_contract():
+def historical_words():
+    """Read shared frozen bytes; never invoke a compiler to create legacy CALLs."""
+    proc = subprocess.run(
+        ["node", "-e", "console.log(JSON.stringify(require('./tests/fixtures/legacy-symbolic-calls').native))"],
+        text=True, capture_output=True, check=True, timeout=30)
+    return json.loads(proc.stdout)
+
+
+def test_real_compiler_rejects_unresolved_calls():
     source = ("abstraction ide.Caller {\ncapabilities { SELF E, ide.Target E }\n"
               "method Run() {\nCALL ide.Target.Run\nRETURN\n}\n}\n")
     proc = subprocess.run(["node", "server/compile_worker.js"], input=json.dumps({
         "source": source, "language": "javascript", "tier": 2}),
         text=True, capture_output=True, check=True, timeout=30)
     result = json.loads(proc.stdout)
-    assert result["ok"], result
-    contract = embedded(result["words"])
-    assert contract["owner"] == "ide.Caller"
-    assert contract["calls"][0]["full_name"] == "ide.Target.Run"
-    assert result["words"][contract["calls"][0]["word_offset"]] == FAULT
-    compact_zero = result["words"][:]
+    assert not result["ok"], result
+    assert "Cannot encode CALL" in result["error"]
+    assert "words" not in result
+
+
+def test_historical_integrity_covered_symbolic_contract():
+    words = historical_words()
+    contract = embedded(words)
+    assert contract["owner"] == "ide.Probe"
+    assert contract["calls"][0]["full_name"] == "ide.SelfTest.Run"
+    assert words[contract["calls"][0]["word_offset"]] == FAULT
+    compact_zero = words[:]
     compact_zero[-(compact_zero[0] & 255)] = 0
     assert embedded(compact_zero) == contract
     for row in (0, 1):

@@ -15,7 +15,7 @@
 //   • Declared capabilities must materialize to the canonical Wukong tokens.
 //
 // What is intentionally NOT compared:
-//   • Words [0..1] (LOAD instructions) — the LUMP uses c-list slots 0/1 for
+//   • Words [0..1] (LOAD instructions) — source uses c-list rows 4/5 for
 //     (LED0, UART_TX) while the hardware boot c-list uses slots 5/6 for
 //     (LED_DEV, UART_DEV).  Only the imm field (c-list slot index) differs;
 //     opcode, condition code, and register fields are identical.  The check
@@ -35,7 +35,8 @@
 
 const fs            = require('fs');
 const path          = require('path');
-const { execSync }  = require('child_process');
+const { execSync, execFileSync } = require('child_process');
+const os = require('os');
 
 const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
@@ -59,12 +60,8 @@ if (typeof ChurchAssembler === 'undefined') {
 
 // ── Assemble the CLOOMC source ───────────────────────────────────────────────
 const source = fs.readFileSync(SOURCE, 'utf8');
-const assemblySource = source.replace(
-    /(UART_TX\s+RW)(\s*\n\})/,
-    '$1,\n    WukongCallHome.hw E$2'
-);
 const asm    = new ChurchAssembler();
-const result = asm.assemble(assemblySource);
+const result = asm.assemble(source);
 
 if (result.errors.length > 0) {
     console.error('Assembly errors in wukong_callhome.cloomc:');
@@ -80,17 +77,6 @@ console.log(`Assembled ${assembled.length} instruction words from wukong_callhom
 // ── Fetch WUKONG_NUC_PROGRAM via Python ──────────────────────────────────────
 // Run Python to emit the hardware program as a JSON array.
 // hardware/boot_rom.py uses Amaranth relative imports; run via the package.
-const pyCmd = [
-    'python3', '-c',
-    [
-        'import sys',
-        `sys.path.insert(0, ${JSON.stringify(ROOT)})`,
-        'from hardware.boot_rom import WUKONG_NUC_PROGRAM',
-        'import json',
-        'print(json.dumps([w & 0xFFFFFFFF for w in WUKONG_NUC_PROGRAM]))',
-    ].join('; '),
-].join(' ');
-
 let nucProgram;
 try {
     // Use python3 -c with the script passed via stdin via execSync's input option
@@ -115,8 +101,8 @@ console.log(`WUKONG_NUC_PROGRAM has ${nucProgram.length} words.`);
 // ── Verify lengths ────────────────────────────────────────────────────────────
 let failed = false;
 
-if (assembled.length !== 75) {
-    console.error(`FAIL: wukong_callhome.cloomc assembled to ${assembled.length} words; expected 75.`);
+if (assembled.length !== 74) {
+    console.error(`FAIL: wukong_callhome.cloomc assembled to ${assembled.length} words; expected 74.`);
     failed = true;
 }
 if (nucProgram.length !== 73) {
@@ -135,7 +121,7 @@ if (failed) process.exit(1);
 // so the check detects opcode/operand/value drift without false-failing on this
 // known encoding convention difference.
 //
-// BRANCH is NOT normalised — bit14 is part of the 15-bit signed offset and must
+// BRANCH is NOT normalised — bit14 is part of its offset magnitude and must
 // match exactly.  DREAD/DWRITE use the 4-operand indexed form (bit14=0 always),
 // so they also match exactly without normalisation.
 //
@@ -191,28 +177,20 @@ if (!diverged) {
     console.log('  OK: words [2..71] match exactly.');
 }
 
-// The immutable ROM loops at word 72. The software LUMP instead materializes
-// the recovered hardware capability into CR0, calls its direct/default entry,
-// then keeps an adjusted loop as a safe fallback. The assembly-only runtime
-// handoff follows the six source declarations, so it is row 6 before the
-// builder inserts compiler-owned SELF at physical row 0.
-const EXPECTED_HW_LOAD = 0x07030006;
-const EXPECTED_HW_CALL = 0x17000000;
-const EXPECTED_SW_LOOP = 0xBF007FB9;
-const EXPECTED_ROM_LOOP = 0xBF007FBB;
-if ((assembled[72] >>> 0) !== EXPECTED_HW_LOAD) {
-    console.error(`  DIVERGED word[72]: expected WukongCallHome.hw LOAD ` +
-                  `0x${EXPECTED_HW_LOAD.toString(16)}, got 0x${(assembled[72] >>> 0).toString(16)}.`);
+// The immutable ROM loops at word 72. The software LUMP directly CALLs
+// the selected CR6 capability without touching CR0. It is declaration row 6
+// before the builder inserts SELF, then physical row 7; selector stays zero.
+const EXPECTED_HW_CALL = 0x17030006;
+const EXPECTED_SW_LOOP = 0xBF040046; // sign bit 18, magnitude 70
+const EXPECTED_ROM_LOOP = 0xBF040045; // sign bit 18, magnitude 69
+if ((assembled[72] >>> 0) !== EXPECTED_HW_CALL) {
+    console.error(`  DIVERGED word[72]: expected indexed selector-0 CALL ` +
+                  `0x${EXPECTED_HW_CALL.toString(16)}, got 0x${(assembled[72] >>> 0).toString(16)}.`);
     diverged = true;
 }
-if ((assembled[73] >>> 0) !== EXPECTED_HW_CALL) {
-    console.error(`  DIVERGED word[73]: expected selector-0 CALL ` +
-                  `0x${EXPECTED_HW_CALL.toString(16)}, got 0x${(assembled[73] >>> 0).toString(16)}.`);
-    diverged = true;
-}
-if ((assembled[74] >>> 0) !== EXPECTED_SW_LOOP) {
-    console.error(`  DIVERGED word[74]: expected loop fallback 0x${EXPECTED_SW_LOOP.toString(16)}, ` +
-                  `got 0x${(assembled[74] >>> 0).toString(16)}.`);
+if ((assembled[73] >>> 0) !== EXPECTED_SW_LOOP) {
+    console.error(`  DIVERGED word[73]: expected loop fallback 0x${EXPECTED_SW_LOOP.toString(16)}, ` +
+                  `got 0x${(assembled[73] >>> 0).toString(16)}.`);
     diverged = true;
 }
 if ((nucProgram[72] >>> 0) !== EXPECTED_ROM_LOOP) {
@@ -221,7 +199,7 @@ if ((nucProgram[72] >>> 0) !== EXPECTED_ROM_LOOP) {
     diverged = true;
 }
 
-// Structural branch-target check: decode the 15-bit signed offset from word[72]
+// Structural branch-target check: decode sign/magnitude displacement at word[72]
 // and verify it resolves to WUKONG_LOOP_TOP (word 3), regardless of program length.
 // This catches silent drift when banner bytes are added: the branch index shifts
 // forward but the loop-top index stays at 3, making a hardcoded offset wrong.
@@ -229,15 +207,14 @@ if ((nucProgram[72] >>> 0) !== EXPECTED_ROM_LOOP) {
     const WUKONG_LOOP_TOP   = 3;   // _WUKONG_LOOP_TOP in hardware/boot_rom.py
     const BRANCH_INDEX      = 72;
     const romBranchWord     = nucProgram[BRANCH_INDEX] >>> 0;
-    const imm15             = romBranchWord & 0x7FFF;
-    // Sign-extend 15-bit two's-complement value (bit 14 is the sign bit).
-    const signedOffset      = (imm15 & 0x4000) ? (imm15 - 0x8000) : imm15;
+    const magnitude         = romBranchWord & 0x3FFFF;
+    const signedOffset      = magnitude * (romBranchWord & 0x40000 ? -1 : 1);
     const branchTarget      = BRANCH_INDEX + signedOffset;
     if (branchTarget !== WUKONG_LOOP_TOP) {
         console.error(
             `  DIVERGED: ROM word[${BRANCH_INDEX}] branch target is word ${branchTarget}, ` +
             `expected ${WUKONG_LOOP_TOP} (_WUKONG_LOOP_TOP). ` +
-            `Encoded offset=${signedOffset} (0x${(imm15).toString(16)}). ` +
+            `Encoded offset=${signedOffset} (magnitude 0x${magnitude.toString(16)}). ` +
             `Banner bytes were added without updating the BRANCH AL offset.`
         );
         diverged = true;
@@ -315,6 +292,36 @@ for (let i = 0; i < 2; i++) {
         const crSrc = (a >>> 15) & 0xF;
         console.log(`  word[${i}]: LOAD CR${crDst}, CR${crSrc}[${aSlot}]` +
                     `  (LUMP slot=${aSlot}  HW slot=${nSlot}  — expected difference)`);
+    }
+}
+
+// Check actual builder output, not a second implementation of row relocation.
+// All publication/history writes stay in a disposable copy.
+if (!diverged) {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'wch-divergence-'));
+    try {
+        const catalog = path.join(temp, 'lumps');
+        fs.cpSync(path.join(ROOT, 'server', 'lumps'), catalog,
+            {recursive: true, verbatimSymlinks: true});
+        execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'build_wukong_callhome_lump.js'),
+            '--out-dir', catalog], {cwd: ROOT, encoding: 'utf8'});
+        const manifest = JSON.parse(fs.readFileSync(path.join(catalog, 'manifest.json'), 'utf8'));
+        const active = manifest.filter(row => row.abstraction === 'WukongCallHome' && !row.archived);
+        if (active.length !== 1) throw new Error('expected one active rebuilt WukongCallHome');
+        const raw = fs.readFileSync(path.join(catalog, active[0].filename));
+        const header = raw.readUInt32BE(0);
+        if (((header >>> 10) & 8191) !== 74 || (header & 255) !== 8 ||
+            raw.readUInt32BE(73 * 4) !== 0x17030007 ||
+            raw.readUInt32BE(74 * 4) !== EXPECTED_SW_LOOP ||
+            raw.readUInt32BE(raw.length - 4) !== 0x4A000007) {
+            throw new Error('rebuilt handoff must use physical row 7, selector 0 and exact hardware GT');
+        }
+        console.log('  OK: rebuilt CALL selects physical row 7 after SELF insertion; selector remains 0.');
+    } catch (err) {
+        console.error('  DIVERGED builder output: ' + err.message);
+        diverged = true;
+    } finally {
+        fs.rmSync(temp, {recursive: true, force: true});
     }
 }
 

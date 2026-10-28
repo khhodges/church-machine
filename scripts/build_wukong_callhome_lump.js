@@ -66,15 +66,8 @@ if (typeof ChurchAssembler === 'undefined') {
 
 // ── Assemble the source ──────────────────────────────────────────────────────
 const source = fs.readFileSync(SOURCE, 'utf8');
-// WukongCallHome.hw is an installation-owned handoff, not a programmer
-// declaration. Add it only to the assembly input so the named CALL can be
-// encoded; the embedded/restored source remains the exact six-row source.
-const assemblySource = source.replace(
-    /(UART_TX\s+RW)(\s*\n\})/,
-    '$1,\n    WukongCallHome.hw E$2'
-);
 const asm    = new ChurchAssembler();
-const result = asm.assemble(assemblySource);
+const result = asm.assemble(source);
 
 if (result.errors.length > 0) {
     console.error('Assembly errors in wukong_callhome.cloomc:');
@@ -86,7 +79,8 @@ if (result.errors.length > 0) {
 
 const words = result.words.map(word => {
     const op = (word >>> 27) & 0x1F, src = (word >>> 15) & 0xF;
-    return src === 6 && [0, 1, 8, 9].includes(op)
+    // SELF insertion shifts indexed CALL rows as well as LOAD/SAVE rows.
+    return src === 6 && [0, 1, 2, 8, 9].includes(op)
         ? ((word & ~0x1F) | ((word + 1) & 0x1F)) >>> 0 : word;
 });
 console.log(`Assembled ${words.length} instruction words.`);
