@@ -159,3 +159,13 @@ fault restart; unchanged bytes at the fault itself are insufficient.
 **How to apply:** Distinguish restarting execution over retained memory from
 reloading a pristine image. Verify Reveal after recovery, not just the
 pre-restart value. Do not imply persistence across power loss.
+
+For the combined running-loop demonstration, the user proposes Alice saving
+x+1 on each turn to show that useful work continues across Mallory's denial.
+
+**Why:** A retained constant alone demonstrates preservation, not ongoing work.
+
+**How to apply:** Derive the increment from Alice's retained protected value and
+check continuity before updating, rather than reinitializing or reconstructing
+the value from an external counter. Treat this as the proposed demonstration,
+not proof of fault containment or permission to implement it.
