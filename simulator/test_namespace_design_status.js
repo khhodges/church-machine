@@ -55,6 +55,34 @@ function harness(initialProfile, persisted) {
 }
 
 async function run() {
+    const fresh=harness('ascending',true);
+    await fresh.api.load();
+    let stopped=0, invalidated=0;
+    fresh.scope.DesignSimulation={stop(){stopped++;},invalidate(){invalidated++;}};
+    fresh.response.fingerprint='updated';
+    await fresh.api.reloadSaved();
+    assert.equal(fresh.api.state.fingerprint,'updated');
+    assert.equal(stopped,1);
+    assert(invalidated>=1);
+    assert.match(fresh.host.innerHTML,/Reload saved design/);
+    fresh.api.policy(9,'Lazy');
+    const draft=JSON.stringify(fresh.api.state.document), count=fresh.requests.length;
+    await fresh.api.reloadSaved();
+    assert.equal(fresh.requests.length,count,'dirty reload must not fetch or overwrite');
+    assert.equal(JSON.stringify(fresh.api.state.document),draft);
+    assert.match(fresh.api.state.error,/unsaved Namespace changes are retained/);
+    const racing=harness('ascending',true);
+    await racing.api.load();
+    const originalFetch=racing.scope.fetch;
+    racing.scope.fetch=async (...args)=>{
+        const result=await originalFetch(...args);
+        racing.api.policy(9,'Lazy');
+        return result;
+    };
+    await racing.api.reloadSaved();
+    assert.equal(racing.api.state.dirty,true);
+    assert.equal(racing.api.state.document.rows[2].policy,'Lazy');
+    assert.match(racing.api.state.error,/changed while reloading/);
     for (const profile of ['ascending', 'phase1']) {
         for (const persisted of [true, false, undefined]) {
             const {api, host, scope, controls, requests} = harness(profile, persisted);

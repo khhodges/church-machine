@@ -105,6 +105,25 @@
         catch (e) { state.error = e.message; }
         finally { state.loading = false; render(); }
     }
+    async function reloadSaved() {
+        if (state.loading || state.saving) return;
+        if (state.dirty) {
+            state.error='Reload blocked: your unsaved Namespace changes are retained. Save them or duplicate this Namespace first.';
+            render(); return;
+        }
+        const owner=JSON.stringify([state.profile,state.designId,state.document,state.fingerprint]);
+        root.DesignSimulation?.stop();
+        root.DesignSimulation?.invalidate();
+        state.loading=true;
+        try {
+            const data=await request('GET');
+            if (state.dirty || owner!==JSON.stringify([state.profile,state.designId,state.document,state.fingerprint]))
+                throw Error('Namespace changed while reloading. Your local changes are retained; nothing was replaced.');
+            ++sourceRequest;
+            accept(data);
+        } catch(error) { state.error=error.message; }
+        finally { state.loading=false; render(); }
+    }
     async function selectCopy(identifier) {
         if (state.loading || state.saving) return;
         if (state.dirty) {
@@ -254,6 +273,7 @@
                 <option value="">Original — ${esc(root.NamespaceProfileNames.label(state.profile))}</option>
                 ${copies.filter(c=>c.profile===state.profile).map(c=>`<option value="${esc(c.id)}" ${c.id===state.designId?'selected':''}>${esc(c.name)}</option>`).join('')}
             </select></label>
+            <button type="button" id="reloadNamespaceSaved" onclick="NamespaceDesignV1.reloadSaved()" ${state.loading || state.saving?'disabled':''}>Reload saved design</button>
             <button type="button" id="duplicateNamespace" onclick="NamespaceDesignV1.duplicateNamespace()" ${state.loading || state.saving?'disabled':''}>Duplicate Namespace</button>
             <strong>${esc(profileLabel())} · ${label}</strong>
             ${state.designId?'<div>Independent copy · test/approval status is not inherited.</div>':''}
@@ -696,7 +716,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery};
+    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');

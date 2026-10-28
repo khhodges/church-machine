@@ -477,7 +477,10 @@
             return true;
         } catch(error) {
             if(actionIntent!==intent) return false;
-            stop(); message='Selected simulation blocked: '+error.message; render();
+            const reason=error.message.includes('Saved design changed')
+                ? 'The saved Namespace changed since this tab loaded it. Open Namespace → Reload saved design, then click Run again. Unsaved Namespace edits must be saved or preserved first. Nothing ran; no installed image or hardware was changed.'
+                : error.message;
+            stop(); message='Selected simulation blocked: '+reason; render();
             if(typeof root.appendOutput==='function') root.appendOutput(message,'error');
             if(typeof root._showFpgaToast==='function') root._showFpgaToast('Simulation blocked',message,'error',15000);
             return false;
