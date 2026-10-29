@@ -1466,3 +1466,17 @@ mtime_ms = 1793220915722
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/0d3c5513-a0f8-4d74-8cee-3ce4db903f1e/d969568d-d25e-4c29-b9d1-6f13c5ca4133"
 storage_version_token = "1793220930465671"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "H3KeKieL77atw3-09Q_5s"
+uri = "file://generated-artifacts/combined-continuation-validation.zip"
+type = "unspecified"
+title = "Combined FPGA validation package"
+description = "Isolated initializer + continuation corrections with the unchanged image, checksums, and validation runners. No BIT generation or board commands."
+logical_id = "505fd630-e835-4f47-ac68-3269e05bb52e"
+content_hash = "sha256:76b706348c003c6bd5443f93cf49c7bebb8873f23917d650dc21c1c7444b9e79"
+size = 3438018
+mtime_ms = 1793284314472
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/505fd630-e835-4f47-ac68-3269e05bb52e/371a74a0-7357-4a89-b8cd-f98979a2d5be"
+storage_version_token = "1793284329001013"
+content_type = "application/octet-stream"

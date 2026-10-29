@@ -13,6 +13,7 @@ description: Build-host, staging, artifact tracking, and release authority const
 - [Binary merge survival](verified-binary-merge-survival.md) — track and verify the complete release bundle.
 - [Historical authority](historical-hardware-authority-chain.md) — bind test context to the exact source, build, and artifact digest.
 - [RTL replay and ISA gates](generated-rtl-replay.md) — reset-faithful synthesis, model distinctions, ISA-derived acceptance, and trace/snapshot evidence limits.
+- [Experimental correction composition](experimental-hardware-composition.md) — validated overlays must be explicitly included in later frozen candidates.
 - [Elaboration performance](amaranth-shape-memoization.md) — reuse release-generator AST memoization; bare traversal can stall or crash.
 - [Validation supervision](rtl-validation-budget.md) — long matrices may outlive completion validation; unfinished checks are not passes or RTL failures.
 - [ISA/simulator reference goals](isa-simulator-reference-goals.md) — fully defined ISA, explicit simulator exceptions, and FPGA-comparable binary memory detail.
