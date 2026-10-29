@@ -155,3 +155,4 @@
 - [Thread strip visibility](thread-strip-visibility.md) — all views retain configured membership; missing runtime is not missing configuration or authority to activate.
 - [Python ABI dependencies](python-abi-dependencies.md) — check the serving interpreter when installing SDKs; package installation and `python3` can use different versions.
 - [GitHub source-control access](github-source-control-access.md) — connector lookup may fail while secure `gh` works; verify binary release uploads separately.
+- [Vendor observer portability](vendor-observer-portability.md) — declare before use; Icarus acceptance does not prove xvlog compatibility; reuse verified synthesis after observer-only failures.

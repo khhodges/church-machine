@@ -20,6 +20,13 @@ def test_missing_write_bus_fails_closed():
         observer(mapped_fixture(), 2)
 
 
+def test_observer_declarations_precede_all_uses():
+    text = observer(fixture(), 2)
+    assert text.count("integer write_count=0;") == 1
+    assert text.index("integer write_count=0;") < text.index("if(write_count")
+    assert text.index("reg [45:0] expected") < text.index('$readmemh')
+
+
 @pytest.mark.parametrize("first,last,entry,fault,success", [
     ("f8810100", "00000011", "00004610", "0", True),
     ("00000000", "00000011", "00004610", "0", False),

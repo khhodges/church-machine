@@ -31,9 +31,12 @@ def observer(text, count):
     tb = tb.replace('$display("COMBINED_VENDOR_BOOT_PASS:',
                     f'if(write_count!={count} || {done} !== 1) $fatal(1,"Incomplete initialization");\n'
                     '$display("COMBINED_VENDOR_BOOT_PASS:')
-    addition = f"""
+    declarations = f"""
 reg [45:0] expected [0:{count-1}];
 integer write_count=0;
+"""
+    tb = tb.replace("module full_boot_tb;", "module full_boot_tb;" + declarations, 1)
+    addition = f"""
 initial $readmemh("pairs.hex", expected);
 always @(posedge dut.\\boot_rom.clk ) begin
  if($realtime>0) begin
