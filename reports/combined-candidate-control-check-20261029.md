@@ -115,3 +115,23 @@ Preserve the approved image and existing frozen artifacts. Any replacement
 hardware candidate requires full-model validation, vendor build evidence and
 separate approval before programming. No new hardware commands, source
 replacement, image upload or programming was performed in this follow-up.
+
+## Full-top UART regression
+
+The original full-top test
+`test_full_top_uart_halt_emits_board_evidence` passed in 14.68 seconds. It
+requires that the six response bytes appear together, but does not protect
+the surrounding trace packet.
+
+The new `test_full_top_uart_halt_preserves_inflight_trace` drives the actual
+production top's UART RX pins while UART TX is transmitting a trace. It fails
+in 6 seconds: only three trace bytes (`AA 00 00`) precede the injected Halt
+response (`AD 01 01 01 09 A5`).
+
+This upgrades the evidence from an extracted-arbiter reproduction to a full-top
+simulation failure in the current production source. It is not a vendor-netlist
+simulation or a physical raw-byte capture of the frozen candidate.
+
+The regression is deliberately not marked xfail or weakened: it is the red
+build gate that the UART correction must satisfy. No transmitter correction or
+new bitstream has yet been produced by this test-only change.

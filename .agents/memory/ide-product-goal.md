@@ -40,6 +40,17 @@ genuine identity/authentication enforcement, but do not expose it as a sequence
 of manual bookkeeping tasks. Do not use the later simplification review to
 delay the current functional milestone or claim success before board evidence.
 
+During active hardware build validation, stay on the build/tests and do not
+surface separate usability or unrelated follow-up task proposals.
+
+**Why:** On 2026-10-29 the user explicitly called those proposals confusing and
+asked to stay focused on the build tests. The broader simplification review is
+for after the arrangement works, not a parallel operator workflow.
+
+**How to apply:** Keep diagnosis, corrections and evidence for the current
+hardware candidate together. Report the specific build gate and result without
+redirecting the user into additional task cards.
+
 Every completed explicit Bind action must visibly present its outcome, even
 when the design is unchanged or earlier result windows were closed.
 

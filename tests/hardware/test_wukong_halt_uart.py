@@ -203,8 +203,8 @@ def test_full_top_uart_step_pauses_run_and_advances_once():
     )
 
 
-def test_full_top_uart_halt_emits_board_evidence():
-    """Nonce-bearing Halt emits the complete wire-format evidence frame."""
+def _capture_full_top_halt(interrupt_trace=False):
+    """Drive real UART pins, optionally requesting Halt during a trace frame."""
     _memoize_amaranth_shapes()
     clk_freq = 100
     baud = 10
@@ -233,8 +233,16 @@ def test_full_top_uart_halt_emits_board_evidence():
 
     async def drive(ctx):
         ctx.set(top.uart_rx_pin, 1)
-        for _ in range(30_000):
-            await ctx.tick()
+        if interrupt_trace:
+            for _ in range(50_000):
+                if 0xAA in tx_bytes:
+                    result["trace_start"] = tx_bytes.index(0xAA)
+                    break
+                await ctx.tick()
+            assert "trace_start" in result, "No trace packet reached UART before Halt"
+        else:
+            for _ in range(30_000):
+                await ctx.tick()
         for level in _uart_frame(ord("h")):
             ctx.set(top.uart_rx_pin, level)
             for _ in range(bit_cycles):
@@ -265,6 +273,34 @@ def test_full_top_uart_halt_emits_board_evidence():
                for i in range(len(tx_bytes) - len(expected) + 1)), (
         "UART TX did not emit all six nonce-bound halt evidence bytes: "
         f"{[f'0x{byte:02X}' for byte in tx_bytes]}"
+    )
+    return tx_bytes, result
+
+
+def test_full_top_uart_halt_emits_board_evidence():
+    """Nonce-bearing Halt emits the complete wire-format evidence frame."""
+    _capture_full_top_halt()
+
+
+def test_full_top_uart_halt_preserves_inflight_trace():
+    """Halt evidence must not be inserted into a partly transmitted trace."""
+    tx_bytes, result = _capture_full_top_halt(interrupt_trace=True)
+    expected = [0xAD, 0x01, 0x01, 0x01, 0x09, 0xA5]
+    halt_start = next(
+        i for i in range(len(tx_bytes) - len(expected) + 1)
+        if tx_bytes[i:i + len(expected)] == expected
+    )
+    trace_start = result["trace_start"]
+    # Before the Halt request, this fixture emits only complete trace frames
+    # after its boot sentinel/banner. Halt has priority over its own snapshot.
+    prefix = tx_bytes[trace_start:halt_start]
+    assert len(prefix) % 12 == 0, (
+        "Halt evidence interrupted an in-flight 12-byte trace: "
+        f"{len(prefix)} trace bytes precede Halt; "
+        f"stream={[f'{byte:02x}' for byte in tx_bytes[trace_start:halt_start + 6]]}"
+    )
+    assert all(prefix[offset] == 0xAA for offset in range(0, len(prefix), 12)), (
+        "Trace packet boundaries were lost before Halt evidence"
     )
 
 
