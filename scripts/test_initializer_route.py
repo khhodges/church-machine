@@ -37,9 +37,13 @@ def test_reject_missing_or_duplicate_summary():
 
 
 @pytest.mark.parametrize("scenario", ["pass", "drc", "slack", "pulse", "clock"])
-def test_tcl_stops_before_bitstream_on_gate_failure(tmp_path, scenario):
+@pytest.mark.parametrize("combined", [False, True])
+def test_tcl_stops_before_bitstream_on_gate_failure(tmp_path, scenario, combined):
     script = Path(__file__).resolve().parents[1] / "hardware/initializer_route.tcl"
-    (tmp_path / "route.tcl").write_text(script.read_text())
+    text = script.read_text()
+    if combined:
+        text = text.replace("initializer_route_verify.py", "combined_route.py")
+    (tmp_path / "route.tcl").write_text(text)
     (tmp_path / "clock-guard.tcl").write_text(
         'proc assert_25mhz_clocks {} {if {$::scenario eq "clock"} {error "bad clock"}}')
     harness = r"""

@@ -19,8 +19,11 @@ and last initialization writes, not only embedded ROM contents. See
 reports/continuation-startup-investigation.md for the evidence and its limits.
 
 The user approved preparing an isolated package combining these two corrections,
-with the same approved image. This does not authorize production initializer
-replacement, live Namespace edits, bitstream generation or board programming.
+with the same approved image. After both validation runners passed, the user
+approved proceeding with a build-only runner using the validated synthesized
+checkpoint for implementation and experimental bitstream generation. This does
+not authorize production initializer replacement, live Namespace edits, or
+board programming; physical programming requires separate approval.
 
-**Why:** Package preparation and validation are separate from adopting or flashing
-a replacement. Preserve that boundary until the user explicitly expands it.
+**Why:** Validation and experimental build preparation are separate from adopting
+or flashing a replacement. Preserve that boundary until explicitly expanded.

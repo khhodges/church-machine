@@ -1494,3 +1494,17 @@ mtime_ms = 1793292144442
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d0547a26-874d-440f-bc6c-3d2cdadc545e/f0f00c60-0c3c-46e2-92b6-49efb26c00f8"
 storage_version_token = "1793292164485917"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "nJSLyz0pdmbyuclb4PUm-"
+uri = "file://generated-artifacts/combined-build-only.zip"
+type = "unspecified"
+title = "Combined candidate — build-only runner"
+description = "Reuses the validated synthesized checkpoint, preserves both validation results, and gates experimental bitstream generation on clock, DRC, and timing checks. No board programming."
+logical_id = "30ffa006-270b-48c9-8d8c-5b19740a9c8f"
+content_hash = "sha256:ff521c91855742b4152cd5fac40816c6a97fd96f8d872e3be40270c05d017fca"
+size = 9052
+mtime_ms = 1793297392759
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/30ffa006-270b-48c9-8d8c-5b19740a9c8f/527f576c-dcc1-4340-b2d4-f0bfda948a56"
+storage_version_token = "1793297398517842"
+content_type = "application/octet-stream"
