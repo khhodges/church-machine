@@ -68,3 +68,11 @@ sufficient to prove this correction and declined the four-cycle extension.
 **How to apply:** Do not reopen a multi-cycle acceptance requirement for this
 correction without new evidence or a new request. This acceptance does not
 authorize live installation or claim physical-board validation.
+
+The user then approved making a bitstream from the accepted correction.
+
+**Why:** Bitstream generation is now requested, separately from the prior
+isolated RTL implementation approval.
+**How to apply:** Use the approved exact-image candidate and established 25 MHz
+build policy. Preserve vendor timing/DRC/provenance gates. This does not authorize
+programming the FPGA or replacing live Namespace/LUMP data.

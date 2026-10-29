@@ -8,10 +8,21 @@ ROOT = Path(__file__).resolve().parents[1]
 NAME = "new-layout-guarded-relative-nia-v1"
 NAME_25 = "new-layout-guarded-relative-nia-25mhz-v1"
 IMAGE_SHA256 = "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451"
+CONTINUATION_NAME = "factory-continuation-25mhz-v1"
+CONTINUATION_SHA256 = "e8ba3755a56fa69308de1154e442529b6cadef6a8a98e10b6976a09137fe9102"
 
 
 def validate_words(words, guard):
     words = tuple(words)
+    if guard == 0 and len(words) == 16384:
+        if any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words):
+            raise ValueError("Continuation image must contain uint32 words")
+        if hashlib.sha256(struct.pack("<16384I", *words)).hexdigest() != CONTINUATION_SHA256:
+            raise ValueError("Continuation image differs from the approved replay")
+        if ((words[5] >> 21 & 511) or (words[9] >> 21 & 511) or
+                (words[5] & 0x1fffff) != (((words[0] >> 10) & 8191) * 4 - 1)):
+            raise ValueError("Continuation image authority layout is invalid")
+        return words
     if (type(guard) is not int or guard != 23971 or len(words) != 16384
             or any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words)):
         raise ValueError("Production runtime image requires the exact frozen guard and uint32 image")
@@ -29,6 +40,19 @@ def build_inputs(profile=None):
     kwargs = dict(clk_freq=50_000_000, baud=57600, sim_mode=False)
     if profile is None:
         return kwargs, None
+    if profile == CONTINUATION_NAME:
+        path = ROOT / "generated-artifacts/data-access-validation/admitted.bin"
+        raw = path.read_bytes()
+        if len(raw) != 65536:
+            raise ValueError("Continuation image must be exactly 64 KiB")
+        kwargs.update(clk_freq=25_000_000, clock_mode="mmcm-25mhz",
+                      expected_boot_guard=0,
+                      runtime_image_words=validate_words(struct.unpack("<16384I", raw), 0))
+        return kwargs, dict(
+            profile=profile, imageSha256=CONTINUATION_SHA256, imageBytes=len(raw),
+            part="xc7a100tfgg676-2", top="church_wukong_xc7a100t",
+            clockHz=25_000_000, inputClockHz=50_000_000, clockMode="mmcm-25mhz",
+            uartBaud=57600, expectedBootGuard=0)
     if profile not in (NAME, NAME_25):
         raise ValueError("Unknown Wukong production profile")
     reduced = profile == NAME_25
