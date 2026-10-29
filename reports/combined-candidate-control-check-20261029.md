@@ -65,3 +65,53 @@ The next necessary evidence is the Windows bridge console output around this
 reboot and explicit Halt, to distinguish raw serial framing, parsing, and
 server-delivery failures. No additional board commands should be used merely
 to replace missing evidence.
+
+## Operator UART log and isolated arbitration reproduction
+
+The subsequent Windows console capture starts after the same port reopen and
+boot sentinel, followed by Boot's CALL to NS21, entry 0x4610, CALL into NS10,
+the SelfTest path, RETURN at 0x0FD0 and CALL to WukongCallHome at 0x2868.
+This provides serial-stream ordering missing from server arrival timestamps.
+It establishes substantially more startup progress, but a SelfTest RETURN alone
+does not establish every test's success status.
+
+At NIA 0x1814, the bridge prints a LOAD.shadow payload of 0x000000AD with flags
+N, loses frame sync, discards six bytes, and reacquires at LOAD.new for the same
+NIA. It later reports trace POST timeouts and rejection of a non-fault snapshot.
+The displayed "Explicit Halt" dialog lacks command/session correlation and must
+not be used as permission to Step or Run.
+
+`scripts/reproduce_halt_trace_interleaving.py` exercises the exact combinational
+TX arbiter extracted from the frozen source in Amaranth. Source SHA-256:
+`fbb5460cfa0db92164558c4ac2161ee5c0290db0f89834809173d9e5ee9b5c58`.
+
+The arbiter chooses Halt response bytes over an unfinished trace packet. Injecting
+the valid six-byte Halt response after byte 8 of a trace reproduces all of:
+
+- NIA 0x1814 and LOAD.shadow unchanged;
+- payload 0x000000AD;
+- flags value 1;
+- fault_valid false;
+- six leftover bytes before the next trace packet.
+
+Both observed request nonces (1 and 2) reproduce that corruption pattern.
+Serializing the complete trace followed by the complete Halt response instead
+decodes correctly using the bridge's existing parser.
+
+This is an extracted-arbiter simulation, not a full-top simulation or capture
+of the physical raw UART bytes. It establishes a packet-interleaving defect in
+the frozen source and a specific matching explanation for the observed framing
+loss. It does not independently prove every live byte took that path.
+
+### Correction boundary
+
+The appropriate correction is packet ownership in the FPGA UART transmitter,
+not trusting an uncorrelated UI Halt, weakening the parser, or guessing at bytes
+to delete. Validate the full mux (trace, Halt state, snapshots, sentinel, upload
+ACK and console output) and producer backpressure so atomic frames do not drop
+console writes or deadlock recovery.
+
+Preserve the approved image and existing frozen artifacts. Any replacement
+hardware candidate requires full-model validation, vendor build evidence and
+separate approval before programming. No new hardware commands, source
+replacement, image upload or programming was performed in this follow-up.
