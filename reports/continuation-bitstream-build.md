@@ -21,11 +21,21 @@ Archive:
 Archive SHA-256:
 `eb491fd72fed35b68d1440801700ae2c682fed30de89c088e5bcd1ed8999b4f8`
 
-## Current blocker
+## Vendor build status
 
-The documented build host's SSH port is reachable, but SSH access using the two
-saved droplet credentials failed. Vivado has **not** been launched. No `.bit`
-file or successful synthesis/timing receipt is claimed.
+Workspace SSH access using the two saved droplet credentials failed. The user
+established access from their own terminal, uploaded the archive, and verified
+its checksum and package inputs.
+
+The uploaded terminal transcript confirms Vivado 2026.1 started successfully
+and launched `synth_1` on 2026-10-29 at 11:07:05 UTC, in:
+`/root/continuation-build.uaj0Xd/factory-continuation-build`.
+It reports a valid license and no actual build error in the supplied excerpt.
+The printed Tcl `error` statements are script definitions, not raised errors.
+
+Synthesis completion, implementation, timing/DRC success, and the bitstream
+remain unverified. No `.bit` file or successful build receipt is claimed.
+Evidence: `attached_assets/Pasted-root-ubuntu-s-4vcpu-8gb-nyc3-continuation-build-uaj0Xd-_1793272091399.txt`.
 
 ## Manual build handoff
 
