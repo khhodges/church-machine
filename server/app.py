@@ -1506,7 +1506,8 @@ def download_wukong_bridge():
         return jsonify({"ok": False, "error": "Wukong bridge is unavailable"}), 404
     return send_file(os.path.abspath(p), as_attachment=True,
                      download_name="wukong_bridge.py",
-                     mimetype="text/plain")
+                     mimetype="application/octet-stream",
+                     max_age=0)
 
 def _wukong_build_version():
     """Read WUKONG_BUILD_VERSION from hardware/wukong_top.py (best-effort)."""
@@ -8797,7 +8798,7 @@ def release_r12_index():
   <div class="hero-title">Approved bitstream delivery</div>
   <div class="hero-sub">Select an exact approved revision in Build Approval history, then Download selected revision.</div>
   <a class="dl-btn" href="/simulator/index.html?view=builder&amp;hardware-history=1">Open approved bitstream history</a>
-  <a class="dl-btn" href="/dl/wukong-bridge" style="margin-left:.5rem;background:#4c1d95;color:#ddd6fe"><span class="dl-btn-icon">&#x2B07;</span>Download wukong_bridge.py</a>
+  <a class="dl-btn" href="/dl/wukong-bridge" target="_blank" rel="noopener" style="margin-left:.5rem;background:#4c1d95;color:#ddd6fe"><span class="dl-btn-icon">&#x2B07;</span>Download wukong_bridge.py</a>
   <div class="hero-meta">Approved .bit delivery is supported. Approved .mcs, BSCAN helper, and project-package exports are unavailable. The bridge is a separate host utility.</div>
 </div>
 

@@ -15372,7 +15372,7 @@ const VersionsView = {
             ? '<div class="versions-note">Start the Windows Wukong bridge, then refresh this view.</div>'
             : '';
         const downloadLine =
-            '<div class="versions-note"><a href="/dl/wukong-bridge" download="wukong_bridge.py">Download current bridge.py</a></div>';
+            '<div class="versions-note"><a href="/dl/wukong-bridge" target="_blank" rel="noopener">Download current bridge.py</a></div>';
         el.innerHTML = versionLine + latestLine + badge + expectedLine +
             portLine + ageLine + offlineNote + downloadLine;
     },

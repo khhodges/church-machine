@@ -8,6 +8,15 @@ and approve bitstreams. These role names supersede the older Builder/system
 engineer terminology below. Hardware flashing remains a separate explicit action.
 Do not combine these into one implicit Save/Prepare/Run/Flash workflow.
 
+The bridge download must work through the website button for ordinary users
+without JTAG; a PowerShell download command is not a substitute for fixing it.
+
+**Why:** The user explicitly requires a self-service download for other users,
+not a workaround for the developer.
+
+**How to apply:** Keep bridge acquisition independent of board connection,
+bitstream selection, and flashing. Distinguish download from hardware installation.
+
 For the proposed combined hardware-check, image-install, readback-verification,
 and explicit-start flow, the user requires the operator interface to be only
 the published IDE at lab.cloomc.org.
