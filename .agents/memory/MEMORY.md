@@ -36,8 +36,6 @@
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Hardware profiles and release evidence](hardware-release-index.md) — resource abstraction, activation proof, internal probes, builds and release provenance.
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
-- [Single delivery record needs client command lock](single-slot-delivery-watch-lock.md) — hold busy until watcher terminal; record replaced after consumed = likely delivered, not superseded
-- [Single-slot command ack correlation](single-slot-cmd-ack-correlation.md) — correlate queue/consume/ack/confirm stages by monotonic id, never by command letter; no time-window heuristics
 - [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
@@ -54,7 +52,7 @@
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
-- [Fault telemetry constraints](fault-telemetry-index.md) — snapshot/reboot correlation, retained incidents, delivery blocking and serial isolation.
+- [Fault telemetry constraints](fault-telemetry-index.md) — startup/stop proof, command correlation, UART ownership, retained incidents, and recovery boundaries.
 - [Fault recovery boot precedence](fault-boot-selftest-order.md) — boot wins after faults; three Boot steps enter the prepared lightning-bolt target, not an implicit SelfTest
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only
 - [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
@@ -66,7 +64,6 @@
 - [Bank validation gates](bank-validation-gates.md) — Bank uses structural, E/type, then mechanical identity checks; provenance remains human-vouched until a genesis verifier exists
 - [Static-slot historical variants](capabilitytest-static-variant-manifest.md) — archive older fixed-slot binaries in a shared variant group while the active manifest record names its exact artifact and sidecar
 - [Release-check registry policy](release-check-registry-policy.md) — sync configuration is required and fail-closed; every release suite must be workflow-backed or explicitly script-only
-- [UART raw-transfer ownership](uart-raw-transfer-ownership.md) — bridge control bytes must be deferred for the whole framed payload interval or they corrupt board-side binary parsers
 - [Execution identity provenance](execution-identity-provenance.md) — empty source is comparable; opaque cross-algorithm source hashes never prove editor freshness
 - [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
@@ -75,10 +72,7 @@
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
 - [CALL E-GT identity flow](call-egt-identity-flow.md) — CR6 keeps its E-only GT; CR6.M permits L without token mutation; CALL/RETURN preserve E identity.
-- [Bridge-causal retirement gates](bridge-causal-retirement-gates.md) — UART write→retirement proofs must use bridge-side counters, not server receive order
-- [Board-state acknowledgement correlation](board-state-ack-correlation.md) — state-changing UART acknowledgements need a request nonce, atomic receive, and bounded partial-frame recovery
 - [M-bit I/O object](m-bit-io-object.md) — one Namespace-held 32-bit I/O word; bits 0–15 map CR0.M–CR15.M and full-word writes set/clear all bits
-- [Wukong one-shot Skip Fault](wukong-skip-fault-protocol.md) — explicit post-snapshot skip needs authenticated FPGA-sequence proof; lost correlation requires reboot
 - [LUMP output profiles](lump-output-profile-stability.md) — linked editing/sharing/build forms, allocation semantics, and black-box public API boundary.
 - [LUMP save vs boot rebuild](lump-save-boot-rebuild-boundary.md) — an approved LUMP save must not roll back because an unchanged boot-image dependency cannot rebuild
 - [Save advances the IDE](save-leading-revision.md) — successful saves advance the exact working revision; preserve history, stop stale execution, and keep hardware untouched.
@@ -149,7 +143,6 @@
 - [Mint RTL replay boundary](mint-rtl-replay-boundary.md) — exact-byte tests must not translate instructions; encoding corrections cover every emitter and execution profile.
 - [Mint CREATE RTL entry](mint-create-rtl-entry-boundary.md) — use normal proof checks and an explicit scratch L binding; exact saved candidates need independent replay.
 - [Mint trial history origin](mint-trial-history-origin.md) — fresh disposable slot history cannot certify live or reused slots; closed-fixture alias evidence is not a live audit.
-- [Startup halt boundary](startup-halt-boundary.md) — post-sentinel Halt is best-effort, not a pre-entry pause; distinguish program fault-stop from confirmed startup halt.
 - [Reboot authority evidence](reboot-authority-evidence.md) — skipped-instruction telemetry is not a grant; distinguish live reset, persistent homes, and exact-image replay.
 - [Boot fault save errors](boot-fault-save-error.md) — outgoing-save memory failures use approved THREAD_CONTEXT (0x1D); Boot stash/activation failures remain catastrophic.
 - [Thread strip visibility](thread-strip-visibility.md) — all views retain configured membership; missing runtime is not missing configuration or authority to activate.

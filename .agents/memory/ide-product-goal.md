@@ -27,6 +27,19 @@ and refactor the affected code during scoped changes while preserving approved
 behavior; this standing goal does not authorize unrelated broad rewrites,
 saved-artifact changes or hardware actions.
 
+The user reiterated on 2026-10-29: security must be hidden and automatic.
+First establish a working end-to-end hardware arrangement; then perform a
+substantial simplification review, rather than expanding the operator's checklist.
+
+**Why:** The operator was repeatedly sent between token entry, duplicate Target
+selectors, refresh controls, and historical fault displays just to request a reboot.
+Mechanically correct security gates are not sufficient if the workflow is unusable.
+
+**How to apply:** Own internal diagnosis and reuse verified configuration. Keep
+genuine identity/authentication enforcement, but do not expose it as a sequence
+of manual bookkeeping tasks. Do not use the later simplification review to
+delay the current functional milestone or claim success before board evidence.
+
 Every completed explicit Bind action must visibly present its outcome, even
 when the design is unchanged or earlier result windows were closed.
 
