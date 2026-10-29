@@ -104,3 +104,40 @@ recur. This establishes RTL execution through the first intended fault boundary,
 not four-cycle RTL fault recovery: the probe deliberately stops at its first
 fault. No synthesis, timing closure, bitstream build or physical acceptance is
 claimed.
+
+## Isolated RTL recovery: failed before Boot completion
+
+The recovery probe used the same admitted image and real simulated UART pins.
+It did not inject a fault, patch registers, skip instructions, reload memory, or
+access a physical board.
+
+Verified from `rtl-recovery.json` and the independently CRC-checked
+`recovery-snapshot.bin`:
+
+1. The first fault is the expected Mallory BOUNDS, in Thread.3 / NS[12],
+   executing ide.Mallory / NS[17].
+2. A complete reason-2 snapshot with CRC16 integrity was captured and correlated
+   to that Thread and artifact.
+3. A UART Run command could not retire an instruction while the fault was held.
+4. Only after the snapshot was captured did the test send UART `g`, representing
+   the bridge's recovery authorization. This tests RTL protocol handling, not
+   the real bridge/server's promotion implementation.
+5. Boot state transitioned COMPLETE → FAULT_RST → LOAD_NS.
+6. Recovery then raised `STACK_CORRUPT` (`0x12`), with fetch address `0x4` and
+   fault instruction `0x27000001`. CR12 and CR14 were zero at this second fault.
+   Boot did not complete and no post-reset instruction retired.
+
+**Verdict:** Snapshot capture, hold, authorization and reset entry worked.
+Successful RTL fault recovery is **not** established. The exact source of the
+reported stack corruption requires investigation; no runtime repair was made.
+The simulator's four successful recovery cycles do not prove RTL equivalence.
+
+The first attempt was interrupted by a workspace restart. The next attempt
+exposed a probe sampling error: the fault code was read after its valid pulse.
+The corrected run captured the code on its valid cycle and observed Boot state
+independently. Its final JSON and independent evidence checks establish the
+result above. Amaranth also emitted an asynchronous-generator cleanup warning
+after producing the final result; this is not the reported architectural fault.
+Cycle values in the probe's main-loop events and continuous Boot observer use
+different counters because UART send/wait operations consume cycles; do not
+subtract those fields across the two streams.

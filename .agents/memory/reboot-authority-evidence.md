@@ -15,3 +15,12 @@ reboot is also not equivalent to re-uploading immutable initial Thread homes.
 policy. Replay exact admitted bytes; if another execution model rejects their
 format, report that boundary instead of translating the fixture or counting a
 fallback/default boot as a successful replay.
+
+Capture a fault's code on its valid cycle, then collect registered instruction
+metadata after the clock edge. A fault pulse ending does not prove recovery;
+observe the Boot reset transition independently.
+
+**Why:** A recovery probe sampled the code after the pulse and falsely reported
+code zero at the otherwise correctly identified intentional fault.
+**How to apply:** Keep same-cycle cause evidence separate from latched snapshot
+evidence, and verify recovery via Boot transitions rather than deasserted faults.
