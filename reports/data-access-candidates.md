@@ -208,3 +208,77 @@ GUARDED_CALL root writes are also included, not mistaken for recovery writes.
 
 No runtime RTL, live catalog, Namespace assignment, application process, or FPGA
 was changed during this investigation. Recovery acceptance remains open.
+
+## Approved isolated RTL correction (verification in progress)
+
+Following separate implementation approval, the RTL now distinguishes a pristine
+root sentinel from a suspension frame. Suspensions retain geometry and E-GT type
+checks; activation validates saved homes without requiring CR0 to equal a fresh
+startup entry. A guarded resume uses the existing RETURN and cLoad machinery for
+saved-E-GT version/seal checks, return-PC bounds, protected pop, flags, executable
+identity, C-list, and fetch-fence restoration. The original fresh-root CALL path
+remains separate.
+
+Early LOAD_NS faults now generate one fault-retirement event per reset attempt.
+That event enters the existing top-level reason-2 snapshot/authorization path;
+it does not bypass snapshot draining, authorize itself, skip instructions, or
+change version numbers. Reset rearms the event for another attempt.
+
+Completed focused checks:
+
+- Nine synthetic current-layout structural-admission cases.
+- Three consecutive malformed-context attempts in one core test: each emits
+  one fault event, remains faulted, and rearms only on explicit reboot.
+- Six integrated core cases covering fresh root, suspension, stale saved home,
+  stale saved E-GT, invalid executable seal, and out-of-range return PC.
+- Twenty-one existing top-level snapshot/recovery protocol checks.
+- A separate reconstructed-retained-Thread component probe completes Boot at
+  cycle 217, restores CapabilityTest / NS[10], and resumes at byte `0x2870`.
+  This component probe is not a replacement for exact-image full-top acceptance.
+
+The old guarded Boot test files fail with their historical fixture. The
+unmodified baseline also fails the exact activation case before this correction;
+those fixtures are not counted as passing evidence and were not rewritten.
+
+The exact admitted-image full-top replay is running separately through actual
+simulated UART authorization, with no memory reload, register injection, or
+instruction skip. It must complete Boot and retire 100 post-reset events to
+report `continuation-resumed`. That bounded result would not, by itself, prove
+four complete fault/recovery cycles or physical-board acceptance.
+
+The diagnostic checker defaults to corrected structural-admission verification
+and writes `boot-continuation-validation.json`. Its `--expect-rejection` mode is
+for the pre-correction RTL baseline and retains the historical failure assertion.
+Live catalog/configuration and the FPGA remain untouched.
+
+### Exact-image corrected replay: bounded recovery PASS
+
+The full-top replay has completed with outcome `continuation-resumed`, using
+the unchanged admitted image SHA-256
+`e8ba3755a56fa69308de1154e442529b6cadef6a8a98e10b6976a09137fe9102`.
+Independent assertions checked:
+
+1. The expected Mallory BOUNDS fault remains at cycle 1,880,095, executing
+   `0x070B0020` in Thread NS[12] / artifact NS[17].
+2. The reason-2 snapshot is CRC-valid and exactly matches the decoded saved
+   frame. Run cannot bypass the fault hold.
+3. After simulated bridge authorization, Boot transitions
+   COMPLETE → FAULT_RST → LOAD_NS → GUARDED_RESUME → COMPLETE.
+4. The first resumed program retirement is at byte `0x2870`, in Boot.Thread
+   NS[2], executing CapabilityTest NS[10]—the saved continuation, not a fresh
+   entry substituted by the probe.
+5. There are 100 post-reset retirement events: two Boot/return control events
+   followed by 98 program retirements. No additional fault occurred in this
+   measured window.
+
+Evidence is in `rtl-recovery-corrected.json` and
+`rtl-continuation-correction.log`. The simulator again printed an asynchronous
+generator cleanup warning after writing its final result; independent result
+and snapshot checks passed. Observer timestamps and main-loop counters remain
+separate time domains for reporting.
+
+This closes the isolated first-recovery reproduction. Four complete RTL
+fault/recovery cycles, broader release acceptance, synthesis/timing, and physical
+board acceptance are **not** claimed. The broader RTL alignment task remains
+open. No live publication, application restart, Namespace/LUMP replacement, or
+FPGA programming was performed.

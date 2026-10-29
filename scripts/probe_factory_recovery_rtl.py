@@ -13,7 +13,7 @@ from hardware.test_wukong_upload_fsm import _install_amaranth_elaboration_caches
 from hardware.wukong_bridge import decode_snapshot_frame
 
 
-def replay(directory, budget=4000000, *, diagnostic=False):
+def replay(directory, budget=4000000, *, diagnostic=False, corrected=False):
     raw = (directory / "admitted.bin").read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     assert digest == json.loads((directory / "admission.json").read_text())["imageHash"]
@@ -106,6 +106,11 @@ def replay(directory, budget=4000000, *, diagnostic=False):
                         ctx.get(core.retire_nia), ctx.get(core.retire_instr),
                         ctx.get(core.debug_cr_words[12][0]),
                         ctx.get(core.debug_cr_words[14][0])])
+                    if corrected and len(result["recoveryRetirements"]) >= 100:
+                        assert result.get("bootCompletedAfterAuthorization")
+                        assert ctx.get(core.boot_complete)
+                        result["outcome"] = "continuation-resumed"
+                        break
             if phase == "running" and ctx.get(core.fault_valid):
                 fault_code = ctx.get(core.fault)
                 await ctx.tick()
@@ -192,8 +197,10 @@ def replay(directory, budget=4000000, *, diagnostic=False):
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
     diagnostic = "--diagnostic" in sys.argv[2:]
-    result = replay(directory, diagnostic=diagnostic)
-    filename = "rtl-recovery-diagnostic.json" if diagnostic else "rtl-recovery.json"
+    corrected = "--corrected" in sys.argv[2:]
+    result = replay(directory, diagnostic=diagnostic, corrected=corrected)
+    filename = ("rtl-recovery-corrected.json" if corrected else
+                "rtl-recovery-diagnostic.json" if diagnostic else "rtl-recovery.json")
     (directory / filename).write_text(json.dumps(result, indent=2))
     print(json.dumps({k:v for k,v in result.items()
                        if k not in ("snapshot", "recoveryRetirements", "memoryEvents")}, indent=2))

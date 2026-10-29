@@ -378,5 +378,6 @@ class BootState(IntEnum):
     LOAD_NUC   = 5
     COMPLETE   = 6
     GUARDED_CALL = 7
+    GUARDED_RESUME = 8  # incoming-only RETURN/cLoad of a validated suspension
 
 

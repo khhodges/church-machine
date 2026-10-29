@@ -20,6 +20,7 @@ class BootThreadActivation(Elaboratable):
         self.header = Signal(32)
         self.indicator = Signal(32)
         self.entry_gt = Signal(32)
+        self.resume = Signal()
         self.namespace_slots = Signal(13)
         self.mem_addr = Signal(32)
         self.mem_en = Signal()
@@ -43,6 +44,7 @@ class BootThreadActivation(Elaboratable):
         m = Module()
         base, authority, header, indicator, entry = [Signal(32) for _ in range(5)]
         slots = Signal(13)
+        resume = Signal()
         row = Signal(4)
         part = Signal(range(3))
         armed = Signal()
@@ -76,6 +78,7 @@ class BootThreadActivation(Elaboratable):
                         base.eq(self.base_word), authority.eq(self.authority),
                         header.eq(self.header), indicator.eq(self.indicator),
                         entry.eq(self.entry_gt), slots.eq(self.namespace_slots),
+                        resume.eq(self.resume),
                         row.eq(0), armed.eq(0), self.fault_type.eq(0),
                     ]
                     m.next = "HOME"
@@ -83,7 +86,7 @@ class BootThreadActivation(Elaboratable):
                 read((base + cap_start + row) << 2)
                 with m.If(armed & self.mem_valid):
                     m.d.sync += [armed.eq(0), gt.eq(self.mem_data)]
-                    with m.If((row == 0) & (self.mem_data != entry)):
+                    with m.If(~resume & (row == 0) & (self.mem_data != entry)):
                         fail(FaultType.STACK_CORRUPT)
                     with m.Else():
                         m.next = "KIND"

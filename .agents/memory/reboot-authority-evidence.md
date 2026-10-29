@@ -43,6 +43,14 @@ superseding the older second-failure fallback interpretation for this path.
 retry-count-triggered Genesis switch. Do not bypass authority checks or treat
 this behavioral clarification as approval to change the runtime.
 
+The user subsequently approved implementing and testing the isolated RTL
+continuation/retry correction. Live publication, Namespace/LUMP replacement,
+application restart, and FPGA programming remain outside that approval.
+
+**Why:** Correction approval was explicitly scoped to isolated RTL work.
+**How to apply:** Reuse normal capability validation for retained continuations;
+do not infer installation or physical acceptance from an isolated replay.
+
 For passive RTL memory probes, distinguish bus visibility from consumed reads:
 synchronous BRAM may still expose the preceding address's data on the first
 request cycle. Follow the consumer's armed handshake before assigning causality.

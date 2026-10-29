@@ -55,7 +55,7 @@ class ChurchCore(Elaboratable):
 
     An explicit expected_boot_guard selects ascending Namespace admission.
     This staged implementation commits CR15 after metadata/seal/version checks,
-    checks slot 2 and its boot root frame, then holds before Thread activation.
+    checks slot 2 and its root or suspension frame, then holds before activation.
     It never enters the historical
     bootstrap states or falls back after failure. Omission preserves existing
     historical callers; it does not select or support an ascending image.
@@ -99,7 +99,7 @@ class ChurchCore(Elaboratable):
         self.clist_wr_en = Signal()
 
         self.boot_start = Signal()
-        self.boot_state = Signal(3)
+        self.boot_state = Signal(4)
         self.boot_complete = Signal()
 
         self.gc_start = Signal()
@@ -388,7 +388,7 @@ class ChurchCore(Elaboratable):
         lambda_active_reg = Signal()
         lambda_pc_reg = Signal(32)
 
-        boot_state_reg = Signal(3, init=BootState.IDLE)
+        boot_state_reg = Signal(4, init=BootState.IDLE)
         namespace_init_armed = Signal()
         namespace_commit = Signal()
         activation_start = Signal()
@@ -398,6 +398,10 @@ class ChurchCore(Elaboratable):
         guarded_call_fault = Signal()
         guarded_call_error = Signal(5)
         active_thread_header = Signal(32)
+        resume_started = Signal()
+        resume_start = Signal()
+        early_fault_reported = Signal()
+        early_fault_event = Signal()
         if self.expected_boot_guard is not None:
             with m.If(clear_all):
                 m.d.sync += active_thread_header.eq(0)
@@ -406,7 +410,8 @@ class ChurchCore(Elaboratable):
         else:
             m.d.comb += active_thread_header.eq(u_change.thread_hdr_out if not self.iot_profile else 0)
         m.d.comb += execution_phase.eq(
-            self.boot_complete | (boot_state_reg == BootState.GUARDED_CALL))
+            self.boot_complete | (boot_state_reg == BootState.GUARDED_CALL) |
+            (boot_state_reg == BootState.GUARDED_RESUME))
         if self.expected_boot_guard is not None:
             with m.If(clear_all):
                 m.d.sync += guarded_call_error.eq(0)
@@ -450,6 +455,7 @@ class ChurchCore(Elaboratable):
                 activation.header.eq(thread.header),
                 activation.indicator.eq(thread.indicator),
                 activation.entry_gt.eq(thread.entry_gt),
+                activation.resume.eq(thread.resume),
                 activation.namespace_slots.eq(reader.slots),
                 activation.mem_valid.eq(self.dmem_rd_valid),
                 activation.mem_data.eq(self.dmem_rd_data),
@@ -492,6 +498,22 @@ class ChurchCore(Elaboratable):
                     ]
                 with m.Elif(activation.done):
                     m.d.sync += self.boot_thread_activated.eq(1)
+            m.d.comb += resume_start.eq(
+                (boot_state_reg == BootState.GUARDED_RESUME) &
+                ~resume_started & ~self.halt_req & ~self.fault_valid)
+            with m.If(clear_all):
+                m.d.sync += [resume_started.eq(0), early_fault_reported.eq(0)]
+            with m.Else():
+                with m.If(resume_start):
+                    m.d.sync += resume_started.eq(1)
+                with m.If(early_fault_event):
+                    m.d.sync += early_fault_reported.eq(1)
+            m.d.comb += early_fault_event.eq(
+                (boot_state_reg == BootState.LOAD_NS) &
+                self.fault_valid & ~early_fault_reported)
+            with m.If((boot_state_reg == BootState.GUARDED_RESUME) &
+                      u_cload.cload_done & ~self.fault_valid):
+                m.d.sync += boot_state_reg.eq(BootState.COMPLETE)
 
         m.d.comb += [
             self.boot_state.eq(boot_state_reg),
@@ -501,7 +523,8 @@ class ChurchCore(Elaboratable):
         m.submodules.reset_marker_admission = reset_marker = ResetMarkerAdmission()
         m.d.comb += [
             reset_marker.reset_enter.eq(clear_all),
-            reset_marker.boot_handoff.eq(u_call.call_normal_complete),
+            reset_marker.boot_handoff.eq(u_call.call_normal_complete |
+                ((boot_state_reg == BootState.GUARDED_RESUME) & u_cload.cload_done)),
             reset_marker.instruction.eq(self.imem_data),
             reset_marker.fetch_address.eq(self.imem_fetch_address),
             reset_marker.trusted_rom_fetch.eq(self.imem_from_reset_rom),
@@ -527,7 +550,8 @@ class ChurchCore(Elaboratable):
             with m.Case(BootState.LOAD_NS):
                 if self.expected_boot_guard is not None:
                     with m.If(activation.done):
-                        m.d.sync += boot_state_reg.eq(BootState.GUARDED_CALL)
+                        m.d.sync += boot_state_reg.eq(Mux(
+                            thread.resume, BootState.GUARDED_RESUME, BootState.GUARDED_CALL))
                 if self.expected_boot_guard is None:
                     m.d.sync += boot_state_reg.eq(BootState.INIT_THRD)
                 # Guarded boot holds after Namespace/Thread validation.
@@ -1584,11 +1608,12 @@ class ChurchCore(Elaboratable):
         ]
 
         m.d.comb += ret_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.RETURN) & ~any_unit_busy
+            (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.RETURN) & ~any_unit_busy) |
+            resume_start
         )
         m.d.comb += [
             u_return.return_start.eq(ret_start_sig),
-            u_return.return_mask.eq(u_decoder.return_mask),
+            u_return.return_mask.eq(Mux(resume_start, 0, u_decoder.return_mask)),
             u_return.lambda_active.eq(lambda_active_reg),
             u_return.lambda_pc.eq(lambda_pc_reg),
             u_return.cr5_heap.eq(u_regs.cr5_heap),
@@ -3197,7 +3222,7 @@ class ChurchCore(Elaboratable):
             retire_conds = retire_conds_base
 
         m.d.comb += [
-            self.retire_valid.eq(((execution_phase & retire_conds) |
+            self.retire_valid.eq(((execution_phase & retire_conds) | early_fault_event |
                                 (activation.done if self.expected_boot_guard is not None else 0)) &
                                 (Const(self.expected_boot_guard is None) | ~clear_all)),
             self.retire_nia.eq(
@@ -3210,7 +3235,7 @@ class ChurchCore(Elaboratable):
                         delayed_issuer_instr, self.imem_data))),
             self.retire_flags.eq(u_regs.flags),
             self.retire_fault_code.eq(self.fault),
-            self.retire_fault_valid.eq(self.fault_valid & execution_phase),
+            self.retire_fault_valid.eq(self.fault_valid & (execution_phase | early_fault_event)),
         ]
 
         # ── TraceUnit per-event GT signals ─────────────────────────────────────

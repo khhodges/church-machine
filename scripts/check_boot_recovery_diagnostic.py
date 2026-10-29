@@ -44,7 +44,7 @@ def validate(words):
     return result
 
 
-def main(directory):
+def main(directory, *, expect_rejection=False):
     raw = (directory / "admitted.bin").read_bytes()
     evidence = json.loads((directory / "rtl-recovery-diagnostic.json").read_text())
     assert hashlib.sha256(raw).hexdigest() == evidence["imageSha256"]
@@ -60,7 +60,10 @@ def main(directory):
         assert event["boot"] in (6, 7) and event["cycle"] < reset_cycle
         words[event["address"] // 4] = event["data"]
     retained = validate(words)
-    assert not retained["done"] and retained["fault"] == 18
+    if expect_rejection:
+        assert not retained["done"] and retained["fault"] == 18
+    else:
+        assert retained["done"] and retained["fault"] == 0
     # A synchronous BRAM exposes the previous address's data on the first
     # request cycle. The validator's armed handshake consumes the settled
     # response, not that first bus sample. Keep the final sample per address.
@@ -98,10 +101,12 @@ def main(directory):
                                           fullRestorationValidated=False),
                   indicatorWrites=[e for e in writes if e["address"] == indicator_address],
                   recoveryReads=reads,
-                  conclusion="Retained Boot.Thread indicator fails fresh-root admission")
-    (directory / "boot-recovery-cause.json").write_text(json.dumps(result, indent=2))
+                  conclusion=("Retained Boot.Thread indicator fails fresh-root admission"
+                              if expect_rejection else "Retained suspension passes structural admission"))
+    filename = "boot-recovery-cause.json" if expect_rejection else "boot-continuation-validation.json"
+    (directory / filename).write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    main(Path(sys.argv[1]), expect_rejection="--expect-rejection" in sys.argv[2:])

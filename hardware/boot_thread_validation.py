@@ -24,6 +24,7 @@ class BootThreadValidation(Elaboratable):
         self.header = Signal(32)
         self.indicator = Signal(32)
         self.entry_gt = Signal(32)
+        self.resume = Signal()
 
     def elaborate(self, platform):
         m = Module()
@@ -57,6 +58,7 @@ class BootThreadValidation(Elaboratable):
                         self.fault_type.eq(0), self.base_word.eq(0),
                         self.authority.eq(0), self.header.eq(0),
                         self.indicator.eq(0), self.entry_gt.eq(0),
+                        self.resume.eq(0),
                     ]
                     m.next = "READ"
             with m.State("READ"):
@@ -69,9 +71,9 @@ class BootThreadValidation(Elaboratable):
                     with m.Case(5):
                         m.d.comb += self.mem_addr.eq((d[0] + 17) << 2)
                     with m.Case(6):
-                        m.d.comb += self.mem_addr.eq((d[0] + caps - 2) << 2)
+                        m.d.comb += self.mem_addr.eq((d[0] + self.indicator[:12] + 1) << 2)
                     with m.Case(7):
-                        m.d.comb += self.mem_addr.eq((d[0] + caps - 1) << 2)
+                        m.d.comb += self.mem_addr.eq((d[0] + self.indicator[:12] + 2) << 2)
                     with m.Case(8):
                         m.d.comb += self.mem_addr.eq((d[0] + caps) << 2)
                 m.d.sync += armed.eq(1)
@@ -97,10 +99,18 @@ class BootThreadValidation(Elaboratable):
                             with m.Else():
                                 m.d.sync += index.eq(7)
                         with m.Case(7):
-                            with m.If(self.mem_data != ((caps - 1) | (0x7fff << 13) | 0x1000)):
+                            with m.If(self.mem_data[13:28] != 0x7fff):
+                                with m.If(self.mem_data[:12] != self.indicator[:12] + 2):
+                                    fail(FaultType.STACK_CORRUPT)
+                                with m.Else():
+                                    m.d.sync += [self.base_word.eq(d[0]), self.authority.eq(d[1]),
+                                                 self.resume.eq(1)]
+                                    m.next = "DONE"
+                            with m.Elif((self.indicator[:12] != caps - 3) |
+                                        (self.mem_data != ((caps - 1) | (0x7fff << 13) | 0x1000))):
                                 fail(FaultType.STACK_CORRUPT)
                             with m.Else():
-                                m.d.sync += index.eq(8)
+                                m.d.sync += [index.eq(8), self.resume.eq(0)]
                         with m.Case(8):
                             with m.If(self.mem_data != self.entry_gt):
                                 fail(FaultType.STACK_CORRUPT)
@@ -140,12 +150,13 @@ class BootThreadValidation(Elaboratable):
                     m.next = "READ"
             with m.State("INDICATOR_CHECK"):
                 with m.If(
-                    (self.indicator[:28] != ((caps - 3) | 0x1000)) |
-                    (caps - 3 < stack_start) | (caps - 1 > 0xfff)
+                    ~self.indicator[12] | (self.indicator[13:28] != 0) |
+                    (self.indicator[:12] < stack_start + 2) |
+                    (self.indicator[:12] > caps - 3) | (caps - 1 > 0xfff)
                 ):
                     fail(FaultType.STACK_CORRUPT)
                 with m.Else():
-                    m.d.sync += index.eq(6)
+                    m.d.sync += [index.eq(6), self.resume.eq(self.indicator[:12] != caps - 3)]
                     m.next = "READ"
             with m.State("DONE"):
                 m.d.comb += self.done.eq(1)
