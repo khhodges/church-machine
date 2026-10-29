@@ -48,6 +48,12 @@ def prepare(output):
     from hardware.boot_rom import _lumps_dir
     context = snapshot / "server/lumps"
     context.mkdir(parents=True)
+    # boot_rom imports approval verification even for explicit-image models.
+    # Include the real helper and its deferred validator, never approval stubs.
+    for name in ("__init__.py", "lump_approvals.py", "idx1_profile.py"):
+        source = ROOT / "server" / name
+        shutil.copyfile(source, snapshot / "server" / name)
+        supplements[f"server/{name}"] = sha(source)
     state = json.loads((_lumps_dir / "ns-state.json").read_text())
     names = {"ns-state.json", "approvals.json"}
     for row in state.get("abstractions", []):

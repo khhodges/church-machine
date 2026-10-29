@@ -43,3 +43,18 @@ Python dependencies pinned in requirements-model.txt.
 Both runners verify the complete input checksum list before and after running.
 Preserve their logs. One runner's pass does not stand in for the other.
 No release or board-programming approval is granted by this package.
+
+## Droplet follow-up evidence
+
+The user supplied COMBINED_VENDOR_VALIDATION_PASS and exit code 0 after
+moving the observer counter declaration before its first use. The original
+synthesis outputs were reused and checksums verified; no new BIT was generated.
+
+The model then failed before simulation: first missing Amaranth, then missing
+the project module server.lump_approvals. The latter exposed repository import
+leakage in local packaging checks. The separately hashed combined-model-support.zip
+provides the real server package initializer, approval helper, deferred IDX1
+validator, and a model-only runner. It adds no files inside the frozen snapshot.
+Its clean subprocess import check passed without repository paths or inherited
+secrets; original package checksums remained valid. Nine observer tests passed.
+Full model recovery remains pending; import success is not recovery evidence.

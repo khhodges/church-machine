@@ -1480,3 +1480,17 @@ mtime_ms = 1793284314472
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/505fd630-e835-4f47-ac68-3269e05bb52e/371a74a0-7357-4a89-b8cd-f98979a2d5be"
 storage_version_token = "1793284329001013"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "MkbOG4cf_4MXJ18_jItv0"
+uri = "file://generated-artifacts/combined-model-support.zip"
+type = "unspecified"
+title = "Combined recovery-model support repair"
+description = "Separately checksummed missing Python support modules and model-only runner. Preserves the original frozen package and vendor evidence."
+logical_id = "d0547a26-874d-440f-bc6c-3d2cdadc545e"
+content_hash = "sha256:4df208c90cc447e047bb60fe25d3832f651e5a72ff265fc77a6bceb1d2916c82"
+size = 9928
+mtime_ms = 1793292144442
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d0547a26-874d-440f-bc6c-3d2cdadc545e/f0f00c60-0c3c-46e2-92b6-49efb26c00f8"
+storage_version_token = "1793292164485917"
+content_type = "application/octet-stream"
