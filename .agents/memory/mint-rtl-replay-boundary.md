@@ -7,7 +7,9 @@ encoding conversion or host-selected continuation.
 
 On 2026-10-28 the user approved correcting compiler/simulator DREAD/DWRITE
 to the ISA sign/magnitude/DR-index format and preparing review-only candidates.
-This is not approval to publish, bind, activate or replace the saved layout.
+They subsequently approved validation through normal save, binding and admission
+in a disposable copy, including simulator and RTL execution. This is not approval
+to publish, bind, activate or replace the live saved layout or program hardware.
 
 **Why:** The working older simulator used bit 14 as an immediate-mode selector,
 while the approved ISA/RTL uses it as subtraction; identical old words cannot

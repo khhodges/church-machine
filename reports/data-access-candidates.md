@@ -54,5 +54,53 @@ it is not evidence for the corrected decoder or these unpublished candidates.
   failure: its old `CompactIndex` source lacks the currently required canonical
   dot-name and explicit methods. It is not counted as a passing suite.
 
-These candidates have not been bound into a new complete image or replayed
-end-to-end. No saved LUMP, Namespace selection or physical FPGA was changed.
+## Subsequent isolated validation
+
+The user approved disposable validation, not adoption into the live layout.
+`scripts/validate_data_access_candidates.py` copied the catalog/configuration,
+recompiled matching source and instruction bytes, and used the ordinary
+save-plan, approval-intent, confirmation, save, bind, prepare, approve and activate
+endpoints through a Flask test client. It did not connect to a live HTTP server.
+
+The admitted 64 KiB image has SHA-256
+`e8ba3755a56fa69308de1154e442529b6cadef6a8a98e10b6976a09137fe9102`.
+
+`node simulator/check_factory_build.js generated-artifacts/data-access-validation`
+passed 5,777 steps, four intentional Mallory BOUNDS fault/recovery cycles,
+Alice commits 42/43/44/45, exact expected UART text, and preservation of
+Boot.Thread and the other Thread's saved state.
+
+Live catalog/configuration hashes before and after were identical. All admitted
+bytes, admission evidence, execution evidence and isolation hashes are under
+`generated-artifacts/data-access-validation/`. No live saved LUMP, Namespace
+selection or physical FPGA was changed.
+
+The preparation shell exceeded its 120-second wrapper deadline, but its captured
+log records completion through admission and the final unchanged-live-files
+assertion. The separately executed simulator checker exited successfully.
+
+The first full-top RTL replay exhausted its 1,400,000-cycle budget after 1,322
+retirements with no fault (`rtl.json`). This exceeds the historical failing
+444-retirement run but is not full acceptance. The simulator reaches its first
+intentional Mallory fault at step index 1792; a longer RTL budget is needed to
+compare that boundary.
+
+The extended replay (`rtl-extended.json`, budget 3,000,000 cycles) reached
+the **expected intentional Mallory fault** at cycle 1,880,095 after 1,794
+retirements:
+
+- Fault code 8 (BOUNDS), stage 7.
+- Instruction `0x070B0020`: `LOAD CR1, CR6, #2`.
+- CR12 identifies Thread.3, NS[12].
+- CR14 and CR6 identify ide.Mallory, NS[17].
+- CR6 has C-list limit 1; index 2 is deliberately outside that limit.
+- Fetch address `0x3A08` equals the admitted NS[17] base plus word 2
+  (source-relative PC 1).
+- SHA-256 matches the exact admitted image used by the simulator.
+
+Independent assertions checked all those identities, bounds and addresses
+against the admitted binary. The old WukongCallHome data-access failure did not
+recur. This establishes RTL execution through the first intended fault boundary,
+not four-cycle RTL fault recovery: the probe deliberately stops at its first
+fault. No synthesis, timing closure, bitstream build or physical acceptance is
+claimed.
