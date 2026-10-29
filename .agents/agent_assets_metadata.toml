@@ -1079,14 +1079,14 @@ content_type = "text/markdown"
 id = "g_tgiD7aKLQhEPSau-YzP"
 uri = "file://docs/phase-1/CTMM_W7_Threat_Test_Plan.xlsx"
 type = "table"
-title = "CTMM W7 Test Spreadsheet — 29 October Update"
-description = "Updated ten tracking rows with vendor boot and recovery-model passes. Combined bitstream build remains in progress; physical acceptance remains pending. Original threat sheets and formulas preserved, with refreshed summary results."
+title = "CTMM W7 — Updated Test Workbook"
+description = "Ten added planning sheets, including all 113 existing scope classifications. Eight original worksheets and cached results preserved; no new security passes claimed."
 logical_id = "d39713d1-b9c8-4bee-9c41-0d032e8da1a6"
-content_hash = "sha256:09eaff2c0f2191f29df3d93c58ef09d5bb2728908d7eea9e28eeb7de1c2e4eb9"
-size = 54847
-mtime_ms = 1793297909143
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/3b9ee280-d6e3-4036-a220-18bf6768d852"
-storage_version_token = "1793297915534916"
+content_hash = "sha256:19142c9c621c89abccbb1b8c344746bd5f4230234cb7c8afcf3f5be7afd6f36f"
+size = 410491
+mtime_ms = 1793299880087
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/bfe320e0-e6bd-4a31-ac91-189c4c6b32de"
+storage_version_token = "1793299908309269"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 [[outputs]]
@@ -1508,3 +1508,17 @@ mtime_ms = 1793297392759
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/30ffa006-270b-48c9-8d8c-5b19740a9c8f/527f576c-dcc1-4340-b2d4-f0bfda948a56"
 storage_version_token = "1793297398517842"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "plueeHbqz-jefQXtYFfWt"
+uri = "file://generated-artifacts/CTMM-W7-Phase-1-and-2-Test-Plan.html"
+type = "html"
+title = "CTMM W7 — Revised Phase 1 and Phase 2 Test Plan"
+description = "Owner review incorporated: complete mediation, correct grants, reviewed route inventory, fixed classifications, check-to-use campaign and installed-byte evidence."
+logical_id = "6e0db6b9-371f-4b01-83b2-0a8070636001"
+content_hash = "sha256:2f7bff90bbade1a678dc903a8285fac6f4c9ad71d40c87e4470abb01ef22fe80"
+size = 32882
+mtime_ms = 1793299885406
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6e0db6b9-371f-4b01-83b2-0a8070636001/3bee2ccd-6e34-4970-933c-7c75897cf60d"
+storage_version_token = "1793299907031942"
+content_type = "text/html"

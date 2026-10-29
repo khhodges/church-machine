@@ -16,6 +16,14 @@ claims or intended evidence levels, not verified findings from this review.
 They do not supersede the [Master ISA](01-isa/instruction-set.md) or establish
 hardware readiness.
 
+## Revised Phase 1 and Phase 2 qualification plan
+
+Use the [revised test plan](W7-phase-1-and-2-test-plan.md) for the
+complete-mediation route inventory, co-equal grant audit, fixed claim
+classifications, check-to-use cases, installed-byte evidence and phase exit gates.
+It incorporates the owner's 29 October methodology review without changing
+historical test results or approving unresolved mechanisms.
+
 ## Objectives to reconcile and test
 
 | Workbook ID | Objective | Required qualification |
