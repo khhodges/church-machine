@@ -13,7 +13,7 @@ from hardware.test_wukong_upload_fsm import _install_amaranth_elaboration_caches
 from hardware.wukong_bridge import decode_snapshot_frame
 
 
-def replay(directory, budget=4000000):
+def replay(directory, budget=4000000, *, diagnostic=False):
     raw = (directory / "admitted.bin").read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     assert digest == json.loads((directory / "admission.json").read_text())["imageHash"]
@@ -29,6 +29,37 @@ def replay(directory, budget=4000000):
                   outcome="deadline", faults=[], recoveryRetirements=[],
                   bootTransitions=[], snapshot=None)
     bit = 8
+    words = struct.unpack("<16384I", raw)
+    thread_base = words[8]
+    thread_size = 1 << (((words[thread_base] >> 23) & 15) + 6)
+    diagnostic_events = []
+
+    async def observe_memory(ctx):
+        core = top.sim_core
+        cycle = 0
+        previous = None
+        while True:
+            addr = ctx.get(core.dmem_addr)
+            write = ctx.get(core.dmem_wr_en)
+            read = ctx.get(core.dmem_rd_en) and ctx.get(core.dmem_rd_valid)
+            recovering = result.get("resetObserved", False)
+            relevant = (write and thread_base * 4 <= addr <
+                        (thread_base + thread_size) * 4)
+            if relevant or (recovering and read):
+                event = dict(address=addr, write=bool(write),
+                             data=ctx.get(core.dmem_wr_data if write else core.dmem_rd_data),
+                             boot=ctx.get(core.boot_state),
+                             namespaceAdmitted=ctx.get(core.boot_namespace_admitted),
+                             threadValidated=ctx.get(core.boot_thread_validated),
+                             threadActivated=ctx.get(core.boot_thread_activated),
+                             faultSlot=ctx.get(core.boot_fault_slot))
+                if event != previous:
+                    diagnostic_events.append(dict(cycle=cycle, **event))
+                previous = event
+            else:
+                previous = None
+            cycle += 1
+            await ctx.tick()
 
     async def capture(ctx):
         while True:
@@ -145,18 +176,24 @@ def replay(directory, budget=4000000):
     sim.add_testbench(bench)
     sim.add_testbench(capture, background=True)
     sim.add_testbench(observe_boot, background=True)
+    if diagnostic:
+        sim.add_testbench(observe_memory, background=True)
     try:
         sim.run()
     except Exception as exc:
         result.update(outcome="probe-error", error=str(exc))
         (directory / "rtl-recovery-partial.json").write_text(json.dumps(result, indent=2))
         raise
+    if diagnostic:
+        result["memoryEvents"] = diagnostic_events
     return result
 
 
 if __name__ == "__main__":
     directory = Path(sys.argv[1])
-    result = replay(directory)
-    (directory / "rtl-recovery.json").write_text(json.dumps(result, indent=2))
+    diagnostic = "--diagnostic" in sys.argv[2:]
+    result = replay(directory, diagnostic=diagnostic)
+    filename = "rtl-recovery-diagnostic.json" if diagnostic else "rtl-recovery.json"
+    (directory / filename).write_text(json.dumps(result, indent=2))
     print(json.dumps({k:v for k,v in result.items()
-                      if k not in ("snapshot", "recoveryRetirements")}, indent=2))
+                       if k not in ("snapshot", "recoveryRetirements", "memoryEvents")}, indent=2))

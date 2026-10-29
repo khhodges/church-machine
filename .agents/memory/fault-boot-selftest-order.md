@@ -13,6 +13,11 @@ whole-machine reset for every Namespace fault.
 The user requires the ultimate double-error fallback to reboot the first
 Genesis Namespace.
 
+Qualification: for retained-continuation recovery, the user subsequently
+specified “try again and again” and rejected switching to Genesis on the second
+failure. See [reboot authority evidence](reboot-authority-evidence.md). Do not
+apply the older double-error interpretation to that path.
+
 Genesis is also the default for unfinished or unspecified behavior; improvements
 are second-order refinements rather than prerequisites to that baseline.
 

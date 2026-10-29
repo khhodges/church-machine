@@ -141,3 +141,70 @@ after producing the final result; this is not the reported architectural fault.
 Cycle values in the probe's main-loop events and continuous Boot observer use
 different counters because UART send/wait operations consume cycles; do not
 subtract those fields across the two streams.
+
+## Recovery investigation: intended continuation and retry behavior
+
+The user clarified that a retained continuation should work and, if it fails,
+the intended behavior is to try again repeatedly—not switch to Genesis merely
+because a second failure occurred. This is a behavioral requirement, not
+authorization to apply a runtime fix or alter the live Namespace.
+
+Read-only RTL inspection identifies two distinct concerns:
+
+- `BootThreadValidation` requires the protected indicator to equal the
+  pristine root value `(caps - 3) | 0x1000`. Ordinary CHANGE writes a suspension
+  frame and changes that indicator. A difference from the pristine value does
+  not by itself prove that a continuation is invalid.
+- The top-level reason-2 snapshot/recovery path is triggered by a faulting
+  retirement. In guarded `LOAD_NS`, `execution_phase` is false, so a validation
+  fault has neither `retire_valid` nor `retire_fault_valid`. The registered
+  Namespace error persists until reset, while automatic core fault reset also
+  requires `boot_complete`. Thus this early failure is not wired into the
+  ordinary automatic snapshot/authorization retry path. An explicit manual
+  reboot is a separate path.
+
+The second point is a code-path finding; the existing probe stops at the
+second fault and does not constitute a long-duration repeated-retry test.
+Neither concern justifies weakening capability validation or accepting an
+arbitrary saved frame.
+
+### Exact cause confirmed
+
+The completed diagnostic replay uses the same admitted SHA-256 and reproduces
+the same two faults. Its recorded writes and settled Boot reads establish:
+
+- Boot.Thread occupies word base 256. Its protected indicator is at byte
+  `0x444` (word 17 within the Thread).
+- The initial image has indicator `0x10F1` (stack pointer 241), and passes the
+  isolated, unchanged `BootThreadValidation` module.
+- Execution writes the indicator several times. The final pre-fault value is
+  `0x10ED` (stack pointer 237), written at observer cycle 580079.
+- After authorized reset, Namespace admission succeeds. Boot reads that same
+  `0x10ED` at observer cycle 1908307. No Thread validation or activation completes.
+- The fresh-root equality check requires `0x10F1` and rejects `0x10ED` with
+  `STACK_CORRUPT`. Replaying the unchanged validator with the recorded Thread
+  writes reproduces this rejection independently of the full-top reset path.
+
+The retained stack pointer is within its bounds (212–243); the suspension frame
+at word offset 239 points back to 239, exactly two words above the saved pointer.
+Its saved E-GT is `0x4A00000A`. These satisfy the corresponding CHANGE structural
+checks. **Full continuation restoration and all capability checks have not been
+validated.** The immediate failure is a pristine-root requirement, not evidence
+that these structural continuation checks failed.
+
+Simply removing the equality check would not be an adequate repair: the Boot
+validator and activation path also assume a pristine root entry and startup
+homes. A proposed correction must validate and restore the retained continuation
+as a continuation, preserve authority checks, and handle early Boot failures in
+the retry protocol. Repeatedly rebooting the unchanged RTL against these same
+retained words will hit the same equality rejection.
+
+Evidence: `rtl-recovery-diagnostic.json` and `boot-recovery-cause.json` under
+`generated-artifacts/data-access-validation/`. The independent checker is
+`scripts/check_boot_recovery_diagnostic.py`. Its bus interpretation accounts for
+synchronous BRAM latency: first-cycle data can belong to the preceding address;
+the validator's armed handshake consumes the settled response. Initial
+GUARDED_CALL root writes are also included, not mistaken for recovery writes.
+
+No runtime RTL, live catalog, Namespace assignment, application process, or FPGA
+was changed during this investigation. Recovery acceptance remains open.
