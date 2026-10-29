@@ -22,8 +22,11 @@ The user approved preparing an isolated package combining these two corrections,
 with the same approved image. After both validation runners passed, the user
 approved proceeding with a build-only runner using the validated synthesized
 checkpoint for implementation and experimental bitstream generation. This does
-not authorize production initializer replacement, live Namespace edits, or
-board programming; physical programming requires separate approval.
+not authorize production initializer replacement or live Namespace edits.
+After verifying the combined BIT against its build receipt and the Windows
+transfer, the user separately approved temporary FPGA programming. That approval
+does not include persistent flash writes, changed images, or automatic fault
+recovery commands.
 
 **Why:** Validation and experimental build preparation are separate from adopting
 or flashing a replacement. Preserve that boundary until explicitly expanded.
