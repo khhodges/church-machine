@@ -153,3 +153,4 @@
 - [Reboot authority evidence](reboot-authority-evidence.md) — skipped-instruction telemetry is not a grant; distinguish live reset, persistent homes, and exact-image replay.
 - [Boot fault save errors](boot-fault-save-error.md) — outgoing-save memory failures use approved THREAD_CONTEXT (0x1D); Boot stash/activation failures remain catastrophic.
 - [Thread strip visibility](thread-strip-visibility.md) — all views retain configured membership; missing runtime is not missing configuration or authority to activate.
+- [Python ABI dependencies](python-abi-dependencies.md) — check the serving interpreter when installing SDKs; package installation and `python3` can use different versions.

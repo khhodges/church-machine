@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.python312Packages.cffi
     pkgs.iverilog
     pkgs.zip
     pkgs.chromium

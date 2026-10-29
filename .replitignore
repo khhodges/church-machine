@@ -68,5 +68,7 @@ build/uart_test.asc
 # Synthesis log (large text, not served):
 build/synth.log
 /generated-artifacts/
+/attached_assets/candidate-EXPERIMENTAL_1793277978205.bit
+/attached_assets/candidate-EXPERIMENTAL_1793277978206.mcs
 /server/lumps/design-drafts/
 /build/guarded-runtime-installation.json

@@ -626,6 +626,8 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 
 app = Flask(__name__)
+from experimental_downloads import downloads as experimental_downloads_blueprint
+app.register_blueprint(experimental_downloads_blueprint)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
 
 # Save diagnostics are intentionally append-only and metadata-only. They give
