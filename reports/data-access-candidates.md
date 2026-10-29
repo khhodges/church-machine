@@ -282,3 +282,9 @@ fault/recovery cycles, broader release acceptance, synthesis/timing, and physica
 board acceptance are **not** claimed. The broader RTL alignment task remains
 open. No live publication, application restart, Namespace/LUMP replacement, or
 FPGA programming was performed.
+
+The user accepted this single successful exact-image recovery as sufficient
+evidence for the isolated continuation correction and declined the proposed
+four-cycle extension. No additional recovery run is required for that scoped
+acceptance. The exclusions for live publication and physical-board validation
+remain unchanged.

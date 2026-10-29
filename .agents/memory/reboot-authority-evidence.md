@@ -60,3 +60,11 @@ equating every request-cycle sample with a consumed read falsely suggests
 memory corruption.
 **How to apply:** Record request/response timing and validate the settled sample.
 Also distinguish initial guarded Boot writes from writes during recovery.
+
+The user accepted one exact-image successful RTL continuation recovery as
+sufficient to prove this correction and declined the four-cycle extension.
+
+**Why:** The user explicitly directed moving on rather than repeating this test.
+**How to apply:** Do not reopen a multi-cycle acceptance requirement for this
+correction without new evidence or a new request. This acceptance does not
+authorize live installation or claim physical-board validation.
