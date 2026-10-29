@@ -1522,3 +1522,17 @@ mtime_ms = 1793299885406
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6e0db6b9-371f-4b01-83b2-0a8070636001/3bee2ccd-6e34-4970-933c-7c75897cf60d"
 storage_version_token = "1793299907031942"
 content_type = "text/html"
+
+[[outputs]]
+id = "_jIcaBAG8r-Sa6sVeN3Qc"
+uri = "file://generated-artifacts/uart-packet-atomic-validation.zip"
+type = "unspecified"
+title = "UART packet correction — Vivado validation package"
+description = "Frozen validation inputs and generated RTL with the unchanged approved image. Validation only; no bitstream generation or board programming."
+logical_id = "5f4c1ff4-4ec1-4182-902e-681268fca77d"
+content_hash = "sha256:ed321982b40ece12ecf53c8909ef97359d650368b49ec1106b2f1a36d90d7cbc"
+size = 3455464
+mtime_ms = 1793312494495
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5f4c1ff4-4ec1-4182-902e-681268fca77d/dc35f8d9-6c62-4f71-ac34-c0889a9aa81d"
+storage_version_token = "1793314760848364"
+content_type = "application/octet-stream"
