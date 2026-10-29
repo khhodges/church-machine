@@ -43,6 +43,8 @@ What you will see:
 """
 
 from amaranth import *
+from amaranth.lib.fifo import SyncFIFOBuffered
+from hardware.uart_packet_arbiter import UartPacketArbiter
 
 
 class WukongClock25(Elaboratable):
@@ -749,18 +751,20 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Trace TX arbitration signals ───────────────────────────────────────
         # trace_tx_req / trace_tx_byte are driven by the TraceUnit FSM below.
-        # CM MMIO reg-5 writes always win over trace bytes.
+        # Priority applies between complete packets, never between their bytes.
         trace_tx_req  = Signal()   # TraceUnit wants to send a byte
         trace_tx_byte = Signal(8)  # byte from TraceUnit
+        trace_tx_last = Signal()
         snapshot_tx_req = Signal()
         snapshot_tx_byte = Signal(8)
+        snapshot_tx_last = Signal()
         snapshot_tx_ack = Signal()
         snapshot_complete = Signal()
         snapshot_complete_reason = Signal(2)
         # Board-state evidence frame, emitted only after an explicit Halt has
         # been applied to step_mode/step_halted:
-        #   AD 01 01 01 AC
-        # magic, version, state=halted, reason=explicit-halt, XOR checksum.
+        #   AD 01 01 01 nonce (AC XOR nonce)
+        # magic, version, state, reason, request nonce, XOR checksum.
         halt_state_pending = Signal()
         halt_state_phase = Signal(3)
         halt_state_nonce = Signal(8)
@@ -921,13 +925,24 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   1. CM MMIO reg-5 write       — cm_tx_start
         #   2. HW boot banner            — "WUKONG\r\n", sent before boot_start
         #   3. Boot sentinel (4 bytes)   — 0xBC, N_INIT, TU_VERSION, BUILD_VERSION
-        #   4. Halt state evidence       — fixed 5-byte 0xAD frame
-        #   5. TraceUnit packets         — fill remaining idle TX cycles
+        #   4. Upload acknowledgement    — single byte
+        #   5. Halt state evidence       — fixed 6-byte nonce-bound 0xAD frame
+        #   6. Architectural snapshot
+        #   7. TraceUnit packets         — fill remaining idle TX cycles
         #
         # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
         # colliding with in-flight CM bytes.
         cm_tx_start = Signal()
         m.d.comb += cm_tx_start.eq(is_mmio_write & (mmio_reg_sel == 5))
+        # A CPU write is a pulse, unlike the framed producers' held requests.
+        # Queue it while another packet owns UART; STATUS supplies backpressure.
+        console_tx = m.submodules.console_tx = SyncFIFOBuffered(width=8, depth=4)
+        tx_arb = m.submodules.tx_arb = UartPacketArbiter(7)
+        m.d.comb += [
+            console_tx.w_en.eq(cm_tx_start),
+            console_tx.w_data.eq(core.dmem_wr_data[:8]),
+            console_tx.r_en.eq(tx_arb.ack[0]),
+        ]
 
         # ── Banner request logic ──────────────────────────────────────────────
         # banner_req is active in Phase 2.5: hw_init done, banner not yet sent,
@@ -951,7 +966,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         m.d.comb += tx_free.eq(~uart_tx.busy & ~uart_tx.done)
 
         # Advance banner on each accepted byte (start pulse fired = accepted)
-        with m.If(banner_req & tx_free & ~cm_tx_start):
+        with m.If(tx_arb.ack[1]):
             with m.If(banner_idx == _N_BANNER - 1):
                 m.d.sync += [banner_done.eq(1), banner_idx.eq(0)]
             with m.Else():
@@ -967,7 +982,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # complete identity before a newly restarted program can claim UART TX.
         sentinel_req = Signal()
         m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
-        with m.If(sentinel_req & tx_free & ~cm_tx_start & ~banner_req):
+        with m.If(tx_arb.ack[2]):
             with m.If(sentinel_phase == 0):
                 m.d.sync += sentinel_phase.eq(1)   # 0xBC accepted → queue N_INIT byte
             with m.Elif(sentinel_phase == 1):
@@ -992,9 +1007,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.d.comb += halt_state_byte.eq(halt_state_nonce)
             with m.Default():
                 m.d.comb += halt_state_byte.eq(0xAC ^ halt_state_nonce)
-        m.d.comb += halt_state_ack.eq(
-            halt_state_req & tx_free & ~cm_tx_start & ~sentinel_req &
-            ~banner_req & ~upload_ack_req)
+        m.d.comb += halt_state_ack.eq(tx_arb.ack[4])
         with m.If(halt_state_ack):
             with m.If(halt_state_phase == 5):
                 m.d.sync += [
@@ -1004,33 +1017,24 @@ class ChurchWukongXC7A100T(Elaboratable):
                 ]
             with m.Else():
                 m.d.sync += halt_state_phase.eq(halt_state_phase + 1)
+        sentinel_byte = Array([C(0xBC, 8), C(N_INIT & 0xFF, 8),
+                               C(_TU_VERSION_CALL_3PKT, 8), C(_BUILD_VERSION & 0xFF, 8)])
+        producers = [
+            (console_tx.r_rdy, console_tx.r_data, C(1)),
+            (banner_req, banner_byte, banner_idx == _N_BANNER - 1),
+            (sentinel_req, sentinel_byte[sentinel_phase], sentinel_phase == 3),
+            (upload_ack_req, C(0x06, 8), C(1)),
+            (halt_state_req, halt_state_byte, halt_state_phase == 5),
+            (snapshot_tx_req, snapshot_tx_byte, snapshot_tx_last),
+            (trace_tx_req, trace_tx_byte, trace_tx_last),
+        ]
+        for i, (req, data, last) in enumerate(producers):
+            m.d.comb += [tx_arb.req[i].eq(req), tx_arb.data[i].eq(data),
+                         tx_arb.last[i].eq(last)]
         m.d.comb += [
-            uart_tx.data.eq(
-                Mux(cm_tx_start,                              core.dmem_wr_data[0:8],
-                Mux(banner_req,                                banner_byte,
-                Mux(sentinel_req & (sentinel_phase == 0),    C(0xBC, 8),
-                Mux(sentinel_req & (sentinel_phase == 1),    C(N_INIT & 0xFF, 8),
-                Mux(sentinel_req & (sentinel_phase == 2),    C(_TU_VERSION_CALL_3PKT, 8),
-                Mux(sentinel_req & (sentinel_phase == 3),    C(_BUILD_VERSION & 0xFF, 8),
-                Mux(upload_ack_req,                          C(0x06, 8),
-                Mux(halt_state_req,                          halt_state_byte,
-                Mux(snapshot_tx_req,                         snapshot_tx_byte,
-                                                               trace_tx_byte))))))))))  ,
-            uart_tx.start.eq(
-                cm_tx_start |
-                (banner_req      & tx_free & ~cm_tx_start) |
-                (sentinel_req    & tx_free & ~cm_tx_start & ~banner_req) |
-                (upload_ack_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req) |
-                (halt_state_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req) |
-                (snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req & ~halt_state_req) |
-                (trace_tx_req    & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                 ~upload_ack_req & ~halt_state_req & ~snapshot_tx_req)),
-            trace_tx_ack.eq(
-                trace_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
-                ~upload_ack_req & ~halt_state_req & ~snapshot_tx_req),
-            snapshot_tx_ack.eq(
-                snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req &
-                ~banner_req & ~upload_ack_req & ~halt_state_req),
+            tx_arb.ready.eq(tx_free), uart_tx.data.eq(tx_arb.tx_data),
+            uart_tx.start.eq(tx_arb.tx_start),
+            trace_tx_ack.eq(tx_arb.ack[6]), snapshot_tx_ack.eq(tx_arb.ack[5]),
         ]
 
         is_mmio_read = Signal()
@@ -1043,7 +1047,9 @@ class ChurchWukongXC7A100T(Elaboratable):
                     m.d.comb += mmio_rd_data.eq(mmio_led_reg[i])
             with m.Case(6):
                 # UART STATUS: bit[0] = tx_busy  (poll before each TX write)
-                m.d.comb += mmio_rd_data.eq(Cat(uart_tx.busy, C(0, 31)))
+                m.d.comb += mmio_rd_data.eq(Cat(
+                    uart_tx.busy | uart_tx.done | (console_tx.level != 0) |
+                    ~console_tx.w_rdy | (tx_arb.owner != 0), C(0, 31)))
             with m.Case(7):
                 # UART RX: not implemented in V2; always returns 0
                 m.d.comb += mmio_rd_data.eq(0)
@@ -1487,8 +1493,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                 upload_watchdog=upload_watchdog,
                 watchdog_limit=_UPLOAD_WATCHDOG_LIMIT,
                 upload_ack_req=upload_ack_req,
-                upload_ack_accepted=(
-                    tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req),
+                upload_ack_accepted=tx_arb.ack[3],
                 debug_state=self.dbg_upload_state,
             )
 
@@ -1630,7 +1635,8 @@ class ChurchWukongXC7A100T(Elaboratable):
 
             with m.State("SEND"):
                 # Stall the CM while events are pending (no-drop guarantee)
-                m.d.comb += [trace_tx_req.eq(1), trace_stall.eq(1)]
+                m.d.comb += [trace_tx_req.eq(1), trace_stall.eq(1),
+                             trace_tx_last.eq(tq_bidx == _TRACE_PKT_LEN - 1)]
 
                 # Select the byte for the current packet position
                 with m.Switch(tq_bidx):
@@ -1834,7 +1840,8 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.next = "SEND"
 
             with m.State("SEND"):
-                m.d.comb += snapshot_tx_req.eq(1)
+                m.d.comb += [snapshot_tx_req.eq(1),
+                             snapshot_tx_last.eq(snap_bidx == _SNAP_FRAME_LEN - 1)]
                 with m.Switch(snap_bidx):
                     with m.Case(0):
                         m.d.comb += snapshot_tx_byte.eq(_SNAP_MAGIC)

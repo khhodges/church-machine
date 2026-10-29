@@ -20,7 +20,7 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def prepare(output):
+def prepare(output, *, uart_packet_atomic=False):
     frozen = ROOT / "generated-artifacts/factory-continuation-bitstream/factory-continuation-build"
     original = verify(frozen)
     output = output.resolve()
@@ -92,10 +92,21 @@ SparseMemoryInitializer = ObservedInitializer
             differences.append(str(Path(rel).relative_to("sources")))
     if differences != ["hardware/sparse_memory_init.py"]:
         raise ValueError(f"Unexpected frozen-source delta: {differences}")
+    # Optional isolated follow-on candidate. Never edit the earlier frozen
+    # package or substitute its approved image.
+    uart_sources = {}
+    if uart_packet_atomic:
+        for name in ("hardware/wukong_top.py", "hardware/uart_packet_arbiter.py"):
+            src = ROOT / name
+            shutil.copyfile(src, snapshot / name)
+            uart_sources[name] = sha(snapshot / name)
+        differences.append("hardware/wukong_top.py")
+        supplements["hardware/uart_packet_arbiter.py"] = uart_sources["hardware/uart_packet_arbiter.py"]
     (output / "provenance.json").write_text(json.dumps({
         "imageSha256": IMAGE, "baselineManifestSha256": sha(frozen / "manifest.json"),
         "baselineSources": {k: v for k, v in original["files"].items() if k.startswith("sources/")},
         "sourceDelta": differences, "supplementalSources": supplements,
+        "uartPacketAtomicSources": uart_sources,
         "candidateSourceSha256": sha(candidate),
         "overlaySha256": sha(base),
         "observationAttributes": "keep on initializer outputs only",
@@ -170,8 +181,10 @@ sha256sum -c inputs.sha256
 """)
     (output / "README.txt").write_text(
         "ISOLATED COMBINED VALIDATION — NO BIT GENERATION OR BOARD ACCESS\n"
-        "Image: " + IMAGE + "\n"
-        "Only frozen hardware logic change: tested initializer overlay.\n"
+        "Image: " + IMAGE + "\n" +
+        ("Frozen hardware changes: initializer overlay plus UART packet ownership and buffered console TX.\n"
+         if uart_packet_atomic else
+         "Only frozen hardware logic change: tested initializer overlay.\n") +
         "Initializer output keep attributes preserve diagnostic observation.\n"
         "1. Source Vivado settings64.sh; bash run-vendor.sh in a fresh extraction.\n"
         "   Checks every initializer write, first/last, then boot entry 0x4610 at 25MHz.\n"
@@ -199,4 +212,9 @@ sha256sum -c inputs.sha256
 
 
 if __name__ == "__main__":
-    prepare(Path(sys.argv[1]))
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--uart-packet-atomic", action="store_true")
+    args = parser.parse_args()
+    prepare(args.output, uart_packet_atomic=args.uart_packet_atomic)

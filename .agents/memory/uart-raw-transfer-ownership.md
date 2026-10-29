@@ -29,3 +29,18 @@ Unbounded or ahead-of-execution dequeueing also destroys command ownership.
 **How to apply:** Keep serial execution on its owning thread. Background HTTP
 work may return a response but must not write UART, replay timed-out commands,
 or enqueue a second consuming GET until the prior response is consumed.
+
+FPGA-to-host arbitration must also own whole packets. A higher-priority Halt
+confirmation may wait for a trace/snapshot to finish, but must not splice into
+its bytes. Advance each producer only on its actual UART acceptance; buffer
+pulsed console writes rather than suppressing them during another frame.
+
+**Why:** The physical diagnostic stream showed a plausible trace with a Halt
+marker in its payload followed by lost framing. Full-top simulation reproduced
+the byte-level preemption. Finding an intact Halt packet somewhere in a stream
+does not prove that the stream is decodable.
+
+**How to apply:** Validate surrounding frame boundaries as well as individual
+control messages, with UART busy/DONE gaps and competing producers active.
+Keep source-model passes, frozen-image replay, vendor mapping and board evidence
+separate.
