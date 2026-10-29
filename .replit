@@ -1092,6 +1092,9 @@ externalPort = 3002
 localPort = 23638
 externalPort = 3000
 
+[objectStorage]
+defaultBucketID = "replit-objstore-adfaced3-a23c-49f1-8180-d29390eb5215"
+
 [[workflows.workflow]]
 name = "wukong-command-delivery-tests"
 author = "agent"
