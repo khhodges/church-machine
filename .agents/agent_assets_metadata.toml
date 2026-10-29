@@ -1079,14 +1079,14 @@ content_type = "text/markdown"
 id = "g_tgiD7aKLQhEPSau-YzP"
 uri = "file://docs/phase-1/CTMM_W7_Threat_Test_Plan.xlsx"
 type = "table"
-title = "CTMM W7 Threat Test Plan — updated 28 October 2026"
-description = "Updated 37 requirement reviews with evidence references and remaining acceptance work. Original threat sheets preserved; summary formula results refreshed. Evidence links are relative to the project repository."
+title = "CTMM W7 Test Spreadsheet — 29 October Update"
+description = "Updated ten tracking rows with vendor boot and recovery-model passes. Combined bitstream build remains in progress; physical acceptance remains pending. Original threat sheets and formulas preserved, with refreshed summary results."
 logical_id = "d39713d1-b9c8-4bee-9c41-0d032e8da1a6"
-content_hash = "sha256:61effa0520f8296912ee3cc4385a7f21127193c89001f2a39ad14996a66725ea"
-size = 53145
-mtime_ms = 1793190111476
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/6046386b-84fe-4949-8c1a-7feffe0008f9"
-storage_version_token = "1793190120173945"
+content_hash = "sha256:09eaff2c0f2191f29df3d93c58ef09d5bb2728908d7eea9e28eeb7de1c2e4eb9"
+size = 54847
+mtime_ms = 1793297909143
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/3b9ee280-d6e3-4036-a220-18bf6768d852"
+storage_version_token = "1793297915534916"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 [[outputs]]
