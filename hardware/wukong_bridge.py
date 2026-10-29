@@ -1779,6 +1779,23 @@ def _find_serial_port(preferred=None):
     return 'COM3' if os.name == 'nt' else '/dev/ttyUSB0'
 
 
+def configured_device_uid(value):
+    """Validate operator-provisioned identity; never infer it from a COM port."""
+    uid = str(value or '').strip()
+    if len(uid) > 128 or any(ord(ch) < 32 or ord(ch) == 127 for ch in uid):
+        raise ValueError('device UID must be at most 128 characters with no control characters')
+    return uid
+
+
+def device_identity_notice(uid):
+    if uid:
+        return '[bridge] configured device UID: ' + uid
+    return ('[bridge] HARDWARE CONTROLS BLOCKED: no device UID configured. '
+            'Monitoring may continue, but browser commands require the verified '
+            'board UID via --device-uid or WUKONG_DEVICE_UID, and the same UID '
+            'selected in the IDE. Do not use COM3 or a bridge session as board identity.')
+
+
 def main():
     if serial is None:
         print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
@@ -1811,7 +1828,11 @@ def main():
     church_only = args.church_only
     # This is host configuration because the UART trace protocol deliberately
     # has no UID field. Never derive identity from a serial path or truncate it.
-    device_uid = str(args.device_uid or '').strip()
+    try:
+        device_uid = configured_device_uid(args.device_uid)
+    except ValueError as exc:
+        parser.error(str(exc))
+    print(device_identity_notice(device_uid), flush=True)
 
     # HTTPS carries the bridge credential: verify the server certificate by
     # default. Only an explicit --insecure may disable verification.

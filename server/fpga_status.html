@@ -181,6 +181,8 @@
   <span class="sep"></span>
   <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages statusGrid" aria-expanded="true" title="Collapse or expand FPGA health details">Collapse</button>
 </div>
+<div id="controlTargetStatus" class="status-note" role="status">Checking physical target…</div>
+<div id="controlResult" class="status-note" role="status" aria-live="polite">No control command sent from this page.</div>
 
 <div id="healthStrip" style="margin-bottom:8px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
   <div class="health-head">
@@ -530,6 +532,8 @@
   }
   function note(text) {
     addLine('[' + new Date().toLocaleTimeString() + '] ' + text, 'ev-note');
+    var result = document.getElementById('controlResult');
+    if (result) result.textContent = text;
   }
   function dismissBridgeAlert(incidentId) {
     bridgeAlertDismissed = true;
@@ -602,6 +606,50 @@
   // other in the server's one-slot pending-command queue, and prevents a
   // command racing an upload for that slot.
   var ctlBusy = false;
+  var controlTarget = null;
+  var controlTargetSeenAt = 0;
+  function controlTargetBinding() {
+    var selected;
+    try {
+      if (window.parent !== window) {
+        if (!window.parent.TargetState) throw new Error('IDE target selection unavailable');
+        selected = window.parent.TargetState.resolve();
+      } else {
+        selected = JSON.parse(localStorage.getItem('church_programming_target_v1') || '{}');
+      }
+    } catch (_) {
+      return { error: 'Cannot read the selected target. Open Builder → Testing in the IDE.' };
+    }
+    if (!controlTarget || Date.now() - controlTargetSeenAt >= 3000)
+      return { error: 'Live target status is unavailable or stale. Wait for the bridge connection.' };
+    if (!controlTarget.device_uid)
+      return { error: 'Bridge has no device UID. Configure its verified board UID using --device-uid or WUKONG_DEVICE_UID; do not use COM3 as an identity.' };
+    if (!controlTarget.live || !controlTarget.session_id)
+      return { error: 'The identified bridge is not live. Restore its connection before sending commands.' };
+    if (!selected || !['wukong-runtime-ram', 'wukong-fpga-bitstream'].includes(selected.mode) || !selected.deviceUid)
+      return { error: 'Select a Wukong target and its verified device UID in the IDE target controls.' };
+    if (selected.deviceUid !== controlTarget.device_uid)
+      return { error: 'Selected Wukong UID does not match the connected bridge. Verify the board and target selection.' };
+    return { request: {
+      target_device_uid: selected.deviceUid,
+      target_session_id: controlTarget.session_id
+    } };
+  }
+  function bindControlRequest(body, label) {
+    var binding = controlTargetBinding();
+    if (binding.error) {
+      note(label + ' BLOCKED — no command sent. ' + binding.error);
+      return null;
+    }
+    return Object.assign({}, body, binding.request);
+  }
+  function observeControlTarget(status) {
+    controlTarget = status.physical_target || null;
+    controlTargetSeenAt = Date.now();
+    var binding = controlTargetBinding();
+    var el = document.getElementById('controlTargetStatus');
+    if (el) el.textContent = binding.error || ('Control target verified: ' + binding.request.target_device_uid);
+  }
   var boardRunning = false;
   var runUnlocked = false;
   var pendingExecutionCmd = null;
@@ -770,6 +818,11 @@
   }
   function sendCmd(body, label, onResult, priorityStop) {
     if (ctlBusy && !priorityStop) return;
+    body = bindControlRequest(body, label);
+    if (!body) {
+      if (typeof onResult === 'function') onResult(false);
+      return;
+    }
     if (priorityStop) cancelCmdWatchForStop();
     setCtlBusy(true);
     fetch('/hardware/wukong/command', {
@@ -942,12 +995,14 @@
   }
   document.getElementById('btnReboot').onclick = function () {
     if (ctlBusy) return;
+    var body = bindControlRequest({ cmd: 'f' }, 'REBOOT');
+    if (!body) return;
     stopRebootWatch();
     setCtlBusy(true);
     fetch('/hardware/wukong/command', {
       method: 'POST',
       headers: controlHeaders(),
-      body: JSON.stringify({ cmd: 'f' })
+      body: JSON.stringify(body)
     }).then(function (r) {
       return r.text().then(function (t) {
         var d = null;
@@ -1347,6 +1402,7 @@
 
   function pollStatus() {
     fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
+      observeControlTarget(s);
       handleBridgeAlert(s.bridge_alert);
       if (s.bridge_connected) setState('bridgeState', 'ok', 'connected');
       else if (s.bridge_poll_age !== null && s.bridge_poll_age !== undefined)
