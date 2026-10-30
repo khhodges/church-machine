@@ -1,7 +1,8 @@
 # Isolated Amoeba retry candidate
 
-Scope: source and disposable simulator checks only. No publication, image
-admission, Namespace save, FPGA build, upload, programming, or board commands.
+Scope: source, disposable simulator checks, and offline frozen-RTL whole-image
+replay. No publication, image admission, Namespace save, FPGA build, upload,
+programming, or board commands.
 
 Candidate: `simulator/examples/candidates/amoeba-retry.cloomc`.
 Check: `node simulator/test_amoeba_retry_candidate.js`.
@@ -41,7 +42,50 @@ be misattributed to the tested application.
 
 ## Remaining acceptance
 
-The new candidate has not undergone full three-Thread RTL replay, vendor
-synthesis, timing, or physical acceptance. Those earlier results cover the old
-image, not this candidate. The retry loop does not clear a hard fault or send a
+The new candidate passed the bounded three-Thread RTL replay below, but has not
+undergone vendor synthesis, timing, or physical acceptance. Earlier physical
+results cover the old image, not this candidate. The retry loop does not clear a hard fault or send a
 recovery command; the existing explicit fault disposition remains separate.
+
+## Offline whole-image replay preparation
+
+`scripts/prepare_amoeba_retry_image.py` runs the existing compiler and symbolic
+destination binder against exact dependency identities from the frozen image.
+The separately compiled API artifact retains its 256-word allocation. The
+resulting replay image differs at only six words, the three terminal pairs.
+Namespace descriptors, other artifacts, grants, and initial Thread bytes are
+unchanged. Output evidence is in `generated-artifacts/amoeba-retry-image/`.
+
+Candidate SHA-256:
+`5603d8e105e47ca0f6524e4553989387c088de19ac0e6b3f6fd9897e170cf16d`.
+
+This is an offline bound replay fixture, not server save/admission or permission
+to install. The whole-image replay uses the unchanged frozen RTL and a simulated
+manual reboot after the first complete fault snapshot. Its acceptance condition
+is the original Mallory fault followed by the same intended Mallory fault after
+execution traverses the retry branch, not STACK_UNDERFLOW.
+
+## Completed frozen-RTL result
+
+The replay exited 0 with `AMOEBA_RETRY_RTL_TWO_MALLORY_FAULTS_PASS`.
+The before/after frozen-input checksum checks passed.
+
+- First fault: code 8, instruction `0x070B0020`, address `0x3A08`,
+  Thread GT `0x0200000C` (Mallory), at cycle 1,890,190.
+- First snapshot was CRC-validated; Run could not bypass the fault hold.
+- The simulated manual reboot completed; 1,854 subsequent retirements covered
+  Boot (601), Alice (639), and Mallory (614).
+- Mallory executed Amoeba's backward branch `0xBF040001` at `0x4638`
+  at post-reboot event index 1245, instead of falling into the old root RETURN.
+- Second fault: the same code, instruction, address and Mallory Thread GT,
+  at cycle 3,858,251. No Boot/Alice fault or STACK_UNDERFLOW occurred in this run.
+
+Evidence: `generated-artifacts/amoeba-retry-image/results/result.json`,
+`results/recovery-snapshot.bin`, `results/uart.bin`, and `replay.log`.
+The observer stops at the second fault; this proves one retry through the actual
+workload, not indefinite repeated recovery or long-run stack stability. The
+100-repeat constant-stack checks above remain separate fixture evidence.
+
+After results and checksum verification, Amaranth emitted the previously observed
+ignored coroutine cleanup warning (`aclose(): asynchronous generator is already
+running`). It did not prevent completion or change the exit status.
