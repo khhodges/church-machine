@@ -3,6 +3,19 @@ name: Amobea Thread initialization ownership
 description: All Thread initialization belongs to Amobea; distinguish fixture prerequisites from an operational lifecycle.
 ---
 
+## Amoeba return boundary
+
+Amoeba must check stack size before any return. Do not treat an unconditional
+root RETURN or resulting STACK_UNDERFLOW as an acceptable startup termination.
+The user explicitly questioned whether Amoeba should contain any RETURN at all.
+
+**Why:** On 2026-10-30 the user stated, “Amoeba should always check the stack
+size before returning,” while reviewing the startup continuation fault.
+
+**How to apply:** Review generated epilogues as well as authored instructions.
+Establish the intended non-returning startup behavior before changing the image;
+do not weaken hardware underflow checks or invent a replacement scheduler.
+
 Mint completion is mandatory in Phase 1. Use Mint to initialize new Threads
 against templates for each application transaction used for clean recovery.
 
