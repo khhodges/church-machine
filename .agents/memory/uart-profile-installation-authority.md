@@ -30,3 +30,16 @@ its required caller/service bindings, and observable success. Reuse transport
 validation as supporting evidence, not the demonstration objective. Do not
 silently promote historical private Mint fixtures or expand this direction into
 authorization for live provisioning, runtime fixes, or flash programming.
+
+Proceed toward the Mint demonstration step by step with joint review and
+explicit approval before each next step. Do not batch later stages under a
+general agreement to pursue the demonstration.
+
+**Why:** The user directed “Step by step with joint review and approval” after
+raising the time and cost of another RTL replay.
+
+**How to apply:** Propose the bounded action and its exclusions, await approval,
+execute only that action, then review the result together. Do not launch a new
+RTL simulation without separate approval; omitted tests remain omitted, not
+passed. Keep image preparation, software testing, board commands and flash writes
+as separately reviewed steps.
