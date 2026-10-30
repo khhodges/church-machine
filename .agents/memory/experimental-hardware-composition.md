@@ -42,3 +42,12 @@ on the earlier candidate, not on every subsequent revision.
 **How to apply:** Keep prior frozen candidates intact, carry the exact local
 recovery evidence alongside the matching remote synthesis evidence, and request
 separate approval before any replacement programming or flash operation.
+
+After receipt and Windows-transfer verification, the user approved temporary
+programming of the UART-corrected candidate and passive startup capture.
+This does not include persistent flash writes, Namespace changes, or subsequent
+Run/Step/Skip Fault/recovery commands.
+
+**Why:** The approval followed an explicit description of temporary configuration
+replacement and startup-only verification; later runtime interventions remain
+separate decisions.
