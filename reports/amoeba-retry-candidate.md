@@ -1,8 +1,9 @@
 # Isolated Amoeba retry candidate
 
-Scope: source, disposable simulator checks, and offline frozen-RTL whole-image
-replay. No publication, image admission, Namespace save, FPGA build, upload,
-programming, or board commands.
+Initial scope: source, disposable simulator checks, and offline frozen-RTL
+whole-image replay. Subsequent explicit approvals covered the vendor build,
+temporary FPGA programming, and one captured manual reboot described below.
+No live catalog publication, Namespace save, or configuration-flash write.
 
 Candidate: `simulator/examples/candidates/amoeba-retry.cloomc`.
 Check: `node simulator/test_amoeba_retry_candidate.js`.
@@ -42,9 +43,9 @@ be misattributed to the tested application.
 
 ## Remaining acceptance
 
-The new candidate passed the bounded three-Thread RTL replay below, but has not
-undergone vendor synthesis, timing, or physical acceptance. Earlier physical
-results cover the old image, not this candidate. The retry loop does not clear a hard fault or send a
+The candidate passed the bounded RTL replay and the physical single-retry test
+below. Indefinite recovery and long-run stack stability are not established.
+The retry loop does not clear a hard fault or send a
 recovery command; the existing explicit fault disposition remains separate.
 
 ## Offline whole-image replay preparation
@@ -89,3 +90,40 @@ workload, not indefinite repeated recovery or long-run stack stability. The
 After results and checksum verification, Amaranth emitted the previously observed
 ignored coroutine cleanup warning (`aclose(): asynchronous generator is already
 running`). It did not prevent completion or change the exit status.
+
+## Vendor build and physical single-retry acceptance — 2026-10-30
+
+The operator supplied a successful Vivado 2026.1 build log and receipt (exit 0).
+Setup slack was +2.927 ns, hold +0.039 ns, pulse-width +7.000 ns; all
+reported failing-endpoint counts were zero. The receipt's manifest and image
+hashes were independently matched to the local prepared package.
+
+- Manifest SHA-256: `5ab35bf4d2060ca4fad7b36d4a1cd5f8f4498f960a8d717f56580e0c54a1604b`.
+- BIT SHA-256: `a4acb0ef9a39ba985d7769031cf146edb68fb65ff96e0b4f4a895093b54e5d4e`.
+- The operator verified the downloaded BIT checksum and supplied Vivado output
+  showing that selected file programmed successfully, startup status HIGH.
+  This is operator programming provenance, not live UART hash attestation.
+
+Startup capture:
+`attached_assets/amoeba-retry-startup-20261030-190911-786619_1793387477299.bin`.
+SHA-256 `3d3d55d228729fe156abae8aed8a396bf396025e9a030f094942a00e39ec21bb`.
+23,281 bytes: 1,907 trace packets and one complete CRC-valid reason-2 snapshot,
+sequence 1. Fault code 8 at `0x3A08`; snapshot CR12 `0x0200000C` identifies Mallory.
+
+Explicitly authorized manual-reboot capture:
+`attached_assets/amoeba-retry-manual-reboot-20261030-191344-489410_1793387733633.bin`.
+SHA-256 `a5d98bc704f818968b5d313966792aee04e2a029bbbe4123c3ea518776e03b39`.
+23,996 bytes: 1,968 trace packets, a build-20 boot sentinel, and one complete
+CRC-valid reason-2 snapshot, sequence 2, ending exactly at EOF.
+
+The second capture includes the retry-branch address `0x4638` at trace index 1330
+and no event at the old root RETURN address `0x463C`. Application output advances
+from `Alice=42` to `Alice=43`. The terminal fault remains code 8 at `0x3A08`,
+with snapshot CR12 `0x0200000C`; no Boot/Alice fault or STACK_UNDERFLOW appears.
+The two fault-marked packets describe one instruction's two trace events, not
+two separate faults. Remaining bytes decode as expected ASCII application text.
+
+This accepts the bounded physical startup/manual-reboot/retry scenario. It does
+not authorize automatic fault release, further board commands, flash programming,
+or a general production release. Passive captures are not server-correlated live
+incidents. No automatic recovery authorization was sent.
