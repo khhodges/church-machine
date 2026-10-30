@@ -18,3 +18,15 @@ retain approved image bytes without legacy projection, and bind installation
 evidence to the selected physical board/session. Offline format checking,
 physical runtime replacement, and persistent flash programming remain distinct.
 Do not treat transfer ACK as board readback or startup acceptance.
+
+The next image must drive towards a Mint demonstration, not merely repeat a
+generic UART transfer or Amoeba/Mallory retry demonstration.
+
+**Why:** The user explicitly directed: “the next image must drive towards a
+Mint demonstration.”
+
+**How to apply:** Make the next image review identify a concrete Mint operation,
+its required caller/service bindings, and observable success. Reuse transport
+validation as supporting evidence, not the demonstration objective. Do not
+silently promote historical private Mint fixtures or expand this direction into
+authorization for live provisioning, runtime fixes, or flash programming.
