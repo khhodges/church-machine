@@ -127,3 +127,45 @@ This accepts the bounded physical startup/manual-reboot/retry scenario. It does
 not authorize automatic fault release, further board commands, flash programming,
 or a general production release. Passive captures are not server-correlated live
 incidents. No automatic recovery authorization was sent.
+
+## Five additional physical cycles — 2026-10-30
+
+The user authorized five further manual-reboot captures. Each was decoded and
+checked before the next command was issued; no automatic fault release was used.
+
+| Additional cycle | Capture bytes | Trace packets | Snapshot sequence | Alice progress |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 24,176 | 1,983 | 3 | 43 → 44 |
+| 2 | 24,356 | 1,998 | 4 | 44 → 45 |
+| 3 | 24,536 | 2,013 | 5 | 45 → 46 |
+| 4 | 24,716 | 2,028 | 6 | 46 → 47 |
+| 5 | 24,896 | 2,043 | 7 | 47 → 48 |
+
+All five contain the retry address `0x4638`, no old root RETURN event at
+`0x463C`, and only the expected code-8 fault at `0x3A08`. Each complete reason-2
+snapshot ends exactly at EOF, passes CRC, and identifies Mallory via CR12
+`0x0200000C`. Snapshot contents match the preceding cycle except sequence and
+CRC. Non-frame bytes are expected ASCII application output; no unexpected trace
+event types were found. There is no observed Boot/Alice fault or STACK_UNDERFLOW.
+
+Uploaded evidence filenames and SHA-256:
+
+- `amoeba-retry-extra-1-20261030-194431-225301_1793389696834.bin`:
+  `24457ff205ad22acf42dc62b4559e53f5b38a7d3e2360359b011aaa626d14c6a`
+- `amoeba-retry-extra-2-20261030-194951-345302_1793389995388.bin`:
+  `ed050c1433ad830c25512e776078da0d82bdaa6a8005a838dfb6bece599d3217`
+- `amoeba-retry-extra-3-20261030-195449-726089_1793390228551.bin`:
+  `3f6c62576ea7d0a2dfcfbb1be794905c20fb4b83039fe9fc2e3a2d8e75cc34ae`
+- `amoeba-retry-extra-4-20261030-195849-180880_1793390465132.bin`:
+  `2e58ae497afdf3328d27dad703636e5ad0994293efba8e143c81504f5553f172`
+- `amoeba-retry-extra-5-20261030-200249-587719_1793390614689.bin`:
+  `c4aab7c9b0f5ad5daf4bed87136644f31eee39952b3c545c6810d4299fc6659e`
+
+These files are under `attached_assets/`. The first four hashes also matched the
+operator's console output; the last hash was computed from the uploaded file.
+
+Including the original manual-reboot test, six physical retries passed after
+startup. This establishes bounded repeatability and stable exposed fault
+snapshot fields, not an exhaustive stack-memory audit or indefinite recovery.
+Configuration flash remains unchanged; no additional board command is authorized
+by completion of this test.
