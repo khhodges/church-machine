@@ -1079,14 +1079,14 @@ content_type = "text/markdown"
 id = "g_tgiD7aKLQhEPSau-YzP"
 uri = "file://docs/phase-1/CTMM_W7_Threat_Test_Plan.xlsx"
 type = "table"
-title = "CTMM W7 — Updated Test Workbook"
-description = "Ten added planning sheets, including all 113 existing scope classifications. Eight original worksheets and cached results preserved; no new security passes claimed."
+title = "Updated W7 Test Results"
+description = "Includes verified Amoeba retry build, six physical retries, evidence references, and refreshed progress totals. Broader acceptance and security gaps remain open."
 logical_id = "d39713d1-b9c8-4bee-9c41-0d032e8da1a6"
-content_hash = "sha256:19142c9c621c89abccbb1b8c344746bd5f4230234cb7c8afcf3f5be7afd6f36f"
-size = 410491
-mtime_ms = 1793299880087
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/bfe320e0-e6bd-4a31-ac91-189c4c6b32de"
-storage_version_token = "1793299908309269"
+content_hash = "sha256:b7ba9f9a0563c8d7c877bbd00369371c2155f321c70173a19177395c389f4dfa"
+size = 424246
+mtime_ms = 1793391573976
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/8d0b4991-3599-4424-9d0c-5e70b315862b"
+storage_version_token = "1793391582509634"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 [[outputs]]
