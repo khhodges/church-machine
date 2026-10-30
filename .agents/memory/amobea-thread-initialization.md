@@ -16,6 +16,19 @@ size before returning,” while reviewing the startup continuation fault.
 Establish the intended non-returning startup behavior before changing the image;
 do not weaken hardware underflow checks or invent a replacement scheduler.
 
+For the three-Thread Boot/Alice/Mallory experiment, the user requires Boot
+not to fault and automatically restart, only Mallory to fault, and Amoeba
+to “just try again.” Root completion must not fall into an implicit RETURN.
+
+**Why:** On 2026-10-30 the user supplied this intended completion behavior,
+while explicitly leaving uncertain whether saved-NIA continuation progresses
+or immediately repeats the deliberate fault.
+
+**How to apply:** Propose retry at the Amoeba application-call boundary, keep
+it distinct from saved-NIA resumption, and test both before claiming recovery.
+This software intent does not itself authorize automatic fault-release commands,
+changes to hardware fault guards, or physical image installation.
+
 Mint completion is mandatory in Phase 1. Use Mint to initialize new Threads
 against templates for each application transaction used for clean recovery.
 
