@@ -172,6 +172,16 @@ Keep MMIO treatment separate. Continue joint step-by-step approval; no inferred
 RTL simulation, hardware build, board installation, or flash authorization.
 The later contract alignment is a chosen direction, not current implementation scope.
 
+Keep the initial unchanged-BIT adaptation descriptor-only, not a deployable full
+Mint variant.
+
+**Why:** The approved step is isolated descriptor adaptation and non-RTL checks;
+exposing the full service would imply compatibility for DESTROY and allocator/
+publication paths that have not been adapted or accepted.
+
+**How to apply:** Component success does not authorize full-service integration,
+caller provisioning, image generation, or board execution. Review those separately.
+
 ## Agreed FPGA slot limit
 
 W1 limit_offset is the inclusive word offset: allocated_word_count minus one.
