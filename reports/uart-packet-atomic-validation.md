@@ -77,10 +77,25 @@ generated RTL and validation runners, not a bitstream or board operation.
     This happened during capture-coroutine teardown, not a failed replay
     assertion. The warning is retained in the log; this is not a warning-free
     run. The wrapper subsequently finished all checksum checks and exited 0.
-- Vendor synthesis/mapped boot validation: **not run**.
+- Vendor synthesis/mapped boot validation: **PASS, reported by the operator's
+  terminal capture** in
+  `attached_assets/Pasted-root-ubuntu-s-4vcpu-8gb-nyc3-dir-ls-td-HOME-uart-valida_1793357372884.txt`.
+  The run directory is
+  `/root/uart-validation.uAebUc/uart-packet-atomic-validation`.
+  - `COMBINED_SYNTH_EXPORT_COMPLETE`
+  - `COMBINED_VENDOR_BOOT_PASS: entry=00004610 cycles=211530`
+  - `COMBINED_VENDOR_VALIDATION_PASS`
+  - Final checksums show the mapped netlist, boot testbench and synthesized
+    checkpoint unchanged; the process listing contains no active vendor jobs.
+  This is vendor-mapped startup evidence, not a routed timing or physical-board
+  pass. The complete remote logs/checkpoint have not been copied into this
+  workspace.
 - Placement/routing, timing/DRC and replacement BIT generation: **not run**.
 - Physical programming and startup/control verification: **not run**.
 
-Vivado is not available in this workspace. Vendor validation must use the
-established vendor build environment. The exact-image replay is now passed,
-but no previous candidate's timing or hardware pass transfers to this change.
+Vivado is not available in this workspace. Vendor validation ran in the
+established build environment. Both the exact-image recovery replay and
+vendor-mapped startup have now passed, but placement/routing, timing and physical
+acceptance remain outstanding. Preserve the verified synthesis checkpoint for
+the build-only stage; no previous candidate's timing or hardware pass transfers
+to this change.
