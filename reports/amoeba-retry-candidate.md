@@ -169,3 +169,23 @@ startup. This establishes bounded repeatability and stable exposed fault
 snapshot fields, not an exhaustive stack-memory audit or indefinite recovery.
 Configuration flash remains unchanged; no additional board command is authorized
 by completion of this test.
+
+## Preserved vendor evidence
+
+The uploaded vendor archive was independently inspected without executing its
+contents. Archive SHA-256:
+`1a796051c9e415ee7ec6c4abff7949646fbd6ac6b8298b2c6d80de79d19def2f`.
+Its manifest exactly matches the locally prepared manifest. All 126 input-file
+hashes and all seven output-file hashes match. Exit status is 0; the final build
+success marker is present. The timing report independently parses to the same
+passing values in the receipt, and precise setup/hold slack agrees.
+
+The receipt remains immutable with its build-time `physicalBoardTested: false`
+and `releaseApproved: false`. Subsequent bounded physical acceptance is recorded
+separately above; these historical receipt fields are not retroactively rewritten.
+
+The combined preservation archive is
+`generated-artifacts/amoeba-retry-preserved/amoeba-retry-complete-evidence.zip`.
+It contains the exact vendor archive, local acceptance archive, this updated
+report, a verification record, and a checksum index. Preservation does not
+authorize configuration-flash programming or a general production release.
