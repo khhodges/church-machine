@@ -154,6 +154,24 @@ review, explicitly rejecting IDE prototype conventions as the design basis.
 a pool-relative offset or require an IDE lookup. Register assignments and the
 remaining descriptor fields are separate decisions.
 
+### Demonstration-only word-address exception
+
+For the current unchanged-BIT Mint demonstration, the user selected a scoped
+exception: retain allocator byte addresses, convert the resident descriptor W0
+to a word address at publication preparation, and calculate integrity from that
+encoded W0. Keep word-valued allocation limits unchanged.
+
+**Why:** After reviewing the byte-contract/installed-BIT mismatch, the user chose
+“1 for now 2 later”: a BIT-specific demonstration now, followed later by adopting
+word-addressed resident descriptors as the supported architectural contract.
+
+**How to apply:** This exception does not yet revise the general byte-address
+contract, authorize rewriting saved artifacts, or establish demonstration success.
+Review the exact software scope against the frozen BIT before implementation.
+Keep MMIO treatment separate. Continue joint step-by-step approval; no inferred
+RTL simulation, hardware build, board installation, or flash authorization.
+The later contract alignment is a chosen direction, not current implementation scope.
+
 ## Agreed FPGA slot limit
 
 W1 limit_offset is the inclusive word offset: allocated_word_count minus one.
