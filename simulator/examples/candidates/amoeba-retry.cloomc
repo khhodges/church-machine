@@ -1,0 +1,28 @@
+; Isolated candidate only. No publication or hardware installation.
+; Root entries never RETURN. Retry repeats only the application CALL.
+; Unreachable NOPs preserve the reviewed method-table offsets.
+abstraction ide.AmoebaStartup {
+capabilities { SELF E, ide.CapabilityTest E, ide.WukongCallHome E }
+main method Start() {
+ISUB DR4, DR3, #0
+BRANCHEQ Init
+CALL CR6[ide.WukongCallHome], #2
+Init:
+Retry:
+CALL CR6[ide.CapabilityTest], #0
+BRANCH Retry
+NOP
+}
+main method AliceStart() {
+Retry:
+CALL CR6[ide.CapabilityTest], #1
+BRANCH Retry
+NOP
+}
+main method MalloryStart() {
+Retry:
+CALL CR6[ide.CapabilityTest], #2
+BRANCH Retry
+NOP
+}
+}

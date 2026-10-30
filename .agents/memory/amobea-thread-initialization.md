@@ -29,6 +29,16 @@ it distinct from saved-NIA resumption, and test both before claiming recovery.
 This software intent does not itself authorize automatic fault-release commands,
 changes to hardware fault guards, or physical image installation.
 
+For bounded Amoeba fault tests, stop observation at the first fault unless
+recovery itself is the explicit subject of the test.
+
+**Why:** A simulator may enter its configured fault handler without setting its
+ordinary halted flag. Continuing a supposedly first-fault test then attributes
+later handler/scheduler activity to the original application.
+
+**How to apply:** Preserve fault-time Thread identity and distinguish the
+first-fault result from any subsequent handler or continuation result.
+
 Mint completion is mandatory in Phase 1. Use Mint to initialize new Threads
 against templates for each application transaction used for clean recovery.
 
