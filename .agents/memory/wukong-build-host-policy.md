@@ -16,6 +16,16 @@ Accept a hardware release only after the content-fingerprint readiness gate
 passes, the build records an explicit successful exit, timing is non-negative,
 and the fetched artifacts have fresh hashes and timestamps.
 
+For operator-managed Windows transfers, try the existing authorized SSH identity
+explicitly with `scp -o IdentitiesOnly=yes -i ...` before provisioning new access.
+
+**Why:** The operator confirmed that an existing Wukong identity transferred the
+package successfully after default-key authentication failed. Browser-console
+access alone does not establish Windows SSH access.
+
+**How to apply:** Select the operator's existing key locally; never request its
+contents in chat or assume a default-key failure requires a new authorization.
+
 **Why:** Reused build directories and stale generated RTL can otherwise produce
 a successful-looking artifact that does not correspond to the active sources.
 
