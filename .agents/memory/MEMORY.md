@@ -151,3 +151,4 @@
 - [Vendor observer portability](vendor-observer-portability.md) — declare before use; Icarus acceptance does not prove xvlog compatibility; reuse verified synthesis after observer-only failures.
 - [W7 qualification method](w7-qualification-method.md) — reviewed route completeness and correct grants are separate obligations; fix claim nature before results and bind physical claims to installed bytes.
 - [Wukong operator identity](wukong-operator-device-identity.md) — user confirmed the same physical board; reuse its recorded operator UID, never infer identity from COM3.
+- [UART profile authority](uart-profile-installation-authority.md) — pin software-image compatibility to the installed BIT, not mutable hardware sources; keep flash approval separate.

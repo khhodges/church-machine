@@ -25011,6 +25011,8 @@ def wukong_upload_ack_get():
 
 from server.guarded_runtime_reload import register as _register_guarded_runtime_reload
 _register_guarded_runtime_reload(app, sys.modules[__name__])
+from server.uart_profile_install import register as _register_uart_profile_install
+_register_uart_profile_install(app, sys.modules[__name__])
 
 
 def _approved_namespace_upload_source(revision_id):

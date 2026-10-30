@@ -799,6 +799,62 @@ const BuildApprovalView = {
         this._selectSnapshot(this._availableSnapshot);
     },
 
+    async prepareSelectedUartImage(install = false) {
+        const status = document.getElementById('baInstallImageStatus');
+        if (this._installRunning) return;
+        const revision = this._selectedSnapshot && this._selectedSnapshot.namespace_revision_id;
+        if (!revision) {
+            status.textContent = 'Select an approved hardware Namespace revision first. Nothing was sent.';
+            return;
+        }
+        const profile = 'amoeba-retry-25mhz-uart-v1';
+        this._installRunning = true;
+        this._updateApproveBtn();
+        try {
+            const payload = {profile, namespace_revision_id: revision};
+            const call = async (url, body) => {
+                const response = await fetch(url, {method: 'POST',
+                    headers: {'Content-Type': 'application/json', ...this._authHeaders()},
+                    body: JSON.stringify(body)});
+                const data = await response.json();
+                if (!response.ok || !data.ok) throw new Error(data.error || 'UART request rejected.');
+                return data;
+            };
+            status.textContent = 'Checking retained Namespace bytes offline…';
+            const prepared = await call('/api/namespace-image/uart-prepare', payload);
+            if (prepared.namespace_revision_id !== revision || prepared.profile !== profile ||
+                !/^[0-9a-f]{64}$/.test(prepared.artifact_sha256) || prepared.size !== 65536)
+                throw new Error('Prepared image identity mismatch. Nothing was sent.');
+            status.textContent = `UART format check passed: ${prepared.artifact_sha256}, 65536 bytes. ` +
+                `Requires BIT ${prepared.required_bitstream_sha256}. No board commands sent. ` +
+                'Installation still requires operator verification and a fresh board-confirmed STOP.';
+            if (!install) return;
+            const response = await fetch('/hardware/wukong/status', {cache: 'no-store'});
+            if (!response.ok) throw new Error('Could not read the physical target. Nothing was sent.');
+            const target = (await response.json()).physical_target;
+            if (!target || !target.live || !target.device_uid || !target.session_id)
+                throw new Error('No live identified board. Nothing was sent.');
+            if (!window.confirm(`Install native UART image ${prepared.artifact_sha256} on ${target.device_uid}?\n\nProfile: ${profile}\nRequired BIT: ${prepared.required_bitstream_sha256}\n\nThis replaces all runtime memory and discards Thread progress. It reboots and may execute immediately. It does not write flash or release a fault. An upload ACK is not memory readback or startup verification.`))
+                return;
+            const sent = await call('/api/namespace-image/uart-install', {...payload,
+                artifact_sha256: prepared.artifact_sha256, confirm_runtime_memory_replacement: true,
+                target_device_uid: target.device_uid, target_session_id: target.session_id});
+            if (!sent.queued || sent.namespace_revision_id !== revision ||
+                sent.artifact_sha256 !== prepared.artifact_sha256)
+                throw new Error('Upload response identity mismatch. Check FPGA status before another action.');
+            status.textContent = `UART command ${sent.id} queued. Await acknowledgement and startup evidence; installed bytes are not verified. `;
+            const link = document.createElement('a');
+            link.href = '/fpga?namespace_revision=' + encodeURIComponent(revision);
+            link.textContent = 'View delivery and startup status';
+            status.appendChild(link);
+        } catch (error) {
+            status.textContent = 'UART image: ' + error.message;
+        } finally {
+            this._installRunning = false;
+            this._updateApproveBtn();
+        }
+    },
+
     async installSelectedImage() {
         if (this._installRunning || !this._selectedSnapshot) return;
         const revision = this._selectedSnapshot.namespace_revision_id;
