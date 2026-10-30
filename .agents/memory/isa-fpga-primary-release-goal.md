@@ -9,6 +9,18 @@ project objective. The next corrected candidate is provisionally called B.1.1+.
 Do not let incidental IDE repairs generate a continuing sequence of UI or test
 maintenance tasks ahead of the new bitstream.
 
+The immediate handoff goal is an MCS flash release for a second code-development
+team member to use the IDE over UART without JTAG in normal operation.
+
+**Why:** On 2026-10-30 the user redirected the H19 investigation toward that
+specific developer handoff.
+
+**How to apply:** Prioritize exact-build flash boot and the IDE/bridge UART
+development loop (load, run, observe, revise/reload, and recover). Keep unresolved
+H19 evidence explicit; do not convert this goal into full security qualification
+or authorization to program persistent flash. Distinguish initial provisioning
+from the second developer's JTAG-free daily workflow.
+
 **Why:** The user reiterated that the new bitstream is the priority when shown
 follow-up suggestions for selected-design reboot and Thread-control checks.
 
