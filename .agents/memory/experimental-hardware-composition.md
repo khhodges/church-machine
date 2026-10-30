@@ -30,3 +30,15 @@ recovery commands.
 
 **Why:** Validation and experimental build preparation are separate from adopting
 or flashing a replacement. Preserve that boundary until explicitly expanded.
+
+The operator also approved build-only implementation of the UART packet-atomic
+correction after its exact-image recovery and vendor-mapped startup passed.
+Use that correction's verified checkpoint and unchanged approved image.
+
+**Why:** Approval to proceed with the next build is not approval to program the
+physical board again. The earlier temporary-programming approval was exercised
+on the earlier candidate, not on every subsequent revision.
+
+**How to apply:** Keep prior frozen candidates intact, carry the exact local
+recovery evidence alongside the matching remote synthesis evidence, and request
+separate approval before any replacement programming or flash operation.

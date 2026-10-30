@@ -1536,3 +1536,17 @@ mtime_ms = 1793312494495
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5f4c1ff4-4ec1-4182-902e-681268fca77d/dc35f8d9-6c62-4f71-ac34-c0889a9aa81d"
 storage_version_token = "1793314760848364"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "_TeHTl3ZEf6v_2xVKsp8T"
+uri = "file://generated-artifacts/uart-packet-build-only.zip"
+type = "unspecified"
+title = "UART correction — build-only runner"
+description = "Verified runner and recovery evidence for placement/routing, timing/DRC checks and experimental bitstream generation. Reuses the validated checkpoint; no board programming."
+logical_id = "8e265fa1-b7ff-4fb9-88d1-6b4f3fbb03b1"
+content_hash = "sha256:6793b1dbde9f4366ea4837cbfc945d7fdd758145bd54124edecc68e73ac43b95"
+size = 13364
+mtime_ms = 1793357594935
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/8e265fa1-b7ff-4fb9-88d1-6b4f3fbb03b1/da8e7999-c038-4e4c-8900-d896b96f6935"
+storage_version_token = "1793357640723183"
+content_type = "application/octet-stream"

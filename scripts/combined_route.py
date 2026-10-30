@@ -99,14 +99,15 @@ def check_source(source):
     return {name: sha(source / name) for name in EVIDENCE}
 
 
-def prepare(source, target, bundle):
+def prepare(source, target, bundle, *, validate_source=None):
+    validate_source = validate_source or check_source
     checksums(bundle, "checksums.sha256")
-    evidence = check_source(source)
+    evidence = validate_source(source)
     target.mkdir(exist_ok=False)
     for name in checksums(bundle, "checksums.sha256"):
         shutil.copyfile(bundle / name, target / name)
     shutil.copyfile(bundle / "checksums.sha256", target / "checksums.sha256")
-    for name in EVIDENCE:
+    for name in evidence:
         dest = target / "evidence" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, dest)
@@ -115,16 +116,17 @@ def prepare(source, target, bundle):
                 inputCheckpointSha256=sha(source / "synthesized.dcp"),
                 imageSha256=IMAGE, scope="Experimental build only; no board access")
     (target / "continuation.json").write_text(json.dumps(meta, indent=2) + "\n")
-    verify(target)
+    verify(target, validate_source=validate_source)
     print(f"COMBINED_ROUTE_PREPARED: {target}")
     print("No Vivado or board command started.")
 
 
-def verify(root):
+def verify(root, *, validate_source=None):
+    validate_source = validate_source or check_source
     checksums(root, "checksums.sha256")
     meta = json.loads((root / "continuation.json").read_text())
     source = Path(meta["sourceDirectory"])
-    require(check_source(source) == meta["evidence"], "Validation evidence changed")
+    require(validate_source(source) == meta["evidence"], "Validation evidence changed")
     for name, digest in meta["evidence"].items():
         require(sha(safe(root / "evidence", name)) == digest, f"Saved evidence changed: {name}")
     require(sha(root / "input.dcp") == sha(source / "synthesized.dcp")
@@ -132,8 +134,8 @@ def verify(root):
     return meta
 
 
-def record(root, version):
-    meta = verify(root)
+def record(root, version, *, validate_source=None):
+    meta = verify(root, validate_source=validate_source)
     names = ("candidate-EXPERIMENTAL.bit", "routed.dcp", "timing.txt", "drc.txt",
              "precise-slack.txt", "route-status.txt", "routed-utilization.txt",
              "continuation.json", "checksums.sha256")

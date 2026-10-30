@@ -99,3 +99,31 @@ vendor-mapped startup have now passed, but placement/routing, timing and physica
 acceptance remain outstanding. Preserve the verified synthesis checkpoint for
 the build-only stage; no previous candidate's timing or hardware pass transfers
 to this change.
+
+## Build-only handoff
+
+The operator approved proceeding with implementation and experimental BIT
+generation, not board programming. The separate build tools are packaged at
+`generated-artifacts/uart-packet-build-only.zip`, SHA-256
+`6793b1dbde9f4366ea4837cbfc945d7fdd758145bd54124edecc68e73ac43b95`.
+
+The runner pins the exact validated input manifest and includes hash-pinned
+local model results/log. On the vendor host it verifies the mapped startup,
+synthesis and checksum evidence, then copies the validated checkpoint and
+evidence into a new build directory. It preserves the original validation
+directory, refuses overwrite and acquires the existing shared build lock.
+The older combined-candidate gate retains its historical pins; a distinct UART
+gate validates the new evidence format.
+
+66 offline tests passed: 25 UART handoff tests and 41 existing combined/route
+gate tests. They cover evidence tampering, recovery conditions, wrong package
+identity, duplicate/missing pass markers, checkpoint substitution, copied
+evidence, no-overwrite preparation, isolated imports, shell syntax, and the
+unchanged pre-bitstream timing/DRC/clock checks. These are runner tests, not a
+claim that placement/routing or BIT generation has run.
+
+The inherited implementation Tcl opens `input.dcp` directly; it does not
+synthesize or generate a Namespace image. It verifies board/clock constraints,
+performs placement/routing, requires passing DRC and setup/hold/pulse checks,
+then generates the experimental BIT and a hash-bearing receipt. No board or
+flash commands are included.
