@@ -1550,3 +1550,17 @@ mtime_ms = 1793357594935
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/8e265fa1-b7ff-4fb9-88d1-6b4f3fbb03b1/da8e7999-c038-4e4c-8900-d896b96f6935"
 storage_version_token = "1793357640723183"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "CTbX5YD_3TUa3y4ozxw5q"
+uri = "file://generated-artifacts/uart-fault-hold-check.zip"
+type = "unspecified"
+title = "UART fault-hold check — Windows package"
+description = "Guided first-stage capture: validates reviewed files, asks before one Run command, saves evidence, then stops. Recovery and Halt testing are not included."
+logical_id = "e151688b-6ad5-4f8d-a7fe-b17044754651"
+content_hash = "sha256:77ddbbf04332db854b523d5c7e69eb3aae3f5f4e824267180c79139ff7fa9db4"
+size = 2571
+mtime_ms = 1793362238448
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e151688b-6ad5-4f8d-a7fe-b17044754651/003cea8d-3963-4eeb-8bb2-6d87384747e4"
+storage_version_token = "1793362245459872"
+content_type = "application/octet-stream"
