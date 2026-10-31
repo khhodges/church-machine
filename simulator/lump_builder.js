@@ -226,6 +226,8 @@ function validateSuppliedIdentity(cap, row) {
 }
 
 function buildApiDefinition(result, words) {
+    if (result.compactAbi)
+        throw new Error('Typed PassKey ABI requires the isolated typed-ABI build path; ordinary save/admission is not upgraded yet.');
     const nameErrors = require('./assembler.js').objectNameErrors(result);
     if (nameErrors.length) throw new Error(nameErrors.map(e => e.message).join('\n'));
     for (const [row, cap] of (result.capabilities || []).entries()) {

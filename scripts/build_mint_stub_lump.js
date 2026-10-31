@@ -9,7 +9,9 @@ const {buildLump, embedSelfDefinition} = require('../simulator/lump_builder');
 const root = path.resolve(__dirname, '..');
 function build() {
     const source = fs.readFileSync(path.join(root, 'simulator/cloomc/mint_stub.cloomc'), 'utf8');
-    const abi = JSON.parse(fs.readFileSync(path.join(root, 'simulator/mint/mint-stub.abi.json'), 'utf8'));
+    const compiled = new Compiler().compile(source, []);
+    assert.deepEqual(compiled.errors, []);
+    const abi = compiled.compactAbi;
     // Exact scaffold contract: not a general-purpose replacement ABI validator.
     assert.deepEqual(abi, {name:'ide.Mint',passkey:1,methods:{
         CREATE:[0,[['allocation',1],['permissions',1]],[2,'RW']],
@@ -17,8 +19,6 @@ function build() {
         MakeInform:[3,[['target',3,'RW']],[2,'RW']],
         MakeOutform:[2,[['target',2,'RW']],[3,'RW']],
     }});
-    const compiled = new Compiler().compile(source, []);
-    assert.deepEqual(compiled.errors, []);
     assert.deepEqual(compiled.methods.map(m => m.name), ['CREATE','DESTROY','MakeOutform','MakeInform']);
     const packed = buildLump(compiled, {allocationWords:64});
     const words = embedSelfDefinition(packed.words, abi, source, 2);

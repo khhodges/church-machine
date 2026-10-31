@@ -18,10 +18,16 @@ This scaffold uses the first DATA RW slice's concrete types, including
 Inform RW / Outform RW conversion signatures. It does not assert support for
 E/L/LS conversions or broader object types. No operation is implemented.
 
-The existing native-method compiler compiles the bodies. A separate explicit
-ABI manifest is embedded by the isolated builder using the approved tuple
-layout. This is NOT implementation of typed-source parsing or new-ABI support
-in the IDE's general admission pipeline. The artifact is structurally packed
+The compiler parses the typed method signatures and abstraction-level
+`passkey required;` declaration in mint_stub.cloomc, generating compactAbi.
+The separate JSON file is a golden test fixture, not build authority. Native
+instruction bodies are supported; higher-level typed expressions, imports,
+private methods and assembly @signature directives remain outside this slice.
+They must not be mistaken for implemented general ABI support.
+Ordinary legacy API generation rejects typed results rather than dropping
+their ABI. The isolated builder embeds the compiler-generated API.
+This is NOT new-ABI support in the IDE's general admission pipeline.
+The artifact is structurally packed
 and tested locally; it is not signed, admitted, installed or published.
 Do not overwrite the current Mint or promote this scaffold as an operational
 service. Its filename deliberately distinguishes it from canonical saved

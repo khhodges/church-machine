@@ -1,25 +1,26 @@
 // Isolated, uninstalled ABI scaffold. No method implements an operation.
 // Every call returns UNSUPPORTED (5), discarding the incoming CR1 PassKey.
-// PassKey requirement and typed signatures are in mint-stub.abi.json.
-// This source is compiled with the existing native-method frontend.
+// The compiler derives the embedded ABI from these typed declarations.
+// Bodies are native instructions; unsupported calls never authorize access.
 abstraction ide.Mint {
+passkey required;
 capabilities { SELF E }
-method CREATE {
+method CREATE(allocation: U32, permissions: U32) -> Inform[RW] {
     LOAD CR1, NULL
     IADD DR1, DR0, #5
     RETURNAL #0
 }
-method DESTROY {
+method DESTROY(target: Inform[RW]) -> Void {
     LOAD CR1, NULL
     IADD DR1, DR0, #5
     RETURNAL #0
 }
-method MakeOutform {
+method MakeOutform(target: Inform[RW]) -> Outform[RW] {
     LOAD CR1, NULL
     IADD DR1, DR0, #5
     RETURNAL #0
 }
-method MakeInform {
+method MakeInform(target: Outform[RW]) -> Inform[RW] {
     LOAD CR1, NULL
     IADD DR1, DR0, #5
     RETURNAL #0

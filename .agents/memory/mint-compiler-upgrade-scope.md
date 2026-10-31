@@ -2,6 +2,18 @@
 name: Mint compiler upgrade scope
 description: Focused baseline rather than broad legacy-suite repair before ABI work
 ---
+
+The user selected the existing four public Mint methods for the scaffold:
+CREATE, DESTROY, MakeOutform, MakeInform, not four separate creation methods.
+UNSUPPORTED_OPERATION is software status 5 with NULL CR1, not a new hardware
+fault or a successful operation. Stubs deny every call without validating
+PassKeys; do not claim this as an authorization implementation.
+
+**Why:** Explicit method-set selection and unsupported-status confirmation.
+
+**How to apply:** Keep the scaffold isolated and uninstalled. Generate its ABI
+from the typed source; normal publication must not silently downgrade it to
+the old format. Preserve the original operational source during this test.
 Use focused current-ISA/Mint compiler checks for the ABI upgrade. Keep unrelated
 Lambda, EventRouter, and historical-fixture failures visible, but do not require
 their cleanup before proceeding.

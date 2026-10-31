@@ -40,6 +40,39 @@ function detectProfileViolations(methods, manifest) {
 }
 
 class CLOOMCCompiler {
+    static _typedAbiSignature(params, returnType) {
+        const tags = {Inform:2, Outform:3, Abstract:4};
+        function type(text, output) {
+            text = text.trim();
+            if (text === 'U32') return 1;
+            if (text === 'Void' && output) return 0;
+            const exact = text.match(/^(Inform|Outform|Abstract)\[([A-Z]*)\]$/);
+            const union = text.match(/^Object\[([A-Za-z|]+);([A-Z]*)\]$/);
+            if (!exact && !union) throw new Error(`Invalid ABI type: ${text}`);
+            const rights = (exact || union)[2];
+            // LS is explicitly allowed by the Church CREATE policy.
+            if (!['','R','W','RW','X','RX','WX','RWX','E','L','LS'].includes(rights))
+                throw new Error(`Invalid ABI permissions: ${rights}`);
+            if (exact) return [tags[exact[1]], rights];
+            const forms = union[1].split('|').map(t => tags[t]);
+            if (forms.some(t => ![2,3,4].includes(t)) || new Set(forms).size !== forms.length)
+                throw new Error('Invalid or duplicate Object forms');
+            return [5, rights, forms.sort((a,b) => a-b)];
+        }
+        const names = new Set();
+        let scalars = 0, capabilities = 0;
+        const inputs = params.map(param => {
+            const match = param.match(/^([A-Za-z_]\w*)\s*:\s*(.+)$/);
+            if (!match || names.has(match[1])) throw new Error('ABI inputs require unique names and explicit types.');
+            names.add(match[1]);
+            const spec = type(match[2], false);
+            if (spec === 1) { scalars++; return [match[1],1]; }
+            capabilities++;
+            return [match[1], ...spec];
+        });
+        if (scalars > 14 || capabilities > 1) throw new Error('ABI permits at most 14 scalar inputs and one capability input.');
+        return {inputs, result:type(returnType, true)};
+    }
     static _assemblerClass() {
         if (typeof ChurchAssembler === 'function') return ChurchAssembler;
         if (typeof require === 'function') return require('./assembler.js');
@@ -577,6 +610,31 @@ class CLOOMCCompiler {
         // The programmer supplies the abstraction identity. Never wrap unnamed
         // source in a generated RunAbstraction/MyAbstraction declaration.
         const parsed = this._parseAbstraction(source, errors);
+        const typed = parsed.methods.some(m => m.abiSignature);
+        let compactAbi;
+        if (typed || parsed.passkeyRequired) {
+            try {
+                if (!parsed.passkeyRequired) throw new Error('Typed ABI requires passkey required; at abstraction scope.');
+                if ((capabilities || []).length || parsed.capabilities.some(c => !['SELF','__SELF__'].includes(c.name)))
+                    throw new Error('Typed ABI imports are not implemented in this isolated compiler slice.');
+                const entries = [];
+                parsed.methods.forEach((m, selector) => {
+                    if (!m.abiSignature || m.visibility === 'private' || m.aliasOf || selector > 126)
+                        throw new Error('Typed ABI requires explicit typed public methods with selectors 0–126.');
+                    for (const statement of m.body) {
+                        const text = statement.text.replace(/;.*$/, '').trim();
+                        if (!text || /^[A-Za-z_]\w*:$/.test(text)) continue;
+                        if (!this._nativeMnemonic(text) || /^(?:RETURN)\s+\S/i.test(text))
+                            throw new Error('Typed ABI bodies currently require native instructions and explicit registers; use RETURNAL for return masks.');
+                    }
+                    entries.push([m.name, [selector, m.abiSignature.inputs, m.abiSignature.result]]);
+                });
+                entries.sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0);
+                compactAbi = {name:parsed.name, passkey:1, methods:Object.fromEntries(entries)};
+            } catch (error) {
+                errors.push({line:0, message:error.message});
+            }
+        }
         if (errors.length > 0) {
             errors.sort((a, b) => (a.line || 0) - (b.line || 0));
             return { methods: [], errors, source_parse_failed: true, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'javascript' };
@@ -636,7 +694,8 @@ class CLOOMCCompiler {
             }
         }
 
-        return { methods, errors, manifest, abstractionName: parsed.name, capabilities: parsed.capabilities || [], language: 'javascript' };
+        return { methods, errors, manifest, abstractionName: parsed.name, capabilities: parsed.capabilities || [], language: 'javascript',
+            ...(compactAbi && errors.length === 0 ? {compactAbi} : {}) };
     }
 
     _detectLambda(source) {
@@ -1812,6 +1871,13 @@ class CLOOMCCompiler {
         let _commentBlockStart = -1; // start of consecutive // comment block preceding a method
         while (i < lines.length) {
             const line = lines[i].trim();
+            if (/^passkey\b/i.test(line)) {
+                if (line !== 'passkey required;' || result.passkeyRequired)
+                    errors.push({line:i + 1, message:'Declare passkey required; exactly once at abstraction scope.'});
+                result.passkeyRequired = true;
+                i++;
+                continue;
+            }
             if (!line) { _commentBlockStart = -1; i++; continue; }
             if (line.startsWith('//')) {
                 if (_commentBlockStart < 0) _commentBlockStart = i;
@@ -1909,13 +1975,25 @@ class CLOOMCCompiler {
             }
 
             // method Name(...) { ... }  or  method Name { ... }  (optional parens)
-            const methodMatch = cleanLine.match(/^method\s+(\w+)\s*(?:\(([^)]*)\))?\s*\{/);
+            const methodMatch = cleanLine.match(/^method\s+(\w+)\s*(?:\(([^)]*)\))?\s*(?:->\s*([^{}]+?)\s*)?\{/);
             if (methodMatch) {
                 const _srcStart = _commentBlockStart >= 0 ? _commentBlockStart : i;
                 _commentBlockStart = -1;
                 const method = { name: methodMatch[1], params: [], body: [], startLine: i, visibility, explicitVisibility, isMain: _isMain };
                 if (methodMatch[2] && methodMatch[2].trim()) {
                     method.params = methodMatch[2].split(',').map(p => p.trim()).filter(Boolean);
+                }
+                if (methodMatch[3]) {
+                    try {
+                        method.abiSignature = CLOOMCCompiler._typedAbiSignature(method.params, methodMatch[3]);
+                        // This first slice permits native bodies only; parameters are
+                        // ABI declarations, never legacy DR1-based expression locals.
+                        method.params = [];
+                    } catch (error) {
+                        errors.push({line:i + 1, message:error.message});
+                    }
+                } else if (method.params.some(p => p.includes(':'))) {
+                    errors.push({line:i + 1, message:'Typed parameters require an explicit -> result type.'});
                 }
                 // Extract inline content after the opening brace on the declaration line
                 const _mOpenBrace = cleanLine.indexOf('{');
