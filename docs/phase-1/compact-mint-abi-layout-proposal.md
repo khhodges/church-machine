@@ -1,7 +1,8 @@
-# Compact ABI layout and signatures — proposed
+# Compact ABI layout and signatures — approved
 
-Status: review draft only. The conventions in compact-mint-abi-proposal.md are
-approved. This layout, signature grammar and scalar-result placement are not.
+Status: layout, signature grammar and scalar-result placement approved by the
+user on 2026-10-31. Not implemented. Mint's concrete method signatures still
+require review against the selected executable implementation.
 
 ## Storage
 
@@ -111,8 +112,8 @@ entries independently of this structural validation.
 
 ## Next implementation gate
 
-Review this draft before changing codec, compiler, admission or browser readers.
-Then settle Mint's exact typed signatures against the selected implementation,
+The layout review is complete. Before changing codec, compiler, admission or
+browser readers, settle Mint's exact typed signatures against the selected implementation,
 particularly CREATE's initializer/result types and scalar argument list.
 Do not infer them from legacy fixtures or broaden grants to make a test pass.
 Implement all readers/writers together and test exact bytes, negative inputs,

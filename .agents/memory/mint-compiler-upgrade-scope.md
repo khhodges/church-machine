@@ -22,6 +22,16 @@ on normal error or successful no-capability-result returns.
 **Why:** This was explicit approval of conventions, not the future serialized
 layout, compiler implementation, conversion behavior, or hardware work.
 
-**How to apply:** Do not reopen settled convention choices. Obtain review of
-the exact layout and signatures next; distinguish approved design from current
-executable behavior.
+**How to apply:** Do not reopen settled convention choices; distinguish approved
+design from current executable behavior.
+
+The user also approved the layout and signature syntax in
+`docs/phase-1/compact-mint-abi-layout-proposal.md`, including scalar results in
+DR2 and the initial limit of one capability input in CR2.
+
+**Why:** This was a separate explicit layout approval, not approval of concrete
+Mint argument types or new initializer/conversion behavior.
+
+**How to apply:** Match concrete Mint signatures to the selected implementation
+before implementation. Do not carry historical slot-number arguments, CR2
+PassKey placement or success=1 into the new approved convention.

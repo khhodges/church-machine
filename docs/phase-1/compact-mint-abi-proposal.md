@@ -1,7 +1,8 @@
 # Compact Mint ABI — review proposal
 
 Status: conventions approved by the user on 2026-10-31; not implemented.
-The separate layout/signature proposal still needs review.
+The separate layout/signature proposal is also approved; concrete Mint method
+signatures remain under review.
 Existing compact APIs encode
 explicit register names and Inform/Outform/Abstract type strings. This proposal
 changes the contract; it is not a description of current output.
