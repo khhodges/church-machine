@@ -3,6 +3,8 @@
 'use strict';
 
 const ChurchAssembler = require('./assembler.js');
+// Run in isolated processes so browser-global setup cannot hide Node failures.
+require('./test_compiler_node_dependency.js');
 
 let passed = 0;
 let failed = 0;

@@ -62,7 +62,7 @@ function capabilityNames(capabilities) {
 function eloadcallWords(result) {
     return result.methods
         .flatMap(method => Array.isArray(method.code) ? method.code : [])
-        .filter(word => ((word >>> 27) & 0x1F) === 2 && ((word >>> 15) & 15) === 6);
+        .filter(word => ((word >>> 27) & 0x1F) === 2 && (word & (1 << 18)) !== 0);
 }
 
 function decodeEloadcall(word) {
@@ -78,7 +78,7 @@ function decodeEloadcall(word) {
 function assertEloadTargets(result, expected) {
     const words = eloadcallWords(result);
     assert.strictEqual(words.length, expected.length,
-        `expected ${expected.length} ELOADCALL words, got ${words.length}`);
+        `expected ${expected.length} indexed CALL words, got ${words.length}`);
     expected.forEach((item, index) => {
         const decoded = decodeEloadcall(words[index]);
         assert.strictEqual(capabilityName(result.capabilities[decoded.row]), item.name,

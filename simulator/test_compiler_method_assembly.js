@@ -41,19 +41,19 @@ function wrapSelfTest(rawSource) {
 
 // The IDE's structured source path must not reinstate a CHANGE privilege ban.
 for (const dst of [12, 13, 14, 15]) {
-    const result = compile(`abstraction ChangeOperands {
+    const result = compile(`abstraction test.ChangeOperands {
 capabilities { SELF E }
 method Run {
     CHANGE CR${dst}
 }
 }`);
-    const expected = ((4 << 27) | (14 << 23) | (dst << 19) | (dst << 15)) >>> 0;
+    const expected = ((4 << 27) | (14 << 23) | (dst << 15)) >>> 0;
     assert.equal(result.methods[0].code[0] >>> 0, expected,
         `structured CHANGE CR${dst} retains the exact instruction`);
 }
 
 const snippet = [
-    'abstraction MethodAssembly {',
+    'abstraction test.MethodAssembly {',
     'capabilities { SELF E }',
     'method Run {',
     'start:',
@@ -74,12 +74,12 @@ const snippetBefore = snippet;
 // must use method-local relocation, not a one-statement assembler label table.
 for (const spelling of ['BRANCH NE, denied', 'BRANCH NE denied', 'BRANCHNE denied', 'branch ne, denied']) {
     const source = `abstraction ide.Mint {
-capabilities { SELF E, nstab RW, pkref E }
+capabilities { SELF E, ide.nstab RW, ide.pkref E }
 method Forge_GT_At_Slot {
-    LOAD CR3, pkref
+    LOAD CR3, ide.pkref
     TPERM CR2, EXACT, CR3
     ${spelling} ; must immediately follow EXACT
-    LOAD CR5, nstab
+    LOAD CR5, ide.nstab
     RETURN
 denied:
     RETURN
@@ -97,7 +97,7 @@ denied:
     }
 }
 for (const spelling of ['BRANCH NE, start', 'BRANCH NE start', 'BRANCHNE start']) {
-    const result = compile(`abstraction Backward {
+    const result = compile(`abstraction test.Backward {
 capabilities { SELF E }
 method Run {
 start:
@@ -106,14 +106,14 @@ ${spelling}
 RETURN
 }
 }`);
-    assert.equal(result.methods[0].code[1] & 0x7fff, 0x7fff);
+    assert.equal(result.methods[0].code[1] & 0x7ffff, 0x40001);
 }
 for (const [body, expected] of [
     ['BRANCH NE, absent\nRETURN', /Undefined label: absent/],
     ['BRANCH NE, constructor\nRETURN', /Undefined label: constructor/],
     ['same:\nIADD DR1, DR0, #0\nsame:\nRETURN', /Duplicate label: same/],
 ]) {
-    const result = new CLOOMCCompiler().compile(`abstraction Invalid {
+    const result = new CLOOMCCompiler().compile(`abstraction test.Invalid {
 capabilities { SELF E }
 method Run {
 ${body}
@@ -121,7 +121,7 @@ ${body}
 }`, []);
     assert.ok(result.errors.some(e => expected.test(e.message)), JSON.stringify(result.errors));
 }
-const scoped = new CLOOMCCompiler().compile(`abstraction Scoped {
+const scoped = new CLOOMCCompiler().compile(`abstraction test.Scoped {
 capabilities { SELF E }
 method First {
 BRANCH NE, elsewhere
@@ -140,7 +140,7 @@ for (const condition of Object.keys(new CLOOMCCompiler().conditions)) {
     for (const instruction of [`BRANCH ${condition}`, `BRANCH ${condition}, #0`]) {
         const expected = new global.ChurchAssembler().assemble(instruction);
         assert.deepEqual(expected.errors, []);
-        const actual = compile(`abstraction Numeric {
+        const actual = compile(`abstraction test.Numeric {
 capabilities { SELF E }
 method Run {
 ${instruction}
@@ -154,7 +154,7 @@ RETURN
 // states. This checks actual branch semantics rather than only our decoding.
 global.window = global.window || {};
 const Simulator = require('./simulator.js');
-const branchCode = compile(`abstraction Guard {
+const branchCode = compile(`abstraction test.Guard {
 capabilities { SELF E }
 method Run {
 BRANCH NE, denied
@@ -190,7 +190,7 @@ assert.equal(snippetResult.methods[0].code[1] & 0x7FFF, 0,
     'LOAD SELF must encode canonical c-list row zero');
 assert.equal(snippetResult.methods[0].code[2] & 0x7FFF, 2,
     'forward branch must resolve relative to its own instruction');
-assert.equal(snippetResult.methods[0].code[4] & 0x7FFF, 0x7FFF,
+assert.equal(snippetResult.methods[0].code[4] & 0x7FFFF, 0x40001,
     'backward branch must resolve to the earlier method label');
 assert.ok(snippetResult.methods[0].sourceLines.includes(
     '    LOAD CR1, SELF          ; CR1 = E-GT from c-list row 0\n\n    BRANCHEQ forward'

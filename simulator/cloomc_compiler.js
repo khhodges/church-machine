@@ -40,6 +40,11 @@ function detectProfileViolations(methods, manifest) {
 }
 
 class CLOOMCCompiler {
+    static _assemblerClass() {
+        if (typeof ChurchAssembler === 'function') return ChurchAssembler;
+        if (typeof require === 'function') return require('./assembler.js');
+        throw new Error('Church Machine assembler is unavailable.');
+    }
     constructor(methodConventions = {}) {
         this.opcodes = {
             LOAD: 0, SAVE: 1, CALL: 2, RETURN: 3,
@@ -217,7 +222,11 @@ class CLOOMCCompiler {
 
         // Exact dotted capability names win over Abstraction.Method splitting,
         // matching ChurchAssembler's CALL parser.
-        const callAssembler = opts.callAssembler || new ChurchAssembler();
+        const AssemblerClass = CLOOMCCompiler._assemblerClass();
+        if (!opts.callAssembler && typeof AssemblerClass !== 'function') {
+            throw new Error('Church Machine assembler is unavailable for CALL diagnostics.');
+        }
+        const callAssembler = opts.callAssembler || new AssemblerClass();
         if (!opts.callAssembler) {
             if (opts.clistSlots) callAssembler.setLocalClistSlots(opts.clistSlots);
             callAssembler._capBlockSlots = callAssembler._parseCapBlockSlots(
@@ -287,7 +296,7 @@ class CLOOMCCompiler {
                     callAssembler._symbolicRowFor(match[1]) !== null) {
                 continue; // Symbolic relocation: the linking loader owns resolution.
             }
-            const call = ChurchAssembler.parseCallTarget(match[1], match[2],
+            const call = AssemblerClass.parseCallTarget(match[1], match[2],
                 name => callAssembler._resolveCListName(name) !== null);
             if (call) inspect(i + 1, call.petName, call.method, call.sourceToken);
         }
@@ -322,6 +331,7 @@ class CLOOMCCompiler {
     }
 
     compile(source, capabilities, options) {
+        const ChurchAssembler = CLOOMCCompiler._assemblerClass();
         const compileOptions = options && typeof options === 'object' ? options : {};
         const targetDirective = this._parseTargetDirective(source);
         const portableDirective = this._parsePortableDirective(source);
@@ -1330,7 +1340,7 @@ class CLOOMCCompiler {
             errors: [{line: 0, message: 'No abstraction declaration found. Add: ; @abstraction YourName and recompile.'}],
             warnings: [],
         };
-        const asm = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler() : null;
+        const asm = new (CLOOMCCompiler._assemblerClass())();
         if (!asm) {
             return {
                 abstractionName: declaration[1],
@@ -2577,9 +2587,7 @@ class CLOOMCCompiler {
                 asmText = `${nativeInstruction.mnemonic} ${namedLoad[1].toUpperCase()}, CR6, #${row}`;
             }
 
-            const AsmClass = typeof ChurchAssembler !== 'undefined'
-                ? ChurchAssembler
-                : (typeof require !== 'undefined' ? require('./assembler.js') : null);
+            const AsmClass = CLOOMCCompiler._assemblerClass();
             if (!AsmClass) {
                 errors.push({ line: stmt.lineNum, message: 'Church Machine assembler is unavailable.' });
                 return;
@@ -5575,9 +5583,7 @@ class CLOOMCCompiler {
         const flushAsmBlock = () => {
             if (asmBlock.length === 0) return;
             const combined = asmBlock.join('\n');
-            const AsmClass = typeof ChurchAssembler !== 'undefined'
-                ? ChurchAssembler
-                : (typeof require !== 'undefined' ? require('./assembler.js') : null);
+            const AsmClass = CLOOMCCompiler._assemblerClass();
             const asmObj = new AsmClass();
             const asmResult = asmObj.assemble(combined);
             if (asmResult.errors && asmResult.errors.length > 0) {
