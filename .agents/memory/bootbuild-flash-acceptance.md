@@ -16,14 +16,37 @@ run. Keep display cleanup separate; do not convert investigation into permission
 to rebuild, change grants, install an image, or reset hardware.
 
 Acceptance also requires visible pre-attack execution history in the live event
-log. The user expects 1000 instructions before the programmed attack fault.
+log. The user initially expected 1000 instructions before the programmed attack
+fault, then selected a reduced control-flow trace to improve delivery speed:
+CALL, RETURN, CHANGE, and SWITCH, with full dot.names including Namespace and
+Thread context.
+
+Phase 1 is a single Namespace, explicitly confirmed by the user.
+
+Simultaneous multi-FPGA support is also deferred until multi-Namespace support,
+as explicitly selected by the user. Phase 1 covers one FPGA and one Namespace
+with multiple Threads.
+
+**Why:** Multi-Namespace SWITCH tracing and simultaneous multi-FPGA support
+must not delay the Phase 1 bridge
+trace improvement.
+
+**How to apply:** Use the verified single Namespace identity as fixed context
+while tracking CALL, RETURN, and CHANGE across Threads and objects. Retain full
+dot.names; defer multi-Namespace transition reconstruction, not identity
+validation. This does not authorize changes to the golden image.
 
 **Why:** The user challenged treating the expected Mallory fault as sufficient
 evidence when the preceding instruction history was missing.
 
-**How to apply:** Check trace completeness independently of fault correctness.
-Distinguish instruction retirements from multi-event trace packet counts; never
-infer complete execution history merely from successful fault delivery.
+**How to apply:** Check completeness of the selected control-flow trace
+independently of fault correctness. Include source and destination context for
+Thread and Namespace transitions; do not conflate identically named objects in
+different contexts. Preserve fault, stop, and deliberate-Step confirmation
+evidence. Resolve names against the exact installed image, never stale reference
+labels or invented names. Distinguish instruction retirements from multi-event
+trace packet counts; successful fault delivery alone does not prove complete
+history.
 
 The user confirmed that slot 21 in the golden image is Amoeba and is the
 intended Boot CALL destination.
