@@ -33,3 +33,15 @@ and unavailable evidence; never render undefined fields as diagnostic values.
 comparison, followed by evidence and source-navigation actions. Distinguish a
 rejected C-list lookup from access to the target object's data. Do not recommend
 widening authority merely to remove an intentional security-test fault.
+
+Keep Machine Fault dialogs within the viewport, with paginated details rather
+than a long scrolling report.
+
+**Why:** The user approved the deeper diagnosis but explicitly required “a better
+modal that dosnt need to scroll.”
+
+**How to apply:** Keep the immediate diagnosis visible; paginate register,
+instruction and provenance evidence. Hardware annotations require an explicitly
+selected immutable image reference and must not be described as UART capture
+or hardware attestation. Correlate register snapshots by incident and bridge
+session, not just a matching NIA.

@@ -1,0 +1,45 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const crypto = require('node:crypto');
+const source = fs.readFileSync('simulator/app-run.js', 'utf8');
+const context = vm.createContext({});
+vm.runInContext(source.slice(source.indexOf('const _FAULT_GOLDEN_REFERENCE ='), source.indexOf('function _wukongFlagsStr(')), context);
+const reference = vm.runInContext('_FAULT_GOLDEN_REFERENCE', context);
+const trace = {incident_id:'fixture-incident', bridge_session:'fixture-session', nia:0x3a08, fault_code:8, bridge_trace_counter:1907};
+const snapshot = { ...trace, source:'hardware', snapshot_complete:true, crc_valid:true,
+    correlation_status:'correlated', cr:Array.from({length:16},()=>[0,0,0]), dr:Array(16).fill(0)};
+snapshot.cr[6]=[0x4a000011,0x3bf8,1];
+snapshot.cr[12]=[0x0200000c,0x3400,255];
+snapshot.cr[14]=[0x42000011,0x3a04,3];
+snapshot.cr[15]=[0x1a000001,0,255];
+assert(context._wukongFaultSnapshotMatches(trace,snapshot));
+for (const change of [{incident_id:'other'}, {bridge_session:'other'}, {nia:0x4000},
+    {fault_code:9},{snapshot_complete:false},{crc_valid:false},{source:'simulator'},
+    {correlation_status:'pending'}, {cr:[]}, {dr:[] }]) {
+    assert(!context._wukongFaultSnapshotMatches(trace,{...snapshot,...change}));
+}
+const f = {type:'BOUNDS', physicalPC:trace.nia,faultCode:8,_hardwareTrace:trace,_acceptedSnapshot:snapshot};
+assert(!context._wukongFaultDiagnosis(f).title.includes('Mallory'));
+f._goldenReference=true;
+let d=context._wukongFaultDiagnosis(f);
+assert(d.title.includes('only 0–1'));
+assert(d.instruction.includes('0x070B0020'));
+assert(d.context.some(row=>row[1].includes('Thread.3')));
+assert(d.provenance.includes('NOT hardware attestation'));
+assert(d.history[0].includes('not its caller'));
+snapshot.dr[0]=1;
+assert(!context._wukongFaultDiagnosis(f).title.includes('only 0–1'));
+snapshot.dr[0]=0;
+const imagePath='generated-artifacts/amoeba-retry-vendor-build/candidate-le.bin';
+if(fs.existsSync(imagePath)){
+    const image=fs.readFileSync(imagePath);
+    assert.equal(crypto.createHash('sha256').update(image).digest('hex'),reference.image);
+    assert.equal(image.readUInt32LE(reference.malloryLoad.nia),reference.malloryLoad.word);
+    for(const [slot,row] of Object.entries(reference.slots)){
+        assert.equal(image.readUInt32LE(Number(slot)*16)*4,row[1]);
+        assert.equal(image.readUInt32LE(Number(slot)*16+4),row[2]);
+    }
+} else console.log('Preserved golden-image byte comparison skipped: image not distributed');
+console.log('PASS hardware fault diagnosis: correlation, explicit reference, bounds, provenance');
+module.exports={trace,snapshot};

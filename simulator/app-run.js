@@ -4715,7 +4715,7 @@ function showFaultModal(f) {
 
     // Snapshot the current awaitingLump so the Retry Download button can use it
     // even if sim.awaitingLump is cleared before the user clicks.
-    if (sim.awaitingLump && sim.awaitingLump.token != null) {
+    if (sim && sim.awaitingLump && sim.awaitingLump.token != null) {
         _lastRetryLump = { token: sim.awaitingLump.token, nsIndex: sim.awaitingLump.nsIndex };
     }
 
@@ -4794,7 +4794,8 @@ function showFaultModal(f) {
     }
     const nsStr  = locationNs && locationNs.label
         ? `${locationNs.label}${Number.isInteger(locationNs.offset) ? ` +${locationNs.offset}` : ' (offset unavailable)'}`
-        : (pc === null
+        : (f._origin === 'hardware' ? 'Not captured by UART; see selected image reference'
+        : pc === null
             ? 'unavailable (no immutable instruction provenance)'
             : `unmapped address ${pcHex} (outside the captured code capability)`);
 
@@ -4813,7 +4814,7 @@ function showFaultModal(f) {
         ? `0x${codeVal.toString(16).toUpperCase().padStart(2,'0')} (${codeVal})`
         : 'SW only';
 
-    const allFaults  = sim.faultLog || [];
+    const allFaults  = f._origin === 'hardware' ? [] : (sim && sim.faultLog || []);
     const historyHtml = allFaults.length > 1
         ? allFaults.slice(-5).map((fl, i, arr) => {
             const isCurrent = (i === arr.length - 1);
@@ -4845,6 +4846,11 @@ function showFaultModal(f) {
     let crTableRows = '';
     crSnap.forEach((c, i) => {
         if (!c || c.word0 === 0) return;
+        if (f._origin === 'hardware') {
+            const hx = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            crTableRows += `<tr><td>CR${i}</td><td colspan="2">${hx(c.word0)}</td><td>${hx(c.word2)}</td><td>${hx(c.word1)}</td><td>Captured</td></tr>`;
+            return;
+        }
         try {
             const p = sim.parseGT(c.word0);
             const typeChar = ['\u2014','I','O','A'][p.type] || '?';
@@ -4866,7 +4872,9 @@ function showFaultModal(f) {
             <div class="fault-regs-label">Capability Registers <span class="fault-regs-legend">${_rightsLegendHTML()}</span></div>
             <div class="fault-regs-scroll">
                 <table class="fault-regs-table">
-                    <thead><tr><th>Reg</th><th>Type</th><th>Slot</th><th>Perms</th><th>Base</th><th>Name</th></tr></thead>
+                    <thead>${f._origin === 'hardware'
+                        ? '<tr><th>Reg</th><th colspan="2">GT</th><th>Limit</th><th>Base</th><th>Evidence</th></tr>'
+                        : '<tr><th>Reg</th><th>Type</th><th>Slot</th><th>Perms</th><th>Base</th><th>Name</th></tr>'}</thead>
                     <tbody>${crTableRows}</tbody>
                 </table>
             </div>
@@ -4992,7 +5000,7 @@ function showFaultModal(f) {
     let scopeSection = '';
     let _scopeBadOffsetStr = null; // shared with trace renderer to highlight same token
     if (f.type === 'BOUNDS' || f.type === 'RANGE') {
-        const auditEntries = sim.auditLog || [];
+        const auditEntries = f._origin === 'hardware' ? [] : (sim && sim.auditLog || []);
         const lastEntry = auditEntries.length > 0 ? auditEntries[auditEntries.length - 1] : null;
         if (lastEntry && lastEntry.checks && lastEntry.checks.range && !lastEntry.checks.range.pass) {
             const rc = lastEntry.checks.range;
@@ -5268,34 +5276,77 @@ function showFaultModal(f) {
                     </div>
                     ${bootEvidenceHtml}
                 </div>`;
-    const instrTraceSection = `
-        <div class="fault-trace-section fault-trace-collapsible">
-            <div class="fault-trace-toggle" onclick="this.closest('.fault-trace-collapsible').classList.toggle('fault-trace-open')" title="Click to expand/collapse trace">
-                <span class="fault-trace-toggle-arrow">&#x25B6;</span>
-                <span class="fault-trace-toggle-label">TRACE</span>
-                ${instrTrace.length > 0 ? `<span class="fault-trace-toggle-count">(last ${instrTrace.length} instruction${instrTrace.length !== 1 ? 's' : ''})</span>` : ''}
+    const _isHw = f._origin === 'hardware';
+    const _fe = v => _escHtml(v === undefined || v === null || v === '' ? 'unknown' : String(v));
+    const _pd = f.programmerDiagnosis && typeof f.programmerDiagnosis === 'object' ? f.programmerDiagnosis : null;
+    const _pairs = a => Array.isArray(a) ? a.filter(p => Array.isArray(p) && p.length >= 1) : [];
+    const _pairRows = a => _pairs(a).map(p => `<div class="fault-detail-row"><span class="fault-detail-label">${_fe(p[0])}</span><span class="fault-detail-value">${_fe(p[1])}</span></div>`).join('');
+    const _diagTitle = _pd && _pd.title ? _pd.title : (f.type ? f.type + ' fault' : 'Machine fault');
+    const _diagExplain = _pd ? _pd.explanation : (f.diagnosticNote || f.message);
+    const _diagNext = _pd ? _pd.nextAction : (_isHw ? null : (_editLineNum ? 'Open the source line and check the operand bounds shown below.' : 'Inspect the Trace and Registers tabs for the faulting operands.'));
+    const _diagInstr = _pd && _pd.instruction ? _pd.instruction : (word !== null ? disasm : null);
+    const _stepTxt = Number.isInteger(f.step) ? '#' + f.step : 'unknown';
+    const _hwPackets = Number.isInteger(f.tracePacketCount) ? String(f.tracePacketCount) : null;
+    const _stepMeta = _isHw
+        ? (_hwPackets ? `<div><span>Trace packets</span><code>${_fe(_hwPackets)}</code></div>` : '')
+        : `<div><span>Step</span><code>${_fe(_stepTxt)}</code></div>`;
+    const _nextHtml = _diagNext ? _fe(_diagNext) : (_isHw ? 'unknown &mdash; no programmer diagnosis captured for this hardware report yet.' : '');
+    const _diagHero = `
+        <section class="fault-diag-hero">
+            <div class="fault-diag-kicker">${_isHw ? 'Hardware report' : 'Simulator capture'} &middot; ${_fe(f.type)} &middot; code ${_fe(codeStr)}</div>
+            <h3 class="fault-diag-title" id="faultModalDiagTitle">${_fe(_diagTitle)}</h3>
+            <p class="fault-diag-explain">${_fe(_diagExplain)}</p>
+            <div class="fault-diag-meta">
+                <div><span>Instruction</span><code>${_fe(_diagInstr)}</code></div>
+                <div><span>PC</span><code>${_fe(pcHex)}</code></div>
+                ${_stepMeta}
             </div>
+            ${_nextHtml ? `<div class="fault-diag-next"><span>Next</span>${_nextHtml}</div>` : ''}
+        </section>`;
+    const _ctxRows = _pd ? _pairRows(_pd.context) + _pairRows(_pd.facts) : '';
+    const _provHtml = `<div class="fault-detail-grid fault-provenance">
+            <div class="fault-detail-row"><span class="fault-detail-label">Origin</span><span class="fault-detail-value">${_isHw ? 'Hardware (Wukong trace)' : 'Simulator capture'}</span></div>
+            <div class="fault-detail-row"><span class="fault-detail-label">Provenance</span><span class="fault-detail-value">${_fe(_pd ? _pd.provenance : (_isHw ? null : 'Recorded by the simulator at fault time; live state is not substituted.'))}</span></div>
+            ${_pd && Array.isArray(_pd.history) && _pd.history.length ? _pd.history.map((h, i) => `<div class="fault-detail-row"><span class="fault-detail-label">History ${i + 1}</span><span class="fault-detail-value">${_fe(h)}</span></div>`).join('') : ''}
+        </div>`;
+    const _traceDetails = _isHw
+        ? `<div class="fault-detail-grid fault-trace-fault-details">
+                <div class="fault-detail-row"><span class="fault-detail-label">Code</span><span class="fault-detail-value"><code class="fault-code-val">${_fe(codeStr)}</code></span></div>
+                <div class="fault-detail-row"><span class="fault-detail-label">NIA</span><span class="fault-detail-value"><code>${_fe(pcHex)}</code></span></div>
+                <div class="fault-detail-row"><span class="fault-detail-label">Instruction</span><span class="fault-detail-value"><code>${_fe(_diagInstr)}</code></span></div>
+                ${_hwPackets ? `<div class="fault-detail-row"><span class="fault-detail-label">Trace packets</span><span class="fault-detail-value">${_fe(_hwPackets)}</span></div>` : ''}
+                <div class="fault-detail-row"><span class="fault-detail-label">Provenance</span><span class="fault-detail-value">${_fe(_pd ? _pd.provenance : null)}</span></div>
+            </div>`
+        : (Number.isInteger(f.step) ? _traceFaultDetailsHtml : _traceFaultDetailsHtml.replace(/<button class="gate-loc-step-link[\s\S]*?<\/button>/, 'unknown'));
+    const instrTraceSection = `
+        <div class="fault-trace-section fault-trace-open">
             <div class="fault-trace-body">
-                ${_traceFaultDetailsHtml}
-                ${traceTableHtml}
+                ${_traceDetails}
+                ${_isHw ? traceTableHtml.replace(/\son(click)="[^"]*"/g, '') : traceTableHtml}
+                ${instrTrace.length === 0 ? '<div class="fault-empty">No instruction trace was captured for this fault.</div>' : ''}
             </div>
         </div>`;
 
     const overlay = document.createElement('div');
     overlay.id = 'faultModalOverlay';
-    overlay.className = 'modal-overlay';
+    overlay.className = 'modal-overlay fault-overlay';
+    overlay._faultRecord = f;
 
     const dialog = document.createElement('div');
-    dialog.className = 'modal-dialog fault-dialog';
-    const _editOnclick = _editLineNum
+    dialog.className = 'modal-dialog fault-dialog fault-compact' + (_isHw ? ' fault-origin-hw' : '');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-labelledby', 'faultModalDiagTitle');
+    dialog.tabIndex = -1;
+    const _editOnclick = _isHw ? '' : (_editLineNum
         ? `onclick="faultModalOpenEditor(${_editLineNum})" title="Click to open editor at line ${_editLineNum}"`
         : (nsIdxForViewLump != null
             ? `onclick="faultModalOpenBinaryLump(${nsIdxForViewLump})" title="Click to open lump in code view"`
-            : '');
-    const _editBadge = _editLineNum
-        ? `<span class="fault-edit-hint">&#x270E; line&nbsp;${_editLineNum}</span>`
-        : (nsIdxForViewLump != null ? `<span class="fault-edit-hint">&#x270E; show instruction +${locationNs.offset}</span>` : '');
-    const _msgClass = (_editLineNum || nsIdxForViewLump != null) ? 'fault-modal-message fault-msg-editable' : 'fault-modal-message';
+            : ''));
+    const _editBadge = _isHw ? '' : (_editLineNum
+        ? `<span class="fault-edit-hint">line&nbsp;${_editLineNum}</span>`
+        : (nsIdxForViewLump != null ? `<span class="fault-edit-hint">show instruction +${locationNs.offset}</span>` : ''));
+    const _msgClass = _editOnclick ? 'fault-modal-message fault-msg-editable' : 'fault-modal-message';
     const _noteValue = typeof f.userNote === 'string'
         ? f.userNote
         : (f.diagnosticNote || `${f.type} fault: ${f.message || 'No additional diagnostic message was captured.'}`);
@@ -5305,67 +5356,215 @@ function showFaultModal(f) {
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+    const _lumpLabel = !_isHw && locationNs && locationNs.label ? _escHtml(locationNs.label) : '';
+    const _hasRegs = !!(crSection || drSection || gtSnapshotSection);
+    const _actions = _isHw ? `
+            <button class="btn btn-primary" onclick="_wukongUseGoldenFaultReference()" ${f._goldenReference ? 'disabled' : ''} title="Select the static hash-linked golden reference. This is not hardware attestation.">${f._goldenReference ? 'Golden reference selected' : 'Use golden reference'}</button>
+            <button class="btn btn-muted" onclick="_faultSelectTab(this,'regs')">Inspect C-list</button>
+            <button class="btn btn-muted" onclick="_faultSelectTab(this,'trace')">Instruction</button>
+            <button class="btn btn-muted" onclick="_faultSelectTab(this,'evidence')">History</button>
+            <button class="btn btn-muted fault-btn-end" onclick="faultModalDismiss()">Close</button>` : `
+            <button class="btn btn-primary" onclick="faultModalInvestigate()">Investigate</button>
+            ${isOutformFault ? '<button class="btn btn-primary" onclick="faultModalRetryDownload()">Retry download</button>' : ''}
+            ${nsIdxForViewLump != null
+                ? '<button class="btn btn-muted" onclick="faultModalInvestigate()" title="Open and highlight the recorded instruction">Show faulting code</button>'
+                : '<button class="btn btn-muted" disabled title="No captured source location is available for this fault">Edit code</button>'}
+            <button class="btn btn-muted" onclick="faultModalClearAndDismiss()" title="Clear fault state and stop the flashing alert">Clear</button>
+            <button class="btn btn-ghost-danger fault-btn-end" onclick="faultModalReboot()" title="Reset the simulator">Reboot simulator</button>`;
+    const _tab = (id, label, on) => `<button type="button" role="tab" class="fault-tab${on ? ' active' : ''}" data-tab="${id}" aria-selected="${on}" onclick="_faultSelectTab(this,'${id}')">${label}</button>`;
     dialog.innerHTML = `
         <div class="fault-modal-header">
-            <span class="fault-type-badge" style="background:${color}22;border-color:${color};color:${color}">${f.type}</span>
+            <span class="fault-type-badge" style="background:${color}22;border-color:${color};color:${color}">${_escHtml(f.type || 'FAULT')}</span>
             <span class="fault-modal-title">Machine Fault</span>
-            ${locationNs && locationNs.label ? (nsIdxForViewLump != null
-                ? `<button class="fault-modal-lump-chip fault-modal-lump-chip-link" onclick="faultModalOpenBinaryLump(${nsIdxForViewLump})" title="Click to open lump in code view">${locationNs.label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}<span class="fault-modal-lump-offset">+${locationNs.offset}</span></button>`
-                : `<span class="fault-modal-lump-chip">${locationNs.label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}<span class="fault-modal-lump-offset">+${locationNs.offset}</span></span>`) : ''}
-            <button class="fault-modal-close" onclick="faultModalDismiss()" title="Close">&times;</button>
+            ${_lumpLabel ? ((!_isHw && nsIdxForViewLump != null)
+                ? `<button class="fault-modal-lump-chip fault-modal-lump-chip-link" onclick="faultModalOpenBinaryLump(${nsIdxForViewLump})" title="Click to open lump in code view">${_lumpLabel}<span class="fault-modal-lump-offset">+${locationNs.offset}</span></button>`
+                : `<span class="fault-modal-lump-chip">${_lumpLabel}<span class="fault-modal-lump-offset">+${locationNs.offset}</span></span>`) : ''}
+            <span class="fault-origin-tag">${_isHw ? 'HARDWARE' : 'SIMULATOR'}</span>
+            <button class="fault-modal-close" onclick="faultModalDismiss()" title="Close" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-buttons fault-modal-actions">
-            <button class="btn btn-danger" onclick="faultModalReboot()">&#x21BA; Reboot</button>
-            <button class="btn btn-warning" onclick="faultModalInvestigate()">&#x1F50D; Investigate</button>
-            ${isOutformFault ? '<button class="btn btn-primary" onclick="faultModalRetryDownload()">&#x21BB; Retry Download</button>' : ''}
-            ${nsIdxForViewLump != null
-                ? '<button class="btn btn-primary" onclick="faultModalInvestigate()" title="Open and highlight the recorded instruction">&#x270E; Show faulting code</button>'
-                : '<button class="btn btn-muted" disabled title="No captured source location is available for this fault">&#x270E; Edit Code</button>'}
-            <button class="btn btn-muted" onclick="faultModalClearAndDismiss()" title="Clear fault state — stops the flashing alert">&#x2715; Clear</button>
+        ${_diagHero}
+        <div class="fault-tabs" role="tablist">
+            ${_tab('diag', 'Details', true)}
+            ${_tab('trace', 'Trace' + (instrTrace.length ? ' (' + instrTrace.length + ')' : ''), false)}
+            ${_tab('regs', 'Registers', false)}
+            ${_tab('evidence', 'Evidence', false)}
+            ${_tab('note', 'Note', false)}
         </div>
-        <div class="${_msgClass}" ${_editOnclick}>${_transformFaultMsg(f.message)}${_editBadge}</div>
-        <div class="fault-detail-row">
-            <span class="fault-detail-label">Recorded execution</span>
-            <span class="fault-detail-value">${_escHtml(
-                'PC ' + pcHex + ' / ' + nsStr + '; raw ' +
-                (word === null ? 'unavailable' : '0x' + word.toString(16).padStart(8, '0')) +
-                '; ' + disasm + '; captured binary seal: ' +
-                (f.executionArtifact && f.executionArtifact.identity &&
-                    f.executionArtifact.identity.binaryHash || 'unknown') +
-                '. Open code to compare with the currently saved artifact. The slot may now contain another revision; names and a single matching word do not prove identity.'
-            )}</span>
+        <div class="fault-panes">
+            <div class="fault-pane active" data-pane="diag"><div class="fault-pane-body">
+                ${_diagExplain ? `<p class="fault-diag-dup fault-diag-explain-dup">${_fe(_diagExplain)}</p>` : ''}
+                ${_nextHtml ? `<div class="fault-diag-dup fault-diag-next"><span>Next</span>${_nextHtml}</div>` : ''}
+                <div class="${_msgClass}" ${_editOnclick}>${_transformFaultMsg(f.message)}${_editBadge}</div>
+                ${_ctxRows ? `<div class="fault-detail-grid fault-diag-context">${_ctxRows}</div>` : ''}
+                ${_isHw ? `<div class="fault-detail-grid"><div class="fault-detail-row">
+                    <span class="fault-detail-label">Provenance</span>
+                    <span class="fault-detail-value">${_fe(_pd ? _pd.provenance : null)}</span>
+                </div></div>` : `<div class="fault-detail-grid"><div class="fault-detail-row">
+                    <span class="fault-detail-label">Recorded</span>
+                    <span class="fault-detail-value">${_escHtml(
+                        'PC ' + pcHex + ' / ' + nsStr + '; raw ' +
+                        (word === null ? 'unavailable' : '0x' + word.toString(16).padStart(8, '0')) +
+                        '; ' + disasm + '; captured binary seal: ' +
+                        (f.executionArtifact && f.executionArtifact.identity &&
+                            f.executionArtifact.identity.binaryHash || 'unknown') +
+                        '. The slot may now contain another revision; names and a single matching word do not prove identity.'
+                    )}</span>
+                </div></div>`}
+                <div class="fault-summary-grid">${descSection}</div>
+            </div></div>
+            <div class="fault-pane" data-pane="trace"><div class="fault-pane-body">${instrTraceSection}</div></div>
+            <div class="fault-pane" data-pane="regs"><div class="fault-pane-body">
+                ${crSection}${drSection}${gtSnapshotSection}
+                ${_hasRegs ? '' : `<div class="fault-empty">No register snapshot was captured${_isHw ? ' by the hardware trace packet' : ''}. Live simulator registers are not substituted.</div>`}
+            </div></div>
+            <div class="fault-pane" data-pane="evidence"><div class="fault-pane-body">
+                ${_provHtml}
+                <div class="fault-diagnostic-grid">${malformedGTSection}${scopeSection}${outformSection}${recoverySection}</div>
+                ${historyHtml ? `<div class="fault-detail-grid"><div class="fault-detail-row fault-history-row">
+                    <span class="fault-detail-label">Session</span><span class="fault-detail-value">${historyHtml}</span>
+                </div></div>` : ''}
+            </div></div>
+            <div class="fault-pane" data-pane="note"><div class="fault-pane-body">
+                <div class="fault-user-note-row">
+                    <label class="fault-user-note-label" for="faultUserNoteInput">Note</label>
+                    <textarea id="faultUserNoteInput" class="fault-user-note-input" rows="2" maxlength="300"
+                        placeholder="Add a plain-English description of this fault\u2026"
+                        oninput="_autoGrowFaultNote(this);(function(v){var el=document.getElementById('faultModalOverlay'),rec=el&&el._faultRecord;if(rec){rec.userNote=v;if(typeof _saveFaultNote==='function')_saveFaultNote(rec,v);}if(typeof updateGateLog==='function')updateGateLog();})(this.value)">${_noteAttr}</textarea>
+                </div>
+            </div></div>
         </div>
-        <div class="fault-summary-grid">
-            ${descSection}
-            ${gtSnapshotSection}
-        </div>
-        <div class="fault-user-note-row">
-            <label class="fault-user-note-label" for="faultUserNoteInput">Note</label>
-            <textarea id="faultUserNoteInput" class="fault-user-note-input" rows="2" maxlength="300"
-                placeholder="Add a plain-English description of this fault\u2026"
-                oninput="_autoGrowFaultNote(this);(function(v){var fl=sim.faultLog,rec=fl&&fl[${_faultRecordIndex}];if(rec){rec.userNote=v;if(typeof _saveFaultNote==='function')_saveFaultNote(rec,v);}if(typeof updateGateLog==='function')updateGateLog();})(this.value)">${_noteAttr}</textarea>
-        </div>
-        ${historyHtml ? `<div class="fault-detail-grid">
-            <div class="fault-detail-row fault-history-row">
-                <span class="fault-detail-label">History</span>
-                <span class="fault-detail-value">${historyHtml}</span>
-            </div>
-        </div>` : ''}
-        <div class="fault-diagnostic-grid">
-            ${malformedGTSection}
-            ${scopeSection}
-            ${outformSection}
-            ${recoverySection}
-        </div>
-        ${instrTraceSection}
-        ${crSection}
-        ${drSection}`;
+        <div class="modal-buttons fault-modal-actions">${_actions}</div>`;
 
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
     _autoGrowFaultNote(document.getElementById('faultUserNoteInput'));
     overlay.addEventListener('click', e => { if (e.target === overlay) faultModalDismiss(); });
+    const _prevFocus = document.activeElement;
+    overlay.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            faultModalDismiss();
+            if (_prevFocus && _prevFocus.isConnected && _prevFocus.focus) _prevFocus.focus();
+        } else if (e.key === 'Tab') {
+            const focusables = Array.from(dialog.querySelectorAll('button:not([disabled]), textarea, [href], [tabindex]:not([tabindex="-1"])'))
+                .filter(el => el.offsetParent !== null);
+            if (!focusables.length) return;
+            const first = focusables[0], last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    });
+    const _activeTab = dialog.querySelector('.fault-tab.active');
+    if (_activeTab) _activeTab.focus({ preventScroll: true }); else dialog.focus();
+    _faultPaginateActive(dialog);
+    if (!overlay._faultResize) {
+        overlay._faultResize = () => { if (dialog.isConnected) _faultPaginateActive(dialog); else window.removeEventListener('resize', overlay._faultResize); };
+        window.addEventListener('resize', overlay._faultResize);
+    }
+    if (_isHw && !f._diagnosticLoaded && typeof _wukongEnrichFaultReport === 'function') {
+        try { Promise.resolve(_wukongEnrichFaultReport(f)).catch(() => {}); } catch (_) {}
+    }
 }
+
+function _faultSelectTab(el, id) {
+    const dialog = el && el.closest ? el.closest('.fault-dialog') : null;
+    if (!dialog) return;
+    dialog.querySelectorAll('.fault-tab').forEach(t => {
+        const on = t.dataset.tab === id;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    dialog.querySelectorAll('.fault-pane').forEach(p => p.classList.toggle('active', p.dataset.pane === id));
+    _faultPaginateActive(dialog);
+}
+
+// Split the active pane's content into pages that fit the available height.
+// Containers (trace body, detail grids, register tables, DR chip rows) are
+// descended recursively so each row/chip is its own pageable unit; container
+// headers (table thead, section labels) repeat on every page. Only if one
+// atomic unit is taller than the pane does the pane fall back to overflow:auto.
+const _FAULT_PAGE_LEAF = '.fault-detail-row, tr, .freg-dr, .freg-flag, .fault-diag-meta, .fault-user-note-row, ' +
+    '.fault-modal-message, .fault-empty, .fault-regs-label, .fault-scope-label, .fault-trace-legend, ' +
+    'label, textarea, code, button, h3, h4, p, thead';
+function _faultPaginateActive(dialog) {
+    const pane = dialog.querySelector('.fault-pane.active');
+    if (!pane) return;
+    const body = pane.querySelector('.fault-pane-body');
+    const old = pane.querySelector('.fault-pager');
+    if (old) old.remove();
+    body.querySelectorAll('[data-fpg-hidden]').forEach(el => { el.hidden = false; el.removeAttribute('data-fpg-hidden'); });
+    pane.classList.remove('fault-pane-overflow');
+    const overflows = () => body.scrollHeight > body.clientHeight + 1;
+    if (!overflows()) return;
+    const units = [];
+    const containers = [];
+    const isVisible = el => el.getClientRects().length > 0;
+    const collect = (node) => {
+        for (const child of Array.from(node.children)) {
+            if (!isVisible(child)) continue;
+            const kids = Array.from(child.children).filter(isVisible);
+            const splittable = !child.matches(_FAULT_PAGE_LEAF) &&
+                (kids.length > 1 || (kids.length === 1 && kids[0].children.length > 0 && !kids[0].matches(_FAULT_PAGE_LEAF)) ||
+                 child.tagName === 'TABLE' || child.tagName === 'TBODY');
+            if (splittable) {
+                containers.push(child);
+                collect(child);
+            } else if (!child.matches('thead, .fault-regs-label, .fault-scope-label') || node === body) {
+                units.push(child);
+            }
+        }
+    };
+    collect(body);
+    const hide = el => { el.hidden = true; el.setAttribute('data-fpg-hidden', ''); };
+    const unhide = el => { el.hidden = false; el.removeAttribute('data-fpg-hidden'); };
+    const hideAll = () => { units.forEach(hide); containers.forEach(hide); };
+    const showUnit = el => {
+        unhide(el);
+        for (let p = el.parentElement; p && p !== body; p = p.parentElement) if (p.hasAttribute('data-fpg-hidden')) unhide(p);
+    };
+    const pager = document.createElement('div');
+    pager.className = 'fault-pager';
+    pager.innerHTML = '<button type="button" class="fault-pager-btn" data-d="-1" aria-label="Previous page">Prev</button><span class="fault-pager-label" aria-live="polite"></span><button type="button" class="fault-pager-btn" data-d="1" aria-label="Next page">Next</button>';
+    pane.appendChild(pager);
+    const pages = [];
+    let cur = [];
+    hideAll();
+    for (const u of units) {
+        showUnit(u);
+        if (overflows() && cur.length > 0) {
+            pages.push(cur);
+            hideAll();
+            showUnit(u);
+            cur = [u];
+        } else {
+            cur.push(u);
+        }
+        if (cur.length === 1 && overflows()) pane.classList.add('fault-pane-overflow');
+    }
+    if (cur.length) pages.push(cur);
+    if (pages.length <= 1) {
+        pager.remove();
+        body.querySelectorAll('[data-fpg-hidden]').forEach(unhide);
+        return;
+    }
+    let idx = Math.max(0, pages.findIndex(p => p.some(el => el.classList && el.classList.contains('itrace-fault'))));
+    const label = pager.querySelector('.fault-pager-label');
+    const show = () => {
+        hideAll();
+        pages[idx].forEach(showUnit);
+        label.textContent = 'Page ' + (idx + 1) + ' of ' + pages.length;
+        pager.querySelector('[data-d="-1"]').disabled = idx === 0;
+        pager.querySelector('[data-d="1"]').disabled = idx === pages.length - 1;
+    };
+    pager.addEventListener('click', e => {
+        const b = e.target.closest('.fault-pager-btn');
+        if (!b) return;
+        idx = Math.max(0, Math.min(pages.length - 1, idx + Number(b.dataset.d)));
+        show();
+    });
+    show();
+}
+
 
 function _autoGrowFaultNote(input) {
     if (!input) return;
@@ -20917,6 +21116,14 @@ function _wukongApplySnapshot(data) {
     if (Number(data.reason) === 2 && typeof _fetchAndShowLastFaultPanel === 'function') {
         _lastFaultSnapshotDismissed = false;
         _fetchAndShowLastFaultPanel();
+        const modal = document.getElementById('faultModalOverlay');
+        const fault = modal && modal._faultRecord;
+        if (fault && fault._origin === 'hardware' && fault._hardwareTrace &&
+            fault._hardwareTrace.incident_id === data.incident_id &&
+            fault._hardwareTrace.bridge_session === data.bridge_session) {
+            fault._diagnosticLoaded = false;
+            void _wukongEnrichFaultReport(fault);
+        }
     }
     return true;
 }
@@ -21426,7 +21633,141 @@ function _wukongBuildHwFaultObj(data) {
         faultCode:        faultCode,
         faultingMnemonic: _WUKONG_EV_INSTR_NAME[evType] || null,
         _origin:          'hardware',
+        _hardwareTrace:   { ...data },
+        _goldenReference: /^@phase1 /.test(data.gt_label || ''),
     };
+}
+
+// Display-only, explicitly selected reference. Never use the mutable simulator
+// catalog to explain an installed FPGA image. Tests bind these rows/word to the
+// preserved golden image and the bridge's selected profile.
+const _FAULT_GOLDEN_REFERENCE = {
+    bit: 'a4acb0ef9a39ba985d7769031cf146edb68fb65ff96e0b4f4a895093b54e5d4e',
+    image: '5603d8e105e47ca0f6524e4553989387c088de19ac0e6b3f6fd9897e170cf16d',
+    slots: {
+        1: ['Boot.NS', 0, 255], 2: ['Boot.Thread', 0x400, 255],
+        6: ['ide.SelfTest', 0x800, 1023], 7: ['ide.WukongCallHome', 0x1800, 1023],
+        10: ['ide.CapabilityTest', 0x2800, 511], 11: ['Thread.2', 0x3000, 255],
+        12: ['Thread.3', 0x3400, 255], 16: ['ide.Alice', 0x3800, 127],
+        17: ['ide.Mallory', 0x3a00, 127], 18: ['ide.AliceDriver', 0x3c00, 255],
+        19: ['ide.MalloryDriver', 0x4000, 127], 20: ['ide.ActorManager', 0x4200, 255],
+        21: ['ide.AmoebaStartup', 0x4600, 255],
+    },
+    malloryLoad: { nia: 0x3a08, word: 0x070b0020, base: 0x3bf8, limit: 1 },
+};
+
+function _wukongFaultSnapshotMatches(trace, snap) {
+    return !!(trace && snap && trace.incident_id && trace.bridge_session &&
+        snap.incident_id === trace.incident_id &&
+        snap.bridge_session === trace.bridge_session &&
+        snap.snapshot_complete === true && snap.crc_valid === true &&
+        snap.correlation_status === 'correlated' &&
+        snap.source === 'hardware' && snap.nia === trace.nia &&
+        snap.fault_code === trace.fault_code &&
+        Array.isArray(snap.cr) && snap.cr.length === 16 &&
+        snap.cr.every(row => Array.isArray(row) && row.length === 3 && row.every(Number.isInteger)) &&
+        Array.isArray(snap.dr) && snap.dr.length === 16 && snap.dr.every(Number.isInteger));
+}
+
+function _wukongFaultDiagnosis(f) {
+    const t = f._hardwareTrace || {};
+    const s = f._acceptedSnapshot;
+    const ref = f._goldenReference ? _FAULT_GOLDEN_REFERENCE : null;
+    const hex = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    const d = {
+        title: `${f.type || 'Machine'} fault at ${hex(f.physicalPC)}`,
+        explanation: s ? 'Fault-time registers are available. The UART did not capture the instruction word; an image reference is needed to diagnose the operands.'
+            : 'The fault packet identifies the stop, but no complete snapshot correlated to this incident is available yet.',
+        nextAction: s ? 'Select the golden reference only if that is the image installed on this board.'
+            : 'Keep the bridge connected. Reopen the report after the fault snapshot arrives; do not reset to obtain diagnostic data.',
+        instruction: 'Not captured by UART',
+        context: [['Namespace', 'Not captured'], ['Thread', 'Not resolved'], ['Object / method', 'Not resolved'], ['Caller', 'Not established by this snapshot']],
+        facts: [['Fault NIA', hex(f.physicalPC)], ['Fault code', hex(f.faultCode)],
+            ['Trace packet', Number.isInteger(t.bridge_trace_counter) ? String(t.bridge_trace_counter) + ' (not an instruction count)' : 'Not captured'],
+            ['Snapshot', s ? 'CRC16 verified; same incident and bridge session' : 'No matching accepted snapshot']],
+        provenance: 'Hardware supplies the NIA, fault code and correlated register values. No live simulator memory or catalog names are used.',
+        history: f._controlFlowHistory && f._controlFlowHistory.length
+            ? ['Selected control-flow packets preceding this fault; not a complete instruction history.', ...f._controlFlowHistory]
+            : ['No complete caller history was captured in this fault record. CR14 identifies the active callee, not its caller.'],
+    };
+    if (s) {
+        d.facts.push(['CR6 GT / base / limit', s.cr[6].map(hex).join(' / ')],
+            ['DR0', hex(s.dr[0])], ['Incident', s.incident_id]);
+    }
+    if (!ref) return d;
+    d.provenance += ` Operator-selected golden reference; NOT hardware attestation. BIT SHA256 ${ref.bit}; image SHA256 ${ref.image}. Decoding is conditional on that image still being installed.`;
+    if (!s) return d;
+    const named = reg => {
+        const row = s.cr[reg];
+        const slot = row[0] & 0xffff;
+        const entry = row[0] ? ref.slots[slot] : null;
+        return entry && row[1] === entry[1] && row[2] === entry[2] ? entry[0] : 'Not matched to reference';
+    };
+    d.context[0][1] = named(15) + ' (reference)';
+    d.context[1][1] = named(12) + ' (reference)';
+    const object = Object.values(ref.slots).find(row =>
+        row[1] <= f.physicalPC && f.physicalPC < row[1] + 4 * (row[2] + 1));
+    d.context[2][1] = object ? object[0] + ' (reference address range)' : 'Outside reference map';
+    d.nextAction = 'Compare the captured registers with the selected image. Unknown or mismatched operands are not proof of a specific cause.';
+    const m = ref.malloryLoad;
+    // This precise explanation is only supported by the exact known reference
+    // instruction and its expected descriptor shape, not NIA alone.
+    if (f.faultCode === 8 && f.physicalPC === m.nia &&
+        s.cr[6][0] === 0x4a000011 && s.cr[6][1] === m.base && s.cr[6][2] === m.limit &&
+        s.cr[14][0] === 0x42000011 && s.cr[14][1] === 0x3a04 && s.cr[14][2] === 3 &&
+        s.dr[0] === 0) {
+        d.title = 'ide.Mallory.Steal requested C-list entry 2; only 0–1 are permitted';
+        d.instruction = `LOAD CR1, CR6, #2 · ${hex(m.word)} (golden image, not UART)`;
+        d.explanation = 'With the selected golden image, this is a C-list bounds denial: index 2 exceeds the inclusive limit 1. No target capability was loaded; this does not test access to the target object’s data.';
+        d.nextAction = 'For the intentional Mallory attack, this denial is expected. Do not widen authority just to remove it. Otherwise correct the requested C-list index or the explicitly authored grant.';
+        d.context[2][1] = 'ide.Mallory / Steal (golden reference)';
+        d.facts.push(['Requested / permitted', '2 / 0–1 (inclusive)'],
+            ['Calculated address', `${hex(m.base + 8)} — outside the C-list`],
+            ['Destination', 'CR1; lookup denied before a new capability was loaded']);
+    }
+    return d;
+}
+
+async function _wukongEnrichFaultReport(f) {
+    if (f._diagnosticLoaded) return;
+    f._diagnosticLoaded = true;
+    try {
+        const response = await fetch('/hardware/wukong/status', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Status lookup failed');
+        const status = await response.json();
+        const snap = status.last_accepted_fault;
+        if (_wukongFaultSnapshotMatches(f._hardwareTrace, snap)) {
+            f._acceptedSnapshot = snap;
+            f.crSnapshot = snap.cr.map(row => ({word0: row[0], word1: row[1], word2: row[2]}));
+            f.drSnapshot = snap.dr.slice();
+        }
+        const trace = f._hardwareTrace;
+        if (trace && Number.isInteger(trace.seq) && trace.bridge_session) {
+            const eventsResponse = await fetch('/hardware/wukong/events?after=' +
+                Math.max(0, trace.seq - 300), {cache: 'no-store'});
+            if (eventsResponse.ok) {
+                const feed = await eventsResponse.json();
+                f._controlFlowHistory = (feed.events || []).filter(e =>
+                    e.bridge_session === trace.bridge_session && e.seq < trace.seq &&
+                    /^@phase1 event (CALL|RETURN|CHANGE) /.test(e.gt_label || '')
+                ).slice(-12).map(e => `Packet ${e.bridge_trace_counter == null ? 'unknown' : e.bridge_trace_counter}: ${e.gt_label.replace(/^@phase1 event /, '')}`);
+            }
+        }
+    } catch (_) {
+        // Remain explicit about unavailable evidence; never borrow live state.
+    }
+    f.programmerDiagnosis = _wukongFaultDiagnosis(f);
+    const overlay = document.getElementById('faultModalOverlay');
+    if (overlay && overlay._faultRecord === f) showFaultModal(f);
+}
+
+function _wukongUseGoldenFaultReference() {
+    const overlay = document.getElementById('faultModalOverlay');
+    const f = overlay && overlay._faultRecord;
+    if (!f || f._origin !== 'hardware') return;
+    f._goldenReference = true;
+    f.programmerDiagnosis = _wukongFaultDiagnosis(f);
+    showFaultModal(f);
 }
 
 function _wukongFlagsStr(flags) {
