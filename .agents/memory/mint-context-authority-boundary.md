@@ -144,6 +144,15 @@ agreement rather than using it to settle the FPGA contract.
 
 ## Mint public return convention review
 
+The LUMP's embedded public definition should be an ABI, not merely an API
+description; use Mint's register-level contract to design that extension.
+
+**Why:** The user explicitly requested an ABI carried by the LUMP.
+
+**How to apply:** Extend the single canonical embedded definition rather than
+adding a competing sidecar. Concrete schema extensions and implementation remain
+subject to review; do not infer agreed register preservation or error numbers.
+
 A one-time-use Passkey must be explicitly defined before it is used.
 Replacing a Passkey register with a result does not define or enforce one-time use.
 
