@@ -26,6 +26,13 @@ When a hardware fault triggers an automatic reboot, the bridge must not treat
 an HTTP success for the snapshot transport as permission to reset. It must wait
 for server confirmation that the complete snapshot was promoted as Last Fault
 for the exact accepted fault event, scoped to the current server generation.
+Ordinary halted-state, breakpoint, and explicit-read snapshots require storage
+acknowledgement, not fault promotion.
+
+**Why:** Applying the fault-promotion requirement to ordinary snapshots falsely
+reports successfully stored boot evidence as rejected. Accepting ordinary
+storage must never weaken the separate fault-recovery gate.
+
 Pending correlation is single-use and must be cleared on any later fault
 attempt or terminal snapshot that does not reboot.
 

@@ -296,7 +296,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 19
+BRIDGE_VERSION    = 20
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
@@ -1500,13 +1500,25 @@ def _post_wukong_trace(ide_base, payload, verify_tls, max_attempts=None):
 
 
 def _post_wukong_snapshot(ide_base, decoded, verify_tls, max_attempts=None):
-    """Commit a snapshot and confirm promotion for this exact incident."""
+    """Acknowledge ordinary storage separately from fault promotion."""
+    def accepted(reply):
+        if not isinstance(reply, dict) or reply.get('accepted') is not True:
+            return False
+        reason = decoded.get('reason')
+        if type(reason) is not int:
+            return False
+        if reason == FaultRecovery.FAULT_SNAPSHOT_REASON:
+            # Storage alone never establishes durable fault correlation.
+            return (reply.get('promoted') is True and
+                    reply.get('decision') in ('promoted', 'duplicate'))
+        if reason in (0, 1, 3):
+            return (reply.get('promoted') is False and
+                    reply.get('decision') == 'not_fault_snapshot')
+        return False
+
     return _post_json_retry(
         f'{ide_base}/hardware/wukong/snapshot', decoded, verify_tls,
-        'snapshot POST',
-        lambda reply: bool(
-            reply.get('accepted') and reply.get('promoted') and
-            reply.get('decision') in ('promoted', 'duplicate')),
+        'snapshot POST', accepted,
         max_attempts=max_attempts)
 
 
