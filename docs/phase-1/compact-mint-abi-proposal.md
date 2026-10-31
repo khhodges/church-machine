@@ -1,6 +1,8 @@
 # Compact Mint ABI — review proposal
 
-Status: proposed, not implemented or approved. Existing compact APIs encode
+Status: conventions approved by the user on 2026-10-31; not implemented.
+The separate layout/signature proposal still needs review.
+Existing compact APIs encode
 explicit register names and Inform/Outform/Abstract type strings. This proposal
 changes the contract; it is not a description of current output.
 
@@ -18,7 +20,7 @@ changes the contract; it is not a description of current output.
 - Historical artifacts remain immutable; new builds require recompilation.
 - One-time PassKey semantics are not defined by this declaration.
 
-## Proposed source declaration
+## Approved source declaration
 
 Structured CLOOMC++: `passkey required;` inside the abstraction, once.
 Native assembly equivalent: `@passkey required`, once at abstraction scope.
@@ -30,7 +32,7 @@ silently selecting a different calling convention. This declaration documents
 the requirement; it is not evidence that the executable verifies the PassKey.
 Mint's real verification path must remain part of acceptance.
 
-## Proposed ABI type codes
+## Approved ABI type codes
 
 These are metadata tags, NOT GT bit encodings or permission grants.
 
@@ -55,7 +57,7 @@ Outform; MakeInform returns an Inform; DESTROY has no capability result.
 CREATE's accepted initializer forms and result form must match the chosen
 implementation, not a generic fixture or invented default.
 
-## Proposed returned status numbers
+## Approved returned status numbers
 
 | DR1 | Meaning |
 |---|---|
@@ -66,12 +68,12 @@ implementation, not a generic fixture or invented default.
 | 4 | Resource unavailable |
 | 5 | Unsupported operation |
 
-These numbers are a proposed software return convention, not hardware fault
+These numbers are the approved software return convention, not hardware fault
 numbers. They do not authorize replacing existing HARDFAULT paths with returns
 or implementing conversion semantics. Unknown nonzero status is failure.
 Compiler errors remain compile errors, not runtime status results.
 
-## Proposed output safety rule
+## Approved output safety rule
 
 On a normal error return, CR1 is NULL. On successful no-capability-result
 methods, CR1 is also NULL. Successful capability-returning methods replace the
