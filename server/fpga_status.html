@@ -737,8 +737,9 @@
     }
   }
   function cmdWatchTick() {
+    var watching = cmdWatch;
     fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
-      if (!cmdWatch) return;
+      if (!cmdWatch || cmdWatch !== watching) return;
       var w = cmdWatch;
       var elapsed = (Date.now() - w.t0) / 1000;
       var d = s.command_delivery;
@@ -807,10 +808,14 @@
     }).catch(function () {});
   }
   function startCmdWatch(id, label, onResult) {
-    stopCmdWatch();
+    // Starting a watch is not completion: retain the in-flight lock and
+    // pending execution command so Run cannot be queued twice and Stop stays
+    // available while a Run/Step is awaiting its serial acknowledgement.
+    cancelCmdWatchForStop();
     cmdWatch = { t0: Date.now(), id: id, label: label, phase: 'queued', warned: false,
                  onResult: onResult,
                  timer: setInterval(cmdWatchTick, 500) };
+    updateRunButton();
   }
   function cancelCmdWatchForStop() {
     if (cmdWatch && cmdWatch.timer) clearInterval(cmdWatch.timer);
@@ -823,7 +828,22 @@
       if (typeof onResult === 'function') onResult(false);
       return;
     }
+    var interruptedWatch = priorityStop ? cmdWatch : null;
+    var interruptedExecution = pendingExecutionCmd;
     if (priorityStop) cancelCmdWatchForStop();
+    function commandFailed() {
+      // A rejected Stop did not cancel the original hardware command.
+      // Resume tracking it rather than leaving Run/Stop in a false idle state.
+      if (interruptedWatch) {
+        cmdWatch = interruptedWatch;
+        pendingExecutionCmd = interruptedExecution;
+        cmdWatch.timer = setInterval(cmdWatchTick, 500);
+        setCtlBusy(true);
+      } else {
+        setCtlBusy(false);
+      }
+      if (typeof onResult === 'function') onResult(false);
+    }
     setCtlBusy(true);
     fetch('/hardware/wukong/command', {
       method: 'POST',
@@ -848,14 +868,12 @@
           startCmdWatch(d.id, label, onResult);
         } else {
           note(controlFailure(label, r.status, d, t));
-          setCtlBusy(false);
-          if (typeof onResult === 'function') onResult(false);
+          commandFailed();
         }
       });
     }).catch(function (e) {
       note(label + ' FAILED: ' + e);
-      setCtlBusy(false);
-      if (typeof onResult === 'function') onResult(false);
+      commandFailed();
     });
   }
   function awaitFirstStepRetirement() {
@@ -1467,6 +1485,7 @@
          (br.reason || 'review bridge timeline')) : 'no active fault';
 
       var bi = s.boot_info || {};
+      if (s.halt && s.halt.active_fault) boardRunning = false;
       if (typeof s.run_unlocked === 'boolean') runUnlocked = s.run_unlocked;
       if (bi.tu_version !== undefined && Object.keys(bi).length) {
         if (bi.received_ts && bi.received_ts !== startupSentinelTs) {

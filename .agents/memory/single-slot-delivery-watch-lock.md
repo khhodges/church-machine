@@ -6,4 +6,4 @@ Rule: when the server keeps only ONE command-delivery record, every client must 
 
 **Why:** Wukong board commands — the FPGA status page cleared its busy flag right after queueing, and the IDE had no lock at all; Run/Halt UI reverted despite successful delivery.
 
-**How to apply:** (1) hold busy/lock until watcher terminal; (2) in the watcher, if the record id changes AFTER consumed_ts was seen, treat as likely-delivered with an explicit note — never as superseded. Applies to any watcher keyed to a single-slot status record shared across clients.
+**How to apply:** Hold busy/lock until watcher terminal. Starting/replacing a watcher must not invoke its completion cleanup: that releases the lock and erases the pending command needed to keep emergency Stop available. Capture watcher ownership before each asynchronous status fetch and ignore replies belonging to a replaced watcher. If a priority Stop is rejected, preserve tracking of the command it did not cancel. A consumed record alone is not serial-write or board acknowledgement; report missing evidence without claiming success. Applies to any watcher keyed to a single-slot status record shared across clients.

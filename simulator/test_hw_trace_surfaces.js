@@ -49,7 +49,7 @@ check('Testing STOP can cancel queued Run or Step',
 check('IDE upload path remains step-first',
       /Never auto-run a newly uploaded image/.test(appRun) &&
       /_wukongLastRetirementSeq/.test(appRun));
-check('Testing exposes Load control', /id="btnUpload"[^>]*>⚡ Load<\/button>/.test(status));
+check('Testing exposes Install Image control', /id="btnUpload"[^>]*>Install Image<\/button>/.test(status));
 check('Testing exposes live HW call depth', /id="toolbarCallDepth"/.test(status));
 check('Testing owns Shift+H emergency stop', /e\.shiftKey/.test(status) && /e\.key !== 'H'/.test(status));
 check('Testing uses the simplified Show trace button', /id="btnWorkspace"[^>]*>Show trace<\/button>/.test(status));
