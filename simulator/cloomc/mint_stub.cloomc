@@ -1,0 +1,27 @@
+// Isolated, uninstalled ABI scaffold. No method implements an operation.
+// Every call returns UNSUPPORTED (5), discarding the incoming CR1 PassKey.
+// PassKey requirement and typed signatures are in mint-stub.abi.json.
+// This source is compiled with the existing native-method frontend.
+abstraction ide.Mint {
+capabilities { SELF E }
+method CREATE {
+    LOAD CR1, NULL
+    IADD DR1, DR0, #5
+    RETURNAL #0
+}
+method DESTROY {
+    LOAD CR1, NULL
+    IADD DR1, DR0, #5
+    RETURNAL #0
+}
+method MakeOutform {
+    LOAD CR1, NULL
+    IADD DR1, DR0, #5
+    RETURNAL #0
+}
+method MakeInform {
+    LOAD CR1, NULL
+    IADD DR1, DR0, #5
+    RETURNAL #0
+}
+}

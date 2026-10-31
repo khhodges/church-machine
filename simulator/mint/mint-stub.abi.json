@@ -1,0 +1,1 @@
+{"name":"ide.Mint","passkey":1,"methods":{"CREATE":[0,[["allocation",1],["permissions",1]],[2,"RW"]],"DESTROY":[1,[["target",2,"RW"]],0],"MakeInform":[3,[["target",3,"RW"]],[2,"RW"]],"MakeOutform":[2,[["target",2,"RW"]],[3,"RW"]]}}
