@@ -177,8 +177,27 @@ async function main() {
             const installedSize = 64 * (2 ** ((installedHeader >>> 23) & 15));
             assert.equal(installedHeader >>> 27, 31, `NS${row.slot} installed LUMP header`);
             assert.equal(installedHeader & 255, cc, `NS${row.slot} installed C-list count`);
-            assert.deepEqual(machine.words.slice(base+installedSize-cc, base+installedSize),
+            // Independently reconstruct the API-only allocation and body to
+            // verify preservation of the bound code, API and complete C-list.
+            const savedHeader = item.boundWords[0];
+            const cw = (savedHeader >>> 10) & 8191;
+            const frame = item.boundWords[cw + 1];
+            assert.equal(frame >>> 24, 0xAB);
+            const apiLength = frame & 65535;
+            assert(apiLength > 0);
+            const frameEnd = cw + 2 + Math.ceil(apiLength / 4);
+            const size = Math.max(64, 2 ** Math.ceil(Math.log2(frameEnd + cc)));
+            const expectedBody = Array(size).fill(0);
+            expectedBody.splice(0, frameEnd, ...item.boundWords.slice(0, frameEnd));
+            expectedBody[0] = ((savedHeader & ~(15 << 23)) | ((Math.log2(size) - 6) << 23)) >>> 0;
+            expectedBody[cw + 1] = (0xAB000000 | apiLength) >>> 0;
+            expectedBody.splice(size - cc, cc, ...item.boundWords.slice(-cc));
+            assert.equal(installedSize, size,
+                `NS${row.slot} API-only allocation`);
+            assert.deepEqual(machine.words.slice(base + size - cc, base + size),
                 item.boundWords.slice(-cc), `complete NS${row.slot} C-list including SELF`);
+            assert.deepEqual(machine.words.slice(base, base + size), expectedBody,
+                `NS${row.slot} preserves bound code, API and C-list in its API-only derivative`);
         }
         assert.deepEqual([...schemas].sort(), ['church.portable-lump-binding/v1','church.symbolic-lump-binding/v1']);
         await page.locator('#toolBreakBtn').click();

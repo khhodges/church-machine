@@ -28,6 +28,88 @@
     let _currentToken = null;
     let _mouseX = 0, _mouseY = 0;
     let _pickCallback = null;
+    let _callRequest = 0;
+
+    // CALL help is read-only and deliberately independent of the static catalog.
+    function _showCallHelp(textarea, offset, x, y) {
+        if (typeof LumpPublicApi === 'undefined') return false;
+        const context = LumpPublicApi.callContext(textarea.value, offset);
+        if (!context) return false;
+        const text = textarea.value;
+        const receipt = window._editorSavedBinaryReceipt;
+        const receiptKey = JSON.stringify(receipt || null);
+        const key = 'call:' + JSON.stringify(context) + ':' + receiptKey + ':' + text;
+        if (_currentToken === key) return true;
+        _currentToken = key;
+        _pickCallback = null;
+        const request = ++_callRequest;
+        const popup = _getPopup();
+        popup.innerHTML = '<div class="api-popup-header">CALL — saved method contract</div>';
+        popup.style.maxHeight = '65vh';
+        popup.style.overflowY = 'auto';
+        const host = document.createElement('div');
+        host.className = 'api-popup-desc';
+        popup.appendChild(host);
+        const active = () => request === _callRequest && textarea.value === text &&
+            JSON.stringify(window._editorSavedBinaryReceipt || null) === receiptKey &&
+            document.getElementById('asmEditor') === textarea;
+        const inspect = async identity => {
+            const inspectionRequest = ++host._inspectionRequest;
+            host.textContent = 'Inspecting exact saved LUMP…';
+            try {
+                const api = await LumpPublicApi.inspectExact(identity, fetch);
+                if (active() && inspectionRequest === host._inspectionRequest) {
+                    host.innerHTML = LumpPublicApi.renderCallContract(api, context.method, identity);
+                    _positionPopup(popup, x, y);
+                }
+            } catch (error) {
+                if (active() && inspectionRequest === host._inspectionRequest)
+                    host.textContent = `Saved contract unavailable: ${error.message}. No data changed. Reopen CALL help and select the exact saved revision to retry.`;
+            }
+        };
+        host._inspectionRequest = 0;
+        _positionPopup(popup, x, y);
+        if (receipt && context.abstraction && receipt.abstraction === context.abstraction) {
+            inspect({ ...receipt });
+            return true;
+        }
+        host.textContent = 'Choose an exact saved revision. No contract is inferred from the editor draft or catalog.';
+        (async () => {
+            try {
+                const response = await fetch('/api/lumps/list', { cache: 'no-store' });
+                if (!response.ok) throw new Error(`Catalog returned HTTP ${response.status}`);
+                const rows = (await response.json()).filter(row =>
+                    !context.abstraction || row.abstraction === context.abstraction);
+                if (!active()) return;
+                const select = document.createElement('select');
+                select.setAttribute('aria-label', 'Exact saved LUMP for CALL help');
+                select.style.maxWidth = '100%';
+                const empty = document.createElement('option');
+                empty.value = '';
+                empty.textContent = 'Select an exact saved LUMP';
+                select.appendChild(empty);
+                rows.forEach((row, i) => {
+                    const option = document.createElement('option');
+                    option.value = String(i);
+                    option.textContent = `${row.filename} · ${row.binary_hash}`;
+                    select.appendChild(option);
+                });
+                popup.insertBefore(select, host);
+                if (!rows.length) host.textContent = 'No saved LUMP found. Functional contract unavailable; no source or other-revision fallback is used.';
+                select.onchange = () => {
+                    if (!active()) return;
+                    if (select.value === '') {
+                        ++host._inspectionRequest;
+                        host.textContent = 'No saved revision selected.';
+                    } else inspect({ ...rows[Number(select.value)] });
+                };
+                _positionPopup(popup, x, y);
+            } catch (error) {
+                if (active()) host.textContent = `Saved contract unavailable: ${error.message}. No data changed. Reopen CALL help to retry.`;
+            }
+        })();
+        return true;
+    }
 
     // ── Create popup DOM element ──────────────────────────────────────────────
     function _getPopup() {
@@ -189,6 +271,7 @@ ${methodsHtml}
 
     // ── Show / hide ────────────────────────────────────────────────────────────
     function _showPopup(entry, x, y) {
+        ++_callRequest;
         const html = _buildPopupHtml(entry);
         if (!html) return;
         const popup = _getPopup();
@@ -207,6 +290,8 @@ ${methodsHtml}
     }
 
     function _hidePopup() {
+        clearTimeout(_hoverTimer);
+        ++_callRequest;
         _pickCallback = null;
         _currentToken = null;
         const popup = _getPopup();
@@ -320,9 +405,10 @@ ${methodsHtml}
 
     function _processHover(textarea, x, y) {
         if (!textarea || textarea.id !== 'asmEditor') return;
-        if (typeof API_INDEX === 'undefined') return;
 
         const offset = _charOffsetFromMouse(textarea, x, y);
+        if (_showCallHelp(textarea, offset, x, y)) return;
+        if (typeof API_INDEX === 'undefined') return;
         const token = _tokenAt(textarea.value, offset);
         if (!token) { _hidePopup(); return; }
         if (token === _currentToken) return;
@@ -338,7 +424,9 @@ ${methodsHtml}
 
     function _onEditorMouseLeave() {
         clearTimeout(_hoverTimer);
-        setTimeout(_hidePopup, 150);
+        setTimeout(function() {
+            if (!_popup || !_popup.matches(':hover')) _hidePopup();
+        }, 150);
     }
 
     // ── Keyboard: show popup when cursor rests on a known token ───────────────
@@ -352,8 +440,10 @@ ${methodsHtml}
 
     function _processKeyPos(textarea) {
         if (!textarea || textarea.id !== 'asmEditor') return;
-        if (typeof API_INDEX === 'undefined') return;
         const offset = textarea.selectionStart;
+        const position = _caretPixelPos(textarea, offset);
+        if (_showCallHelp(textarea, offset, position.x, position.y)) return;
+        if (typeof API_INDEX === 'undefined') return;
         const token = _tokenAt(textarea.value, offset);
         if (!token) { _hidePopup(); return; }
         const entry = apiLookupToken(token);
@@ -377,6 +467,9 @@ ${methodsHtml}
             if (!popup.contains(e.target)) _hidePopup();
         }
     });
+    document.addEventListener('focusin', function(e) {
+        if (_popup && !_popup.contains(e.target) && e.target.id !== 'asmEditor') _hidePopup();
+    });
 
     // ── Attach to editor once it exists ──────────────────────────────────────
     function _attachToEditor() {
@@ -386,6 +479,10 @@ ${methodsHtml}
         ta.addEventListener('mouseleave', _onEditorMouseLeave);
         ta.addEventListener('keyup', _onEditorKeyUp);
         ta.addEventListener('scroll', _hidePopup);
+        ta.addEventListener('input', _hidePopup);
+        ta.addEventListener('blur', function(e) {
+            if (!_popup || !_popup.contains(e.relatedTarget)) _hidePopup();
+        });
     }
 
     if (document.readyState === 'loading') {

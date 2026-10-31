@@ -63,6 +63,21 @@ No source, sidecar, or catalog fallback supplies missing contracts.
 This is a descriptive contract, not an executable precondition language.
 Code review and execution tests remain necessary to verify its claims.
 
+## CALL help in the editor
+
+Pause while typing a CALL statement, or hover over its line, to inspect a saved
+method contract. Choose the exact saved LUMP in the popup; its filename and
+SHA-256 are shown with the contract. When the editor already has an exact saved
+receipt for the named target, that receipt is used, including historical revisions.
+The popup never substitutes the newest revision.
+
+Named dot calls identify the method directly. For register or C-list calls the
+programmer must select the target artifact: help does not infer register authority
+or resolve a petname to an abstraction. Numeric selectors are matched only when
+explicitly declared by the saved API. Missing methods, APIs, and contracts are
+reported explicitly. The popup does not edit source, select an execution target,
+change grants, or change the saved Public API view.
+
 ## Mint Phase 1
 
 `mint_v4_functional_contracts (draft)` is a separate annotated copy of the

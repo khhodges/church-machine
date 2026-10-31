@@ -87,7 +87,64 @@
         html += '<p>This is a public projection of the saved metadata, not a rewritten LUMP. Internal binding records and allocation are unchanged.</p></div></div>';
         return html;
     }
-    const exported = {project, render, renderContracts};
+    // Context only: never resolves registers, grants, or source declarations.
+    function callContext(text, offset) {
+        const start = text.lastIndexOf('\n', Math.max(0, offset - 1)) + 1;
+        const end = text.indexOf('\n', offset);
+        const line = text.slice(start, end < 0 ? text.length : end);
+        const code = line.split(/;|\/\//)[0];
+        if (offset - start > code.length) return null;
+        const call = code.match(/^\s*(?:[\w.]+:\s*)?CALL\s+(.+?)\s*$/i);
+        if (!call) return null;
+        const args = call[1].trim();
+        const indexed = args.match(/^CR6\[([\w.]+)\]\s*,\s*(#?\d+|[\w.]+)$/i);
+        const held = args.match(/^CR\d+\s*,\s*(#?\d+|[\w.]+)$/i);
+        const target = indexed ? indexed[2] : held ? held[1] : args;
+        if (/^#?\d+$/.test(target))
+            return { abstraction: null, method: target.replace(/^#/, '') };
+        // Unparsed operands must not turn a dot inside CR6[pet.name] into
+        // an abstraction name. Petnames are not target identity evidence.
+        if (!indexed && !held && /[\[\],]/.test(args))
+            return { abstraction: null, method: null };
+        const dot = target.lastIndexOf('.');
+        if (dot > 0) return { abstraction: target.slice(0, dot), method: target.slice(dot + 1) };
+        if (/^[\w.]+$/.test(target) && !/^CR\d+$/i.test(target))
+            return { abstraction: null, method: target };
+        return { abstraction: null, method: null };
+    }
+    async function inspectExact(identity, fetcher) {
+        if (!identity.filename || !identity.token || !/^[a-f0-9]{64}$/i.test(identity.binary_hash || ''))
+            throw new Error('Exact filename, token and binary hash are required');
+        const response = await fetcher(`/api/lump/${encodeURIComponent(identity.token)}/words?exact_filename=${encodeURIComponent(identity.filename)}&binary_hash=${encodeURIComponent(identity.binary_hash)}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Inspection returned HTTP ${response.status}`);
+        const data = await response.json();
+        const inspection = data.inspection || data.binary_inspection || data;
+        if ((data.filename || data.lump || data.archive_filename) !== identity.filename ||
+            String(inspection.binary_hash || '').toLowerCase() !== identity.binary_hash.toLowerCase())
+            throw new Error('Returned artifact does not match the selected revision');
+        if (Object.prototype.hasOwnProperty.call(inspection, 'api_definition')) return inspection.api_definition;
+        if (!data.raw_tail_hex && Array.isArray(data.words) && typeof LumpContentFrame !== 'undefined') {
+            const content = await LumpContentFrame.lumpInspectContentFrame(data.words);
+            if (content.headerValid && content.contentFrameValid) return content.apiDefinition;
+        }
+        return null;
+    }
+    function renderCallContract(api, methodName, identity) {
+        let html = `<p>Exact saved LUMP: <code>${escape(identity.filename)}</code><br>SHA-256: <code style="overflow-wrap:anywhere">${escape(identity.binary_hash)}</code></p>`;
+        if (!api || !Array.isArray(api.methods))
+            return html + '<p>Saved API unavailable for these bytes. No contract is inferred from source or another revision.</p>';
+        // Numeric selectors must be declared, never inferred from array position.
+        const method = api.methods.find(m => m && (m.name === methodName ||
+            (/^\d+$/.test(methodName || '') && (m.index ?? m.selector) !== undefined &&
+                String(m.index ?? m.selector) === methodName)));
+        if (!method)
+            return html + '<p>Method unavailable or unresolved in this saved API. No method or contract is inferred.</p>';
+        const contract = api.contracts && Object.prototype.hasOwnProperty.call(api.contracts, method.name)
+            ? api.contracts[method.name] : null;
+        if (!contract) return html + `<p>No functional contract was embedded for ${escape(method.name)} in this artifact. Argument meanings are not inferred.</p>`;
+        return html + renderContracts({ [method.name]: contract });
+    }
+    const exported = {project, render, renderContracts, callContext, inspectExact, renderCallContract};
     if (typeof module !== 'undefined' && module.exports) module.exports = exported;
     else root.LumpPublicApi = exported;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
