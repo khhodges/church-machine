@@ -1,21 +1,18 @@
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const {method} = require('../scripts/create_mint_v4_draft');
-const Compiler = require('./cloomc_compiler');
+const crypto = require('node:crypto');
+const candidate = require('../scripts/build_mint_v4_candidate').build();
 const draft = fs.readFileSync('simulator/drafts/mint_v4_integrated.cloomc', 'utf8');
-const newer = fs.readFileSync('simulator/cloomc/mint.cloomc', 'utf8');
-const stubs = fs.readFileSync('tests/fixtures/mint_stub.cloomc', 'utf8');
-const body = text => text.slice(text.indexOf('{')).replace(/;\s*PROPOSED CONVERSION STUBS:[\s\S]*$/, '').trim();
-assert(body(method(draft, 'DESTROY', 'MakeOutform')).startsWith(body(method(newer, 'DESTROY', 'MakeOutform'))));
-for (const [name, next] of [['MakeOutform','MakeInform'], ['MakeInform',null]]) {
-    assert.equal(method(draft, name, next), method(stubs, name, next));
-}
-assert(draft.includes('create_data_allocate:'));
-assert(draft.includes('destroy_body:'));
-assert(draft.includes('passkey required;'));
-assert.equal((draft.match(/^method /gm) || []).length, 4);
-const result = new Compiler().compile(draft, []);
-assert(result.errors.some(e => e.message.includes('Typed ABI imports are not implemented')),
-    'unfinished ABI body integration must not masquerade as accepted compiled output');
-console.log('PASS integrated review draft retains CREATE, newer DESTROY, both conversion stubs; compilation fails closed on typed imports');
+const provenance = JSON.parse(fs.readFileSync('simulator/drafts/mint_v4_provenance.json'));
+assert.equal(draft, candidate.source);
+assert.equal(fs.readFileSync('simulator/drafts/pkverify_v4.cloomc','utf8'), candidate.verifier);
+assert.equal(crypto.createHash('sha256').update(draft).digest('hex'), provenance.draftSourceSha256);
+assert.equal(provenance.savedRevision, false);
+assert.equal(provenance.installed, false);
+assert.deepEqual(candidate.compiled.errors, []);
+assert.equal(candidate.compiled.methods.length, 4);
+assert(draft.includes('create_v1_allocate:'));
+assert(draft.includes('destroy_scan_found:'));
+assert(!draft.includes('Typed imports are intentionally rejected'));
+console.log('PASS editor candidate matches compiling v4 sources and recorded provenance; uninstalled');

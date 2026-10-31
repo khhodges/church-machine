@@ -1,36 +1,38 @@
-# Mint v4 integrated source-review draft
+# Mint v4 integrated candidate
 
 Open **mint_v4_integrated (draft)** in the IDE's Open File picker.
 
-This is a source draft, **not saved Mint revision 4** and not a runnable ABI port.
+This is a compilable source candidate, **not saved Mint revision 4**.
 The exact source and provenance are retained separately from immutable LUMPs.
 
 ## Included
 
-- CREATE from saved Mint v3, `ide.Mint.1.3229a560.lump`, resolved through its
-  exact full-source sibling.
-- The newer editable DESTROY implementation, as explicitly selected for this draft.
+- The newer paired Cleaner-managed CREATE/DESTROY implementation, as approved
+  for lifecycle consistency instead of mixing v3's older allocator with newer DESTROY.
 - Proposed MakeOutform and MakeInform stubs: NULL CR1, status 5, normal return.
 - Approved typed method signatures and the abstraction-wide PassKey declaration.
 - The additional MintCleaner and MintApproval imports required by newer DESTROY.
 
-The CREATE and DESTROY bodies are preserved, not replaced with denial stubs.
-Their signatures describe the target ABI; **their bodies still use the older ABI**.
-The current compiler rejects typed imports, so this draft cannot accidentally
-be treated as a completed ABI migration.
+CREATE and DESTROY are not denial stubs. Their entry/return code uses the
+approved ABI; DESTROY derives the target slot through exact native comparison
+with live Namespace identities. The original implementation files remain unchanged.
+The companion `pkverify_v4.cloomc` declares `ide.MintV4Verifier` and uses CR1 proof, Mint-supplied trusted CR3 reference,
+native EXACT, and zero-success status. Do not bind Mint v4 to the older verifier.
+The distinct verifier identity prevents a name-only binding from selecting the
+older CR2-proof verifier. The original PkVerify artifact is not renamed or changed.
+MintCleaner retains its internal contract, interpreted only inside Mint.
 
-## Remaining integration work
+## Verification and remaining acceptance
 
-1. Preserve and verify the incoming CR1 PassKey before any result-register clear.
-   Port PkVerify and its call sites together; use Mint's trusted approval reference.
-2. DESTROY must take its target in CR2 and derive the Namespace slot from that
-   verified capability, not trust an ordinary caller slot argument.
-3. Translate successful CREATE/DESTROY completion to DR1=0. Keep existing
-   failure checks; unused inputs must not be treated as authority preconditions.
-4. Reconcile v3 CREATE's older allocation scheme with the Cleaner-managed
-   ownership, zeroization and release checks used by newer DESTROY.
-5. Implement typed-import compilation without dropping the compact ABI, then
-   verify exact-source/API round-trip and real allocation/destruction.
+- Typed imports, method-table correspondence, API encoding/decoding, invalid
+  descriptors and the ordinary compiler/builder path have focused checks.
+- An isolated server test exercises normal compile, finalization, reviewed save
+  and exact-source reopening without assigning a Namespace slot.
+- Native lifecycle execution still requires qualification. The prepared core
+  simulation tests are not evidence until actually run and passed.
+- No release or physical acceptance is claimed by compiler/save checks.
 
-No compiler guard was loosened. No v3 bytes, Namespace selection, owned browser
+The typed-import rejection was replaced with structural validation using the
+existing import contract and shared decoder, not a permissive bypass.
+No v3 bytes, Namespace selection, owned browser
 draft, saved revision, boot image or hardware was changed by assembling this draft.

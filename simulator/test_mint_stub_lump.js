@@ -42,7 +42,7 @@ HALT
 }
 assert.deepEqual(build().bytes, image.bytes, 'deterministic build');
 const {buildApiDefinition} = require('./lump_builder');
-assert.throws(() => buildApiDefinition(image.compiled, image.words), /ordinary save\/admission/);
+assert.deepEqual(buildApiDefinition(image.compiled, image.words).methods, image.abi.methods);
 for (const [label, source] of [
     ['missing PassKey declaration', image.source.replace('passkey required;', '')],
     ['duplicate declaration', image.source.replace('passkey required;', 'passkey required;\npasskey required;')],
@@ -52,7 +52,6 @@ for (const [label, source] of [
     ['invalid rights', image.source.replaceAll('Inform[RW]', 'Inform[EL]')],
     ['missing result type', image.source.replace(' -> Void', '')],
     ['legacy expression body', image.source.replace('RETURNAL #0', 'return 5')],
-    ['unsupported imports', image.source.replace('SELF E', 'SELF E, ide.Other E')],
 ]) {
     const rejected = new Compiler().compile(source, []);
     assert.ok(rejected.errors.length > 0, label);

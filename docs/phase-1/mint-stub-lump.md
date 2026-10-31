@@ -48,9 +48,10 @@ The separate JSON file is a golden test fixture, not build authority. Native
 instruction bodies are supported; higher-level typed expressions, imports,
 private methods and assembly @signature directives remain outside this slice.
 They must not be mistaken for implemented general ABI support.
-Ordinary legacy API generation rejects typed results rather than dropping
-their ABI. The isolated builder embeds the compiler-generated API.
-This is NOT new-ABI support in the IDE's general admission pipeline.
+The ordinary compiler/builder now supports the native-body typed ABI with
+declared imports, sharing canonical validation and expansion with admission.
+An isolated compile/finalize/reviewed-save/reopen test covers the Mint candidate.
+That pipeline support does not establish lifecycle execution acceptance.
 The artifact is structurally packed
 and tested locally; it is not signed, admitted, installed or published.
 Do not overwrite the current Mint or promote this scaffold as an operational

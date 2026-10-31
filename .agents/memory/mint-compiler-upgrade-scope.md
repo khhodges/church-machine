@@ -35,6 +35,23 @@ the user approved the newer DESTROY only after that distinction was explained.
 Do not replace these methods with the proposed denial stubs. Conversion stubs
 remain separate from lifecycle implementation and new-ABI acceptance.
 
+The user subsequently approved a bounded full integration: use the newer
+paired Cleaner-managed CREATE/DESTROY implementation, the approved public
+ABI, typed imports through ordinary save/reopen, and isolated verification.
+
+**Why:** Mixing v3 allocation with newer DESTROY is not a coherent lifecycle.
+The approval preserves v3 history and does not authorize live publication,
+Namespace activation, or FPGA changes. Do not treat compilation or a saved
+source round-trip as successful allocation/destruction evidence.
+
+The v4 verifier must not resolve by the older CR2-proof verifier's name alone.
+The isolated companion uses a distinct declared identity until exact-revision
+dependency selection can establish the matching helper.
+
+**Why:** A new CR1-proof caller bound to the old verifier could have the wrong
+register tested as proof. Keeping both source files does not prevent this
+cross-version binding; the declared dependency must distinguish them.
+
 **How to apply:** Port the real CREATE and verification path together; preserve
 proof before clearing CR1 and distinguish old success=1 from new success=0.
 An exhausted-allocator authorization test does not prove successful creation.

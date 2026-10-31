@@ -615,8 +615,6 @@ class CLOOMCCompiler {
         if (typed || parsed.passkeyRequired) {
             try {
                 if (!parsed.passkeyRequired) throw new Error('Typed ABI requires passkey required; at abstraction scope.');
-                if ((capabilities || []).length || parsed.capabilities.some(c => !['SELF','__SELF__'].includes(c.name)))
-                    throw new Error('Typed ABI imports are not implemented in this isolated compiler slice.');
                 const entries = [];
                 parsed.methods.forEach((m, selector) => {
                     if (!m.abiSignature || m.visibility === 'private' || m.aliasOf || selector > 126)
@@ -624,8 +622,8 @@ class CLOOMCCompiler {
                     for (const statement of m.body) {
                         const text = statement.text.replace(/;.*$/, '').trim();
                         if (!text || /^[A-Za-z_]\w*:$/.test(text)) continue;
-                        if (!this._nativeMnemonic(text) || /^(?:RETURN)\s+\S/i.test(text))
-                            throw new Error('Typed ABI bodies currently require native instructions and explicit registers; use RETURNAL for return masks.');
+                        if ((!this._nativeMnemonic(text) && !/^HARDFAULT\s+"/i.test(text)) || /^(?:RETURN)\s+\S/i.test(text))
+                            throw new Error('Typed ABI bodies require native instructions and explicit registers; use RETURNAL for return masks. Unsupported: ' + text);
                     }
                     entries.push([m.name, [selector, m.abiSignature.inputs, m.abiSignature.result]]);
                 });

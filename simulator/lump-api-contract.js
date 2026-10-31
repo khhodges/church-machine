@@ -20,7 +20,7 @@
     function rights(v) {
         if (typeof v !== 'string' || (v !== '' && !/^[RWX]+$|^[LSE]+$/.test(v)) ||
             [...'RWXLSE'].filter(r => v.includes(r)).join('') !== v ||
-            (/^[LSE]+$/.test(v) && v.length > 1))
+            (/^[LSE]+$/.test(v) && v.length > 1 && v !== 'LS'))
             fail('permissions must be empty or unique, ordered RWX or LSE, without mixing families');
     }
     function register(v, path) {
@@ -52,12 +52,40 @@
         if (!Number.isInteger(header.cw) || header.cw < 1 || header.cw > 8191 ||
             !Number.isInteger(header.cc) || header.cc < 1 || header.cc > 255)
             fail('invalid code/C-list extent');
-        keys(api, ['name','methods','imports','symbolic_binding'], ['name','methods'], 'root');
+        keys(api, ['name','passkey','methods','imports','symbolic_binding'], ['name','methods'], 'root');
+        const typed = own(api, 'passkey');
+        if (typed && api.passkey !== 1) fail('passkey must be 1');
         if (typeof api.name !== 'string' || !NAME.test(api.name)) fail('invalid abstraction name');
         if (!object(api.methods)) fail('methods must be a name-keyed object, not a legacy array');
         const selectors = new Set();
         for (const [name, method] of Object.entries(api.methods)) {
             if (!NAME.test(name)) fail('invalid method name');
+            if (typed) {
+                if (!Array.isArray(method) || method.length !== 3)
+                    fail('typed method requires [selector, inputs, result]');
+                const [selector, inputs, result] = method;
+                if (!Number.isInteger(selector) || selector < 0 || selector > 126 ||
+                        selector >= header.cw || selectors.has(selector))
+                    fail('invalid or duplicate typed method selector');
+                selectors.add(selector);
+                if (!Array.isArray(inputs)) fail('typed inputs must be an ordered array');
+                const names = new Set();
+                let scalarCount = 0, capabilityCount = 0;
+                for (const input of inputs) {
+                    if (!Array.isArray(input) || typeof input[0] !== 'string' ||
+                            !NAME.test(input[0]) || names.has(input[0]))
+                        fail('invalid or duplicate typed input name');
+                    names.add(input[0]);
+                    const spec = input.slice(1);
+                    typedType(spec.length === 1 ? spec[0] : spec, false);
+                    if (input[1] === 1) scalarCount++;
+                    else capabilityCount++;
+                }
+                if (scalarCount > 14 || capabilityCount > 1)
+                    fail('typed inputs exceed DR2–DR15 or single CR2 input');
+                typedType(result, true);
+                continue;
+            }
             keys(method, ['selector','inputs','returns'], ['selector'], 'method ' + name);
             if (!Number.isInteger(method.selector) || method.selector < 0 || method.selector >= header.cw)
                 fail('method selector outside code extent');
@@ -125,6 +153,17 @@
         if (own(api, 'symbolic_binding')) symbolic(api.symbolic_binding, header, api.name);
         return api;
     }
+    function typedType(spec, result) {
+        if (spec === 1 || (result && spec === 0)) return;
+        if (!Array.isArray(spec) || ![2,3,4,5].includes(spec[0]) ||
+                spec.length !== (spec[0] === 5 ? 3 : 2))
+            fail('invalid typed capability descriptor');
+        rights(spec[1]);
+        if (spec[0] === 5 && (!Array.isArray(spec[2]) || !spec[2].length ||
+                spec[2].some((type, i, types) => ![2,3,4].includes(type) ||
+                    (i > 0 && type <= types[i - 1]))))
+            fail('Object accepted types must be unique ascending types 2–4');
+    }
     // Symbolic CALL relocations are integrity-covered declarations only.
     function symbolic(b, header, owner) {
         keys(b, ['schema','owner','dependencies','calls'], ['schema','owner','dependencies','calls'], 'symbolic_binding');
@@ -161,7 +200,11 @@
     }
     function serialize(api, header) {
         validate(api, header);
-        const text = JSON.stringify(sort(api));
+        const text = JSON.stringify(own(api, 'passkey') ? {
+            name:api.name, passkey:api.passkey, methods:sort(api.methods),
+            ...(api.imports ? {imports:sort(api.imports)} : {}),
+            ...(api.symbolic_binding ? {symbolic_binding:sort(api.symbolic_binding)} : {})
+        } : sort(api));
         if (new TextEncoder().encode(text).length > 65535) fail('JSON exceeds frame length');
         return text;
     }

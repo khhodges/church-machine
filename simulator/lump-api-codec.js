@@ -9,6 +9,8 @@
     const compact = api => !!api && !!api.methods && !Array.isArray(api.methods);
     function encode(api, header) {
         if (compact(api)) return JSON.parse(contract.serialize(api, header));
+        if (api && Object.prototype.hasOwnProperty.call(api, 'passkey'))
+            throw new Error('Serialize the canonical typed ABI, not its expanded inspection view');
         if (!api || !Array.isArray(api.methods) || !Array.isArray(api.capabilities))
             throw new Error('Cannot compile compact API without method and capability declarations');
         const out = {name:api.name, methods:{}};
@@ -104,6 +106,30 @@
             return Object.entries(params || {}).map(([name, spec]) => typeof spec === 'string'
                 ? {name,register:spec,kind:'value'}
                 : {name,register:spec.register,kind:'capability',secure_type:spec.type,rights:[...spec.rights]});
+        }
+        if (api.passkey === 1) {
+            const typeNames = {2:'Inform',3:'Outform',4:'Abstract',5:'Object'};
+            const descriptor = (name, spec, register) => spec === 1
+                ? {name, register, kind:'value'}
+                : {name, register, kind:'capability', secure_type:typeNames[spec[0]],
+                    rights:[...spec[1]],
+                    ...(spec[0] === 5 ? {acceptedTypes:spec[2].map(t => typeNames[t])} : {})};
+            const tableEnd = Math.max(-1, ...Object.values(api.methods).map(m => m[0])) + 1;
+            const methods = Object.entries(api.methods).map(([name, [index, inputs, result]]) => {
+                const branchOffset = words[index + 1];
+                if (!Number.isInteger(branchOffset) || branchOffset <= tableEnd || branchOffset > header.cw)
+                    throw new Error('Typed ABI selector does not name a valid method-table entry');
+                let dr = 2;
+                return {name, index, branchOffset,
+                    inputs:inputs.map(([label, ...spec]) => descriptor(label,
+                        spec.length === 1 ? spec[0] : spec, spec[0] === 1 ? 'DR' + dr++ : 'CR2')),
+                    ...(result === 0 ? {} : {returns:descriptor('result', result,
+                        result === 1 ? 'DR2' : 'CR1')})};
+            });
+            return {name:api.name, passkey:1,
+                returnConvention:{register:'DR1', description:'status; zero means success'},
+                capabilities, methods,
+                ...(api.symbolic_binding ? {symbolic_binding:clone(api.symbolic_binding)} : {})};
         }
         return {name:api.name, capabilities,
             ...(api.symbolic_binding ? {symbolic_binding:clone(api.symbolic_binding)} : {}),

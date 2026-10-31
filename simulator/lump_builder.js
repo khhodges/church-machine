@@ -226,8 +226,20 @@ function validateSuppliedIdentity(cap, row) {
 }
 
 function buildApiDefinition(result, words) {
-    if (result.compactAbi)
-        throw new Error('Typed PassKey ABI requires the isolated typed-ABI build path; ordinary save/admission is not upgraded yet.');
+    if (result.compactAbi) {
+        // Reuse the existing import/identity validation and symbolic relocation
+        // emitter, but never serialize the legacy method view as this ABI.
+        const declaration = buildApiDefinition({...result, compactAbi:undefined, methods:[]}, words);
+        const imports = require('./lump-api-codec').encode(declaration, {
+            cw:(words[0] >>> 10) & 8191, cc:words[0] & 255
+        });
+        const symbolic = buildSymbolicBinding(result);
+        const api = {...result.compactAbi,
+            ...(imports.imports ? {imports:imports.imports} : {}),
+            ...(symbolic ? {symbolic_binding:symbolic} : {})};
+        require('./lump-api-codec').expand(api, words);
+        return api;
+    }
     const nameErrors = require('./assembler.js').objectNameErrors(result);
     if (nameErrors.length) throw new Error(nameErrors.map(e => e.message).join('\n'));
     for (const [row, cap] of (result.capabilities || []).entries()) {

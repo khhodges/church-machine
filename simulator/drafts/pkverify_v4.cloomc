@@ -1,0 +1,15 @@
+; Internal Mint verifier: CR1 proof, CR3 trusted reference supplied by Mint.
+; Native EXACT enforces authority. DR1=0 match, DR1=1 mismatch.
+; CR2 is preserved for Mint DESTROY; no proof is returned as a result.
+abstraction ide.MintV4Verifier {
+capabilities { SELF E }
+method Verify {
+    IADD DR1, DR0, #1
+    TPERM CR1, EXACT, CR3
+    BRANCHNE verify_return
+    IADD DR1, DR0, #0
+verify_return:
+    LOAD CR1, NULL
+    RETURNAL #4
+}
+}

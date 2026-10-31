@@ -1,47 +1,18 @@
-; MINT v4 INTEGRATED REVIEW DRAFT — NOT A SAVED REVISION.
-; Identity remains ide.Mint. No installation or hardware approval is implied.
-; TARGET ABI: CR1 PassKey, CR2 target, DR2/DR3 scalars, DR1=0 success.
-; IMPORTANT: retained CREATE/DESTROY bodies below are NOT YET PORTED.
-; Their old registers/status and allocator contracts are annotated below.
-; Typed imports are intentionally rejected by the current compiler.
-; Do not remove that rejection or use legacy signatures to run this draft.
-; Source provenance and outstanding integration work: docs/phase-1/mint-v4-draft.md
-
+; Mint v4 candidate — uninstalled, not hardware-qualified.
+; CR1 PassKey; CREATE DR2 allocation/DR3 permissions; DESTROY CR2 target.
+; DR1=0 success; CR1 result or NULL. Conversion stubs return DR1=5.
+; Paired Cleaner-managed lifecycle, inherited from the newer Mint implementation.
+; Execution acceptance is pending: compile/save tests are not runtime qualification.
+; Requires the companion v4 PkVerify candidate, never the older verifier.
 abstraction ide.Mint {
 passkey required;
-capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW, ide.MintCleaner E, ide.MintApproval SL }
-
-; FROM EXACT SAVED v3: CREATE body, unchanged.
-; PORT REQUIRED: preserve CR1 proof before result clearing; use trusted
-; PkVerify reference; remove unused-input checks; return DR1=0 on completion.
-; ALLOCATOR REQUIRED: reconcile v3 pool allocation with the Cleaner ownership
-; expected by the retained newer DESTROY. No lifecycle acceptance is claimed.
+capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.MintV4Verifier E, ide.MintNamespace RW, ide.MintCleaner E, ide.MintApproval LS }
 method CREATE(allocation: U32, permissions: U32) -> Inform[RW] {
 CREATE_inputs:
-    ; First implementation slice: case 4, DATA RW only.
-    ; CR2/CR3: Passkey GT/proof. CR4: NULL; Data has no source payload.
-    ; Allocate separate storage and zero EVERY word before issuing its GT.
-    ; DR2 = power-of-two word size | 4 (low three bits).
-    ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
-    ; Other cases/permissions remain unsupported, never silently become Data.
-    ; TPERM CLEAR tests presence; it does NOT erase a capability.
-    ; Spell constant data offsets as #offset, DR0: this uses the shared
-    ; indexed encoding supported by both RTL and the simulator. The legacy
-    ; three-operand immediate encoding is not part of this acceptance image.
-    LOAD CR1, NULL
 create_data_inputs_after_clear:
     IADD DR1, DR0, #0
 create_data_credentials:
-    ; Normal credential/proof checks only. No all-ones token escape.
-    TPERM CR2, NULL
-    BRANCHEQ TODO_CREATE_INPUT_CREDENTIAL_NULL
-    TPERM CR3, R
-    BRANCHNE TODO_CREATE_INPUT_PROOF_READ
-    ; Probe proof bounds without clobbering packed DR2 or permission DR3.
-    DREAD DR4, CR3, #3, DR0
 create_data_source_checks:
-    TPERM CR4, NULL
-    BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL
 create_data_scalar_checks:
     BFEXT DR4, DR2, #0, #3
     MCMP DR4, #4
@@ -52,8 +23,6 @@ create_data_scalar_checks:
     BFINS DR6, DR0, #0, #3
     MCMP DR6, #0
     BRANCHEQ TODO_CREATE_INPUT_ALLOCATION_ZERO
-    ; Exact power of two: shift until one, rejecting any earlier odd value.
-    ; No unapproved 64-word minimum is enforced here.
     IADD DR7, DR6, #0
 create_data_power_loop:
     MCMP DR7, #1
@@ -64,30 +33,76 @@ create_data_power_loop:
     SHR DR7, DR7, #1
     BRANCH create_data_power_loop
 create_data_authorize:
-    ; Call Verify through Mint's own E capability after the ordinary
-    ; credential/proof checks. Source method 0 uses CALL selector 1.
-    LOAD CR1, CR6, #4
-    CALL CR1, #0
-    MCMP DR1, #1
+    LOAD CR3, CR6, #7
+    LOAD CR4, CR6, #4
+    CALL CR4, #0
+    MCMP DR1, #0
     BRANCHNE TODO_CREATE_PKVERIFY_NOT_APPROVED
-    ; Phase 1 uses PkVerify APPROVED as allocation approval: no separate quota gate.
-    ; Approval is not completed CREATE; pool/slot capacity checks still follow.
-    ; PkVerify preserves requested size DR6 and credential/proof CR2/CR3.
     IADD DR1, DR0, #0
     LOAD CR1, NULL
-    BRANCH create_data_allocate
+    BRANCH create_v1_allocate
+create_v1_allocate:
+    LOAD CR7, CR6, #1
+    DREAD DR9, CR7, #3, DR0
+    MCMP DR9, #7
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR10, CR7, #4, DR0
+    MCMP DR9, DR10
+    BRANCHHS TODO_CREATE_SLOTS_EXHAUSTED
+    DREAD DR4, CR7, #6, DR0
+    MCMP DR10, DR4
+    BRANCHHI TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR7, CR7, #0, DR9
+    BFEXT DR4, DR7, #16, #16
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    MCMP DR7, #2
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR9, CR7, #6, DR0
+    IADD DR10, DR9, DR7
+    MCMP DR10, DR9
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR4, DR2, #10, #22
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    BFEXT DR3, DR2, #9, #1
+    BFEXT DR2, DR2, #0, #9
+    MCMP DR2, #511
+    BRANCHHS TODO_CREATE_DESCRIPTOR_RETIRED
+    MCMP DR3, #0
+    BRANCHNE create_v1_check_first
+    MCMP DR2, #0
+    BRANCHEQ TODO_CREATE_ALLOCATOR_STATE
+    BRANCH create_v1_reserve
+create_v1_check_first:
+    MCMP DR2, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+create_v1_reserve:
+    IADD DR4, DR0, #1
+    BFINS DR2, DR4, #10, #1
+    DWRITE DR2, CR7, #0, DR10
+    LOAD CR1, CR6, #6
+    CALL CR1, #0
+    MCMP DR1, #1
+    BRANCHNE TODO_CREATE_RESULT_COMPLETION
+    IADD DR8, DR2, #0
+    LOAD CR7, CR6, #1
+    LOAD CR1, NULL
+    DREAD DR10, CR7, #6, DR0
+    IADD DR10, DR10, DR7
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR2, DR2, #0, #9
+    MCMP DR2, #0
+    BRANCHEQ create_v1_first
+    ISUB DR2, DR2, #1
+    IADD DR3, DR0, #0
+    BRANCH create_descriptor_prepare
+create_v1_first:
+    IADD DR3, DR0, #1
+    BRANCH create_descriptor_prepare
+
 create_data_allocate:
-    ; Mint-owned state payload (word 0 remains the LUMP header):
-    ; 1 pool cursor, 2 exclusive pool end, 3 free-slot queue cursor,
-    ; 4 exclusive queue end, 5 physical BYTE base of MintPool's RW view,
-    ; 6 history-table offset; queue starts at >=7 and ends before history.
-    ; history[slot]: bits 0..8 current sequence, bit9 never-used,
-    ; bit10 reserved (reject reuse), all higher bits zero.
-    ; Trusted provisioning must bind word5 to the actual pool capability,
-    ; exclude pool metadata and supply authoritative history, not infer it
-    ; from an empty Namespace entry. No caller-supplied base/history.
-    ; Single-threaded bump allocation; no reclamation policy is implied.
-    ; All checks/reads precede reservation writes. Exhaustion is a hard fault.
     LOAD CR7, CR6, #1
     LOAD CR8, CR6, #3
     IADD DR1, DR0, #0
@@ -119,14 +134,10 @@ create_data_allocate:
     BRANCHNE TODO_CREATE_ALLOCATOR_STATE
     MCMP DR7, #2
     BRANCHLO TODO_CREATE_ALLOCATOR_STATE
-    ; Probe the complete pool interval before advancing either cursor.
-    ; DR6 is already checked nonzero; available-space subtraction above
-    ; prevents cursor addition overflow for valid unsigned state.
     IADD DR10, DR8, DR6
     ISUB DR11, DR10, #1
     DREAD DR4, CR8, #0, DR8
     DREAD DR4, CR8, #0, DR11
-    ; Validate physical end (inclusive last word), without shift/add wrap.
     BFEXT DR4, DR11, #30, #2
     MCMP DR4, #0
     BRANCHNE TODO_CREATE_ALLOCATOR_STATE
@@ -140,8 +151,6 @@ create_data_allocate:
     BRANCHLO TODO_CREATE_ALLOCATOR_STATE
     SHL DR8, DR8, #2
     IADD DR8, DR8, DR2
-    ; History indexed by slot, NOT by free-queue position. Duplicate queue
-    ; entries cannot turn a reserved slot back into a never-used slot.
     DREAD DR9, CR7, #6, DR0
     IADD DR10, DR9, DR7
     MCMP DR10, DR9
@@ -154,8 +163,6 @@ create_data_allocate:
     BFEXT DR2, DR2, #0, #9
     BRANCH create_data_publish
 create_data_zero_begin:
-    ; Package succeeded. Consume history before advancing either cursor:
-    ; a later fault may leak a reservation, never reuse its authority.
     DREAD DR13, CR7, #6, DR0
     IADD DR13, DR13, DR7
     BFEXT DR2, DR9, #21, #9
@@ -175,28 +182,33 @@ create_data_zero_loop:
     IADD DR13, DR13, #1
     BRANCH create_data_zero_loop
 create_data_publish:
-    ; Inputs now come from the native allocator and Mint-owned history.
     BRANCH create_descriptor_prepare
 create_data_descriptor_ready:
     MCMP DR12, #1
     BRANCHNE create_data_retire_slot
     IADD DR1, DR0, #0
-    BRANCH create_data_zero_begin
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    DREAD DR2, CR7, #0, DR13
+    BFEXT DR3, DR2, #10, #1
+    MCMP DR3, #0
+    BRANCHEQ create_data_zero_begin
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    BFEXT DR2, DR9, #21, #9
+    IADD DR3, DR0, #1
+    BFINS DR2, DR3, #10, #1
+    DWRITE DR2, CR7, #0, DR13
+    DREAD DR15, CR7, #3, DR0
+    IADD DR15, DR15, #1
+    DWRITE DR15, CR7, #3, DR0
+    BRANCH create_data_set_slot
 create_data_retire_slot:
-    ; Durable within MintState: retries see 511, never wrap or allocate.
-    ; Leave queue/pool cursors and pool bytes unchanged; no auto-skip policy.
     DREAD DR13, CR7, #6, DR0
     IADD DR13, DR13, DR7
     DWRITE DR4, CR7, #0, DR13
     BRANCH TODO_CREATE_DESCRIPTOR_RETIRED
 
-; BEGIN NATIVE SLOT PACKAGE -- private same-context blocks, no extra GT.
-; Inputs: DR8 physical byte address, DR6 nonzero word count, DR7 slot >= 2,
-;         DR2 current 9-bit version, DR3 never-used boolean from slot history.
-; Success: DR8..11 = W0..3, DR12 = 1. DR1 remains CREATE-incomplete (0).
-; Retired: DR12 = 0, DR4 = 511, W1..3 = 0; no storage retirement is performed.
-; Preserves DR5 (heap), DR6, DR7, DR8 and ALL CRs. Other DRs/flags are scratch.
-; No memory writes, Namespace reads, CALL, CHANGE, SWITCH or opcode-7 frame.
 create_descriptor_prepare:
     IADD DR1, DR0, #0
     IADD DR9, DR0, #0
@@ -227,8 +239,6 @@ create_descriptor_prepare:
 create_descriptor_after_sequence:
     BFINS DR9, DR4, #21, #9
     BFINS DR9, DR0, #30, #2
-    ; T === issued GT: slot[15:0], seq[24:16], Inform=01, dom=0,
-    ; DATA RW=011, B=1. The high seven bits are therefore 0b1011001.
     IADD DR11, DR7, #0
     BFINS DR11, DR4, #16, #9
     IADD DR12, DR0, #89
@@ -240,7 +250,6 @@ create_descriptor_after_integrity:
     IADD DR12, DR0, #1
     BRANCH create_descriptor_done
 
-; Private sequence Lambda: one local invocation, fixed local continuation.
 create_descriptor_next_sequence:
     MCMP DR2, #510
     BRANCHGE create_descriptor_retired
@@ -249,7 +258,6 @@ create_descriptor_next_sequence:
     IADD DR4, DR2, #1
     BRANCH create_descriptor_after_sequence
 create_descriptor_first_use:
-    ; A never-used slot has initial version zero, never an arbitrary history.
     MCMP DR2, #0
     BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
     IADD DR4, DR0, #0
@@ -259,19 +267,15 @@ create_descriptor_retired:
     IADD DR9, DR0, #0
     BRANCH create_descriptor_done
 
-; Private integrity Lambda: W0/W1 unchanged; W2 in DR10.
-; ROL32(W0,7), using only existing shift/bitfield instructions.
 create_descriptor_integrity:
     BFEXT DR12, DR8, #25, #7
     SHL DR13, DR8, #7
     BFINS DR13, DR12, #0, #7
-    ; ROL32(W1 & 0x3FFFFFFF,13).
     IADD DR14, DR9, #0
     BFINS DR14, DR0, #30, #2
     BFEXT DR12, DR14, #19, #13
     SHL DR14, DR14, #13
     BFINS DR14, DR12, #0, #13
-    ; Construct 0xDEADBEEF without a new large-immediate instruction.
     IADD DR15, DR0, #222
     SHL DR15, DR15, #8
     IADD DR15, DR15, #173
@@ -282,7 +286,6 @@ create_descriptor_integrity:
     IADD DR10, DR0, #0
     IADD DR4, DR0, #32
 create_descriptor_xor_bits:
-    ; XOR of three bits is their sum modulo two. No invented XOR opcode.
     BFEXT DR1, DR13, #0, #1
     BFEXT DR2, DR14, #0, #1
     BFEXT DR3, DR15, #0, #1
@@ -294,26 +297,16 @@ create_descriptor_xor_bits:
     SHR DR14, DR14, #1
     SHR DR15, DR15, #1
     ISUB DR4, DR4, #1
-    ; Register-form MCMP preserves live DR15. Immediate MCMP lowering uses
-    ; DR15 as scratch and would corrupt the remaining XOR constant bits.
     MCMP DR4, DR0
     BRANCHNE create_descriptor_xor_bits
     BRANCH create_descriptor_after_integrity
 create_descriptor_done:
     BRANCH create_data_descriptor_ready
-; END NATIVE SLOT PACKAGE
 
 create_data_set_slot:
-    ; Single local call site: ordinary branches use the unchanged CR14.
-    ; No separate X GT, CALL frame, LAMBDA frame or new operand encoding.
     BRANCH create_data_slot_lambda
 create_data_slot_after_clear:
-    ; Same Mint context, single-threaded Phase 1: retain private authority.
 create_data_account_and_issue:
-    ; Allocation cursors/history were already consumed once. No second debit.
-    ; MintScratch is an explicit one-word L view of the final MintState word.
-    ; Provisioning must keep this row disjoint from queue/history storage;
-    ; RTL LOAD does not automatically reduce a whole-object L capability.
     DREAD DR2, CR7, #0, DR0
     BFEXT DR2, DR2, #23, #4
     IADD DR3, DR0, #64
@@ -328,13 +321,10 @@ create_issue_scratch:
     DWRITE DR11, CR7, #0, DR3
     LOAD CR9, CR6, #2
     LOAD CR1, CR9, #0
-    ; Exact comparison to the just-loaded private row, plus scalar identity
-    ; checks below. LOAD performs the ordinary machine capability checks.
     LOAD CR11, CR9, #0
     DWRITE DR0, CR7, #0, DR3
     IADD DR1, DR0, #1
 create_finish:
-    ; Validate the result before erasing descriptor/accounting evidence.
 create_result:
     MCMP DR1, #1
     BRANCHNE TODO_CREATE_RESULT_COMPLETION
@@ -368,15 +358,10 @@ create_return:
     IADD DR13, DR0, #0
     IADD DR14, DR0, #0
     IADD DR15, DR0, #0
+    IADD DR1, DR0, #0
     RETURNAL #2
 
 create_data_slot_lambda:
-    ; Private same-scope local block, NOT a public method or an E-GT CALL.
-    ; Only this body may acquire the configured Namespace RW view in CR10.
-    ; Trusted provisioning binds this private RW view to the active NS table,
-    ; offset zero = slot zero. No caller-supplied Namespace authority.
-    ; Single-threaded Phase 1: no CALL/CHANGE/SWITCH here, no rollback on fault.
-    ; Four writes are not atomic; no new exclusion mechanism is claimed.
     LOAD CR10, CR6, #5
     LOAD CR1, NULL
     MCMP DR7, #2
@@ -392,8 +377,6 @@ create_data_slot_lambda:
     BFINS DR2, DR4, #10, #1
     MCMP DR2, DR3
     BRANCHNE TODO_CREATE_SLOT_RESERVATION
-    ; The allocator/package reach this block directly with no intervening call.
-    ; History is authoritative; emptiness alone never means never-used.
 create_data_slot_offset:
     SHL DR13, DR7, #2
     DREAD DR4, CR10, #0, DR13
@@ -426,11 +409,8 @@ create_data_slot_write:
     MCMP DR4, DR11
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
 create_data_slot_return:
-    ; This block has one entry site and a fixed local continuation.
-    ; Do not consume the enclosing CALL frame or clear any CR.
     BRANCH create_data_slot_after_clear
 
-; Resolved failure cases. No result issuance and no promised rollback.
 TODO_CREATE_RESULT_TYPE:
     HARDFAULT "Mint.CREATE: result identity does not match the published DATA RW GT"
 TODO_CREATE_SLOT_RESERVATION:
@@ -445,8 +425,6 @@ TODO_CREATE_DESCRIPTOR_RETIRED:
     HARDFAULT "Mint.CREATE: selected slot is retired and cannot be allocated"
 TODO_CREATE_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.CREATE: missing Passkey"
-TODO_CREATE_INPUT_PROOF_READ:
-    HARDFAULT "Mint.CREATE: proof capability is not readable"
 TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL:
     HARDFAULT "Mint.CREATE: DATA source CR4 must be NULL"
 TODO_CREATE_INPUT_CASE_NOT_DATA:
@@ -478,37 +456,51 @@ TODO_CREATE_SLOT_CONFIRM_WORD2:
 TODO_CREATE_SLOT_CONFIRM_WORD3:
     HARDFAULT "Mint.CREATE: Namespace identity read-back mismatch"
 }
-
-; FROM NEWER EDITABLE SOURCE: DESTROY implementation, unchanged.
-; PORT REQUIRED: accept target CR2, derive slot from verified target identity,
-; preserve proof through verification, and translate completion to DR1=0.
-; Current body still uses CR2 proof, CR7 target and caller-provided DR2 slot.
 method DESTROY(target: Inform[RW]) -> Void {
 DESTROY_inputs:
-    ; ISOLATED V1 ONLY: private DATA RW allocated by MintCleaner.
-    ; DR2 identifies the target slot; CR7 must match its exact current GT.
-    ; CR2 is the Genesis-provisioned Passkey; CR3 is replaced by Mint.
-    ; Non-DATA, resident/shared-flagged and non-owned allocations are rejected.
-    ; Fixture provisioning excludes active/code/C-list aliases into this pool.
-    ; No general active-use detector is claimed.
-    LOAD CR1, NULL
 destroy_inputs_after_clear:
     IADD DR1, DR0, #0
-    TPERM CR2, NULL
-    BRANCHEQ TODO_DESTROY_INPUT_CREDENTIAL_NULL
     LOAD CR3, CR6, #7
-    LOAD CR1, CR6, #4
-    CALL CR1, #0
-    MCMP DR1, #1
+    LOAD CR4, CR6, #4
+    CALL CR4, #0
+    MCMP DR1, #0
     BRANCHNE TODO_DESTROY_PKVERIFY_NOT_APPROVED
     IADD DR1, DR0, #0
     LOAD CR1, NULL
-    TPERM CR7, NULL
-    BRANCHEQ TODO_DESTROY_INPUT_TARGET_NULL
-    TPERM CR4, NULL
-    BRANCHNE TODO_DESTROY_INPUT_CR4_NOT_NULL
-    TPERM CR8, NULL
-    BRANCHNE TODO_DESTROY_INPUT_CR8_NOT_NULL
+    LOAD CR8, CR6, #1
+    DREAD DR3, CR8, #0, DR0
+    BFEXT DR3, DR3, #23, #4
+    IADD DR4, DR0, #64
+destroy_scan_size:
+    MCMP DR3, #0
+    BRANCHEQ destroy_scan_start
+    SHL DR4, DR4, #1
+    ISUB DR3, DR3, #1
+    BRANCH destroy_scan_size
+destroy_scan_start:
+    ISUB DR4, DR4, #1
+    LOAD CR10, CR6, #5
+    LOAD CR9, CR6, #2
+    IADD DR7, DR0, #2
+destroy_scan:
+    SHL DR13, DR7, #2
+    DREAD DR11, CR10, #3, DR13
+    MCMP DR11, #0
+    BRANCHEQ destroy_scan_next
+    BFEXT DR3, DR11, #25, #7
+    MCMP DR3, #89
+    BRANCHNE destroy_scan_next
+    BFINS DR11, DR0, #31, #1
+    DWRITE DR11, CR8, #0, DR4
+    LOAD CR11, CR9, #0
+    DWRITE DR0, CR8, #0, DR4
+    TPERM CR2, EXACT, CR11
+    BRANCHEQ destroy_scan_found
+destroy_scan_next:
+    IADD DR7, DR7, #1
+    BRANCH destroy_scan
+destroy_scan_found:
+    IADD DR2, DR7, #0
     BFEXT DR4, DR2, #16, #16
     MCMP DR4, #0
     BRANCHNE destroy_v1_bad
@@ -543,7 +535,6 @@ destroy_inputs_after_clear:
     IADD DR3, DR9, #1024
     MCMP DR4, DR3
     BRANCHNE destroy_v1_bad
-    ; Materialize only this exact current token through private scratch.
     DREAD DR3, CR8, #0, DR0
     BFEXT DR3, DR3, #23, #4
     IADD DR4, DR0, #64
@@ -555,16 +546,13 @@ destroy_v1_size:
     BRANCH destroy_v1_size
 destroy_v1_compare:
     ISUB DR4, DR4, #1
-    ; CALL clears B on passed argument capabilities. Compare the exact
-    ; domain-crossed token, not the B=1 issuance token stored in W3.
-    ; Keep all identity/version/type/permission bits and the descriptor intact.
     IADD DR3, DR11, #0
     BFINS DR3, DR0, #31, #1
     DWRITE DR3, CR8, #0, DR4
     LOAD CR9, CR6, #2
     LOAD CR11, CR9, #0
     DWRITE DR0, CR8, #0, DR4
-    TPERM CR7, EXACT, CR11
+    TPERM CR2, EXACT, CR11
     BRANCHNE destroy_v1_bad
     DREAD DR8, CR10, #0, DR13
 destroy_authorize:
@@ -573,8 +561,6 @@ destroy_authorize:
     MCMP DR1, #1
     BRANCHNE destroy_v1_bad
 destroy_body:
-    ; Validate slot/history and free queue BEFORE invalidation. Single-thread
-    ; fixture only: no CALL/yield during descriptor writes.
     LOAD CR7, CR6, #1
     LOAD CR10, CR6, #5
     DREAD DR12, CR7, #6, DR0
@@ -596,7 +582,6 @@ destroy_body:
     SHL DR13, DR7, #2
     DREAD DR4, CR10, #1, DR13
     BFINS DR4, DR9, #21, #9
-    ; Version first: old tokens fail before storage is made reusable.
     DWRITE DR4, CR10, #1, DR13
     DWRITE DR9, CR7, #0, DR12
     DWRITE DR0, CR10, #0, DR13
@@ -618,7 +603,6 @@ destroy_body:
     DWRITE DR7, CR7, #0, DR14
     DWRITE DR14, CR7, #3, DR0
 destroy_finish:
-    ; Validate completion and NULL result before outward cleanup.
 destroy_result:
     LOAD CR1, NULL
     MCMP DR1, #1
@@ -639,6 +623,7 @@ destroy_return:
     IADD DR13, DR0, #0
     IADD DR14, DR0, #0
     IADD DR15, DR0, #0
+    IADD DR1, DR0, #0
     RETURNAL #0
 
 destroy_v1_bad:
@@ -659,15 +644,11 @@ TODO_DESTROY_RESULT_COMPLETION:
 TODO_DESTROY_RESULT_NOT_NULL:
     HARDFAULT "Mint.DESTROY: result capability must be NULL"
 }
-
-; PROPOSED CONVERSION STUBS: status 5 and NULL CR1; no authorization or
-; conversion is performed. These do not replace CREATE or DESTROY.
 method MakeOutform(target: Inform[RW]) -> Outform[RW] {
     LOAD CR1, NULL
     IADD DR1, DR0, #5
     RETURNAL #0
 }
-
 method MakeInform(target: Outform[RW]) -> Inform[RW] {
     LOAD CR1, NULL
     IADD DR1, DR0, #5

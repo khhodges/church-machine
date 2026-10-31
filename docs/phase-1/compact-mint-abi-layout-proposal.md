@@ -1,8 +1,9 @@
 # Compact ABI layout and signatures — approved
 
 Status: layout, signature grammar and scalar-result placement approved by the
-user on 2026-10-31. Not implemented. Mint's concrete method signatures still
-require review against the selected executable implementation.
+user on 2026-10-31. Native-body compilation, typed imports and ordinary
+save/reopen support are implemented. Mint lifecycle execution acceptance
+remains separate from this serialization/compilation support.
 
 ## Storage
 
