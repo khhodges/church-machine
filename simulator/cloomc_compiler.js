@@ -542,6 +542,22 @@ class CLOOMCCompiler {
         // diagnose that unfinished intermediate capability list as authored data.
         if (!result.source_parse_failed)
             result.errors.push(...ChurchAssembler.objectNameErrors(result, source));
+        if (result.errors.length === 0 && /^\s*;\s*@(?:contract|endcontract)\b/m.test(source)) {
+            try {
+                const contract = typeof module !== 'undefined' && module.exports
+                    ? require('./lump-api-contract') : globalThis.LumpApiContract;
+                if (!contract || !contract.extractContracts)
+                    throw new Error('Functional contract reader unavailable; reload the IDE.');
+                const methods = result.compactAbi ? result.compactAbi.methods :
+                    Object.fromEntries(result.methods.filter(m => m.visibility !== 'private').map(m => [
+                        m.name, {inputs:Object.fromEntries((m.params || []).map(p => [
+                            String(p).split(':')[0].trim(), true]))}
+                    ]));
+                result.functionalContracts = contract.extractContracts(source, methods);
+            } catch (error) {
+                result.errors.push({line:error.line || null, message:error.message});
+            }
+        }
         return result;
     }
 

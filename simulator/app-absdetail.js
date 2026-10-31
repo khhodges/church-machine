@@ -325,6 +325,8 @@ function _absSavedApiHtml(inspection, identity) {
         : Array.isArray(v) ? (v.length ? v.map(x => esc(typeof x === 'object' ? JSON.stringify(x) : x)).join('<br>') : 'None declared')
         : esc(typeof v === 'object' ? JSON.stringify(v) : v);
     html += `<p>Saved API return convention: ${value(api.returnConvention)}</p>`;
+    if (typeof LumpPublicApi !== 'undefined')
+        html += LumpPublicApi.renderContracts(api.contracts);
     if (!api.methods.length) return html + '<p>The saved API declares no methods.</p>';
     for (const method of api.methods) {
         if (!method || typeof method !== 'object') continue;

@@ -1,6 +1,6 @@
 'use strict';
 
-// Step-one contract only. Not wired into compilation, loading or publication.
+// Shared stored API validation for compilation, inspection and admission.
 // Structural validation is not admission or destination binding approval.
 (function(root) {
     const NAME = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_][A-Za-z0-9_-]*)*$/;
@@ -52,7 +52,7 @@
         if (!Number.isInteger(header.cw) || header.cw < 1 || header.cw > 8191 ||
             !Number.isInteger(header.cc) || header.cc < 1 || header.cc > 255)
             fail('invalid code/C-list extent');
-        keys(api, ['name','passkey','methods','imports','symbolic_binding'], ['name','methods'], 'root');
+        keys(api, ['name','passkey','methods','imports','symbolic_binding','contracts'], ['name','methods'], 'root');
         const typed = own(api, 'passkey');
         if (typed && api.passkey !== 1) fail('passkey must be 1');
         if (typeof api.name !== 'string' || !NAME.test(api.name)) fail('invalid abstraction name');
@@ -99,6 +99,7 @@
                 } else parameters(method.returns, name + ' returns');
             }
         }
+        if (own(api, 'contracts')) validateContracts(api.contracts, api.methods);
         const rows = new Map(), names = new Set();
         if (own(api, 'imports')) {
             if (!object(api.imports) || !Object.keys(api.imports).length) fail('omit empty imports');
@@ -164,6 +165,58 @@
                     (i > 0 && type <= types[i - 1]))))
             fail('Object accepted types must be unique ascending types 2–4');
     }
+    function validateContracts(contracts, methods) {
+        keys(contracts, Object.keys(methods), Object.keys(methods), 'functional contracts');
+        if (!Object.keys(contracts).length) fail('functional contracts cannot be empty');
+        const text = (v, path) => {
+            if (typeof v !== 'string' || !v.trim() || v.length > 4096)
+                fail(path + ' must be nonempty text of at most 4096 characters');
+        };
+        for (const [name, contract] of Object.entries(contracts)) {
+            const fields = ['purpose','inputs','result','effects','failures','authorization','example'];
+            keys(contract, fields, fields, 'contract ' + name);
+            for (const field of fields.filter(f => f !== 'inputs'))
+                text(contract[field], name + '.' + field);
+            const method = methods[name];
+            const inputs = Array.isArray(method)
+                ? method[1].map(input => input[0]) : Object.keys(method.inputs || {});
+            keys(contract.inputs, inputs, inputs, name + '.inputs');
+            for (const [input, description] of Object.entries(contract.inputs)) {
+                const fields = ['meaning','unit','allowed','encoding'];
+                keys(description, fields, fields, name + '.' + input);
+                for (const field of fields) text(description[field], name + '.' + input + '.' + field);
+            }
+        }
+        return contracts;
+    }
+    // Explicit comment directives; ordinary comments are never inferred as API.
+    function extractContracts(source, methods) {
+        const contracts = Object.create(null);
+        const lines = source.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if (!/^\s*;\s*@(?:contract|endcontract)\b/.test(lines[i])) continue;
+            const start = i + 1;
+            try {
+                const match = lines[i].match(/^\s*;\s*@contract\s+([A-Za-z_]\w*)\s*$/);
+                if (!match) fail('expected ; @contract MethodName');
+                const name = match[1];
+                if (own(contracts, name)) fail('duplicate functional contract ' + name);
+                const json = [];
+                for (++i; i < lines.length && !/^\s*;\s*@endcontract\s*$/.test(lines[i]); i++) {
+                    if (!/^\s*;/.test(lines[i]) || /^\s*;\s*@contract\b/.test(lines[i]))
+                        fail('contract JSON must be comment lines ending with ; @endcontract');
+                    json.push(lines[i].replace(/^\s*;\s?/, ''));
+                }
+                if (i === lines.length) fail('unterminated functional contract ' + name);
+                contracts[name] = parseJSON(json.join('\n'));
+            } catch (error) {
+                error.line = start;
+                throw error;
+            }
+        }
+        if (!Object.keys(contracts).length) return undefined;
+        return validateContracts({...contracts}, methods);
+    }
     // Symbolic CALL relocations are integrity-covered declarations only.
     function symbolic(b, header, owner) {
         keys(b, ['schema','owner','dependencies','calls'], ['schema','owner','dependencies','calls'], 'symbolic_binding');
@@ -203,12 +256,13 @@
         const text = JSON.stringify(own(api, 'passkey') ? {
             name:api.name, passkey:api.passkey, methods:sort(api.methods),
             ...(api.imports ? {imports:sort(api.imports)} : {}),
+            ...(api.contracts ? {contracts:sort(api.contracts)} : {}),
             ...(api.symbolic_binding ? {symbolic_binding:sort(api.symbolic_binding)} : {})
         } : sort(api));
         if (new TextEncoder().encode(text).length > 65535) fail('JSON exceeds frame length');
         return text;
     }
-    function parse(text, header) {
+    function parseJSON(text) {
         if (typeof text !== 'string' || text.length > 65535 ||
             new TextEncoder().encode(text).length > 65535) fail('invalid JSON length');
         // JSON.parse validates grammar; this second pass rejects duplicate keys,
@@ -239,9 +293,12 @@
             }
         }
         walk(0);
-        return validate(parsed, header);
+        return parsed;
     }
-    const api = {validate, parse, serialize};
+    function parse(text, header) {
+        return validate(parseJSON(text), header);
+    }
+    const api = {validate, parse, serialize, extractContracts, validateContracts};
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.LumpApiContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

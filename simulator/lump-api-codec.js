@@ -14,6 +14,7 @@
         if (!api || !Array.isArray(api.methods) || !Array.isArray(api.capabilities))
             throw new Error('Cannot compile compact API without method and capability declarations');
         const out = {name:api.name, methods:{}};
+        if (api.contracts) out.contracts = clone(api.contracts);
         if (api.symbolic_binding) out.symbolic_binding = clone(api.symbolic_binding);
         for (const method of api.methods) {
             if (method.outputs && method.outputs.length)
@@ -127,11 +128,13 @@
                         result === 1 ? 'DR2' : 'CR1')})};
             });
             return {name:api.name, passkey:1,
+                ...(api.contracts ? {contracts:clone(api.contracts)} : {}),
                 returnConvention:{register:'DR1', description:'status; zero means success'},
                 capabilities, methods,
                 ...(api.symbolic_binding ? {symbolic_binding:clone(api.symbolic_binding)} : {})};
         }
         return {name:api.name, capabilities,
+            ...(api.contracts ? {contracts:clone(api.contracts)} : {}),
             ...(api.symbolic_binding ? {symbolic_binding:clone(api.symbolic_binding)} : {}),
             methods:Object.entries(api.methods).map(([name, method]) => ({
                 name,index:method.selector,branchOffset:words[1 + method.selector] & 0x7fff,

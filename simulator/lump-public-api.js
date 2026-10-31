@@ -23,6 +23,7 @@
         if (definition.methods && !Array.isArray(definition.methods))
             return JSON.parse(JSON.stringify(definition));
         const result = copyFields(definition, ['name', 'description']);
+        if (definition.contracts) result.contracts = JSON.parse(JSON.stringify(definition.contracts));
         result.methods = (Array.isArray(definition.methods) ? definition.methods : [])
             .filter(m => m && typeof m === 'object' && m.visibility !== 'private')
             .map(m => {
@@ -41,12 +42,28 @@
     }
     const escape = value => String(value).replace(/[&<>"']/g, c =>
         ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+    function renderContracts(contracts) {
+        if (!contracts) return '<p>No functional contract was embedded in this artifact. Argument meanings are not inferred.</p>';
+        let html = '<section aria-label="Functional contracts"><h3>Functional contracts</h3>' +
+            '<p>Author-declared behavior, validated for completeness—not proof of implementation or runtime enforcement.</p>';
+        for (const [name, c] of Object.entries(contracts)) {
+            html += `<h4>${escape(name)}</h4><p>${escape(c.purpose)}</p>`;
+            for (const [name, input] of Object.entries(c.inputs))
+                html += `<h5>Input: ${escape(name)}</h5><dl>` +
+                    Object.entries(input).map(([key, value]) =>
+                        `<dt>${escape(key)}</dt><dd>${escape(value)}</dd>`).join('') + '</dl>';
+            for (const field of ['result','effects','failures','authorization','example'])
+                html += `<p><strong>${escape(field[0].toUpperCase() + field.slice(1))}</strong><br>${escape(c[field])}</p>`;
+        }
+        return html + '</section>';
+    }
     function render(definition, loading) {
         const api = project(definition);
         if (api && api.methods && !Array.isArray(api.methods)) {
             return '<div class="lump-detail-section"><div class="lump-section-title">API — canonical black-box definition</div>' +
-                '<p>The exact embedded definition used by the IDE and linking loader.</p><pre>' +
-                escape(JSON.stringify(api, null, 2)) + '</pre></div>';
+                renderContracts(api.contracts) +
+                '<details><summary>ABI and canonical interface JSON</summary><pre>' +
+                escape(JSON.stringify(api, null, 2)) + '</pre></details></div>';
         }
         if (!api) return `<div class="lump-detail-section">${loading
             ? 'Loading the public interface from the saved binary…'
@@ -56,6 +73,7 @@
             `<strong>${escape(api.name || 'Unnamed interface')}</strong>` +
             '<p>What callers can invoke, supply and receive. Implementation details are in Internals.</p>';
         if (api.description) html += `<p>${escape(api.description)}</p>`;
+        html += renderContracts(api.contracts);
         if (!api.methods.length) html += '<p>No public methods are declared in this artifact. No callable methods are invented.</p>';
         api.methods.forEach(m => {
             html += `<h4>${escape(m.name || 'Unnamed method')}` +
@@ -69,7 +87,7 @@
         html += '<p>This is a public projection of the saved metadata, not a rewritten LUMP. Internal binding records and allocation are unchanged.</p></div></div>';
         return html;
     }
-    const exported = {project, render};
+    const exported = {project, render, renderContracts};
     if (typeof module !== 'undefined' && module.exports) module.exports = exported;
     else root.LumpPublicApi = exported;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

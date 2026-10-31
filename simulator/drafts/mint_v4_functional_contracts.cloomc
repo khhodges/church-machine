@@ -1,0 +1,734 @@
+; @contract CREATE
+; {
+;   "purpose": "Create zero-initialized read/write DATA storage and return the capability needed to use it.",
+;   "inputs": {
+;     "allocation": {
+;       "meaning": "Requested storage size with the DATA allocation tag.",
+;       "unit": "32-bit words (one word is four bytes).",
+;       "allowed": "A power-of-two word count of at least 8, subject to the configured pool, descriptor limits, and available Namespace slots. A valid size does not guarantee capacity.",
+;       "encoding": "Low-level encoding is wordCount OR 4. For 8 words, supply 12. Bits 0–2 must encode 4; the remaining bits hold the word count."
+;     },
+;     "permissions": {
+;       "meaning": "Access rights requested for the returned data capability.",
+;       "unit": "Permission mask.",
+;       "allowed": "Only 3 (read and write) is supported in Phase 1.",
+;       "encoding": "Supply integer 3. Other masks are not supported."
+;     }
+;   },
+;   "result": "On normal success DR1 is 0 and CR1 holds an Inform RW capability for the requested zero-initialized storage. Use that capability for reads/writes; release it with DESTROY.",
+;   "effects": "Reserves storage and a Namespace slot, records ownership, and clears storage before returning it. Capacity is shared with other allocations.",
+;   "failures": "Invalid inputs, exhausted capacity, invalid allocator state, or machine authority failures raise faults; they are not ordinary successful returns. Do not assume a fault rolled back partial allocator state.",
+;   "authorization": "A callable Mint capability and valid service bindings are required. The ABI includes a PassKey in CR1, but Phase 1 ignores it until the Phase 2 bitstream. NULL CR1 is usable for Phase 1; no PassKey authentication is claimed.",
+;   "example": "To request 8 words (32 bytes), pass allocation=12 and permissions=3. On DR1=0 retain the returned CR1 capability. This example explains the existing encoding; the compiler does not insert packing code."
+; }
+; @endcontract
+
+; @contract DESTROY
+; {
+;   "purpose": "Release an allocation previously created by this Mint, invalidating its current Namespace identity and making storage eligible for reuse.",
+;   "inputs": {
+;     "target": {
+;       "meaning": "The current Inform RW capability for the allocation to release.",
+;       "unit": "Capability, not an integer slot or address.",
+;       "allowed": "A current live DATA RW allocation owned by this Mint. Stale, unrelated, or already released targets are not valid requests.",
+;       "encoding": "Pass the target in CR2. No caller-supplied Namespace slot is required; Mint derives it from the target identity."
+;     }
+;   },
+;   "result": "On normal success DR1 is 0 and CR1 is NULL. No capability result is returned.",
+;   "effects": "Invalidates the Namespace binding, advances retained slot history, and releases the owned storage. Copies of old GT words are not erased, but must no longer authorize access. Storage is cleared before reuse, not synchronously on release.",
+;   "failures": "Invalid/stale targets, ownership mismatches, inconsistent state, or machine authority failures fault. Do not assume a fault rolled back partial state.",
+;   "authorization": "Requires a callable Mint capability and the target allocation capability. The CR1 PassKey input is ignored in Phase 1; verification is deferred to the Phase 2 bitstream.",
+;   "example": "Retain the capability returned by CREATE, pass it as target in CR2, and invoke DESTROY. On DR1=0 discard your copy; do not use it to access subsequently reused storage."
+; }
+; @endcontract
+
+; @contract MakeOutform
+; {
+;   "purpose": "Reserved interface for conversion to Outform. Not implemented in Phase 1.",
+;   "inputs": {
+;     "target": {
+;       "meaning": "Object proposed for conversion.",
+;       "unit": "Capability.",
+;       "allowed": "The interface declares Inform RW; the Phase 1 stub ignores the input.",
+;       "encoding": "CR2."
+;     }
+;   },
+;   "result": "Always returns DR1=5 (UNSUPPORTED_OPERATION) and NULL CR1. No Outform is created.",
+;   "effects": "No conversion or allocation is performed.",
+;   "failures": "Status 5 is a normal unsupported return, not successful conversion. Machine faults may still occur before the method is entered.",
+;   "authorization": "Requires authority to call Mint. The ABI PassKey input in CR1 is ignored; no authentication is performed by this Phase 1 stub.",
+;   "example": "Invoke only if prepared to handle DR1=5; ignore any result when status is nonzero."
+; }
+; @endcontract
+
+; @contract MakeInform
+; {
+;   "purpose": "Reserved interface for conversion to Inform. Not implemented in Phase 1.",
+;   "inputs": {
+;     "target": {
+;       "meaning": "Object proposed for conversion.",
+;       "unit": "Capability.",
+;       "allowed": "The interface declares Outform RW; the Phase 1 stub ignores the input.",
+;       "encoding": "CR2."
+;     }
+;   },
+;   "result": "Always returns DR1=5 (UNSUPPORTED_OPERATION) and NULL CR1. No Inform is created.",
+;   "effects": "No conversion or allocation is performed.",
+;   "failures": "Status 5 is a normal unsupported return, not successful conversion. Machine faults may still occur before the method is entered.",
+;   "authorization": "Requires authority to call Mint. The ABI PassKey input in CR1 is ignored; no authentication is performed by this Phase 1 stub.",
+;   "example": "Handle DR1=5 as unavailable functionality, not as a completed conversion."
+; }
+; @endcontract
+
+; Mint v4 candidate — uninstalled, not hardware-qualified.
+; CR1 PassKey; CREATE DR2 allocation/DR3 permissions; DESTROY CR2 target.
+; DR1=0 success; CR1 result or NULL. Conversion stubs return DR1=5.
+; Paired Cleaner-managed lifecycle, inherited from the newer Mint implementation.
+; Isolated software validation only; no live installation or physical qualification.
+; PHASE 1: PassKey ABI retained; verification deferred to the Phase 2 bitstream.
+; No proof/reference loads or verifier calls. Imported verifier/reference rows are unused.
+abstraction ide.Mint {
+passkey required;
+capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.MintV4Verifier E, ide.MintNamespace RW, ide.MintCleaner E, ide.MintApproval LS }
+method CREATE(allocation: U32, permissions: U32) -> Inform[RW] {
+CREATE_inputs:
+create_data_inputs_after_clear:
+    IADD DR1, DR0, #0
+create_data_credentials:
+create_data_source_checks:
+create_data_scalar_checks:
+    BFEXT DR4, DR2, #0, #3
+    MCMP DR4, #4
+    BRANCHNE TODO_CREATE_INPUT_CASE_NOT_DATA
+    MCMP DR3, #3
+    BRANCHNE TODO_CREATE_INPUT_PERMISSIONS_NOT_RW
+    IADD DR6, DR2, #0
+    BFINS DR6, DR0, #0, #3
+    MCMP DR6, #0
+    BRANCHEQ TODO_CREATE_INPUT_ALLOCATION_ZERO
+    IADD DR7, DR6, #0
+create_data_power_loop:
+    MCMP DR7, #1
+    BRANCHEQ create_data_authorize
+    BFEXT DR4, DR7, #0, #1
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_INPUT_SIZE_NOT_POWER_TWO
+    SHR DR7, DR7, #1
+    BRANCH create_data_power_loop
+create_data_authorize:
+    ; Phase 1: PassKey input is ignored until the Phase 2 bitstream.
+    LOAD CR1, NULL
+    IADD DR1, DR0, #0
+    LOAD CR1, NULL
+    BRANCH create_v1_allocate
+create_v1_allocate:
+    LOAD CR7, CR6, #1
+    DREAD DR9, CR7, #3, DR0
+    MCMP DR9, #7
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR10, CR7, #4, DR0
+    MCMP DR9, DR10
+    BRANCHHS TODO_CREATE_SLOTS_EXHAUSTED
+    DREAD DR4, CR7, #6, DR0
+    MCMP DR10, DR4
+    BRANCHHI TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR7, CR7, #0, DR9
+    BFEXT DR4, DR7, #16, #16
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    MCMP DR7, #2
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR9, CR7, #6, DR0
+    IADD DR10, DR9, DR7
+    MCMP DR10, DR9
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR4, DR2, #10, #22
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    BFEXT DR3, DR2, #9, #1
+    BFEXT DR2, DR2, #0, #9
+    MCMP DR2, #511
+    BRANCHHS TODO_CREATE_DESCRIPTOR_RETIRED
+    MCMP DR3, #0
+    BRANCHNE create_v1_check_first
+    MCMP DR2, #0
+    BRANCHEQ TODO_CREATE_ALLOCATOR_STATE
+    BRANCH create_v1_reserve
+create_v1_check_first:
+    MCMP DR2, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+create_v1_reserve:
+    IADD DR4, DR0, #1
+    BFINS DR2, DR4, #10, #1
+    DWRITE DR2, CR7, #0, DR10
+    LOAD CR1, CR6, #6
+    CALL CR1, #0
+    MCMP DR1, #1
+    BRANCHNE TODO_CREATE_RESULT_COMPLETION
+    IADD DR8, DR2, #0
+    LOAD CR7, CR6, #1
+    LOAD CR1, NULL
+    DREAD DR10, CR7, #6, DR0
+    IADD DR10, DR10, DR7
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR2, DR2, #0, #9
+    MCMP DR2, #0
+    BRANCHEQ create_v1_first
+    ISUB DR2, DR2, #1
+    IADD DR3, DR0, #0
+    BRANCH create_descriptor_prepare
+create_v1_first:
+    IADD DR3, DR0, #1
+    BRANCH create_descriptor_prepare
+
+create_data_allocate:
+    LOAD CR7, CR6, #1
+    LOAD CR8, CR6, #3
+    IADD DR1, DR0, #0
+    MCMP DR6, #0
+    BRANCHEQ TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    ISUB DR4, DR6, #1
+    BFEXT DR4, DR4, #21, #11
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    DREAD DR8, CR7, #1, DR0
+    DREAD DR10, CR7, #2, DR0
+    MCMP DR8, DR10
+    BRANCHHI TODO_CREATE_ALLOCATOR_STATE
+    ISUB DR10, DR10, DR8
+    MCMP DR6, DR10
+    BRANCHHI TODO_CREATE_POOL_EXHAUSTED
+    DREAD DR9, CR7, #3, DR0
+    MCMP DR9, #7
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR10, CR7, #4, DR0
+    MCMP DR9, DR10
+    BRANCHHS TODO_CREATE_SLOTS_EXHAUSTED
+    DREAD DR4, CR7, #6, DR0
+    MCMP DR10, DR4
+    BRANCHHI TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR7, CR7, #0, DR9
+    BFEXT DR4, DR7, #16, #16
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    MCMP DR7, #2
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    IADD DR10, DR8, DR6
+    ISUB DR11, DR10, #1
+    DREAD DR4, CR8, #0, DR8
+    DREAD DR4, CR8, #0, DR11
+    BFEXT DR4, DR11, #30, #2
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR2, CR7, #5, DR0
+    BFEXT DR4, DR2, #0, #2
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    SHL DR11, DR11, #2
+    IADD DR11, DR11, DR2
+    MCMP DR11, DR2
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    SHL DR8, DR8, #2
+    IADD DR8, DR8, DR2
+    DREAD DR9, CR7, #6, DR0
+    IADD DR10, DR9, DR7
+    MCMP DR10, DR9
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR4, DR2, #10, #22
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    BFEXT DR3, DR2, #9, #1
+    BFEXT DR2, DR2, #0, #9
+    BRANCH create_data_publish
+create_data_zero_begin:
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    BFEXT DR2, DR9, #21, #9
+    IADD DR3, DR0, #1
+    BFINS DR2, DR3, #10, #1
+    DWRITE DR2, CR7, #0, DR13
+    DREAD DR13, CR7, #1, DR0
+    IADD DR14, DR13, DR6
+    DWRITE DR14, CR7, #1, DR0
+    DREAD DR15, CR7, #3, DR0
+    IADD DR15, DR15, #1
+    DWRITE DR15, CR7, #3, DR0
+create_data_zero_loop:
+    MCMP DR13, DR14
+    BRANCHEQ create_data_set_slot
+    DWRITE DR0, CR8, #0, DR13
+    IADD DR13, DR13, #1
+    BRANCH create_data_zero_loop
+create_data_publish:
+    BRANCH create_descriptor_prepare
+create_data_descriptor_ready:
+    MCMP DR12, #1
+    BRANCHNE create_data_retire_slot
+    IADD DR1, DR0, #0
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    DREAD DR2, CR7, #0, DR13
+    BFEXT DR3, DR2, #10, #1
+    MCMP DR3, #0
+    BRANCHEQ create_data_zero_begin
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    BFEXT DR2, DR9, #21, #9
+    IADD DR3, DR0, #1
+    BFINS DR2, DR3, #10, #1
+    DWRITE DR2, CR7, #0, DR13
+    DREAD DR15, CR7, #3, DR0
+    IADD DR15, DR15, #1
+    DWRITE DR15, CR7, #3, DR0
+    BRANCH create_data_set_slot
+create_data_retire_slot:
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    DWRITE DR4, CR7, #0, DR13
+    BRANCH TODO_CREATE_DESCRIPTOR_RETIRED
+
+create_descriptor_prepare:
+    IADD DR1, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    MCMP DR6, #0
+    BRANCHEQ TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    ISUB DR9, DR6, #1
+    BFEXT DR4, DR9, #21, #11
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BFEXT DR4, DR8, #0, #2
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BFEXT DR4, DR7, #16, #16
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    MCMP DR7, #2
+    BRANCHLT TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BFEXT DR4, DR2, #9, #23
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    MCMP DR3, #1
+    BRANCHHI TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BRANCH create_descriptor_next_sequence
+
+create_descriptor_after_sequence:
+    BFINS DR9, DR4, #21, #9
+    BFINS DR9, DR0, #30, #2
+    IADD DR11, DR7, #0
+    BFINS DR11, DR4, #16, #9
+    IADD DR12, DR0, #89
+    BFINS DR11, DR12, #25, #7
+    BRANCH create_descriptor_integrity
+
+create_descriptor_after_integrity:
+    IADD DR1, DR0, #0
+    IADD DR12, DR0, #1
+    BRANCH create_descriptor_done
+
+create_descriptor_next_sequence:
+    MCMP DR2, #510
+    BRANCHGE create_descriptor_retired
+    MCMP DR3, #0
+    BRANCHNE create_descriptor_first_use
+    IADD DR4, DR2, #1
+    BRANCH create_descriptor_after_sequence
+create_descriptor_first_use:
+    MCMP DR2, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    IADD DR4, DR0, #0
+    BRANCH create_descriptor_after_sequence
+create_descriptor_retired:
+    IADD DR4, DR0, #511
+    IADD DR9, DR0, #0
+    BRANCH create_descriptor_done
+
+create_descriptor_integrity:
+    BFEXT DR12, DR8, #25, #7
+    SHL DR13, DR8, #7
+    BFINS DR13, DR12, #0, #7
+    IADD DR14, DR9, #0
+    BFINS DR14, DR0, #30, #2
+    BFEXT DR12, DR14, #19, #13
+    SHL DR14, DR14, #13
+    BFINS DR14, DR12, #0, #13
+    IADD DR15, DR0, #222
+    SHL DR15, DR15, #8
+    IADD DR15, DR15, #173
+    SHL DR15, DR15, #8
+    IADD DR15, DR15, #190
+    SHL DR15, DR15, #8
+    IADD DR15, DR15, #239
+    IADD DR10, DR0, #0
+    IADD DR4, DR0, #32
+create_descriptor_xor_bits:
+    BFEXT DR1, DR13, #0, #1
+    BFEXT DR2, DR14, #0, #1
+    BFEXT DR3, DR15, #0, #1
+    IADD DR1, DR1, DR2
+    IADD DR1, DR1, DR3
+    SHR DR10, DR10, #1
+    BFINS DR10, DR1, #31, #1
+    SHR DR13, DR13, #1
+    SHR DR14, DR14, #1
+    SHR DR15, DR15, #1
+    ISUB DR4, DR4, #1
+    MCMP DR4, DR0
+    BRANCHNE create_descriptor_xor_bits
+    BRANCH create_descriptor_after_integrity
+create_descriptor_done:
+    BRANCH create_data_descriptor_ready
+
+create_data_set_slot:
+    BRANCH create_data_slot_lambda
+create_data_slot_after_clear:
+create_data_account_and_issue:
+    DREAD DR2, CR7, #0, DR0
+    BFEXT DR2, DR2, #23, #4
+    IADD DR3, DR0, #64
+create_issue_state_size:
+    MCMP DR2, #0
+    BRANCHEQ create_issue_scratch
+    SHL DR3, DR3, #1
+    ISUB DR2, DR2, #1
+    BRANCH create_issue_state_size
+create_issue_scratch:
+    ISUB DR3, DR3, #1
+    DWRITE DR11, CR7, #0, DR3
+    LOAD CR9, CR6, #2
+    LOAD CR1, CR9, #0
+    LOAD CR11, CR9, #0
+    DWRITE DR0, CR7, #0, DR3
+    IADD DR1, DR0, #1
+create_finish:
+create_result:
+    MCMP DR1, #1
+    BRANCHNE TODO_CREATE_RESULT_COMPLETION
+    TPERM CR1, NULL
+    BRANCHEQ TODO_CREATE_RESULT_NULL
+    TPERM CR1, RW
+    BRANCHNE TODO_CREATE_RESULT_NOT_RW
+    TPERM CR1, EXACT, CR11
+    BRANCHNE TODO_CREATE_RESULT_TYPE
+    BFEXT DR2, DR11, #25, #7
+    MCMP DR2, #89
+    BRANCHNE TODO_CREATE_RESULT_TYPE
+    BFEXT DR2, DR11, #0, #16
+    MCMP DR2, DR7
+    BRANCHNE TODO_CREATE_RESULT_TYPE
+    BFEXT DR2, DR11, #16, #9
+    BFEXT DR3, DR9, #21, #9
+    MCMP DR2, DR3
+    BRANCHNE TODO_CREATE_RESULT_TYPE
+create_return:
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
+    IADD DR1, DR0, #0
+    RETURNAL #2
+
+create_data_slot_lambda:
+    LOAD CR10, CR6, #5
+    LOAD CR1, NULL
+    MCMP DR7, #2
+    BRANCHLO TODO_CREATE_SLOT_RESERVATION
+    BFEXT DR2, DR7, #16, #16
+    MCMP DR2, #0
+    BRANCHNE TODO_CREATE_SLOT_RESERVATION
+    DREAD DR2, CR7, #6, DR0
+    IADD DR2, DR2, DR7
+    DREAD DR3, CR7, #0, DR2
+    BFEXT DR2, DR9, #21, #9
+    IADD DR4, DR0, #1
+    BFINS DR2, DR4, #10, #1
+    MCMP DR2, DR3
+    BRANCHNE TODO_CREATE_SLOT_RESERVATION
+create_data_slot_offset:
+    SHL DR13, DR7, #2
+    DREAD DR4, CR10, #0, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
+    DREAD DR4, CR10, #1, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
+    DREAD DR4, CR10, #2, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
+    DREAD DR4, CR10, #3, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
+create_data_slot_write:
+    DWRITE DR8, CR10, #0, DR13
+    DWRITE DR9, CR10, #1, DR13
+    DWRITE DR10, CR10, #2, DR13
+    DWRITE DR11, CR10, #3, DR13
+    DREAD DR4, CR10, #0, DR13
+    MCMP DR4, DR8
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD0
+    DREAD DR4, CR10, #1, DR13
+    MCMP DR4, DR9
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD1
+    DREAD DR4, CR10, #2, DR13
+    MCMP DR4, DR10
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD2
+    DREAD DR4, CR10, #3, DR13
+    MCMP DR4, DR11
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
+create_data_slot_return:
+    BRANCH create_data_slot_after_clear
+
+TODO_CREATE_RESULT_TYPE:
+    HARDFAULT "Mint.CREATE: result identity does not match the published DATA RW GT"
+TODO_CREATE_SLOT_RESERVATION:
+    HARDFAULT "Mint.CREATE: slot history does not match the reserved sequence"
+TODO_CREATE_SLOT_OCCUPIED:
+    HARDFAULT "Mint.CREATE: reserved Namespace slot is not empty"
+TODO_CREATE_PKVERIFY_NOT_APPROVED:
+    HARDFAULT "Mint.CREATE: PkVerify did not return APPROVED"
+TODO_CREATE_DESCRIPTOR_INPUT_INVALID:
+    HARDFAULT "Mint.CREATE: invalid allocator or slot-history input for descriptor"
+TODO_CREATE_DESCRIPTOR_RETIRED:
+    HARDFAULT "Mint.CREATE: selected slot is retired and cannot be allocated"
+TODO_CREATE_INPUT_CREDENTIAL_NULL:
+    HARDFAULT "Mint.CREATE: missing Passkey"
+TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL:
+    HARDFAULT "Mint.CREATE: DATA source CR4 must be NULL"
+TODO_CREATE_INPUT_CASE_NOT_DATA:
+    HARDFAULT "Mint.CREATE: only DATA case is implemented"
+TODO_CREATE_INPUT_PERMISSIONS_NOT_RW:
+    HARDFAULT "Mint.CREATE: DATA permissions must be READ/WRITE"
+TODO_CREATE_INPUT_ALLOCATION_ZERO:
+    HARDFAULT "Mint.CREATE: allocation size is zero"
+TODO_CREATE_INPUT_SIZE_NOT_POWER_TWO:
+    HARDFAULT "Mint.CREATE: allocation size is not a power of two"
+TODO_CREATE_ALLOCATOR_STATE:
+    HARDFAULT "Mint.CREATE: inconsistent allocator state"
+TODO_CREATE_POOL_EXHAUSTED:
+    HARDFAULT "Mint.CREATE: memory pool exhausted"
+TODO_CREATE_SLOTS_EXHAUSTED:
+    HARDFAULT "Mint.CREATE: free Namespace slots exhausted"
+TODO_CREATE_RESULT_COMPLETION:
+    HARDFAULT "Mint.CREATE: operation did not complete"
+TODO_CREATE_RESULT_NULL:
+    HARDFAULT "Mint.CREATE: result capability is NULL"
+TODO_CREATE_RESULT_NOT_RW:
+    HARDFAULT "Mint.CREATE: result lacks READ/WRITE permissions"
+TODO_CREATE_SLOT_CONFIRM_WORD0:
+    HARDFAULT "Mint.CREATE: Namespace location read-back mismatch"
+TODO_CREATE_SLOT_CONFIRM_WORD1:
+    HARDFAULT "Mint.CREATE: Namespace bounds/version read-back mismatch"
+TODO_CREATE_SLOT_CONFIRM_WORD2:
+    HARDFAULT "Mint.CREATE: Namespace integrity read-back mismatch"
+TODO_CREATE_SLOT_CONFIRM_WORD3:
+    HARDFAULT "Mint.CREATE: Namespace identity read-back mismatch"
+}
+method DESTROY(target: Inform[RW]) -> Void {
+DESTROY_inputs:
+destroy_inputs_after_clear:
+    IADD DR1, DR0, #0
+    ; Phase 1: PassKey input is ignored until the Phase 2 bitstream.
+    LOAD CR1, NULL
+    IADD DR1, DR0, #0
+    LOAD CR1, NULL
+    LOAD CR8, CR6, #1
+    DREAD DR3, CR8, #0, DR0
+    BFEXT DR3, DR3, #23, #4
+    IADD DR4, DR0, #64
+destroy_scan_size:
+    MCMP DR3, #0
+    BRANCHEQ destroy_scan_start
+    SHL DR4, DR4, #1
+    ISUB DR3, DR3, #1
+    BRANCH destroy_scan_size
+destroy_scan_start:
+    ISUB DR4, DR4, #1
+    LOAD CR10, CR6, #5
+    LOAD CR9, CR6, #2
+    IADD DR7, DR0, #2
+destroy_scan:
+    SHL DR13, DR7, #2
+    DREAD DR11, CR10, #3, DR13
+    MCMP DR11, #0
+    BRANCHEQ destroy_scan_next
+    BFEXT DR3, DR11, #25, #7
+    MCMP DR3, #89
+    BRANCHNE destroy_scan_next
+    BFINS DR11, DR0, #31, #1
+    DWRITE DR11, CR8, #0, DR4
+    LOAD CR11, CR9, #0
+    DWRITE DR0, CR8, #0, DR4
+    TPERM CR2, EXACT, CR11
+    BRANCHEQ destroy_scan_found
+destroy_scan_next:
+    IADD DR7, DR7, #1
+    BRANCH destroy_scan
+destroy_scan_found:
+    IADD DR2, DR7, #0
+    BFEXT DR4, DR2, #16, #16
+    MCMP DR4, #0
+    BRANCHNE destroy_v1_bad
+    MCMP DR2, #2
+    BRANCHLO destroy_v1_bad
+    IADD DR7, DR2, #0
+    SHL DR13, DR7, #2
+    LOAD CR10, CR6, #5
+    DREAD DR11, CR10, #3, DR13
+    BFEXT DR4, DR11, #25, #7
+    MCMP DR4, #89
+    BRANCHNE destroy_v1_bad
+    BFEXT DR4, DR11, #0, #16
+    MCMP DR4, DR7
+    BRANCHNE destroy_v1_bad
+    DREAD DR9, CR10, #1, DR13
+    BFEXT DR4, DR9, #30, #2
+    MCMP DR4, #0
+    BRANCHNE destroy_v1_bad
+    BFEXT DR6, DR9, #0, #21
+    IADD DR6, DR6, #1
+    BFEXT DR9, DR9, #21, #9
+    MCMP DR9, #511
+    BRANCHHS destroy_v1_bad
+    BFEXT DR4, DR11, #16, #9
+    MCMP DR4, DR9
+    BRANCHNE destroy_v1_bad
+    LOAD CR8, CR6, #1
+    DREAD DR12, CR8, #6, DR0
+    IADD DR12, DR12, DR7
+    DREAD DR4, CR8, #0, DR12
+    IADD DR3, DR9, #1024
+    MCMP DR4, DR3
+    BRANCHNE destroy_v1_bad
+    DREAD DR3, CR8, #0, DR0
+    BFEXT DR3, DR3, #23, #4
+    IADD DR4, DR0, #64
+destroy_v1_size:
+    MCMP DR3, #0
+    BRANCHEQ destroy_v1_compare
+    SHL DR4, DR4, #1
+    ISUB DR3, DR3, #1
+    BRANCH destroy_v1_size
+destroy_v1_compare:
+    ISUB DR4, DR4, #1
+    IADD DR3, DR11, #0
+    BFINS DR3, DR0, #31, #1
+    DWRITE DR3, CR8, #0, DR4
+    LOAD CR9, CR6, #2
+    LOAD CR11, CR9, #0
+    DWRITE DR0, CR8, #0, DR4
+    TPERM CR2, EXACT, CR11
+    BRANCHNE destroy_v1_bad
+    DREAD DR8, CR10, #0, DR13
+destroy_authorize:
+    LOAD CR1, CR6, #6
+    CALL CR1, #2
+    MCMP DR1, #1
+    BRANCHNE destroy_v1_bad
+destroy_body:
+    LOAD CR7, CR6, #1
+    LOAD CR10, CR6, #5
+    DREAD DR12, CR7, #6, DR0
+    IADD DR12, DR12, DR7
+    DREAD DR9, CR7, #0, DR12
+    BFEXT DR4, DR9, #10, #22
+    MCMP DR4, #1
+    BRANCHNE destroy_v1_bad
+    BFEXT DR9, DR9, #0, #9
+    IADD DR9, DR9, #1
+    MCMP DR9, #511
+    BRANCHHI destroy_v1_bad
+    DREAD DR14, CR7, #3, DR0
+    MCMP DR14, #7
+    BRANCHLS destroy_v1_bad
+    DREAD DR15, CR7, #4, DR0
+    MCMP DR14, DR15
+    BRANCHHI destroy_v1_bad
+    SHL DR13, DR7, #2
+    DREAD DR4, CR10, #1, DR13
+    BFINS DR4, DR9, #21, #9
+    DWRITE DR4, CR10, #1, DR13
+    DWRITE DR9, CR7, #0, DR12
+    DWRITE DR0, CR10, #0, DR13
+    DWRITE DR0, CR10, #2, DR13
+    DWRITE DR0, CR10, #3, DR13
+    DWRITE DR0, CR10, #1, DR13
+    LOAD CR1, CR6, #6
+    CALL CR1, #1
+    MCMP DR1, #1
+    BRANCHNE destroy_v1_bad
+    LOAD CR7, CR6, #1
+    DREAD DR12, CR7, #6, DR0
+    IADD DR12, DR12, DR7
+    DREAD DR9, CR7, #0, DR12
+    MCMP DR9, #511
+    BRANCHEQ destroy_finish
+    DREAD DR14, CR7, #3, DR0
+    ISUB DR14, DR14, #1
+    DWRITE DR7, CR7, #0, DR14
+    DWRITE DR14, CR7, #3, DR0
+destroy_finish:
+destroy_result:
+    LOAD CR1, NULL
+    MCMP DR1, #1
+    BRANCHNE TODO_DESTROY_RESULT_COMPLETION
+    TPERM CR1, NULL
+    BRANCHNE TODO_DESTROY_RESULT_NOT_NULL
+destroy_return:
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
+    IADD DR1, DR0, #0
+    RETURNAL #0
+
+destroy_v1_bad:
+    HARDFAULT "Mint.DESTROY V1: invalid, protected or non-owned target/state"
+
+TODO_DESTROY_INPUT_CREDENTIAL_NULL:
+    HARDFAULT "Mint.DESTROY: missing Passkey"
+TODO_DESTROY_PKVERIFY_NOT_APPROVED:
+    HARDFAULT "Mint.DESTROY: PkVerify did not return APPROVED"
+TODO_DESTROY_INPUT_TARGET_NULL:
+    HARDFAULT "Mint.DESTROY: target is NULL"
+TODO_DESTROY_INPUT_CR4_NOT_NULL:
+    HARDFAULT "Mint.DESTROY: CR4 must be NULL"
+TODO_DESTROY_INPUT_CR8_NOT_NULL:
+    HARDFAULT "Mint.DESTROY: CR8 must be NULL"
+TODO_DESTROY_RESULT_COMPLETION:
+    HARDFAULT "Mint.DESTROY: operation did not complete"
+TODO_DESTROY_RESULT_NOT_NULL:
+    HARDFAULT "Mint.DESTROY: result capability must be NULL"
+}
+method MakeOutform(target: Inform[RW]) -> Outform[RW] {
+    LOAD CR1, NULL
+    IADD DR1, DR0, #5
+    RETURNAL #0
+}
+method MakeInform(target: Outform[RW]) -> Inform[RW] {
+    LOAD CR1, NULL
+    IADD DR1, DR0, #5
+    RETURNAL #0
+}
+}

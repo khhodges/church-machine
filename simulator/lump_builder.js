@@ -229,12 +229,13 @@ function buildApiDefinition(result, words) {
     if (result.compactAbi) {
         // Reuse the existing import/identity validation and symbolic relocation
         // emitter, but never serialize the legacy method view as this ABI.
-        const declaration = buildApiDefinition({...result, compactAbi:undefined, methods:[]}, words);
+        const declaration = buildApiDefinition({...result, compactAbi:undefined, functionalContracts:undefined, methods:[]}, words);
         const imports = require('./lump-api-codec').encode(declaration, {
             cw:(words[0] >>> 10) & 8191, cc:words[0] & 255
         });
         const symbolic = buildSymbolicBinding(result);
         const api = {...result.compactAbi,
+            ...(result.functionalContracts ? {contracts:result.functionalContracts} : {}),
             ...(imports.imports ? {imports:imports.imports} : {}),
             ...(symbolic ? {symbolic_binding:symbolic} : {})};
         require('./lump-api-codec').expand(api, words);
@@ -251,6 +252,7 @@ function buildApiDefinition(result, words) {
     const methods = result.methods || [];
     const api = {
         name: result.abstractionName || '',
+        ...(result.functionalContracts ? {contracts:result.functionalContracts} : {}),
         language: result.language || 'assembly',
         returnConvention: { register: 'DR1', description: 'return value' },
         methods: [],

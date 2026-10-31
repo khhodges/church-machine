@@ -17,6 +17,15 @@ units, valid input meanings/constraints, effects, result guarantees, failures,
 and phase-specific authorization behavior. Do not silently change the approved
 ABI or saved LUMP while addressing this missing public contract.
 
+The user selected functional contracts first, deferring simpler calling syntax.
+Contracts are explicit author claims carried by the artifact, not inferred
+semantics or executable preconditions.
+
+**Why:** A third-party caller must receive the contract with the exact LUMP,
+but validating documentation cannot prove implementation behavior. Adding
+documentation changes artifact identity and requires an explicit new save;
+never retrofit it into immutable saved revisions or infer it from sidecars.
+
 The user clarified that the ABI would still include a PassKey, while Mint
 would ignore it until the Phase 2 bitstream supports Abstract-GT loading.
 The Phase 1 bitstream remains unchanged. Do not interpret this Phase 1 deferral
