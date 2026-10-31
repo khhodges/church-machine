@@ -184,6 +184,20 @@ description; use Mint's register-level contract to design that extension.
 The user requested minimum ABI size through one standardized register convention
 for all methods, rather than repeated per-method register assignments.
 
+Use a programmer-facing `PassKey Required` declaration rather than a
+`Standard1` calling-convention selector. The compiler owns one shared convention.
+
+**Why:** The user explicitly prefers the meaningful PassKey declaration and
+accepts recompilation with no backward compatibility once the upgraded compiler
+has been retested.
+
+**How to apply:** Plan a clean compiler/ABI-reader cutover, rejecting obsolete
+executable ABI formats rather than guessing or adapting them. Recompile affected
+callers and callees into new revisions; preserve historical bytes. This decision
+does not authorize immediate mass recompilation, publication, or board installation.
+The declaration expresses an authorization requirement, not proof that runtime
+PassKey verification occurred.
+
 **Why:** Repeated register maps inflate the embedded ABI and allow inconsistent
 calling conventions.
 
