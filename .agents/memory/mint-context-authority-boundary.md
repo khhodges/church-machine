@@ -147,6 +147,16 @@ agreement rather than using it to settle the FPGA contract.
 The LUMP's embedded public definition should be an ABI, not merely an API
 description; use Mint's register-level contract to design that extension.
 
+The user requested minimum ABI size through one standardized register convention
+for all methods, rather than repeated per-method register assignments.
+
+**Why:** Repeated register maps inflate the embedded ABI and allow inconsistent
+calling conventions.
+
+**How to apply:** Propose a versioned shared convention and encode only each
+method's signature differences. Specific registers, type codes, error values and
+compact record layouts remain proposals until reviewed.
+
 **Why:** The user explicitly requested an ABI carried by the LUMP.
 
 **How to apply:** Extend the single canonical embedded definition rather than
