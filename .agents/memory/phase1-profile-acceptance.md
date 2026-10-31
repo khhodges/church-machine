@@ -512,7 +512,13 @@ saved rather than a generated seed. Do not describe a server-saved document as
 including unsaved changes from another browser tab or origin.
 
 Primary subsequent priority is fault-free simulator operation with functional
-abstractions and GT coverage across all 17 approved Namespace entries.
+abstractions and GT coverage across the complete current Phase 1 Namespace.
+The earlier 17-entry baseline must not be treated as the current count.
+
+**Current scope correction (2026-10-31):** The user reports seeing 21 slots
+in the Phase 1 Namespace. Audit the actual selected layout rather than assuming
+the historical 17-entry set. Visible slots alone do not prove occupied,
+bound, installed, or operational entries.
 
 **Why:** Genesis explicitly redirected the work from persistence/isolated probes
 toward the complete working set, not merely a populated table or more checklist
@@ -526,7 +532,7 @@ separate. Do not suppress faults, substitute success stubs, or widen authority
 to satisfy the metric. Defer unrelated historical migration and hardware work.
 
 Mint must perform dynamic slot creation/registration and GT issuance during the
-integrated run. The 17 entries are the initial set, not a permanent occupancy cap.
+integrated run. The configured initial set is not a permanent occupancy cap.
 
 **Why:** Genesis explicitly clarified that Mint should function for “dynamic
 slot/GT create etc.” Static Namespace population is not the intended acceptance.
