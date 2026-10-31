@@ -3,6 +3,21 @@ name: Mint compiler upgrade scope
 description: Focused baseline rather than broad legacy-suite repair before ABI work
 ---
 
+## Phase 1 PassKey clarification
+
+The user clarified that the ABI would still include a PassKey, while Mint
+would ignore it until the Phase 2 bitstream supports Abstract-GT loading.
+The Phase 1 bitstream remains unchanged. Do not interpret this Phase 1 deferral
+as removing the PassKey from the ABI or changing the register layout.
+
+**Why:** The user corrected the proposal to remove the declared requirement;
+interface stability and temporary enforcement are separate decisions.
+
+**How to apply:** Clearly distinguish the retained PassKey interface from
+temporarily absent verification. Do not claim authorization was checked.
+The caller's Abstract-load limitation must also be addressed in the proposed
+test setup; ignoring proof inside Mint alone cannot prevent a pre-call fault.
+
 The user selected the existing four public Mint methods for the scaffold:
 CREATE, DESTROY, MakeOutform, MakeInform, not four separate creation methods.
 
