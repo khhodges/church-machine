@@ -142,6 +142,31 @@ assignments or helper conventions as agreed FPGA design. Separate existing
 hardware constraints from proposed software choices; adapt the IDE after
 agreement rather than using it to settle the FPGA contract.
 
+## Mint public return convention review
+
+Mint's public returned status should use DR1 = 0 for success and a nonzero
+error code for failure (the user's example is insufficient budget). Exact error
+numbers remain unassigned in this review.
+
+**Why:** The user corrected the proposed demonstration's DR1 = 1 success
+convention and asked that Mint follow the zero-success convention.
+
+**How to apply:** Reconcile public completion and caller checks before continuing
+the demonstration. Do not confuse an internal predicate/readiness flag with
+public return status, or convert machine hard faults into normal returns.
+This review does not authorize adding budget enforcement.
+
+The user also rejected overwriting the Mint E GT in CR1 with the result object.
+Separate target and result register roles in the proposed interface; the exact
+register assignment and preservation/RETURN contract still need joint review.
+
+**Why:** Reloadability from the C-list does not address the user's objection to
+overwriting the call-target register.
+
+**How to apply:** Do not silently retain the old CR1 input/output convention,
+or promise preservation merely by selecting another CALL operand. Review the
+callee's register use and RETURN behavior before implementation.
+
 ## Agreed FPGA slot location
 
 Namespace W0 receives the physical byte address of the allocated block,
