@@ -4798,5 +4798,391 @@
     "lump_version": 5,
     "compiled_at": 1793223168.5579479,
     "operation_id": "3e19af9f22a24292a50c0369b2de706b"
+  },
+  {
+    "token": "8abd848a",
+    "abstraction": "ide.Mint",
+    "filename": "ide.Mint.1.a3b3dfad.lump",
+    "lump_version": 4,
+    "compiled_at": 1793464411.6129107,
+    "operation_id": "1a627704-d92d-43c5-a807-347ef176a02c",
+    "output_variants": {
+      "api": {
+        "sha256": "d83a4f45f9916a1911881461adab3405839f2316aa0b0215bcab12f67e8be797",
+        "bytes": 4096,
+        "file_bytes": 1709,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/637412634f56580a85cee50cde19aa4ea88c55b6c3fa1af7cc1ddbcc7a2e7193/api?compressed=1"
+      },
+      "compact": {
+        "sha256": "28b2ec2c0a56fa96ca53ab9c46e3e69a93e02c8f4575b0f74a1e27603a962334",
+        "bytes": 32768,
+        "file_bytes": 5105,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/637412634f56580a85cee50cde19aa4ea88c55b6c3fa1af7cc1ddbcc7a2e7193/compact?compressed=1"
+      },
+      "full": {
+        "sha256": "11d35521455d3d621c2da4f3500ff2ea0b7b480d49a7f894f03bcd84175fb1e9",
+        "bytes": 32768,
+        "file_bytes": 5442,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/637412634f56580a85cee50cde19aa4ea88c55b6c3fa1af7cc1ddbcc7a2e7193/full?compressed=1"
+      }
+    },
+    "variant_primary_hash": "d83a4f45f9916a1911881461adab3405839f2316aa0b0215bcab12f67e8be797",
+    "variant_bundle_id": "637412634f56580a85cee50cde19aa4ea88c55b6c3fa1af7cc1ddbcc7a2e7193",
+    "variant_compiler_record": {
+      "binary_hash": "d83a4f45f9916a1911881461adab3405839f2316aa0b0215bcab12f67e8be797",
+      "source_hash": "c32e5b555453b0ea2b6c7b8a749d81285a923758f9181fcffa6f9ad941c4ee01",
+      "language": "javascript",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "d2f4d01569e81df2801a9d416923a5fa277f3b03df013a1c1bcd762da5903b3c",
+        "inputs": {
+          "language": "auto",
+          "_resolved_call_api_authorities": {
+            "ide.MintCleaner": {
+              "source": "embedded-binary",
+              "embedded": true,
+              "token": "d85192c0",
+              "selectedToken": "d85192c0",
+              "revision": "a3c09fb7ae2ff7e13a89adfcdbb20ec9ed326ff8cc4d5272cc107fce4776b8f2",
+              "selectedRevision": "a3c09fb7ae2ff7e13a89adfcdbb20ec9ed326ff8cc4d5272cc107fce4776b8f2",
+              "api": {
+                "name": "ide.MintCleaner",
+                "capabilities": [
+                  {
+                    "name": "SELF",
+                    "rights": [
+                      "E"
+                    ],
+                    "grants": [
+                      "E"
+                    ]
+                  },
+                  {
+                    "name": "ide.CleanerState",
+                    "canonical_leaf": "ide.CleanerState",
+                    "rights": [
+                      "R",
+                      "W"
+                    ],
+                    "grants": [
+                      "R",
+                      "W"
+                    ]
+                  },
+                  {
+                    "name": "ide.CleanerPool",
+                    "canonical_leaf": "ide.CleanerPool",
+                    "rights": [
+                      "R",
+                      "W"
+                    ],
+                    "grants": [
+                      "R",
+                      "W"
+                    ]
+                  }
+                ],
+                "symbolic_binding": {
+                  "calls": [],
+                  "dependencies": [
+                    {
+                      "name": "SELF",
+                      "rights": [
+                        "E"
+                      ],
+                      "relocation_row": 0,
+                      "symbolic_self": true
+                    },
+                    {
+                      "name": "ide.CleanerState",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "relocation_row": 1,
+                      "symbolic_self": false
+                    },
+                    {
+                      "name": "ide.CleanerPool",
+                      "rights": [
+                        "R",
+                        "W"
+                      ],
+                      "relocation_row": 2,
+                      "symbolic_self": false
+                    }
+                  ],
+                  "owner": "ide.MintCleaner",
+                  "schema": "church.symbolic-lump-binding/v1"
+                },
+                "methods": [
+                  {
+                    "name": "Allocate",
+                    "index": 0,
+                    "branchOffset": 4,
+                    "inputs": [],
+                    "returns": {
+                      "name": "result",
+                      "register": "DR1"
+                    }
+                  },
+                  {
+                    "name": "Release",
+                    "index": 1,
+                    "branchOffset": 111,
+                    "inputs": [],
+                    "returns": {
+                      "name": "result",
+                      "register": "DR1"
+                    }
+                  },
+                  {
+                    "name": "ValidateRelease",
+                    "index": 2,
+                    "branchOffset": 144,
+                    "inputs": [],
+                    "returns": {
+                      "name": "result",
+                      "register": "DR1"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "javascript"
+      },
+      "hardfault_sites": [
+        {
+          "offset": 357,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: result identity does not match the published DATA RW GT",
+          "method": "CREATE",
+          "sourceLine": 413
+        },
+        {
+          "offset": 358,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: slot history does not match the reserved sequence",
+          "method": "CREATE",
+          "sourceLine": 415
+        },
+        {
+          "offset": 359,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: reserved Namespace slot is not empty",
+          "method": "CREATE",
+          "sourceLine": 417
+        },
+        {
+          "offset": 360,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: PkVerify did not return APPROVED",
+          "method": "CREATE",
+          "sourceLine": 419
+        },
+        {
+          "offset": 361,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: invalid allocator or slot-history input for descriptor",
+          "method": "CREATE",
+          "sourceLine": 421
+        },
+        {
+          "offset": 362,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: selected slot is retired and cannot be allocated",
+          "method": "CREATE",
+          "sourceLine": 423
+        },
+        {
+          "offset": 363,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: missing Passkey",
+          "method": "CREATE",
+          "sourceLine": 425
+        },
+        {
+          "offset": 364,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: DATA source CR4 must be NULL",
+          "method": "CREATE",
+          "sourceLine": 427
+        },
+        {
+          "offset": 365,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: only DATA case is implemented",
+          "method": "CREATE",
+          "sourceLine": 429
+        },
+        {
+          "offset": 366,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: DATA permissions must be READ/WRITE",
+          "method": "CREATE",
+          "sourceLine": 431
+        },
+        {
+          "offset": 367,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: allocation size is zero",
+          "method": "CREATE",
+          "sourceLine": 433
+        },
+        {
+          "offset": 368,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: allocation size is not a power of two",
+          "method": "CREATE",
+          "sourceLine": 435
+        },
+        {
+          "offset": 369,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: inconsistent allocator state",
+          "method": "CREATE",
+          "sourceLine": 437
+        },
+        {
+          "offset": 370,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: memory pool exhausted",
+          "method": "CREATE",
+          "sourceLine": 439
+        },
+        {
+          "offset": 371,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: free Namespace slots exhausted",
+          "method": "CREATE",
+          "sourceLine": 441
+        },
+        {
+          "offset": 372,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: operation did not complete",
+          "method": "CREATE",
+          "sourceLine": 443
+        },
+        {
+          "offset": 373,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: result capability is NULL",
+          "method": "CREATE",
+          "sourceLine": 445
+        },
+        {
+          "offset": 374,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: result lacks READ/WRITE permissions",
+          "method": "CREATE",
+          "sourceLine": 447
+        },
+        {
+          "offset": 375,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace location read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 449
+        },
+        {
+          "offset": 376,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace bounds/version read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 451
+        },
+        {
+          "offset": 377,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace integrity read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 453
+        },
+        {
+          "offset": 378,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace identity read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 455
+        },
+        {
+          "offset": 530,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY V1: invalid, protected or non-owned target/state",
+          "method": "DESTROY",
+          "sourceLine": 625
+        },
+        {
+          "offset": 531,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: missing Passkey",
+          "method": "DESTROY",
+          "sourceLine": 628
+        },
+        {
+          "offset": 532,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: PkVerify did not return APPROVED",
+          "method": "DESTROY",
+          "sourceLine": 630
+        },
+        {
+          "offset": 533,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: target is NULL",
+          "method": "DESTROY",
+          "sourceLine": 632
+        },
+        {
+          "offset": 534,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: CR4 must be NULL",
+          "method": "DESTROY",
+          "sourceLine": 634
+        },
+        {
+          "offset": 535,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: CR8 must be NULL",
+          "method": "DESTROY",
+          "sourceLine": 636
+        },
+        {
+          "offset": 536,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: operation did not complete",
+          "method": "DESTROY",
+          "sourceLine": 638
+        },
+        {
+          "offset": 537,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: result capability must be NULL",
+          "method": "DESTROY",
+          "sourceLine": 640
+        }
+      ],
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "be3c7dc398251cd88d1240725c7357ffc3a4561220bff959c00fafa77d05299f"
+    }
   }
 ]

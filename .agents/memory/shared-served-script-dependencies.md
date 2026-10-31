@@ -18,6 +18,8 @@ module changes, and verify compilation using the scripts loaded by a browser.
 **Why:** Mint compiled and saved successfully in server tests while an existing
 editor still rejected typed imports using the older browser compiler. Local
 preflight can reject a source before it reaches the authoritative server.
+The user confirmed successful editor compilation/save after refreshing the
+script pins and reloading; server-only compilation was not sufficient evidence.
 
 **How to apply:** Run the existing browser-script freshness check/update and
 its regressions. An already-open tab still needs a reload to replace its
