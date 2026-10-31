@@ -151,22 +151,32 @@ slot number as an object selector, including a redundant slot alongside the GT.
 **Why:** The user explicitly rejected the proposed DESTROY slot argument:
 these methods must use a GT, "NOT (NEVER EVER) a slot#".
 
-**How to apply:** There is no scalar target argument. DESTROY's current ABI
-proposal uses CR2 for its target; the conversion methods use CR1 as below.
+**How to apply:** There is no scalar target argument. The ABI proposal uses
+CR2 for the target and CR1 for the always-required PassKey.
 Do not preserve the current implementation's
 slot-number input as architectural authority. Internal resolution must follow
 the GT's validated authority, not substitute bare slot identity.
 
-MakeOutform and MakeInform require only one input GT, the object being converted;
-do not add a separate Passkey argument.
+Every Mint method requires a PassKey, including MakeOutform and MakeInform.
+The conversion methods take one target-object GT in addition to that PassKey.
 
-**Why:** The user corrected the two-GT proposal: these methods "only need one
-GT not 2".
+**Why:** The user explicitly corrected the agent's interpretation with
+"A PassKey is always required!" The earlier "one GT not 2" must not be used to
+remove authorization from conversion methods.
 
-**How to apply:** Propose CR1 as object input and converted-object output, with
-no other capability or scalar arguments. The ABI must express a primary GT
-input, not require CR1 to be a Passkey for every method. Normal capability
-validation still applies. This does not change CREATE or DESTROY authorization.
+**How to apply:** Keep CR1 as PassKey input/result output and CR2 as the target
+object for the three object-targeting methods. Authorization is implicit in the
+shared calling convention rather than an optional per-method flag.
+
+Do not impose an always-zero DR4 input merely because current Mint methods
+do not use it.
+
+**Why:** The user challenged the unnecessary zero-input restriction. Register
+argument meaning and private-data cleanup on return are separate concerns.
+
+**How to apply:** Propose unused scalar inputs as ignored rather than zero-
+validated. Keep any output cleanup rule explicit and separate; do not infer
+preservation or reserved-register semantics from absence of an argument.
 
 The LUMP's embedded public definition should be an ABI, not merely an API
 description; use Mint's register-level contract to design that extension.
