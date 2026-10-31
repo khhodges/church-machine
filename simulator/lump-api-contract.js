@@ -298,7 +298,7 @@
     function parse(text, header) {
         return validate(parseJSON(text), header);
     }
-    const api = {validate, parse, serialize, extractContracts, validateContracts};
+    const api = {validate, parse, parseJSON, serialize, extractContracts, validateContracts};
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.LumpApiContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

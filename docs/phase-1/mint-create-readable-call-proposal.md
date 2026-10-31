@@ -5,6 +5,16 @@ on 2026-10-31. Implementation requires separate authorization.
 This is a design only. No compiler, ABI, saved v4, binding, RTL, BIT, or
 historical-artifact change is authorized or performed by this document.
 
+Implementation authorization was separately granted on 2026-10-31. The compiler
+now supports the opt-in form below in structured native method bodies. The
+original design approval above remains design-only; the later authorization
+covers compiler lowering and isolated tests, not saved artifacts, live bindings,
+RTL or BIT changes. Run `npm run test:mint-readable-calls` for focused acceptance.
+The compiler-owned version 1 record is fixed, not a caller-editable JSON input;
+its strict validator rejects duplicate keys and any deviation from that record.
+The existing selected-binary API snapshot supplies either the canonical tuple
+or its lossless typed inspection projection; contract prose is never consulted.
+
 ## Programmer-facing form
 
 ```text

@@ -1,6 +1,21 @@
 const FULL_ONLY_OPCODES = [4, 5, 7, 8, 9];
 const FULL_ONLY_OPCODE_NAMES = { 4: 'CHANGE', 5: 'SWITCH', 7: 'LAMBDA', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
 
+// Compiler-owned configuration, never loaded from functional-contract prose.
+const MINT_CREATE_WORDS_V1_JSON = `{
+  "schema":"mint-create-call","version":1,"syntax":"named-literal-statement",
+  "method":"CREATE",
+  "expectedTuple":[0,[["allocation",1],["permissions",1]],[2,"RW"]],
+  "inputs":{
+    "words":{"kind":"decimal-u32-literal","minimum":8,"maximum":2147483648,"powerOfTwo":true,"unit":"word32"},
+    "rights":{"kind":"enum","values":{"RW":3}}
+  },
+  "outputs":{
+    "allocation":{"input":"words","operation":"u32-or","constant":4},
+    "permissions":{"input":"rights","operation":"enum-value"}
+  }
+}`;
+
 function detectProfile(methods) {
     for (const m of methods) {
         if (!m.code) continue;
@@ -40,6 +55,115 @@ function detectProfileViolations(methods, manifest) {
 }
 
 class CLOOMCCompiler {
+    static _mintCreateRule(json = MINT_CREATE_WORDS_V1_JSON) {
+        const contract = typeof LumpApiContract !== 'undefined' ? LumpApiContract :
+            (typeof require === 'function' ? require('./lump-api-contract.js') : null);
+        if (!contract) throw new Error('Mint call adapter requires the strict JSON parser.');
+        const record = contract.parseJSON(json);
+        const expected = JSON.parse(MINT_CREATE_WORDS_V1_JSON);
+        const equal = (a, b) => {
+            if (a === b) return true;
+            if (!a || !b || typeof a !== 'object' || typeof b !== 'object' ||
+                    Array.isArray(a) !== Array.isArray(b)) return false;
+            const keys = Object.keys(a);
+            return keys.length === Object.keys(b).length &&
+                keys.every(k => Object.hasOwn(b, k) && equal(a[k], b[k]));
+        };
+        if (!equal(record, expected))
+            throw new Error('Unsupported or malformed mint-create-call rule; only the closed version 1 record is supported.');
+        return record;
+    }
+
+    _lowerReadableMintCalls(parsed, options, rom, errors) {
+        const adapters = parsed.callAdapters || [];
+        const enabled = new Set();
+        const authorities = options && options.callApiAuthorities || {};
+        let rule;
+        for (const adapter of adapters) {
+            try {
+                rule ||= CLOOMCCompiler._mintCreateRule();
+                const cap = parsed.capabilities.find(c => c.name === adapter.target);
+                const row = rom[adapter.target.toUpperCase()];
+                if (!parsed.adapterDeclaredImports.has(adapter.target) ||
+                        !cap || !Number.isInteger(row) || row < 1 || row > 31 ||
+                        !cap.rights || !cap.rights.includes('E'))
+                    throw new Error('Mint adapter target must be a declared executable C-list import.');
+                const a = Object.hasOwn(authorities, adapter.target) ? authorities[adapter.target] : null;
+                if (!a || !(a.embedded === true || a.source === 'embedded-binary' ||
+                        a.authority === 'embedded-binary') ||
+                        !a.token || !a.revision ||
+                        a.selectedToken !== a.token || a.selectedRevision !== a.revision)
+                    throw new Error('Mint adapter requires the exact selected embedded API with matching token and revision.');
+                const api = a.api || a.apiDefinition;
+                let tuple;
+                if (api && Array.isArray(api.methods)) {
+                    // Lossless typed-ABI projection supplied by the existing binary
+                    // reader. Check register placement as well as tuple semantics.
+                    const matches = api.methods.filter(m => m.name === 'CREATE');
+                    const m = matches.length === 1 && matches[0];
+                    const inputs = m && m.inputs;
+                    const output = m && m.returns;
+                    if (m && Array.isArray(inputs) && inputs.length === 2 &&
+                            inputs.every((p, i) => p.kind === 'value' && p.register === `DR${i + 2}`) &&
+                            output && output.kind === 'capability' && output.secure_type === 'Inform' &&
+                            output.register === 'CR1' && JSON.stringify(output.rights) === '["R","W"]') {
+                        tuple = [m.index, inputs.map(p => [p.name, 1]), [2, 'RW']];
+                    }
+                } else if (api && api.methods && Object.hasOwn(api.methods, 'CREATE')) {
+                    tuple = api.methods.CREATE;
+                }
+                if (!api || api.passkey !== 1 ||
+                        JSON.stringify(tuple) !== JSON.stringify(rule.expectedTuple))
+                    throw new Error('Mint adapter requires passkey: 1 and the exact CREATE(allocation: U32, permissions: U32) -> Inform[RW] tuple at selector 0.');
+                enabled.add(adapter.target);
+            } catch (error) {
+                errors.push({line: adapter.line, message: error.message});
+            }
+        }
+        for (const method of parsed.methods) {
+            method.body = method.body.flatMap(stmt => {
+                // Reserve named CREATE statements even with malformed casing or
+                // operands, so they can never fall through to WORD/expression code.
+                if (!/^\s*CALL\b.*\(/i.test(stmt.text)) return [stmt];
+                if (!/\.CREATE\b/i.test(stmt.text) && !/\b(?:words|rights)\s*:/i.test(stmt.text))
+                    return [stmt];
+                try {
+                    const match = stmt.text.trim().match(
+                        /^CALL\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\.CREATE\s*\(\s*words:\s*([0-9]+)\s*,\s*rights:\s*(RW)\s*\)\s*;$/);
+                    if (!match) throw new Error('Use CALL import.CREATE(words: decimalLiteral, rights: RW); with exactly these named arguments in order.');
+                    if (!enabled.has(match[1]))
+                        throw new Error(`Readable CREATE requires call_adapter ${match[1]}.CREATE = mint_create_words_v1; and its exact imported API.`);
+                    const words = BigInt(match[2]);
+                    if (words < BigInt(rule.inputs.words.minimum) ||
+                            words > BigInt(rule.inputs.words.maximum) || (words & (words - 1n)) !== 0n)
+                        throw new Error('CREATE words must be a power-of-two decimal literal from 8 through 2147483648.');
+                    const allocation = Number(words | BigInt(rule.outputs.allocation.constant));
+                    const permissions = rule.inputs.rights.values[match[3]];
+                    // Signed IADD immediates cannot hold the largest values. Build
+                    // from positive bytes using DR2 alone; CR1 is never touched.
+                    const instructions = [];
+                    if (allocation <= 8191) {
+                        instructions.push(`IADD DR2, DR0, #${allocation}`);
+                    } else {
+                        const bytes = [24, 16, 8, 0].map(shift => (allocation >>> shift) & 255);
+                        while (bytes[0] === 0) bytes.shift();
+                        instructions.push(`IADD DR2, DR0, #${bytes.shift()}`);
+                        for (const byte of bytes) {
+                            instructions.push('SHL DR2, DR2, #8');
+                            if (byte) instructions.push(`IADD DR2, DR2, #${byte}`);
+                        }
+                    }
+                    instructions.push(`IADD DR3, DR0, #${permissions}`,
+                        `CALL CR6[${match[1]}], #0`);
+                    return instructions.map(text => ({...stmt, text}));
+                } catch (error) {
+                    errors.push({line: stmt.lineNum + 1, message: error.message});
+                    return [];
+                }
+            });
+        }
+    }
+
     static _typedAbiSignature(params, returnType) {
         const tags = {Inform:2, Outform:3, Abstract:4};
         function type(text, output) {
@@ -316,6 +440,11 @@ class CLOOMCCompiler {
         for (let i = 0; i < lines.length; i++) {
             const code = lines[i].replace(/;.*$/, '').replace(/\/\/.*$/, '').trim();
             if (!code) continue;
+            // Named CREATE statements have stricter, fail-closed checks in the
+            // structured frontend. Do not parse their argument list as a native
+            // selector token (e.g. "CREATE(words:").
+            if (/^CALL\b.*\(/i.test(code) &&
+                    (/\.CREATE\b/i.test(code) || /\b(?:words|rights)\s*:/i.test(code))) continue;
             let match = code.match(/^ELOADCALL\s+[^,]+,\s*([^,\s]+)(?:\s*,\s*([^,\s]+))?/i);
             if (match) {
                 inspect(i + 1, match[1], match[2] || null, match[1]);
@@ -658,7 +787,9 @@ class CLOOMCCompiler {
             this.nativeCapabilityPredicates === true ||
             String(parsed.name || '').toUpperCase() === 'BANK';
 
+        parsed.adapterDeclaredImports = new Set(parsed.capabilities.map(c => c.name));
         const rom = this._buildROM(parsed.capabilities, capabilities || [], errors);
+        this._lowerReadableMintCalls(parsed, options, rom, errors);
         const methods = [];
         const manifest = [];
 
@@ -1823,7 +1954,8 @@ class CLOOMCCompiler {
             if (c === '/' && next === '*') { out += '  '; i++; block = true; continue; }
             const prefix = c === ';' ? source.slice(source.lastIndexOf('\n', i - 1) + 1, i).trim() : '';
             if ((c === '/' && next === '/') || (c === ';' &&
-                    (lineStart || /^[A-Z][A-Z0-9]*(?:\s|$)/.test(prefix)))) {
+                    (lineStart || (/^[A-Z][A-Z0-9]*(?:\s|$)/.test(prefix) &&
+                        !/^CALL\b.*\(/i.test(prefix))))) {
                 out += ' '; line = true; continue;
             }
             if (c === '"' || c === "'") quote = c;
@@ -1885,6 +2017,15 @@ class CLOOMCCompiler {
         let _commentBlockStart = -1; // start of consecutive // comment block preceding a method
         while (i < lines.length) {
             const line = lines[i].trim();
+            if (/^call_adapter\b/i.test(line)) {
+                const match = line.match(/^call_adapter\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\.CREATE\s*=\s*mint_create_words_v1\s*;$/);
+                result.callAdapters ||= [];
+                if (!match || result.callAdapters.some(a => a.target === match[1])) {
+                    errors.push({line:i + 1, message:'Invalid or duplicate call_adapter; use call_adapter import.CREATE = mint_create_words_v1;'});
+                } else result.callAdapters.push({target:match[1], line:i + 1});
+                i++;
+                continue;
+            }
             if (/^passkey\b/i.test(line)) {
                 if (line !== 'passkey required;' || result.passkeyRequired)
                     errors.push({line:i + 1, message:'Declare passkey required; exactly once at abstraction scope.'});

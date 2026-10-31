@@ -153,4 +153,4 @@
 - [W7 qualification method](w7-qualification-method.md) — reviewed route completeness and correct grants are separate obligations; fix claim nature before results and bind physical claims to installed bytes.
 - [Wukong operator identity](wukong-operator-device-identity.md) — user confirmed the same physical board; reuse its recorded operator UID, never infer identity from COM3.
 - [UART profile authority](uart-profile-installation-authority.md) — pin software-image compatibility to the installed BIT, not mutable hardware sources; keep flash approval separate.
-- [Readable Mint calls](mint-readable-call-approval.md) — literal word-count adapter design approved; implementation requires separate authorization.
+- [Readable Mint calls](mint-readable-call-approval.md) — bounded compiler implementation authorized; saved artifacts, live bindings and hardware remain outside approval.
