@@ -3,6 +3,19 @@ name: UART profile installation authority
 description: Pin UART software compatibility to the installed BIT, not today's mutable hardware checkout.
 ---
 
+The user accepts the existing BIT as a fixed bootstrap toward the CLOOMC++
+ABI LUMP compiler and future software, rather than requiring a new BIT for
+each compiler/ABI iteration.
+
+**Why:** The user described the BIT as a "stranded but adequate bootstrap to
+the future" after agreeing to distinguish software ABI changes from hardware
+changes.
+
+**How to apply:** Check new compiler output against the frozen BIT's actual
+instruction and image contracts. Use separately approved complete UART software
+images; do not claim the revised ABI is physically qualified yet. Hardware
+changes and updating the power-on image remain separately approved work.
+
 For a UART-only developer workflow, preserve the exact installed FPGA profile
 while allowing separately approved native software images to change. Do not
 rebuild hardware or reject its operator installation evidence solely because
