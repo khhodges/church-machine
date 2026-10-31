@@ -15,6 +15,16 @@ physical control test and reiterated “stay focused.”
 run. Keep display cleanup separate; do not convert investigation into permission
 to rebuild, change grants, install an image, or reset hardware.
 
+Acceptance also requires visible pre-attack execution history in the live event
+log. The user expects 1000 instructions before the programmed attack fault.
+
+**Why:** The user challenged treating the expected Mallory fault as sufficient
+evidence when the preceding instruction history was missing.
+
+**How to apply:** Check trace completeness independently of fault correctness.
+Distinguish instruction retirements from multi-event trace packet counts; never
+infer complete execution history merely from successful fault delivery.
+
 The user confirmed that slot 21 in the golden image is Amoeba and is the
 intended Boot CALL destination.
 
