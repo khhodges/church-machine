@@ -1787,7 +1787,7 @@ class CLOOMCCompiler {
                     errors.push({line: i + 1, message: 'Put abstraction contents on the following lines; trailing declaration text is not permitted.'});
                 result.name = absMatch[1];
                 i++;
-                i = this._parseAbstractionBody(lines, i, result, errors);
+                i = this._parseAbstractionBody(lines, i, result, errors, source.split('\n'));
                 for (; i < lines.length; i++)
                     if (lines[i].trim()) errors.push({line: i + 1, message: 'Unexpected source after the abstraction.'});
                 break;
@@ -1808,7 +1808,7 @@ class CLOOMCCompiler {
         return result;
     }
 
-    _parseAbstractionBody(lines, i, result, errors) {
+    _parseAbstractionBody(lines, i, result, errors, sourceLines = lines) {
         let _commentBlockStart = -1; // start of consecutive // comment block preceding a method
         while (i < lines.length) {
             const line = lines[i].trim();
@@ -1903,7 +1903,7 @@ class CLOOMCCompiler {
                     i++;
                 }
                 const _rawIsaMethod = { name: rawIsaMatch[1], rawIsa: rawWords, params: [], body: [], startLine: _rawIsaSrcStart, visibility, explicitVisibility, isMain: _isMain };
-                _rawIsaMethod.sourceLines = lines.slice(_rawIsaSrcStart, i).join('\n');
+                _rawIsaMethod.sourceLines = sourceLines.slice(_rawIsaSrcStart, i).join('\n');
                 result.methods.push(_rawIsaMethod);
                 continue;
             }
@@ -1962,7 +1962,7 @@ class CLOOMCCompiler {
                     }
                     i++;
                 }
-                method.sourceLines = lines.slice(_srcStart, i).join('\n');
+                method.sourceLines = sourceLines.slice(_srcStart, i).join('\n');
                 result.methods.push(method);
                 continue;
             }
@@ -2020,7 +2020,7 @@ class CLOOMCCompiler {
                     }
                     i++;
                 }
-                method.sourceLines = lines.slice(_srcStart, i).join('\n');
+                method.sourceLines = sourceLines.slice(_srcStart, i).join('\n');
                 result.methods.push(method);
                 continue;
             }

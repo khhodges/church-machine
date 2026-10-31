@@ -1,5 +1,21 @@
 # Pre-ABI baseline repair — incomplete
 
+## Focused baseline update
+
+The user approved narrowing this work to the Mint compiler path rather than
+requiring a clean legacy suite. Run `bash scripts/run-mint-compiler-baseline.sh`
+for the eight focused checks; all passed after the source-preservation repair.
+The structured parser had copied its comment-stripped lexical text into method
+source evidence. It now uses original source lines for that evidence while
+retaining the lexical text for parsing. A dedicated fixture checks comments,
+blank lines, local Mint C-list indexing, one-based wire dispatch, and retired
+instruction rejection.
+
+These checks establish the current baseline only. They do not certify the
+proposed universal PassKey ABI, register cleanup, new error conventions, or
+physical Mint execution. The historical failure inventory below remains for
+context; the source-preservation issue is now fixed.
+
 This repair precedes the proposed CLOOMC++ ABI change. It does not implement
 the new ABI, change hardware, or replace historical LUMPs.
 

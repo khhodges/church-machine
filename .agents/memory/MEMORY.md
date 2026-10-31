@@ -1,4 +1,5 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
+- [Mint compiler upgrade scope](mint-compiler-upgrade-scope.md) — focused current-ISA/Mint checks gate the upgrade, not unrelated legacy cleanup; baseline is not new-ABI acceptance.
 - [Runtime fault investigations](runtime-fault-change-approval.md) — explicit approval before NS21 fixes; linked replay guidance avoids false downstream faults.
 - [Mint DESTROY scope](mint-destroy-scope.md) — releases the Namespace slot and object memory; does not collect or erase GT copies.
 - [NULL capability loading](null-capability-loading.md) — loading NULL must discard destination authority; distinguish NULL as loaded data from NULL used to authorize access.
