@@ -296,7 +296,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 22
+BRIDGE_VERSION    = 23
 # Hold a complete bounded acceptance run while HTTPS catches up. This does
 # not promise unlimited recording; any overflow must be explicitly reported.
 TRACE_BACKLOG_CAPACITY = 8192
@@ -329,7 +329,8 @@ class Phase1FlowTrace:
     preserving raw GTs and server control/fault logic without a server restart.
     Names are operator-selected image-map metadata, never raw hardware proof.
     """
-    def __init__(self):
+    def __init__(self, calls_only=False):
+        self.calls_only = calls_only
         self.reset()
 
     def reset(self):
@@ -419,7 +420,16 @@ class Phase1FlowTrace:
         elif is_step and ev not in range(3, 12):
             text = 'STEP ' + text
         packet['gt_label'] = ('@phase1 event ' if terminal else '@phase1 part ') + text
+        # Still process CHANGE/RETURN above to track Thread context correctly.
+        # Filtering is presentation/delivery only; safety evidence always passes.
+        if self.calls_only and ev not in (6, 7, 8) and not (
+                packet.get('fault_valid') or packet.get('bp_hit') or is_step):
+            return False
         return True
+
+def boot_control_bytes(free_run, nonce):
+    """Explicit operator mode; never skip a fault or reset the board."""
+    return b'r' if free_run else b'h' + bytes([nonce])
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
@@ -1975,14 +1985,26 @@ def main():
     parser.add_argument('--phase1-golden', action='store_true',
                         help='Compact CALL/RETURN/CHANGE trace using the explicitly '
                              'selected a4acb0ef golden BIT map; single Namespace only.')
+    parser.add_argument('--calls-only', action='store_true',
+                        help='With --phase1-golden, display CALL transitions only; '
+                             'retain faults, breakpoints and deliberate Step evidence.')
+    parser.add_argument('--free-run', action='store_true',
+                        help='Run after each boot sentinel instead of sending automatic '
+                             'Halt. Does not bypass faults or breakpoints.')
     args = parser.parse_args()
+    if args.calls_only and not args.phase1_golden:
+        parser.error('--calls-only requires --phase1-golden')
 
     ide_base    = args.ide.rstrip('/')
     church_only = args.church_only
-    flow_trace = Phase1FlowTrace() if args.phase1_golden else None
+    flow_trace = Phase1FlowTrace(calls_only=args.calls_only) if args.phase1_golden else None
     if flow_trace:
-        print('[trace] Phase 1 CALL/RETURN/CHANGE; operator-selected BIT '
+        print('[trace] Phase 1 ' + ('CALL only' if args.calls_only else 'CALL/RETURN/CHANGE') +
+              '; operator-selected BIT '
               + PHASE1_BIT_SHA256 + '; not hardware attestation', flush=True)
+    if args.free_run:
+        print('[bridge] Free run after boot; automatic startup halt disabled; '
+              'faults and breakpoints still stop execution', flush=True)
     # This is host configuration because the UART trace protocol deliberately
     # has no UID field. Never derive identity from a serial path or truncate it.
     try:
@@ -2660,22 +2682,24 @@ def main():
                     startup_state = 'halt_failed'
                     try:
                         halt_nonce_counter = (halt_nonce_counter + 1) & 0xFF
-                        ser.write(b'h' + bytes([halt_nonce_counter]))
+                        ser.write(boot_control_bytes(args.free_run, halt_nonce_counter))
                         last_write_ts = time.time()
-                        pending_halt = {
+                        pending_halt = None if args.free_run else {
                             'command_id': None,
                             'automatic': True,
                             'requested_ts': last_write_ts,
                             'state_counter_at_write': state_counter,
                             'nonce': halt_nonce_counter,
                         }
-                        startup_state = 'halt_requested'
-                        print('  [boot] halt requested — awaiting board confirmation',
+                        startup_state = 'run_requested' if args.free_run else 'halt_requested'
+                        print('  [boot] run requested — automatic halt disabled' if args.free_run
+                              else '  [boot] halt requested — awaiting board confirmation',
                               flush=True)
                         _bridge_status(
-                            'automatic_halt_after_sentinel',
-                            'halt_requested',
-                            'halt written after boot sentinel; awaiting board evidence')
+                            'run_after_sentinel' if args.free_run else 'automatic_halt_after_sentinel',
+                            startup_state,
+                            'run written after boot sentinel; awaiting execution evidence' if args.free_run
+                            else 'halt written after boot sentinel; awaiting board evidence')
                     except Exception as exc:
                         print(f'  [halt send error] {exc}', flush=True)
                         _bridge_status(
@@ -2684,11 +2708,12 @@ def main():
                     # Do not send 'q' back-to-back with the sentinel.  Drain
                     # trace bytes already in flight before requesting a
                     # snapshot, or the snapshot can capture partial boot state.
-                    _boot_q_pending   = True
+                    _boot_q_pending   = not args.free_run
                     _boot_q_remaining = BOOT_TRACE_PACKET_COUNT
                     _boot_q_deadline  = time.time() + BOOT_Q_TIMEOUT
-                    print(f'  [boot] deferring snapshot until boot traffic '
-                          f'settles (timeout={BOOT_Q_TIMEOUT:.1f}s)', flush=True)
+                    if not args.free_run:
+                        print(f'  [boot] deferring snapshot until boot traffic '
+                              f'settles (timeout={BOOT_Q_TIMEOUT:.1f}s)', flush=True)
 
                     if sentinel['stale']:
                         if tu_version is None:

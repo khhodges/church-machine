@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from hardware.wukong_bridge import (
-    Phase1FlowTrace, PHASE1_MAP, PHASE1_IMAGE_SHA256,
+    Phase1FlowTrace, PHASE1_MAP, PHASE1_IMAGE_SHA256, boot_control_bytes,
 )
 
 
@@ -76,6 +76,35 @@ def test_missing_or_disagreeing_packets_never_invent_names():
     assert f.name(0x4a000063) == "unresolved"
     assert f.name(0x4a000015, threads=True) == "unresolved"
     assert f.object_at(0x100000) == "unresolved"
+
+
+def test_calls_only_tracks_hidden_changes_and_preserves_safety():
+    f = Phase1FlowTrace(calls_only=True)
+    for p in [event(3, 0x4210), event(4, 0x4210, 0x0200000c),
+              event(5, 0x4210, 0x3200000c)]:
+        assert not f.annotate(p)
+    labels = group(f, [event(6, 0x400c, 0x4a000011),
+                       event(7, 0x400c, 0x42000011), event(8, 0x400c)])
+    assert "CALL Boot.NS / Thread.3 / ide.MalloryDriver" in labels[-1]
+    for p in [event(9, 0x3a10), event(10, 0x3a10, 0x4a000011),
+              event(11, 0x3a10, 0x52000013)]:
+        assert not f.annotate(p)
+    assert not f.annotate(event(0, 0x4000))
+    fault = event(2, 0x3a08)
+    fault["fault_valid"] = True
+    assert f.annotate(fault) and "FAULT" in fault["gt_label"]
+    bp = event(0, 0x4000)
+    bp["bp_hit"] = True
+    assert f.annotate(bp)
+    f.step()
+    assert f.annotate(event(0, 0x4000))
+    f.reset()
+    assert f.calls_only and f.thread is None
+
+
+def test_free_run_is_run_not_reset_or_fault_skip():
+    assert boot_control_bytes(True, 17) == b"r"
+    assert boot_control_bytes(False, 17) == b"h\x11"
 
 
 def test_golden_map_against_exact_preserved_image():

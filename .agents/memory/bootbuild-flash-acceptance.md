@@ -90,6 +90,17 @@ spontaneous restarts.
 **How to apply:** Treat these two sequences as manual-reset observations,
 not evidence of a reset loop or autonomous reboot.
 
+The user subsequently requested continuous running with CALL-only trace.
+This authorizes removing the bridge's deliberate startup halt, not bypassing
+architectural faults or changing the installed golden image.
+
+**Why:** “Make it run without halting and trace calls only” narrows the earlier
+CALL/RETURN/CHANGE display request while preserving machine protection.
+
+**How to apply:** Process hidden CHANGE events to retain correct Thread names;
+retain fault and breakpoint evidence. Distinguish continuous run from a promise
+that the intentionally faulting Mallory program will execute indefinitely.
+
 **Why:** On 2026-10-31 the user explicitly added this requirement while reviewing the 21-slot Namespace fixes. Compiler, simulator, or volatile BIT-loading success does not close flash-image acceptance.
 
 The user clarified on 2026-10-31 that BootBuild.mcs had never been created and that the compiler had already been updated. They then explicitly corrected the proposed rebuild: convert the existing .bit into .mcs; do not recompile to perform this conversion.
