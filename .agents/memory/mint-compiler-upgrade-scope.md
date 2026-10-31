@@ -35,3 +35,15 @@ Mint argument types or new initializer/conversion behavior.
 **How to apply:** Match concrete Mint signatures to the selected implementation
 before implementation. Do not carry historical slot-number arguments, CR2
 PassKey placement or success=1 into the new approved convention.
+
+The user chose zero-initialized DATA first for CREATE on 2026-10-31.
+Use its existing allocation/permission scalar meanings in DR2/DR3 and return
+Inform RW; no initializer input in this slice, so CR2 is ignored.
+
+**Why:** This isolates the compiler ABI upgrade from adding initializer
+semantics. The choice does not authorize conversion implementation or broader
+object-type grants.
+
+**How to apply:** Follow the settled CREATE contract in
+`docs/phase-1/mint-abi-signature-review.md`; do not retain the old unused-input
+NULL checks or clear CR1 before preserving/verifying the incoming PassKey.
