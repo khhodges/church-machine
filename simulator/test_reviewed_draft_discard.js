@@ -21,6 +21,9 @@ const context = vm.createContext({localStorage, sessionStorage, window,
 vm.runInContext(src.slice(src.indexOf('function _discardReviewedLumpDraft('),
     src.indexOf('function _isRestoredSavedLumpOwner(')), context);
 const token = 'test/draft', reviewed = '\uFEFFold\r\n ', replacement = 'saved\n';
+const ownerKey = 'church_editor_owner_draft_v1:' +
+    encodeURIComponent(JSON.stringify({type:'lump', id:token}));
+localStorage.setItem(ownerKey, JSON.stringify(reviewed));
 localStorage.setItem('draft:test%2Fdraft', reviewed);
 localStorage.setItem('legacy:test/draft', reviewed);
 localStorage.setItem('draft:unrelated', reviewed);
@@ -32,6 +35,7 @@ window._editorNavigationBuffers['lump:test%2Fdraft'] = {source: reviewed};
 drafts['test%2Fdraft'] = reviewed;
 context._discardReviewedLumpDraft(token, reviewed, replacement);
 assert.equal(localStorage.getItem('draft:test%2Fdraft'), null);
+assert.equal(localStorage.getItem(ownerKey), null, 'owner recovery cannot resurrect discarded bytes');
 assert.equal(localStorage.getItem('legacy:test/draft'), null);
 assert.equal(localStorage.getItem('draft:unrelated'), reviewed);
 assert.equal(JSON.parse(localStorage.getItem('church_editor_document_v1')).code, replacement);
@@ -40,9 +44,11 @@ assert.equal(sessionStorage.getItem('cm_editor_navigation:lump:test%2Fdraft'), n
 assert.equal(drafts['test%2Fdraft'], undefined);
 assert.equal(window._editorNavigationBuffers['lump:test%2Fdraft'], undefined);
 localStorage.setItem('draft:test%2Fdraft', 'new');
+localStorage.setItem(ownerKey, JSON.stringify('new owner draft'));
 drafts['test%2Fdraft'] = 'new';
 context._discardReviewedLumpDraft(token, reviewed, replacement);
 assert.equal(localStorage.getItem('draft:test%2Fdraft'), 'new');
+assert.equal(JSON.parse(localStorage.getItem(ownerKey)), 'new owner draft');
 assert.equal(drafts['test%2Fdraft'], 'new');
 localStorage.setItem('draft:test%2Fdraft', reviewed);
 localStorage.removeItem = () => { throw new Error('storage denied'); };

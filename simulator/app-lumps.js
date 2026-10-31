@@ -5675,6 +5675,12 @@ function _discardReviewedLumpDraft(token, reviewed, replacement) {
         }
     };
     add(localStorage, _draftLsKey(token), value => value === reviewed);
+    // The editor's owner-scoped recovery store is independent of the LUMP
+    // draft key. Leaving these exact bytes behind makes navigation offer the
+    // deleted draft again.
+    add(localStorage, 'church_editor_owner_draft_v1:' +
+        encodeURIComponent(JSON.stringify({ type: 'lump', id: token })),
+        value => JSON.parse(value) === reviewed);
     const raw = String(token);
     // Lossy legacy keys cannot safely be attributed to this document.
     if (raw !== raw.replace(/[^a-z0-9]/gi, '')) {
@@ -9213,6 +9219,7 @@ async function openLumpInEditor(token, options) {
                     try {
                         const _savedDraft = _draftLsGet(token);
                         if (_savedDraft === null) {
+                            _draftBanner.remove();
                             report('No browser draft is currently stored. Nothing was deleted.');
                             return;
                         }
