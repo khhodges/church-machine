@@ -1336,6 +1336,22 @@
   })();
 
   function renderEvent(e) {
+    // Bridge-selected Phase 1 display metadata travels in the existing label
+    // field; raw event/GT fields remain unchanged for control and fault checks.
+    var flowLabel = typeof e.gt_label === 'string' ? e.gt_label : '';
+    if (flowLabel.indexOf('@phase1 part ') === 0) return;
+    if (flowLabel.indexOf('@phase1 event ') === 0) {
+      var flowTime = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : 'unknown time';
+      addLine('[' + flowTime + '] #' + e.seq + ' ' + flowLabel.slice(14) +
+        ' NIA=' + hex(e.nia) +
+        (e.fault_valid ? ' fault=' + (FAULT_NAMES[e.fault_code] || e.fault_code) : '') +
+        ' [selected golden image map]', e.fault_valid ? 'ev-fault' : 'ev-note');
+      if (e.nia !== undefined) {
+        lastTraceNia = Number(e.nia) >>> 0;
+        setCurrentNia(e.nia);
+      }
+      return;
+    }
     if (e.console !== undefined) {
       addLine(formatEvent(e), /WARNING|stale|mismatch/i.test(String(e.console)) ? 'ev-fault' : 'ev-uart');
       return;

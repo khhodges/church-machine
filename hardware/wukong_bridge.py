@@ -296,10 +296,130 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 21
+BRIDGE_VERSION    = 22
 # Hold a complete bounded acceptance run while HTTPS catches up. This does
 # not promise unlimited recording; any overflow must be explicitly reported.
 TRACE_BACKLOG_CAPACITY = 8192
+
+# Explicit operator-selected map for the preserved golden BIT, not a live
+# firmware attestation. Addresses are bytes, derived from its embedded NST.
+PHASE1_BIT_SHA256 = 'a4acb0ef9a39ba985d7769031cf146edb68fb65ff96e0b4f4a895093b54e5d4e'
+PHASE1_IMAGE_SHA256 = '5603d8e105e47ca0f6524e4553989387c088de19ac0e6b3f6fd9897e170cf16d'
+PHASE1_MAP = {
+    1: ('Boot.NS', 0x0, 255),
+    2: ('Boot.Thread', 0x400, 255),
+    6: ('ide.SelfTest', 0x800, 1023),
+    7: ('ide.WukongCallHome', 0x1800, 1023),
+    10: ('ide.CapabilityTest', 0x2800, 511),
+    11: ('Thread.2', 0x3000, 255),
+    12: ('Thread.3', 0x3400, 255),
+    16: ('ide.Alice', 0x3800, 127),
+    17: ('ide.Mallory', 0x3a00, 127),
+    18: ('ide.AliceDriver', 0x3c00, 255),
+    19: ('ide.MalloryDriver', 0x4000, 127),
+    20: ('ide.ActorManager', 0x4200, 255),
+    21: ('ide.AmoebaStartup', 0x4600, 255),
+}
+
+
+class Phase1FlowTrace:
+    """Single Namespace/board; track context before filtering UART events.
+
+    @phase1 part/event labels use the existing display-only gt_label channel,
+    preserving raw GTs and server control/fault logic without a server restart.
+    Names are operator-selected image-map metadata, never raw hardware proof.
+    """
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.thread = None
+        self.group = None
+        self.step_pending = False
+        self.step_nia = None
+
+    def step(self):
+        self.step_pending = True
+        self.step_nia = None
+
+    def name(self, gt, threads=False):
+        slot = int(gt or 0) & 0xffffff
+        row = PHASE1_MAP.get(slot)
+        if not row or (threads and slot not in (2, 11, 12)):
+            return 'unresolved'
+        return row[0]
+
+    def object_at(self, nia):
+        if nia in (0, 4, 8):
+            return 'Boot ROM'
+        for slot, (name, base, limit) in PHASE1_MAP.items():
+            if slot not in (1, 2, 11, 12) and base <= nia < base + 4 * (limit + 1):
+                return name
+        return 'unresolved'
+
+    def path(self, obj, thread=None):
+        return 'Boot.NS / ' + (thread or self.thread or 'unresolved') + ' / ' + obj
+
+    def snapshot(self, packet):
+        if packet.get('crc_valid') and packet.get('cr'):
+            self.thread = self.name(packet['cr'][12][0], threads=True)
+        if packet.get('reason') == 0:
+            self.step_pending = False
+            self.step_nia = None
+
+    def annotate(self, packet):
+        ev = packet['ev_type']
+        nia = packet['nia']
+        if self.step_pending and self.step_nia is None:
+            self.step_nia = nia
+        is_step = self.step_pending and self.step_nia == nia
+        keep = ev in range(3, 12) or packet.get('fault_valid') or packet.get('bp_hit') or is_step
+        if not keep:
+            return False
+        obj = self.object_at(nia)
+        text = self.path(obj)
+        terminal = ev not in range(3, 12)
+        if ev in (3, 6, 9):
+            kind = {3: 'CHANGE', 6: 'CALL', 9: 'RETURN'}[ev]
+            self.group = {'nia': nia, 'kind': kind, 'from': self.path(obj),
+                          'thread': self.thread or 'unresolved', 'target': 'unresolved',
+                          'next': ev + 1}
+            if ev == 6:
+                self.group['target'] = self.name(packet.get('payload_gt'))
+        elif self.group and self.group['nia'] == nia and self.group['next'] == ev:
+            self.group['next'] += 1
+            if ev == 4:
+                self.thread = self.name(packet.get('payload_gt'), threads=True)
+                self.group['target'] = self.thread
+            elif ev == 10:
+                self.group['target'] = self.name(packet.get('payload_gt'))
+            elif ev == 11:
+                # This BIT retains the callee E-GT in CR6 on RETURN; the
+                # restored CR14 is the observed caller continuation identity.
+                self.group['target'] = self.name(packet.get('payload_gt'))
+            elif ev == 7:
+                if self.group['target'] != self.name(packet.get('payload_gt')):
+                    self.group['target'] = 'unresolved'
+            if ev in (5, 8, 11):
+                terminal = True
+                g = self.group
+                destination = ('Boot.NS / ' + g['target'] if ev == 5
+                               else self.path(g['target']))
+                text = g['kind'] + ' ' + g['from'] + ' -> ' + destination
+                self.group = None
+        elif ev in range(3, 12):
+            self.group = None
+            if ev == 4:
+                self.thread = self.name(packet.get('payload_gt'), threads=True)
+            terminal = True
+            text = 'INCOMPLETE control-flow group; ' + self.path(obj)
+        if packet.get('fault_valid'):
+            terminal = True
+            text = 'FAULT ' + self.path(obj)
+        elif is_step and ev not in range(3, 12):
+            text = 'STEP ' + text
+        packet['gt_label'] = ('@phase1 event ' if terminal else '@phase1 part ') + text
+        return True
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
@@ -1852,10 +1972,17 @@ def main():
                              'instruction always pass through.  Dramatically reduces '
                              'trace volume for programs like SelfTest that execute '
                              'many arithmetic steps between Church-level operations.')
+    parser.add_argument('--phase1-golden', action='store_true',
+                        help='Compact CALL/RETURN/CHANGE trace using the explicitly '
+                             'selected a4acb0ef golden BIT map; single Namespace only.')
     args = parser.parse_args()
 
     ide_base    = args.ide.rstrip('/')
     church_only = args.church_only
+    flow_trace = Phase1FlowTrace() if args.phase1_golden else None
+    if flow_trace:
+        print('[trace] Phase 1 CALL/RETURN/CHANGE; operator-selected BIT '
+              + PHASE1_BIT_SHA256 + '; not hardware attestation', flush=True)
     # This is host configuration because the UART trace protocol deliberately
     # has no UID field. Never derive identity from a serial path or truncate it.
     try:
@@ -2145,6 +2272,8 @@ def main():
         We scan /dev/ttyUSB* on each attempt so the renumbered port is found.
         """
         nonlocal port, pending_halt
+        if flow_trace:
+            flow_trace.reset()
         if pending_halt is not None:
             pending_halt = None
             _bridge_status(
@@ -2296,6 +2425,8 @@ def main():
                         i += 1
                         continue
                     sync.lock('snapshot frame')
+                    if flow_trace:
+                        flow_trace.snapshot(decoded)
                     snapshot_counter += 1
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
@@ -2381,7 +2512,10 @@ def main():
                     # (no fault, no GT payload).  The frame is still consumed
                     # (i advances by TRACE_LEN) but nothing is forwarded to the
                     # IDE and nothing is printed to the terminal.
-                    if church_only and _is_turing_only_result(decoded):
+                    if flow_trace and not flow_trace.annotate(decoded):
+                        i += TRACE_LEN
+                        continue
+                    if not flow_trace and church_only and _is_turing_only_result(decoded):
                         i += TRACE_LEN
                         continue
                     # Queue pending ASCII first so console text and trace
@@ -2394,7 +2528,7 @@ def main():
                     location = _trace_location(decoded['nia'])
                     if location:
                         decoded.update(location)
-                    decoded['gt_label'] = (
+                    decoded['gt_label'] = decoded.get('gt_label') or (
                         _decode_gt_label(decoded.get('payload_gt', 0)) or ''
                         if decoded.get('ev_type') in _EV_HAS_GT_PAYLOAD else ''
                     )
@@ -2442,8 +2576,15 @@ def main():
                     else:
                         where = f"NIA=0x{nia:08X}"
                         instruction = "  <instruction unavailable>"
-                    print(f'[{ts_str}] HW: {where}{instruction}  {ev_name}{gt_str}'
-                          f'  flags={flag_str}{fault_str}{bp_str}')
+                    if flow_trace:
+                        label = decoded.get('gt_label', '')
+                        if label.startswith('@phase1 event '):
+                            print(f'[{ts_str}] HW: {label[14:]} '
+                                  f'NIA=0x{nia:08X}{fault_str}{bp_str} '
+                                  '[selected golden image map]', flush=True)
+                    else:
+                        print(f'[{ts_str}] HW: {where}{instruction}  {ev_name}{gt_str}'
+                              f'  flags={flag_str}{fault_str}{bp_str}')
                     if decoded.get('fault_valid'):
                         _bridge_status(
                             'fault_decoded', 'fault_hold',
@@ -2461,6 +2602,8 @@ def main():
                     if sentinel is False:
                         # Magic byte seen but not enough bytes buffered yet.
                         break
+                    if sentinel and flow_trace:
+                        flow_trace.reset()
                     if not sync.locked:
                         # Unaligned stream: only trust the sentinel to acquire
                         # the lock when its fields validate — sentinel magic
@@ -2703,6 +2846,11 @@ def main():
                                            'dequeued command target differs from bridge identity')
                             continue
                         if cmd in ('s', 'r', 'h', 'q', 'b', 'f', 'k'):
+                            if flow_trace and cmd == 's':
+                                flow_trace.step()
+                            elif flow_trace and cmd in ('r', 'f'):
+                                flow_trace.step_pending = False
+                                flow_trace.step_nia = None
                             if cmd == 'h':
                                 halt_nonce_counter = (
                                     halt_nonce_counter + 1) & 0xFF
@@ -2716,6 +2864,11 @@ def main():
                                                else state_counter),
                                 write_result=_command_write_result)
                         elif cmd == 'u':
+                            if flow_trace:
+                                print('[trace] golden map disabled before upload; '
+                                      'restart with the correct image selection '
+                                      'before using named tracing.', flush=True)
+                                flow_trace = None
                             try:
                                 _leftover = _handle_upload(
                                     data, ser, ide_base, verify_tls, session_id,
