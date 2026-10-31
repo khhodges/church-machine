@@ -41,6 +41,7 @@ if (require.main === module) {
     fs.writeFileSync(path.join(out, 'mint_stub.cloomc'), result.source);
     fs.writeFileSync(path.join(out, 'build.json'), JSON.stringify({
         purpose:'UNINSTALLED unsupported-operation scaffold; not operational Mint',
+        realPrototype:'Build separately with node scripts/build_mint_prototype_review.js; this stub contains neither CREATE allocation nor PkVerify',
         bytes:result.bytes.length, codeWords:result.cw,
         sha256:crypto.createHash('sha256').update(result.bytes).digest('hex'),
         methods:['CREATE','DESTROY','MakeOutform','MakeInform'],

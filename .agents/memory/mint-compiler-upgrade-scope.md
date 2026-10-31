@@ -11,6 +11,16 @@ PassKeys; do not claim this as an authorization implementation.
 
 **Why:** Explicit method-set selection and unsupported-status confirmation.
 
+The user explicitly requires reuse/review of the actual CREATE RW-GT prototype
+and inclusion of PkVerify, not substitution of the four denial stubs for it.
+
+**Why:** The stub-only test excluded the allocator and verification paths the
+user intended to test. Passing stub dispatch is not evidence for actual Mint.
+
+**How to apply:** Port the real CREATE and verification path together; preserve
+proof before clearing CR1 and distinguish old success=1 from new success=0.
+An exhausted-allocator authorization test does not prove successful creation.
+
 **How to apply:** Keep the scaffold isolated and uninstalled. Generate its ABI
 from the typed source; normal publication must not silently downgrade it to
 the old format. Preserve the original operational source during this test.

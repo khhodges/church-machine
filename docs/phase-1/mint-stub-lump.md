@@ -1,5 +1,25 @@
 # Isolated Mint stub LUMP
 
+## Review correction: this is not the existing CREATE prototype
+
+The stub deliberately returns unsupported and has no PkVerify import. It must
+not stand in for the real implementation when judging the compiler upgrade.
+`node scripts/build_mint_prototype_review.js` now packages the actual unchanged
+Mint, PkVerify, and MintCleaner sources and their compiled LUMPs in
+`generated-artifacts/mint-prototype-review/`. Their original API and exact
+source are embedded. `review.json` records hashes, dependencies and ABI gaps.
+
+This is an unlinked review package, not a port or a runnable installed service.
+PkVerify currently receives the proof in CR2 and trusted reference in CR3,
+and returns 1 for approval; Mint's old CREATE similarly uses success=1.
+The approved new ABI uses CR1 proof and zero success. Copying the old body
+under a new signature would clear the incoming PassKey and misreport status.
+The existing authorization fixture reaches an intentionally exhausted allocator;
+passing it is not successful RW allocation/zeroization/result issuance.
+
+Remaining integration work is explicitly recorded in the review report.
+Neither old-ABI prototypes nor new-ABI stubs establish new-ABI CREATE acceptance.
+
 Build: `node scripts/build_mint_stub_lump.js`
 
 Test: `node simulator/test_mint_stub_lump.js`
