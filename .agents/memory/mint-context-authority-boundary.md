@@ -144,6 +144,17 @@ agreement rather than using it to settle the FPGA contract.
 
 ## Mint public return convention review
 
+A one-time-use Passkey must be explicitly defined before it is used.
+Replacing a Passkey register with a result does not define or enforce one-time use.
+
+**Why:** The user required prior definition of any one-time-use Passkey while
+discussing CR1 as a possible proof-input/object-output register.
+
+**How to apply:** Do not infer consumption, revocation, retry behavior, or
+persistence semantics from register clearing or B=0. CR1 proof input remains a
+proposal, not an approved implementation; define and review single-use semantics
+separately if that feature is requested.
+
 Mint's public returned status should use DR1 = 0 for success and a nonzero
 error code for failure (the user's example is insufficient budget). Exact error
 numbers remain unassigned in this review.
