@@ -171,7 +171,13 @@ async function main() {
             const base = machine.words[descriptor];
             const cc = item.boundWords[0] & 255;
             assert(cc > 0);
-            assert.deepEqual(machine.words.slice(base+item.boundWords.length-cc, base+item.boundWords.length),
+            // Binding reports retain the editing artifact; preparation installs
+            // its API-only derivative, whose allocation can be smaller.
+            const installedHeader = machine.words[base] >>> 0;
+            const installedSize = 64 * (2 ** ((installedHeader >>> 23) & 15));
+            assert.equal(installedHeader >>> 27, 31, `NS${row.slot} installed LUMP header`);
+            assert.equal(installedHeader & 255, cc, `NS${row.slot} installed C-list count`);
+            assert.deepEqual(machine.words.slice(base+installedSize-cc, base+installedSize),
                 item.boundWords.slice(-cc), `complete NS${row.slot} C-list including SELF`);
         }
         assert.deepEqual([...schemas].sort(), ['church.portable-lump-binding/v1','church.symbolic-lump-binding/v1']);
