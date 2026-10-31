@@ -1,5 +1,9 @@
 # Isolated Mint stub LUMP
 
+The stub source lives at `tests/fixtures/mint_stub.cloomc`, outside the
+simulator source-catalog scan. It must not appear as a competing editable
+`ide.Mint` source beside the real CREATE/PkVerify prototype.
+
 ## Review correction: this is not the existing CREATE prototype
 
 The stub deliberately returns unsupported and has no PkVerify import. It must

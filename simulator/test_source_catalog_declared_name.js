@@ -23,6 +23,7 @@ const context = vm.createContext({
     } : []})
 });
 vm.runInContext(extract('_loadOpenFileCatalog') + '\n' +
+    extract('_groupOpenFileEntries') + '\n' + extract('_catalogDateText') + '\n' +
     extract('_renderOpenFileList'), context);
 (async () => {
     await context._loadOpenFileCatalog();

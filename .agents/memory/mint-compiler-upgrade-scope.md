@@ -5,6 +5,15 @@ description: Focused baseline rather than broad legacy-suite repair before ABI w
 
 The user selected the existing four public Mint methods for the scaffold:
 CREATE, DESTROY, MakeOutform, MakeInform, not four separate creation methods.
+
+Keep same-identity compiler fixtures outside the normal IDE source catalog.
+
+**Why:** Placing the isolated stub beside the real Mint source caused Open File
+to group both as ide.Mint, obscuring the distinction between prototype and stub.
+
+**How to apply:** Test-only sources belong under tests, not in the catalog's
+simulator scan tree. Never fix this by renaming a saved identity or replacing
+the user's owned editor draft.
 UNSUPPORTED_OPERATION is software status 5 with NULL CR1, not a new hardware
 fault or a successful operation. Stubs deny every call without validating
 PassKeys; do not claim this as an authorization implementation.

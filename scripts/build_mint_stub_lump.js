@@ -8,7 +8,7 @@ const Compiler = require('../simulator/cloomc_compiler');
 const {buildLump, embedSelfDefinition} = require('../simulator/lump_builder');
 const root = path.resolve(__dirname, '..');
 function build() {
-    const source = fs.readFileSync(path.join(root, 'simulator/cloomc/mint_stub.cloomc'), 'utf8');
+    const source = fs.readFileSync(path.join(root, 'tests/fixtures/mint_stub.cloomc'), 'utf8');
     const compiled = new Compiler().compile(source, []);
     assert.deepEqual(compiled.errors, []);
     const abi = compiled.compactAbi;

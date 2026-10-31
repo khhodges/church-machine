@@ -4237,6 +4237,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
         let html = '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Version History</div>';
+        html += `<div class="lump-history-retention">History for selected token ${e(token)}. “Current” identifies this token’s saved revision, not necessarily the newest revision of ${e(absName || 'this abstraction')}. Editor drafts and source files are separate until compiled and saved.</div>`;
         html += `<div class="lump-history-retention">Complete archives: keep 30 days and the three newest versions. Incomplete records expire after 3 days (file modification date if undated), including older top-three revisions. Current and referenced artifacts stay protected. Cleanup runs hourly and after approved saves. ` +
             `<button class="btn" onclick="_pruneLumpHistory('${e(token)}',this)">Delete expired archives…</button></div>`;
         html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">';

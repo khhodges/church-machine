@@ -17618,6 +17618,30 @@ def apply_bootstrap_history_repair(token, version):
         }), 409
 
 
+def _deduplicate_lump_history_entries(entries):
+    """Coalesce two discoveries of the same exact archive, never revisions.
+
+    Manifest-backed discoveries come last and retain their explicit locator.
+    Different bytes, versions, missing hashes, and current rows stay separate.
+    This changes presentation only; no archive or manifest is rewritten.
+    """
+    result = []
+    positions = {}
+    for entry in entries:
+        filename = entry.get("archive_filename")
+        binary_hash = entry.get("binary_hash")
+        if entry.get("current") or not filename or not binary_hash:
+            result.append(entry)
+            continue
+        key = (filename, entry.get("version"), binary_hash)
+        if key in positions:
+            result[positions[key]] = entry
+        else:
+            positions[key] = len(result)
+            result.append(entry)
+    return result
+
+
 @app.route("/api/lumps/<token>/history")
 def get_lump_history(token):
     """Return the current and archived versions for a LUMP token, newest-first.
@@ -17898,6 +17922,7 @@ def get_lump_history(token):
             except (TypeError, ValueError):
                 pass
 
+    entries = _deduplicate_lump_history_entries(entries)
     entries.sort(key=lambda e: e["version"], reverse=True)
     versions = {entry["version"] for entry in entries}
     retention_path = os.path.join(lumps_dir, "history-retention.json")
