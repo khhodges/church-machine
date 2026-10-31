@@ -919,8 +919,8 @@ function _loadOpenFileCatalog() {
                 path:'personal/' + t.name, id:t.id, lang:t.lang});
         });
         entries.sort(function(a,b) {
-            var sectionA = a.kind === 'lump' ? 0 : 1;
-            var sectionB = b.kind === 'lump' ? 0 : 1;
+            var sectionA = a.draft ? -1 : a.kind === 'lump' ? 0 : 1;
+            var sectionB = b.draft ? -1 : b.kind === 'lump' ? 0 : 1;
             return sectionA - sectionB ||
                 a.name.localeCompare(b.name, undefined, {sensitivity:'base'}) ||
                 (Number(b.date) || 0) - (Number(a.date) || 0) ||
@@ -984,7 +984,8 @@ function _renderOpenFileList(query) {
     var html = '<div class="of-catalog-actions"><button class="btn btn-sm" onclick="showNewTabDialog()">+ New Program</button></div>';
     groups.forEach(function(group) {
         var revisions = group.entries.filter(function(f) { return f.kind === 'lump'; });
-        html += '<details class="of-group"><summary class="of-group-title" style="cursor:pointer;display:list-item;margin-left:16px">' +
+        var expanded = (query || '').trim() || group.entries.some(function(f) { return f.draft; });
+        html += '<details class="of-group"' + (expanded ? ' open' : '') + '><summary class="of-group-title" style="cursor:pointer;display:list-item;margin-left:16px">' +
             _escHtml(group.name) + ' <span class="of-group-count">' +
             revisions.length + ' saved revisions · ' + (group.entries.length - revisions.length) +
             ' source entries</span></summary>';

@@ -41,5 +41,15 @@ vm.runInContext(extract('_loadOpenFileCatalog') + '\n' +
             abstraction:'ide.Mint', path:'simulator/drafts/mint_v4_integrated.cloomc'}
     ]);
     assert.equal(grouped.length, 2, 'explicit draft is separate from canonical Mint grouping');
+    context._openFileCache = [
+        {kind:'file', name:'mint_v4_integrated (draft)', draft:true,
+            abstraction:'ide.Mint', path:'simulator/drafts/mint_v4_integrated.cloomc'}
+    ];
+    for (const query of ['', 'mint_v4', 'ide.Mint']) {
+        context._renderOpenFileList(query);
+        assert.ok(list.innerHTML.includes('<details class="of-group" open>'),
+            'draft file must be visible without expanding a group: ' + query);
+        assert.ok(list.innerHTML.includes('openCatalogFile'));
+    }
     console.log('PASS: declared name and filename locate the editable source');
 })().catch(error => { console.error(error); process.exitCode = 1; });
