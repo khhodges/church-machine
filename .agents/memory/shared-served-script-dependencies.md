@@ -12,6 +12,17 @@ Declare shared UI dependencies explicitly in the served script manifest before e
 
 **How to apply:** When extracting browser logic into a shared module used by multiple classic scripts, add it explicitly to the page manifest, retain the project’s cache-version convention, and make one focused integration test load the relevant scripts by parsing that manifest.
 
+Refresh content-hashed script pins whenever a served compiler or shared API
+module changes, and verify compilation using the scripts loaded by a browser.
+
+**Why:** Mint compiled and saved successfully in server tests while an existing
+editor still rejected typed imports using the older browser compiler. Local
+preflight can reject a source before it reaches the authoritative server.
+
+**How to apply:** Run the existing browser-script freshness check/update and
+its regressions. An already-open tab still needs a reload to replace its
+in-memory compiler; do not overwrite the owned draft to fix compiler freshness.
+
 Classic-script top-level classes are global lexical bindings, not necessarily
 properties of `window`. Test browser consumers without CommonJS shims.
 
