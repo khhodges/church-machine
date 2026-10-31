@@ -16,6 +16,18 @@ the user-selected golden source. A filename or build number alone is insufficien
 designation is source-selection authority, not evidence that flash boot has
 passed or permission to program the board.
 
+On 2026-10-31 the user confirmed powering the board down before the subsequent
+power-on and physical Reset that produced the reported boot sentinel and Boot
+execution. The bridge had received no bytes before that Reset.
+
+**Why:** This operator-confirmed power boundary supports post-power-cycle
+operation; it must not be misreported as either reset-only testing or captured
+automatic startup without Reset.
+
+**How to apply:** Preserve separate claims for flash programming/verification,
+post-power-cycle execution after Reset, and still-unobserved initial power-on
+startup. A missed UART message alone does not establish a power-on failure.
+
 **Why:** On 2026-10-31 the user explicitly added this requirement while reviewing the 21-slot Namespace fixes. Compiler, simulator, or volatile BIT-loading success does not close flash-image acceptance.
 
 The user clarified on 2026-10-31 that BootBuild.mcs had never been created and that the compiler had already been updated. They then explicitly corrected the proposed rebuild: convert the existing .bit into .mcs; do not recompile to perform this conversion.
