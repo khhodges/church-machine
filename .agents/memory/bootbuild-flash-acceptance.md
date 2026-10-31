@@ -5,6 +5,16 @@ description: User-required physical acceptance of the Phase 1 BootBuild.mcs imag
 
 Phase 1 includes checking that `BootBuild.mcs` works on the FPGA.
 
+Keep this acceptance effort focused on the installed golden image and its
+physical controls; do not expand it into parallel IDE cleanup work.
+
+**Why:** The user explicitly rejected distracting follow-ups during the
+physical control test and reiterated “stay focused.”
+
+**How to apply:** Investigate faults only as needed to interpret this acceptance
+run. Keep display cleanup separate; do not convert investigation into permission
+to rebuild, change grants, install an image, or reset hardware.
+
 The user confirmed that slot 21 in the golden image is Amoeba and is the
 intended Boot CALL destination.
 
