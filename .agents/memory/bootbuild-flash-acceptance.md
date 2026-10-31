@@ -5,6 +5,16 @@ description: User-required physical acceptance of the Phase 1 BootBuild.mcs imag
 
 Phase 1 includes checking that `BootBuild.mcs` works on the FPGA.
 
+The user confirmed that slot 21 in the golden image is Amoeba and is the
+intended Boot CALL destination.
+
+**Why:** The IDE's older reference map labels the Boot CALL as SelfTest.
+That display label must not override the golden-image identity confirmed by
+the operator.
+
+**How to apply:** Distinguish raw slot/GT evidence from unverified disassembly
+names; do not propose changing the Boot target merely to match that label.
+
 The user explicitly designated the uploaded `amoeba-retry-a4acb0ef_1793472697960.bit`
 as the golden copy on 2026-10-31. Its SHA-256 is
 `a4acb0ef9a39ba985d7769031cf146edb68fb65ff96e0b4f4a895093b54e5d4e`.
