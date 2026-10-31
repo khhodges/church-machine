@@ -5,6 +5,18 @@ description: Keep synthetic context evidence distinct from granting Mint access 
 
 ## PkVerify responsibility
 
+The user clarified that the ISA permits an Abstract GT in any CR and EXACT
+compares GTn === GTm. The current Abstract-load rejection is an RTL
+implementation gap, not a Mint-specific type restriction.
+
+**Why:** Completing generic ISA behavior must not become a special PassKey
+register rule or an authorization bypass for Mint.
+
+**How to apply:** Preserve the complete GT when loading or transporting it,
+distinguish holding a GT from using it for an operation, and validate EXACT
+independently of cached location/limit fields. Review existing architectural
+register-write rules without inventing Abstract-only destination restrictions.
+
 PkVerify's sole objective is to establish that the caller is approved to execute
 the protected function—“No more no less.”
 
