@@ -151,10 +151,22 @@ slot number as an object selector, including a redundant slot alongside the GT.
 **Why:** The user explicitly rejected the proposed DESTROY slot argument:
 these methods must use a GT, "NOT (NEVER EVER) a slot#".
 
-**How to apply:** The standardized ABI proposal uses CR2 for the target GT and
-has no scalar target argument. Do not preserve the current implementation's
+**How to apply:** There is no scalar target argument. DESTROY's current ABI
+proposal uses CR2 for its target; the conversion methods use CR1 as below.
+Do not preserve the current implementation's
 slot-number input as architectural authority. Internal resolution must follow
 the GT's validated authority, not substitute bare slot identity.
+
+MakeOutform and MakeInform require only one input GT, the object being converted;
+do not add a separate Passkey argument.
+
+**Why:** The user corrected the two-GT proposal: these methods "only need one
+GT not 2".
+
+**How to apply:** Propose CR1 as object input and converted-object output, with
+no other capability or scalar arguments. The ABI must express a primary GT
+input, not require CR1 to be a Passkey for every method. Normal capability
+validation still applies. This does not change CREATE or DESTROY authorization.
 
 The LUMP's embedded public definition should be an ABI, not merely an API
 description; use Mint's register-level contract to design that extension.
