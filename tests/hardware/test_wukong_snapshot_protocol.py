@@ -203,14 +203,18 @@ def test_telemetry_queue_is_bounded_during_a_transport_outage(monkeypatch):
 
     monkeypatch.setattr(wb.requests, 'post', blocked_post)
     worker = wb.FaultDeliveryWorker('http://ide.test', True)
-    worker.submit('trace', {'nia': 0})
-    assert started.wait(1)
-    for nia in range(500):
-        worker.submit('trace', {'nia': nia})
-    assert worker._telemetry_jobs.qsize() <= worker._telemetry_jobs.maxsize
-    assert worker._telemetry_jobs.maxsize == 128
-    worker.close()
-    release.set()
+    try:
+        worker.submit('trace', {'nia': 0})
+        assert started.wait(1)
+        for nia in range(wb.TRACE_BACKLOG_CAPACITY + 1):
+            worker.submit('trace', {'nia': nia})
+        assert worker._telemetry_jobs.qsize() <= worker._telemetry_jobs.maxsize
+        assert worker._telemetry_jobs.maxsize == wb.TRACE_BACKLOG_CAPACITY
+        assert worker.telemetry_overflows == 1
+    finally:
+        worker.close()
+        release.set()
+        worker._thread.join(3)
 
 
 def test_active_fault_evidence_replaces_stale_critical_queue_entry():

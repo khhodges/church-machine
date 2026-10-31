@@ -527,7 +527,8 @@
     div.textContent = text;
     var stick = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 8;
     logEl.appendChild(div);
-    while (logEl.childNodes.length > 1500) logEl.removeChild(logEl.firstChild);
+    // A full acceptance run produces about 1900 trace packets plus notices.
+    while (logEl.childNodes.length > 8192) logEl.removeChild(logEl.firstChild);
     if (stick) logEl.scrollTop = logEl.scrollHeight;
   }
   function note(text) {

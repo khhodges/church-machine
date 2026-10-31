@@ -296,7 +296,10 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 20
+BRIDGE_VERSION    = 21
+# Hold a complete bounded acceptance run while HTTPS catches up. This does
+# not promise unlimited recording; any overflow must be explicitly reported.
+TRACE_BACKLOG_CAPACITY = 8192
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
@@ -1254,15 +1257,16 @@ class FaultDeliveryWorker:
         self.device_uid = device_uid
         self._registration_http_failure = None
         self._registration_http_log_at = 0.0
-        # Fault evidence has a small reserved lane. Ordinary telemetry is
-        # lossy by design during an outage: the most recent later trace/status
-        # is useful, but no backlog is worth starving a board-fault record.
+        # Fault evidence keeps its reserved lane, independent of trace bursts.
         self._fault_jobs = queue.Queue(maxsize=16)
-        self._telemetry_jobs = queue.Queue(maxsize=128)
+        self._telemetry_jobs = queue.Queue(maxsize=TRACE_BACKLOG_CAPACITY)
         self._fault_results = queue.Queue(maxsize=16)
         self._telemetry_results = queue.Queue(maxsize=128)
         self._fault_submit_lock = threading.Lock()
         self._stopped = threading.Event()
+        self._wake = threading.Event()
+        self.telemetry_overflows = 0
+        self.telemetry_delivery_failures = 0
         self._thread = threading.Thread(
             target=self._run, name='wukong-telemetry', daemon=True)
         self._thread.start()
@@ -1294,6 +1298,7 @@ class FaultDeliveryWorker:
     def close(self):
         """Stop after any in-flight bounded request; used by bridge shutdown/tests."""
         self._stopped.set()
+        self._wake.set()
 
     def wait_for_idle(self):
         """Wait until all submitted deliveries have produced a result.
@@ -1328,17 +1333,20 @@ class FaultDeliveryWorker:
             with self._fault_submit_lock:
                 try:
                     target.put_nowait((kind, payload, critical))
+                    self._wake.set()
                     return True
                 except queue.Full:
                     try:
                         target.get_nowait()
                         target.task_done()
                         target.put_nowait((kind, payload, critical))
+                        self._wake.set()
                         return True
                     except queue.Empty:
                         # The worker won the race; retry the nonblocking put.
                         try:
                             target.put_nowait((kind, payload, critical))
+                            self._wake.set()
                             return True
                         except queue.Full:
                             pass
@@ -1349,11 +1357,15 @@ class FaultDeliveryWorker:
             return False
         try:
             target.put_nowait((kind, payload, critical))
+            self._wake.set()
             return True
         except queue.Full:
-            # Never let a stalled IDE make the UART parser wait. Fault retries
-            # are resubmitted by the parser after a bounded delivery result;
-            # lower-priority telemetry may be dropped under sustained outage.
+            self.telemetry_overflows += 1
+            n = self.telemetry_overflows
+            if n == 1 or n & (n - 1) == 0:
+                print(f'  [TRACE INCOMPLETE] telemetry backlog full: {n} '
+                      'events rejected this session; IDE history is incomplete. '
+                      'UART reading and fault delivery remain active.', flush=True)
             return False
 
     def poll(self):
@@ -1369,17 +1381,17 @@ class FaultDeliveryWorker:
 
     def _run(self):
         while not self._stopped.is_set():
+            self._wake.clear()
             source = self._fault_jobs
             try:
-                # Wait briefly on the reserved lane rather than blocking on
-                # ordinary telemetry; a fault submitted just after this check
-                # must wake the worker promptly.
-                kind, payload, critical = self._fault_jobs.get(timeout=0.05)
+                # Faults take priority, without a 50ms tax on EVERY trace.
+                kind, payload, critical = self._fault_jobs.get_nowait()
             except queue.Empty:
                 source = self._telemetry_jobs
                 try:
                     kind, payload, critical = self._telemetry_jobs.get_nowait()
                 except queue.Empty:
+                    self._wake.wait(timeout=0.05)
                     continue
             try:
                 if kind == 'trace_fault':
@@ -1434,6 +1446,12 @@ class FaultDeliveryWorker:
                 # terminate telemetry delivery or the serial bridge.
                 print(f'  [{kind} delivery error] {exc}', flush=True)
                 reply = None
+            if kind == 'trace' and reply is None:
+                self.telemetry_delivery_failures += 1
+                n = self.telemetry_delivery_failures
+                if n == 1 or n & (n - 1) == 0:
+                    print(f'  [TRACE INCOMPLETE] {n} trace deliveries failed '
+                          'this session; IDE history is incomplete.', flush=True)
             result = {
                 'kind': kind, 'payload': payload, 'reply': reply}
             target = self._fault_results if critical else self._telemetry_results
