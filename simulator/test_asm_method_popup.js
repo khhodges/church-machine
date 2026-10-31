@@ -37,6 +37,7 @@ Object.assign(document, { body, readyState: 'loading', activeElement: el,
     createElement: () => new Element(), getElementById: () => null });
 const pending = [], requests = [];
 const sandbox = { document, window: { innerWidth: 1000, innerHeight: 800, getComputedStyle: () => ({ lineHeight: '16px' }) },
+    CLOOMCCompiler: require('./cloomc_compiler'),
     _currentEditorOwner: () => ({ id: sandbox.ownerId || 'first' }),
     Event: class { constructor(type) { this.type = type; } },
     fetch(url, options) {
@@ -124,5 +125,100 @@ async function answer(methods, target = 'Echo', extra = {}) {
     assert.match(rows()[0].textContent, /unavailable/);
     input('CALL Echo.'); await answer(['Wrong'], 'Echo', { revision: 'a', selectedRevision: 'b' });
     assert.match(rows()[0].textContent, /unavailable/);
+    const api = require('./lump-api-codec').expand({
+        name: 'ide.Mint', passkey: 1,
+        methods: {CREATE: [0, [['allocation', 1], ['permissions', 1]], [2, 'RW']]}
+    }, [(2 << 10) | 1, 2, 0]);
+    const exact = {token: '12345678', selectedToken: '12345678',
+        revision: 'a'.repeat(64), selectedRevision: 'a'.repeat(64), api};
+    const source = 'abstraction test.Caller {\ncapabilities { SELF E, ide.Mint E }\nmethod Run {\nCALL ide.Mint.\nRETURN\n}\n}';
+    const position = source.indexOf('\nRETURN');
+    input(source, position); await answer(['CREATE'], 'ide.Mint', exact);
+    assert.deepEqual(rows().map(r => r.textContent), ['CREATE', 'Insert readable CREATE template']);
+    assert.equal(el.value, source, 'display alone never enables the adapter');
+    key('Enter');
+    assert(!el.value.includes('call_adapter'), 'ordinary completion remains token-only');
+    await answer(['CREATE'], 'ide.Mint', exact);
+    input(source, position); await answer(['CREATE'], 'ide.Mint', exact);
+    key('ArrowDown'); key('Tab');
+    assert(el.value.includes('call_adapter ide.Mint.CREATE = mint_create_words_v1;'));
+    assert(el.value.includes('CALL ide.Mint.CREATE(words: 8, rights: RW);'));
+    assert.equal(new sandbox.CLOOMCCompiler().compile(el.value, [], {
+        callApiAuthorities: {'ide.Mint': {embedded: true, ...exact}}
+    }).errors.length, 0);
+    const insertedSource = el.value;
+    const activated = el.value.replace('CREATE(words: 8, rights: RW);', '');
+    input(activated, activated.indexOf('\nRETURN'));
+    await answer(['CREATE'], 'ide.Mint', exact);
+    rows()[1].dispatchEvent({type: 'mousedown', preventDefault() {}});
+    assert.equal((el.value.match(/call_adapter/g) || []).length, 1);
+    for (const invalid of [
+        {...exact, selectedRevision: undefined},
+        {...exact, api: {...api, passkey: 0}},
+        {...exact, api: {...api, methods: api.methods.map(m => ({...m, index: 1}))}},
+        {...exact, api: {methods: [{name: 'CREATE', contracts: {encoding: 'mint_create_words_v1'}}]}}
+    ]) {
+        input(source, position); await answer(['CREATE'], 'ide.Mint', invalid);
+        assert(!rows().some(r => r.textContent === 'Insert readable CREATE template'));
+    }
+    for (const invalidSource of [
+        source.replace('ide.Mint E', 'ide.Mint R'),
+        source.replace('SELF E, ide.Mint E', 'SELF E'),
+        'CALL ide.Mint.'
+    ]) {
+        input(invalidSource, invalidSource.includes('\nRETURN') ? invalidSource.indexOf('\nRETURN') : invalidSource.length);
+        await answer(['CREATE'], 'ide.Mint', exact);
+        assert(!rows().some(r => r.textContent === 'Insert readable CREATE template'));
+    }
+    input(source, position); await answer(['CREATE'], 'ide.Mint', exact);
+    sandbox.ownerId = 'third';
+    key('ArrowDown'); key('Enter');
+    assert.equal(el.value, source, 'stale owner cannot insert adapter');
+
+    // Execute the real normal Compile entry point through its preflight,
+    // server handoff and post-server authority check. Stop before unrelated
+    // artifact presentation/publication; no saved data is touched.
+    const reachedPresentation = new Error('reached artifact presentation');
+    let fresh = exact, serverExact = exact;
+    const compileRequests = [];
+    Object.assign(sandbox, {
+        cloomcCompiler: new sandbox.CLOOMCCompiler(),
+        switchCodeTab() {}, showNextSteps() {},
+        _activeCompileClistSlots: () => ({}),
+        _compileWithActiveClist: (text, caps, slots, authorities) =>
+            new sandbox.CLOOMCCompiler().compile(text, [], {callApiAuthorities: authorities}),
+        _compileCallApiBindings: () => [],
+        _readCompileJsonResponse: response => response.json(),
+        _clearAsmErrors() { throw reachedPresentation; },
+        fetch: async (url, options) => {
+            compileRequests.push(url);
+            if (url === '/api/compile/call-methods') return {ok: true, json: async () =>
+                ({call_api_authorities: {'ide.Mint': {embedded: true, ...fresh}}})};
+            if (url === '/api/compile') {
+                assert.equal(JSON.parse(options.body).source, insertedSource);
+                return {ok: true, json: async () => ({ok: true, words: [],
+                    compiler_record: {}, trust_origin: 'trusted-home-ide',
+                    call_api_authorities: {'ide.Mint': {embedded: true, ...serverExact}}})};
+            }
+            assert.equal(url, '/api/compile/attest');
+            return {ok: false, json: async () => ({})};
+        }
+    });
+    document.getElementById = id => id === 'asmEditor' ? el : null;
+    vm.runInContext(compile.slice(compile.indexOf('async function compileAndBuild('),
+        compile.indexOf('function auditLumpOnly(')), sandbox);
+    await assert.rejects(sandbox.compileAndBuild({source: insertedSource}), e => e === reachedPresentation);
+    assert.deepEqual(compileRequests, ['/api/compile/call-methods', '/api/compile', '/api/compile/attest']);
+    fresh = {...exact, selectedRevision: 'b'.repeat(64)};
+    compileRequests.length = 0;
+    let rejected = await sandbox.compileAndBuild({source: insertedSource});
+    assert.equal(rejected.ok, false);
+    assert.match(rejected.error, /exact selected embedded API/);
+    assert.deepEqual(compileRequests, ['/api/compile/call-methods']);
+    fresh = exact;
+    serverExact = {...exact, selectedRevision: 'b'.repeat(64)};
+    rejected = await sandbox.compileAndBuild({source: insertedSource});
+    assert.equal(rejected.ok, false, 'server snapshot is rechecked even after a valid preflight');
+    assert.match(rejected.error, /exact selected embedded API/);
     console.log('asm method popup: dot, filtering, keyboard/click, empty/unavailable, stale, aliases/collisions passed');
 })().catch(err => { console.error(err); process.exitCode = 1; });

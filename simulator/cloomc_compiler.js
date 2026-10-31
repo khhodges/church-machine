@@ -55,6 +55,15 @@ function detectProfileViolations(methods, manifest) {
 }
 
 class CLOOMCCompiler {
+    // Fixed editor template, not derived from descriptive contract text.
+    static readableMintCreateTemplate(target) {
+        if (!/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/.test(target)) return null;
+        return {
+            declaration: `call_adapter ${target}.CREATE = mint_create_words_v1;`,
+            statement: `CALL ${target}.CREATE(words: 8, rights: RW);`
+        };
+    }
+
     static _mintCreateRule(json = MINT_CREATE_WORDS_V1_JSON) {
         const contract = typeof LumpApiContract !== 'undefined' ? LumpApiContract :
             (typeof require === 'function' ? require('./lump-api-contract.js') : null);

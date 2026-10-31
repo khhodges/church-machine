@@ -89,10 +89,15 @@
     }
     function choose(i) {
         if (!current() || !items[i]) { hide(); return; }
-        var el = editor, ctx = snapshot.ctx, name = items[i].name;
+        var el = editor, ctx = snapshot.ctx, item = items[i], name = item.name;
         // Explicit selection is consent to this token-only edit, not to any
         // background source replacement or Namespace/repository mutation.
-        el.setRangeText(name, ctx.start, ctx.end, 'end');
+        if (item.readableEdit) {
+            el.setRangeText(item.readableEdit.value, 0, el.value.length, 'end');
+            el.selectionStart = el.selectionEnd = item.readableEdit.caret;
+        } else {
+            el.setRangeText(name, ctx.start, ctx.end, 'end');
+        }
         hide();
         el.dispatchEvent(new Event('input', { bubbles: true }));
         hide();
@@ -163,6 +168,15 @@
                 return m && typeof m.name === 'string' && /^[A-Za-z_]\w*$/.test(m.name) &&
                     m.name.toLowerCase().indexOf(ctx.filter.toLowerCase()) === 0;
             });
+            if (methods.some(function (m) { return m.name === 'CREATE'; }) &&
+                    typeof _readableMintCreateEdit === 'function') {
+                var edit = _readableMintCreateEdit(snapshot.value, ctx, authorities);
+                if (edit) methods.push({
+                    name: 'Insert readable CREATE template',
+                    signature: 'Opt in to mint_create_words_v1 · 8 words · RW',
+                    readableEdit: edit
+                });
+            }
             render(methods, a.api.methods.length ? 'No matching API methods.' : 'The embedded API declares no methods.');
         } catch (err) {
             if (requestId === generation && current()) render([], 'Exact selected LUMP API unavailable: ' + err.message);

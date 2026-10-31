@@ -881,6 +881,45 @@ function _sourceCallApiBindings(source) {
     }).filter(Boolean);
 }
 
+// This is only an edit proposal. Nothing is enabled until the user chooses it.
+// Compile the proposed source against the exact lookup snapshot, using the same
+// fail-closed adapter/import checks as an ordinary compile. Never read contracts.
+function _readableMintCreateEdit(source, ctx, authorities) {
+    if (typeof CLOOMCCompiler === 'undefined' || !ctx || ctx.collision) return null;
+    const template = CLOOMCCompiler.readableMintCreateTemplate(ctx.target);
+    if (!template) return null;
+    const bindings = _sourceCallApiBindings(source);
+    if (bindings.filter(b => b.petname === ctx.target).length !== 1) return null;
+    // Offer only a standalone native statement, not an expression or raw ASM.
+    const lineStart = source.lastIndexOf('\n', ctx.start - 1) + 1;
+    const prefix = source.slice(lineStart, ctx.start);
+    const call = prefix.match(/^(\s*)CALL\s+([A-Za-z_][\w.]*)\.$/);
+    if (!call || call[2] !== ctx.target) return null;
+    const tail = source.slice(ctx.end).match(/^[ \t]*;?/)[0];
+    const rest = source.slice(ctx.end + tail.length);
+    if (rest && !/^(?:\r?\n|[ \t]*(?:\/\/|;))/.test(rest)) return null;
+    let value = source.slice(0, lineStart) + call[1] + template.statement +
+        source.slice(ctx.end + tail.length);
+    let caret = lineStart + call[1].length + template.statement.length;
+    // The parser determines whether activation already exists; comments do not.
+    const compiler = new CLOOMCCompiler(), parseErrors = [];
+    const parsed = compiler._parseAbstraction(value, parseErrors);
+    if (parseErrors.length || !parsed.name) return null;
+    if (!(parsed.callAdapters || []).some(a => a.target === ctx.target)) {
+        const opening = value.match(/^\s*abstraction\s+[\w.]+\s*\{/m);
+        if (!opening) return null;
+        const offset = opening.index + opening[0].length;
+        const addition = '\n' + template.declaration + '\n';
+        value = value.slice(0, offset) + addition + value.slice(offset);
+        if (offset <= caret) caret += addition.length;
+    }
+    try {
+        const result = compiler.compile(value, [], {callApiAuthorities: authorities});
+        if (result.errors.length) return null;
+    } catch (_) { return null; }
+    return {value, caret};
+}
+
 // Auto-fill rights for capabilities with no declared rights, sourcing defaults
 // from the matching approved capability grants in _lumpsCache.  Mutates caps in place so that
 // downstream draft text and _checkCapAccessRights both see the filled rights.
@@ -1809,7 +1848,25 @@ async function compileAndBuild(options) {
 
     const _compileClistSlots = _activeCompileClistSlots();
     if (window.CompileProgress) window.CompileProgress.stage('Checking source and C-list references…');
-    let result = _compileWithActiveClist(source, [], _compileClistSlots);
+    let _preflightCallAuthorities;
+    if (/^\s*call_adapter\b/m.test(source)) {
+        try {
+            const response = await fetch('/api/compile/call-methods', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({call_api_bindings: _sourceCallApiBindings(source)})
+            });
+            if (!response.ok) throw new Error('API lookup failed (HTTP ' + response.status + ')');
+            const data = await response.json();
+            _preflightCallAuthorities = data.call_api_authorities || {};
+        } catch (error) {
+            const message = 'Cannot check call adapter API: ' + error.message +
+                '. No code was applied. Retry Compile when the API lookup is available.';
+            if (con) con.textContent = message;
+            showNextSteps('error');
+            return {ok: false, kind: 'cloomc', error: message};
+        }
+    }
+    let result = _compileWithActiveClist(source, [], _compileClistSlots, _preflightCallAuthorities);
 
     const _browserMethodAuthorityOnly = result.errors.length > 0 &&
         result.errors.every(error => /not a known method|No method conventions|Cannot encode CALL.*unresolved/i.test(
