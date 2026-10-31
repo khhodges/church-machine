@@ -71,6 +71,19 @@ checks from service and physical acceptance. The existing BIT stays fixed;
 RTL runs, builds, board changes, and historical LUMP replacement require
 separate approval. Continue step-by-step review of unresolved ABI choices.
 
+On 2026-10-31 the user explicitly approved **simulation only** for the isolated
+Mint v4 ChurchCore verification. This does not authorize RTL edits, synthesis,
+bitstream builds, board access, or live binding changes.
+
+**Why:** Permission to test the existing model must not become permission to
+change it when a required operation is unsupported.
+
+**How to apply:** Keep lifecycle acceptance blocked if execution faults before
+Mint entry. Negative scenarios must prove the intended service path was
+reached; a failed proof load or bootstrap is not successful rejection evidence.
+Keep compiled dispatch tables and use observation-only retirement stops, not
+software HALT assumptions, when adapting historical core fixtures.
+
 The user approved the conventions in
 `docs/phase-1/compact-mint-abi-proposal.md` on 2026-10-31: once-per-abstraction
 PassKey declaration, metadata codes 0–5, software status codes 0–5, and NULL CR1

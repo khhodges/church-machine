@@ -91,7 +91,7 @@ def provision(images, scenario):
     return mem, code
 
 
-def replay(images, scenario):
+def replay(images, scenario, *, stop_pc=None):
     mem, code = provision(images, scenario)
     before = mem.copy()
     core = ChurchCore(iot_profile=False)
@@ -143,7 +143,7 @@ def replay(images, scenario):
                         awaiting_return = False
                     if word >> 27 == 2:
                         awaiting_return = True
-                    if word == 0:
+                    if word == 0 or pc == stop_pc:
                         break
             pending = rd
             await ctx.tick()

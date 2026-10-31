@@ -36,16 +36,20 @@ for (const [name, body] of Object.entries({
     reuse:create + capture + destroy + create,
     wrongProof:create,
     exhaust:create,
-    stub: 'LOAD CR4, CR6, #1\nLOAD CR1, CR6, #2\nCALL CR4, #2',
+    stubOutform: 'LOAD CR4, CR6, #1\nCALL CR4, #2',
+    stubInform: 'LOAD CR4, CR6, #1\nCALL CR4, #3',
     stale:create + capture + destroy + destroy
 })) {
-    const words = compile(`abstraction test.V4 { capabilities { SELF E }
+    const words = compile(`abstraction test.V4 {
+capabilities { SELF E }
 method Run {
 ${body}
-HALT
+IADD DR0, DR0, #0
 }
 }`);
-    callers[name] = [words[0], ...words.slice(2)];
+    // Current boot CALL dispatches through selector one; retain the compiler's
+    // method table rather than the historical selector-zero fixture shortcut.
+    callers[name] = words;
 }
 console.log(JSON.stringify({mint:compile(candidate.source), verify:compile(candidate.verifier),
     cleaner:compile(fs.readFileSync('simulator/cloomc/mint_cleaner.cloomc','utf8')), callers}));

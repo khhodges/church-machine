@@ -36,7 +36,13 @@ def run(images, scenario, monkeypatch):
         return mem, code
 
     monkeypatch.setattr(harness, "provision", provision)
-    return harness.replay(images, scenario)
+    # Observation-only stop after the final native no-op retires. The software
+    # HALT pseudo-word is not a terminating instruction on this hardware model.
+    caller_words = images["callers"][scenario]
+    marker = 0xAF004000  # IADD DR0, DR0, #0, before the compiler's implicit RETURN
+    assert caller_words.count(marker) == 1
+    stop_pc = harness.CALLER + caller_words.index(marker) * 4
+    return harness.replay(images, scenario, stop_pc=stop_pc)
 
 
 def test_create_destroy_reuse(images, monkeypatch):
@@ -55,13 +61,25 @@ def test_create_destroy_reuse(images, monkeypatch):
 def test_rejected_calls(images, monkeypatch, scenario):
     result = run(images, scenario, monkeypatch)
     assert result["fault"] is not None
+    assert any(harness.MINT <= pc < harness.CLEANER for pc, _ in result["retired"]), \
+        "a bootstrap failure is not evidence of Mint rejecting a call"
+    assert len(result["returns"]) == (2 if scenario == "stale" else 0)
     if scenario != "stale":
         assert not result["returns"]
         assert all(result["mem"][harness.SLOT * 16 + i * 4] == 0 for i in range(4))
 
 
-def test_stub(images, monkeypatch):
-    result = run(images, "stub", monkeypatch)
+@pytest.mark.parametrize("scenario", ["stubOutform", "stubInform"])
+def test_stub(images, monkeypatch, scenario):
+    result = run(images, scenario, monkeypatch)
     assert result["fault"] is None
     assert result["returns"][0]["dr1"] == 5
     assert result["returns"][0]["cr1"] == (0, 0, 0)
+
+
+def test_current_abstract_clist_load_boundary(images, monkeypatch):
+    """Boundary evidence only: this must not count as lifecycle acceptance."""
+    from hardware.hw_types import FaultType
+    result = run(images, "reuse", monkeypatch)
+    assert result["fault"] == (FaultType.INVALID_OP, harness.CALLER + 12)
+    assert not any(harness.MINT <= pc < harness.CLEANER for pc, _ in result["retired"])

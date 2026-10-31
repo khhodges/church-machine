@@ -28,8 +28,16 @@ MintCleaner retains its internal contract, interpreted only inside Mint.
   descriptors and the ordinary compiler/builder path have focused checks.
 - An isolated server test exercises normal compile, finalization, reviewed save
   and exact-source reopening without assigning a Namespace slot.
-- Native lifecycle execution still requires qualification. The prepared core
-  simulation tests are not evidence until actually run and passed.
+- The isolated ChurchCore simulation was run with explicit simulation-only
+  approval. Both conversion stubs passed: DR1=5 and NULL CR1.
+- CREATE/DESTROY/reuse, wrong-proof, exhaustion, and stale-target acceptance
+  remain blocked. Each stops at the caller's Abstract PassKey C-list LOAD,
+  before Mint entry, with INVALID_OP (0x0B). The current mLoad Abstract branch
+  explicitly rejects that operation; no runtime or RTL bypass was introduced.
+- A separate boundary test confirms that pre-entry fault. Its passing result
+  is evidence of the blocker, not evidence that Mint rejects invalid requests.
+- Final core test result: three passed (two stubs and the boundary check),
+  four failed (the lifecycle acceptance cases). The candidate is not runtime-qualified.
 - No release or physical acceptance is claimed by compiler/save checks.
 
 The typed-import rejection was replaced with structural validation using the
