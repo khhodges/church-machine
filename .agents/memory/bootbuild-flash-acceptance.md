@@ -81,6 +81,15 @@ automatic startup without Reset.
 post-power-cycle execution after Reset, and still-unobserved initial power-on
 startup. A missed UART message alone does not establish a power-on failure.
 
+The user confirmed that both boot sequences in the 2026-10-31 v22 bridge
+log (17:51:59 and 17:52:26) followed manual resets.
+
+**Why:** Repeated sentinels alone cannot distinguish operator resets from
+spontaneous restarts.
+
+**How to apply:** Treat these two sequences as manual-reset observations,
+not evidence of a reset loop or autonomous reboot.
+
 **Why:** On 2026-10-31 the user explicitly added this requirement while reviewing the 21-slot Namespace fixes. Compiler, simulator, or volatile BIT-loading success does not close flash-image acceptance.
 
 The user clarified on 2026-10-31 that BootBuild.mcs had never been created and that the compiler had already been updated. They then explicitly corrected the proposed rebuild: convert the existing .bit into .mcs; do not recompile to perform this conversion.
