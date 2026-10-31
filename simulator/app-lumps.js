@@ -5131,6 +5131,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             _noPreview('Saved artifact identity does not match the requested revision');
             return;
         }
+        const savedPreviewData = data;
         let bindingContext = null, boundAvailable = false, boundView = false;
         const bindingIdentity = exactIdentity || {token:data.token || token, filename:data.filename,
             binary_hash:data.binary_hash, abstraction:data.abstraction};
@@ -5182,8 +5183,13 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                     ? inspection.api_definition.methods.length : 0
             });
         // Editing a separate draft does not approve or mutate this artifact.
-        const editablePreviewSource = !boundView &&
-            selectedCode.kind !== 'unavailable' ? selectedCode.text : '';
+        const editorCode = boundView ? _selectSavedLumpCodeDisplay(
+            savedPreviewData, _lumpBinaryInspection(savedPreviewData),
+            savedPreviewData.words || [], {
+                abstraction: savedPreviewData.abstraction || token,
+                token: savedPreviewData.token || token
+            }) : selectedCode;
+        const editablePreviewSource = editorCode.kind !== 'unavailable' ? editorCode.text : '';
         let sourcePreview = '';
         if (selectedCode.kind !== 'unavailable') {
             const displayedCode = selectedCode.text;
@@ -5203,9 +5209,6 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 (selectedCode.kind === 'embedded'
                     ? `<span class="lump-stored-src-ts">Embedded in the ${boundView ? 'bound derivative' : exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} binary</span>`
                     : `<span class="lump-source-unverified-warning" role="status">${e(selectedCode.warning)}</span>`) +
-                (editablePreviewSource
-                    ? `<button type="button" class="btn lump-history-open-editor" title="Open this preview text as a new editable draft. The immutable LUMP and boot selection are unchanged.">Open in Editor</button>`
-                    : '') +
                 `</div>` +
                 `<p class="lump-history-source-scroll-hint">Full source — ${displayedCode.split(/\r\n|\r|\n/).length} lines. Scroll inside the code below to read every line. Binary words follow underneath.</p>` +
                 `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre" tabindex="0" aria-label="Full source for version ${version}; scroll to read all lines" aria-readonly="${selectedCode.readOnly ? 'true' : 'false'}">${
@@ -5367,22 +5370,26 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                     currentToken, archiveFilename, isCurrent, exactIdentity, mode);
         }
         if (exactIdentity) document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-close')?.focus();
-        const openEditorButton = document.querySelector(
-            '#lumpHistoryPreviewModal .lump-history-open-editor');
+        const previewTitle = document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-title');
+        previewTitle.querySelector('.lump-history-preview-close').insertAdjacentHTML('beforebegin',
+            `<button type="button" class="btn lump-history-open-editor" ${editablePreviewSource ? '' : 'disabled'}
+                title="${editablePreviewSource ? 'Open this exact saved version as an editable draft; existing drafts are preserved.' : 'No editable source or reconstructed assembly is available for this version.'}">Open in Code Editor</button>`);
+        const openEditorButton = previewTitle.querySelector('.lump-history-open-editor');
         if (openEditorButton && editablePreviewSource) {
             const record = _lumpsCache.find(item => item.token === (currentToken || token));
-            const name = (record && record.abstraction) || token;
+            const name = savedPreviewData.abstraction || (exactIdentity && exactIdentity.abstraction) ||
+                (record && record.abstraction) || token;
             // Capture the exact preview response, never resolve a token again:
             // normal opening may redirect it to a different current revision.
-            openEditorButton.addEventListener('click', () => {
+            openEditorButton.addEventListener('click', async () => {
                 try {
-                    _openLumpHistorySourceInEditor(
+                    await _openLumpHistorySourceInEditor(
                         editablePreviewSource, name, version, {
                             token: (exactIdentity && exactIdentity.token) ||
-                                data.token || (isCurrent ? currentToken : token),
-                            filename: data.filename || archiveFilename,
-                            binary_hash: data.binary_hash,
-                            abstraction: data.abstraction || name
+                                savedPreviewData.token || (isCurrent ? currentToken : token),
+                            filename: savedPreviewData.filename || archiveFilename,
+                            binary_hash: savedPreviewData.binary_hash,
+                            abstraction: savedPreviewData.abstraction || name
                         });
                 } catch (error) {
                     alert(error.message);

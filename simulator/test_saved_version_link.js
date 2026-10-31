@@ -14,6 +14,8 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     let mismatch = false;
     w._savedLumpEditorMode = true;
     w._escHtml = s => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;');
+    w._fmtEscape = w._escHtml;
+    w._highlightCLOOMCSource = w._escHtml;
     w._lumpBinaryInspection = () => ({});
     // This navigation test does not exercise reconstruction; its synthetic
     // words intentionally have no source payload.
@@ -49,6 +51,33 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
         w.document.getElementById('lumpHistoryPreviewModal').textContent);
     assert(w.document.getElementById('lumpHistoryPreviewModal').textContent.includes('exact saved revision'));
     assert.equal(w.document.getElementById('asmEditor').value, 'unsaved work');
+    assert(w.document.querySelector('.lump-history-preview-title .lump-history-open-editor').disabled,
+        'header action explains unavailable source rather than substituting latest');
+    w._lumpsCache = [{token: identity.token, abstraction: 'Wrong latest name'}];
+    const opened = [];
+    w._openLumpHistorySourceInEditor = async (...args) => { opened.push(args); };
+    w._selectSavedLumpCodeDisplay = data => ({kind:'embedded',
+        text: data.boundPreview ? 'bound derivative text' : 'exact saved source'});
+    w.NamespaceDesignV1 = {bindingPreview: async () => ({
+        profile:'Test Namespace', slot:9, generation:0, reason:'Not activated',
+        item:{words:[0xf8000000, 1], rows:[], status:'bound', derivativeHash:'b'.repeat(64)}
+    })};
+    // Binding verification has its own tests; exercise both UI modes here.
+    w._verifyBoundPreview = async () => true;
+    for (const mode of ['bound', 'saved']) {
+        await w._lumpHistoryPreview(identity.token, 98, null, null, null, '',
+            true, identity.token, identity.filename, true, identity, mode);
+        const action = w.document.querySelector('.lump-history-preview-title .lump-history-open-editor');
+        assert(action && !action.disabled, mode + ': ' +
+            w.document.getElementById('lumpHistoryPreviewModal').textContent);
+        action.click(); await tick();
+        const [text, name, version, saved] = opened.at(-1);
+        assert.equal(text, 'exact saved source', 'never edit localized derivative bytes');
+        assert.equal(name, 'SelfTest');
+        assert.equal(version, 98);
+        assert.equal(saved.filename, identity.filename);
+        assert.equal(saved.binary_hash, identity.binary_hash, 'retain original seal, not bound seal');
+    }
     mismatch = true;
     link.click(); await tick(); await tick();
     assert(w.document.getElementById('lumpHistoryPreviewModal').textContent.includes('does not match'));
