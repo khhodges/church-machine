@@ -5,6 +5,18 @@ description: Focused baseline rather than broad legacy-suite repair before ABI w
 
 ## Phase 1 PassKey clarification
 
+Public Mint method descriptions must tell a third-party programmer what the
+operation does and how to use it without reading its implementation. Raw U32
+arguments and capability types alone are not a complete functional contract.
+
+**Why:** The user explicitly challenged CREATE(allocation: U32, permissions:
+U32) as implementation detail that does not explain what callers should do.
+
+**How to apply:** Distinguish ABI validity from API usability. Document purpose,
+units, valid input meanings/constraints, effects, result guarantees, failures,
+and phase-specific authorization behavior. Do not silently change the approved
+ABI or saved LUMP while addressing this missing public contract.
+
 The user clarified that the ABI would still include a PassKey, while Mint
 would ignore it until the Phase 2 bitstream supports Abstract-GT loading.
 The Phase 1 bitstream remains unchanged. Do not interpret this Phase 1 deferral
