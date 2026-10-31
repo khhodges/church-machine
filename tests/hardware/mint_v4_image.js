@@ -12,7 +12,7 @@ function compile(source) {
 }
 const create = `
 LOAD CR4, CR6, #1
-LOAD CR1, CR6, #2
+LOAD CR1, NULL
 IADD DR2, DR0, #12
 IADD DR3, DR0, #3
 CALL CR4, #0
@@ -25,7 +25,7 @@ DWRITE DR4, CR9, #0, DR0
 `;
 const destroy = `
 LOAD CR4, CR6, #1
-LOAD CR1, CR6, #2
+LOAD CR1, NULL
 LOAD CR2, CR6, #3
 LOAD CR2, CR2, #0
 IADD DR2, DR0, #123
@@ -33,8 +33,9 @@ CALL CR4, #1
 `;
 const callers = {};
 for (const [name, body] of Object.entries({
-    reuse:create + capture + destroy + create,
-    wrongProof:create,
+    reuse:create + capture + '\nIADD DR4, DR0, #123\nDWRITE DR4, CR1, #0, DR0\n' + destroy + create,
+    ignoredInput:create.replace('LOAD CR1, NULL', 'LOAD CR1, CR6, #1'),
+    abstractBoundary:create.replace('LOAD CR1, NULL', 'LOAD CR1, CR6, #2'),
     exhaust:create,
     stubOutform: 'LOAD CR4, CR6, #1\nCALL CR4, #2',
     stubInform: 'LOAD CR4, CR6, #1\nCALL CR4, #3',

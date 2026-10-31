@@ -18,6 +18,13 @@ temporarily absent verification. Do not claim authorization was checked.
 The caller's Abstract-load limitation must also be addressed in the proposed
 test setup; ignoring proof inside Mint alone cannot prevent a pre-call fault.
 
+The user approved proceeding with this Phase 1 deferral. Preserve the
+PassKey-enabled candidate for Phase 2; Phase 1 verification must explicitly
+demonstrate ignored input, not report wrong-proof rejection as a requirement.
+
+**Why:** A stable ABI declaration is not evidence of enforced authentication
+during the explicitly approved interim phase.
+
 The user selected the existing four public Mint methods for the scaffold:
 CREATE, DESTROY, MakeOutform, MakeInform, not four separate creation methods.
 

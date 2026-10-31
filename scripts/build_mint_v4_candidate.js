@@ -75,7 +75,7 @@ destroy_scan_found:
     // Strip stale ABI prose inherited from the old source; native bodies and
     // hard-fault reasons remain. New public conventions are stated once.
     const stripComments = text => text.split('\n').filter(line => !line.trim().startsWith(';')).join('\n');
-    const source = `; Mint v4 candidate — uninstalled, not hardware-qualified.
+    const phase2Source = `; Mint v4 candidate — uninstalled, not hardware-qualified.
 ; CR1 PassKey; CREATE DR2 allocation/DR3 permissions; DESTROY CR2 target.
 ; DR1=0 success; CR1 result or NULL. Conversion stubs return DR1=5.
 ; Paired Cleaner-managed lifecycle, inherited from the newer Mint implementation.
@@ -90,6 +90,18 @@ ${method(scaffold,'MakeOutform','MakeInform')}
 ${method(scaffold,'MakeInform')}
 }
 `;
+    let source = phase2Source;
+    for (const operation of ['CREATE', 'DESTROY']) {
+        source = replace(source,
+            `    LOAD CR3, CR6, #7\n${newVerify}\n    BRANCHNE TODO_${operation}_PKVERIFY_NOT_APPROVED`,
+            '    ; Phase 1: PassKey input is ignored until the Phase 2 bitstream.\n    LOAD CR1, NULL');
+    }
+    source = source.replace(
+        '; Requires the companion v4 PkVerify candidate, never the older verifier.',
+        '; PHASE 1: PassKey ABI retained; verification deferred to the Phase 2 bitstream.\n; No proof/reference loads or verifier calls. Imported verifier/reference rows are unused.');
+    source = source.replace(
+        '; Execution acceptance is pending: compile/save tests are not runtime qualification.',
+        '; Isolated software validation only; no live installation or physical qualification.');
     const verifier = `; Internal Mint verifier: CR1 proof, CR3 trusted reference supplied by Mint.
 ; Native EXACT enforces authority. DR1=0 match, DR1=1 mismatch.
 ; CR2 is preserved for Mint DESTROY; no proof is returned as a result.
@@ -111,7 +123,7 @@ verify_return:
     const packed = builder.buildLump(compiled);
     const api = builder.buildApiDefinition(compiled, packed.words);
     const words = builder.embedSelfDefinition(packed.words, api, source, 2);
-    return {source, verifier, compiled, api, words};
+    return {source, phase2Source, verifier, compiled, api, words};
 }
 if (require.main === module) {
     const candidate = build();
@@ -124,11 +136,14 @@ if (require.main === module) {
     if (fs.existsSync(verifierPath) &&
             crypto.createHash('sha256').update(fs.readFileSync(verifierPath)).digest('hex') !== recorded.verifierSourceSha256)
         throw Error('Verifier draft has changed; refusing to replace edits.');
+    const phase2Path = 'simulator/drafts/mint_v4_phase2.cloomc';
+    if (!fs.existsSync(phase2Path))
+        fs.writeFileSync(phase2Path, candidate.phase2Source, {flag:'wx'});
     fs.writeFileSync(dest, candidate.source);
     fs.writeFileSync(verifierPath, candidate.verifier);
     recorded.previousDraftSourceSha256 = recorded.draftSourceSha256;
     recorded.draftSourceSha256 = crypto.createHash('sha256').update(candidate.source).digest('hex');
-    recorded.status = 'ABI candidate: compile/save round-trip verified; execution acceptance pending';
+    recorded.status = 'Phase 1 candidate: PassKey ABI retained; verification deferred to Phase 2 bitstream';
     recorded.verifierSourceSha256 = crypto.createHash('sha256').update(candidate.verifier).digest('hex');
     fs.writeFileSync('simulator/drafts/mint_v4_provenance.json', JSON.stringify(recorded, null, 2) + '\n');
     console.log('Generated uninstalled ABI candidate and companion verifier; no live LUMPs changed.');

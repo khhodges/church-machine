@@ -6,6 +6,7 @@ const candidate = require('../scripts/build_mint_v4_candidate').build();
 const draft = fs.readFileSync('simulator/drafts/mint_v4_integrated.cloomc', 'utf8');
 const provenance = JSON.parse(fs.readFileSync('simulator/drafts/mint_v4_provenance.json'));
 assert.equal(draft, candidate.source);
+assert.equal(fs.readFileSync('simulator/drafts/mint_v4_phase2.cloomc', 'utf8'), candidate.phase2Source);
 assert.equal(fs.readFileSync('simulator/drafts/pkverify_v4.cloomc','utf8'), candidate.verifier);
 assert.equal(crypto.createHash('sha256').update(draft).digest('hex'), provenance.draftSourceSha256);
 assert.equal(provenance.savedRevision, false);

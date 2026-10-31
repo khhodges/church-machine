@@ -7,6 +7,15 @@ The exact source and provenance are retained separately from immutable LUMPs.
 
 ## Included
 
+**Phase 1 exception:** The PassKey declaration and CR1 ABI remain unchanged,
+but Mint ignores the input until the Phase 2 bitstream. No proof/reference
+loads or PkVerify calls execute in this candidate. Tests enter with NULL CR1
+and separately confirm that an unrelated input value is ignored, not verified.
+The verifier and reference import rows remain declared but unused.
+The PassKey-enabled source is preserved separately as `mint_v4_phase2.cloomc`;
+it is not approved for Phase 1 execution. Callable-capability authority and
+the existing operational checks remain, without additional PassKey approval.
+
 - The newer paired Cleaner-managed CREATE/DESTROY implementation, as approved
   for lifecycle consistency instead of mixing v3's older allocator with newer DESTROY.
 - Proposed MakeOutform and MakeInform stubs: NULL CR1, status 5, normal return.
@@ -28,16 +37,13 @@ MintCleaner retains its internal contract, interpreted only inside Mint.
   descriptors and the ordinary compiler/builder path have focused checks.
 - An isolated server test exercises normal compile, finalization, reviewed save
   and exact-source reopening without assigning a Namespace slot.
-- The isolated ChurchCore simulation was run with explicit simulation-only
-  approval. Both conversion stubs passed: DR1=5 and NULL CR1.
-- CREATE/DESTROY/reuse, wrong-proof, exhaustion, and stale-target acceptance
-  remain blocked. Each stops at the caller's Abstract PassKey C-list LOAD,
-  before Mint entry, with INVALID_OP (0x0B). The current mLoad Abstract branch
-  explicitly rejects that operation; no runtime or RTL bypass was introduced.
-- A separate boundary test confirms that pre-entry fault. Its passing result
-  is evidence of the blocker, not evidence that Mint rejects invalid requests.
-- Final core test result: three passed (two stubs and the boundary check),
-  four failed (the lifecycle acceptance cases). The candidate is not runtime-qualified.
+- Seven isolated ChurchCore checks pass for Phase 1: CREATE/DESTROY/reuse,
+  exhaustion, stale-target rejection, both conversion stubs (status 5 and
+  NULL CR1), ignored PassKey input, and the unchanged Abstract-load fault boundary.
+- These are compiled-instruction tests in privately provisioned memory, not
+  physical-board or installed-image acceptance. Wrong-proof authentication
+  testing is deferred because Phase 1 deliberately performs no authentication.
+- The Phase 2 candidate remains blocked by the Abstract C-list LOAD fault.
 - No release or physical acceptance is claimed by compiler/save checks.
 
 The typed-import rejection was replaced with structural validation using the

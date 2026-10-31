@@ -7,10 +7,10 @@
   "baseSourceSha256": "9fe720d7e596c00f5e1d3c2a24df9ccc0efb13ef6cf1c8f38b6bef5ad3cef9c6",
   "newerSourceSha256": "47cec77dacb8fb6005aca60d20c6ca7f3e749fd5b403f452d321878588e2d103",
   "stubSourceSha256": "78c2cdaa2c8a030bcfd7b1f67af230aeaced6443493bc951190e3d738a3a9c4f",
-  "draftSourceSha256": "8252563650261f2030445f5b9dc2c42f37909fbbec71258797ce647f50c4cfa1",
-  "status": "ABI candidate: compile/save round-trip verified; execution acceptance pending",
+  "draftSourceSha256": "c32e5b555453b0ea2b6c7b8a749d81285a923758f9181fcffa6f9ad941c4ee01",
+  "status": "Phase 1 candidate: PassKey ABI retained; verification deferred to Phase 2 bitstream",
   "savedRevision": false,
   "installed": false,
-  "previousDraftSourceSha256": "dbe316dd8507677ec05218c4bf94fc489dc3adccea254fb78004c02d99ca2e9f",
+  "previousDraftSourceSha256": "fa00c3657ff5e3b68c6d6cdbd4c48fcadce4ede7030e0f99ccbf5bc99467ae84",
   "verifierSourceSha256": "8970e7bd41a91f4861ddb56fcbeb541daa5189f7131750a6599481322e0fb6d8"
 }

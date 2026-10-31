@@ -2,8 +2,9 @@
 ; CR1 PassKey; CREATE DR2 allocation/DR3 permissions; DESTROY CR2 target.
 ; DR1=0 success; CR1 result or NULL. Conversion stubs return DR1=5.
 ; Paired Cleaner-managed lifecycle, inherited from the newer Mint implementation.
-; Execution acceptance is pending: compile/save tests are not runtime qualification.
-; Requires the companion v4 PkVerify candidate, never the older verifier.
+; Isolated software validation only; no live installation or physical qualification.
+; PHASE 1: PassKey ABI retained; verification deferred to the Phase 2 bitstream.
+; No proof/reference loads or verifier calls. Imported verifier/reference rows are unused.
 abstraction ide.Mint {
 passkey required;
 capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.MintV4Verifier E, ide.MintNamespace RW, ide.MintCleaner E, ide.MintApproval LS }
@@ -33,11 +34,8 @@ create_data_power_loop:
     SHR DR7, DR7, #1
     BRANCH create_data_power_loop
 create_data_authorize:
-    LOAD CR3, CR6, #7
-    LOAD CR4, CR6, #4
-    CALL CR4, #0
-    MCMP DR1, #0
-    BRANCHNE TODO_CREATE_PKVERIFY_NOT_APPROVED
+    ; Phase 1: PassKey input is ignored until the Phase 2 bitstream.
+    LOAD CR1, NULL
     IADD DR1, DR0, #0
     LOAD CR1, NULL
     BRANCH create_v1_allocate
@@ -460,11 +458,8 @@ method DESTROY(target: Inform[RW]) -> Void {
 DESTROY_inputs:
 destroy_inputs_after_clear:
     IADD DR1, DR0, #0
-    LOAD CR3, CR6, #7
-    LOAD CR4, CR6, #4
-    CALL CR4, #0
-    MCMP DR1, #0
-    BRANCHNE TODO_DESTROY_PKVERIFY_NOT_APPROVED
+    ; Phase 1: PassKey input is ignored until the Phase 2 bitstream.
+    LOAD CR1, NULL
     IADD DR1, DR0, #0
     LOAD CR1, NULL
     LOAD CR8, CR6, #1

@@ -53,11 +53,12 @@ def test_create_destroy_reuse(images, monkeypatch):
     assert [r["dr1"] for r in result["returns"]] == [0, 0, 0]
     assert first["cr1"][0] != 0 and reused["cr1"][0] != first["cr1"][0]
     assert destroyed["cr1"] == (0, 0, 0)
+    assert destroyed["mem"][harness.POOL] == 123, "release precedes cleaning on reuse"
     for record in [first, reused]:
         assert [record["mem"][harness.POOL + i * 4] for i in range(8)] == [0] * 8
 
 
-@pytest.mark.parametrize("scenario", ["wrongProof", "exhaust", "stale"])
+@pytest.mark.parametrize("scenario", ["exhaust", "stale"])
 def test_rejected_calls(images, monkeypatch, scenario):
     result = run(images, scenario, monkeypatch)
     assert result["fault"] is not None
@@ -80,6 +81,13 @@ def test_stub(images, monkeypatch, scenario):
 def test_current_abstract_clist_load_boundary(images, monkeypatch):
     """Boundary evidence only: this must not count as lifecycle acceptance."""
     from hardware.hw_types import FaultType
-    result = run(images, "reuse", monkeypatch)
+    result = run(images, "abstractBoundary", monkeypatch)
     assert result["fault"] == (FaultType.INVALID_OP, harness.CALLER + 12)
     assert not any(harness.MINT <= pc < harness.CLEANER for pc, _ in result["retired"])
+
+
+def test_phase1_ignores_input_not_authenticates_it(images, monkeypatch):
+    result = run(images, "ignoredInput", monkeypatch)
+    assert result["fault"] is None
+    assert len(result["returns"]) == 1
+    assert result["returns"][0]["dr1"] == 0
