@@ -26,6 +26,15 @@ and inclusion of PkVerify, not substitution of the four denial stubs for it.
 **Why:** The stub-only test excluded the allocator and verification paths the
 user intended to test. Passing stub dispatch is not evidence for actual Mint.
 
+For the v4 integrated draft, the user explicitly selected retaining CREATE
+and DESTROY and including the newer editable DESTROY implementation rather
+than saved v3's unfinished DESTROY.
+
+**Why:** The saved revision and working-tree lifecycle implementations differ;
+the user approved the newer DESTROY only after that distinction was explained.
+Do not replace these methods with the proposed denial stubs. Conversion stubs
+remain separate from lifecycle implementation and new-ABI acceptance.
+
 **How to apply:** Port the real CREATE and verification path together; preserve
 proof before clearing CR1 and distinguish old success=1 from new success=0.
 An exhausted-allocator authorization test does not prove successful creation.

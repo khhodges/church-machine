@@ -894,7 +894,8 @@ function _loadOpenFileCatalog() {
             });
         });
         files.forEach(function(f) {
-            entries.push({kind:'file', name:f.name, abstraction:f.abstraction, language:'CLOOMC++',
+            entries.push({kind:'file', name:f.name + (f.draft ? ' (draft)' : ''),
+                draft:!!f.draft, abstraction:f.abstraction, language:'CLOOMC++',
                 path:f.path, detail:(f.abstraction ? f.abstraction + ' · ' : '') +
                     (f.dir || 'simulator'), date:f.modified_at || 0});
         });
@@ -948,8 +949,8 @@ function _groupOpenFileEntries(entries, query) {
     var groups = new Map();
     entries.forEach(function(f) {
         // Exact declared identity only: MintCleaner is never part of Mint.
-        var key = f.abstraction || (f.kind === 'lump' ? f.name : f.kind + ':' + f.path);
-        if (!groups.has(key)) groups.set(key, {name:f.abstraction || f.name, entries:[]});
+        var key = (f.draft ? 'draft:' + f.path : f.abstraction) || (f.kind === 'lump' ? f.name : f.kind + ':' + f.path);
+        if (!groups.has(key)) groups.set(key, {name:f.draft ? f.name : f.abstraction || f.name, entries:[]});
         groups.get(key).entries.push(f);
     });
     var q = (query || '').trim().toLowerCase();

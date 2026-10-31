@@ -35,5 +35,11 @@ vm.runInContext(extract('_loadOpenFileCatalog') + '\n' +
     }
     context._renderOpenFileList('unrelated-source');
     assert.ok(list.innerHTML.includes('No files match'));
+    const grouped = context._groupOpenFileEntries([
+        {kind:'file', name:'mint', abstraction:'ide.Mint', path:'simulator/cloomc/mint.cloomc'},
+        {kind:'file', name:'mint_v4_integrated (draft)', draft:true,
+            abstraction:'ide.Mint', path:'simulator/drafts/mint_v4_integrated.cloomc'}
+    ]);
+    assert.equal(grouped.length, 2, 'explicit draft is separate from canonical Mint grouping');
     console.log('PASS: declared name and filename locate the editable source');
 })().catch(error => { console.error(error); process.exitCode = 1; });

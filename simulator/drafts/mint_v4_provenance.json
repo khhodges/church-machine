@@ -1,0 +1,14 @@
+{
+  "base": {
+    "token": "1cc875e0",
+    "filename": "ide.Mint.1.3229a560.lump",
+    "binary_hash": "cbae60a878fed9c540942ebdc32c3446be7fee04ed985a0f1528fa068e8039a5"
+  },
+  "baseSourceSha256": "9fe720d7e596c00f5e1d3c2a24df9ccc0efb13ef6cf1c8f38b6bef5ad3cef9c6",
+  "newerSourceSha256": "47cec77dacb8fb6005aca60d20c6ca7f3e749fd5b403f452d321878588e2d103",
+  "stubSourceSha256": "78c2cdaa2c8a030bcfd7b1f67af230aeaced6443493bc951190e3d738a3a9c4f",
+  "draftSourceSha256": "3af1ccf6243a1145c4c825f672d4810d66ffa5f47a01bd8049e09f71c34a94d5",
+  "status": "source-review-only; ABI/body and allocator integration incomplete",
+  "savedRevision": false,
+  "installed": false
+}

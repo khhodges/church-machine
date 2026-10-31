@@ -18784,6 +18784,7 @@ def list_source_files():
                 'name': stem,
                 'abstraction': abstraction,
                 'dir': rel_dir,
+                'draft': rel_dir == 'drafts' or rel_dir.startswith('drafts/'),
                 'modified_at': os.path.getmtime(abs_f),
             })
 
