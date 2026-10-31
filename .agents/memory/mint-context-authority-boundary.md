@@ -144,6 +144,18 @@ agreement rather than using it to settle the FPGA contract.
 
 ## Mint public return convention review
 
+DESTROY, MakeOutform, and MakeInform identify their target solely through its
+GT supplied as a capability argument. Never accept a caller-supplied Namespace
+slot number as an object selector, including a redundant slot alongside the GT.
+
+**Why:** The user explicitly rejected the proposed DESTROY slot argument:
+these methods must use a GT, "NOT (NEVER EVER) a slot#".
+
+**How to apply:** The standardized ABI proposal uses CR2 for the target GT and
+has no scalar target argument. Do not preserve the current implementation's
+slot-number input as architectural authority. Internal resolution must follow
+the GT's validated authority, not substitute bare slot identity.
+
 The LUMP's embedded public definition should be an ABI, not merely an API
 description; use Mint's register-level contract to design that extension.
 
