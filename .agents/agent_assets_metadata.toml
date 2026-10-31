@@ -1564,3 +1564,17 @@ mtime_ms = 1793362238448
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e151688b-6ad5-4f8d-a7fe-b17044754651/003cea8d-3963-4eeb-8bb2-6d87384747e4"
 storage_version_token = "1793362245459872"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "U14DUQQmI06X_ZCet44MV"
+uri = "file://generated-artifacts/bootbuild-a4acb0ef/BootBuild-package.zip"
+type = "unspecified"
+title = "BootBuild.mcs — golden bitstream conversion"
+description = "ZIP containing BootBuild.mcs, SHA-256 provenance and verification results, and a README. Exact configuration payload preserved; no recompilation or hardware programming."
+logical_id = "bb288a8a-4878-40ed-9776-d39de189f013"
+content_hash = "sha256:f24d13db1d93f9f51558385704d0b439f60fe24a60b522daa0db4696ad698bab"
+size = 1746858
+mtime_ms = 1793472761219
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/bb288a8a-4878-40ed-9776-d39de189f013/ddf06e1e-7a0c-43bc-a1be-42e0b9b6195c"
+storage_version_token = "1793472779734227"
+content_type = "application/octet-stream"
