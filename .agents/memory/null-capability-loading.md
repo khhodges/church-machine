@@ -5,6 +5,20 @@ description: User clarification of LOAD NULL semantics during Mint entry cleanup
 
 Loading a NULL capability must work to close a GT and prevent its use.
 
+The user clarified during Mint ABI review that NULL-authority and other
+hardware-supported POLA checks belong to the machine, not duplicate Mint or
+compiler prechecks.
+
+**Why:** Every exercised instruction remains subject to architectural checks;
+an absent named software test is not an absent hardware protection.
+
+**How to apply:** Do not add a Mint-specific NULL-service validation requirement
+merely because the fixture lacks that named case. Preserve the distinction
+between legitimate NULL storage/clearing and using NULL as authority. Describe
+test coverage accurately: automatic enforcement on exercised paths is not
+evidence that every possible path was executed, nor is a simulator run a
+physical-board test.
+
 **Why:** On 2026-10-21 the user explicitly corrected the claim that loading NULL
 should fault: “Loading a NULL should work it is vital to close a GT and prevent
 its use.” Do not treat existing simulator rejection as normative authority or
