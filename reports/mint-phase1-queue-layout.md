@@ -80,3 +80,60 @@ compile a queue service, or execute a dequeue. The next implementation must
 define the protected queue representation and normal capability-load path,
 then implement synchronous allocation/release against the finite inventory.
 Boot handoff, physical upload, RTL replay and background refill remain separate.
+
+## Proposed protected representation — pending review
+
+For the finite-inventory first implementation, keep the eight preprovisioned
+object GTs in the resident foreground allocator's ordinary C-list. The data
+queue blocks contain object indices and bookkeeping, not writable raw GTs.
+This is a proposed representation, not an implemented binding or a new API.
+
+- C-list row 0: SELF E.
+- Rows 1–4: private RW grants for Free64, Free128, Free256, Returned.
+- Rows 5–8: the four 64-word object GTs.
+- Rows 9–10: the two 128-word object GTs.
+- Rows 11–12: the two 256-word object GTs.
+- No Namespace RW, whole-pool RW, scratch L, or C-list write grant is needed
+  by this foreground allocator.
+
+The normal CALL establishes CR6.M. LOAD of a selected fixed C-list row resolves
+an existing GT; it does not convert client-writable data into new authority.
+Use explicit fixed-row branches for the eight entries initially, avoiding any
+assumption about a variable-index LOAD encoding.
+
+Each free queue's proposed 64-word data block uses word 0 for head, word 1 for
+tail, word 2 for count, and words 3 onward for its bounded ring entries.
+Ring entries are object indices: Free64 uses 0–3, Free128 uses 4–5, and Free256
+uses 6–7. Capacity and class-to-index bounds are code constants rather than
+caller-writable configuration. Each free block also reserves words 16 onward
+for its per-object states (FREE, ISSUED, RETURNED) and matching issue versions.
+Returned uses the same three-word queue header and eight index entries.
+Unused words remain zero. Initial full rings have head=tail=0, with count equal
+to capacity. Returned starts empty.
+
+Synchronous dequeue:
+
+1. Clear the incoming CR1 passkey; it remains ignored under this profile.
+2. Validate the request against the existing packed allocation/RW API contract.
+3. Select the exact size class. Empty means ordinary exhaustion; malformed
+   queue bounds, state or class membership mean hard fault.
+4. Read the head index, require FREE state and the expected provisioned version,
+   then LOAD the corresponding fixed C-list row into CR1.
+5. Mark ISSUED, advance head and decrement count before RETURN. Return CR1 with
+   DR1=0. No calls or yields occur during this operation.
+
+The multiple state writes are NOT hardware-atomic. The first implementation
+requires exclusive single-caller execution. A fault during update is fail-stop:
+do not retry, restore old free lists, or automatically requeue an uncertain
+object. Recovery requires reconciliation; returned references must never
+coexist with a reset queue claiming those same versions are free.
+
+Ordinary failures return NULL CR1 and a documented nonzero DR1 status (numeric
+codes still to be selected). No new GT is minted or version changed by dequeue.
+
+Release/refill needs a separate implementation review. A future version bump
+also requires replacing the corresponding retained GT before requeueing; the
+initial read-only C-list cannot be assumed to refresh itself. Background Mint
+will need a protected publication mechanism and synchronization with dequeue.
+This initial representation demonstrates bounded distribution of prepared
+capabilities, not a complete recycling allocator or proven revocation.
