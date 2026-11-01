@@ -15,6 +15,17 @@ representation, common Outform/Inform transitions, then object-specific behavior
 common capability identity, authority and Outform/Inform lifecycle. Resolve
 apparent exceptions against the common contract before adding special cases.
 
+Keep the unfinished Phase 1 release/UART handoff ahead of networking
+implementation. Maintain an explicit current next action and acceptance boundary
+when discussing new architecture.
+
+**Why:** The user explicitly required that architectural agreement not displace
+present priorities or obscure what must be finished next.
+
+**How to apply:** Consult `docs/network-capability-lifecycle-contract.md` for the
+contract and priority record; refresh evidence rather than treating a merge as
+physical acceptance. Record current work status there, not in memory.
+
 The user's intended model is program-controlled Amoeba Self.Save, which saves
 the Thread including machine register state and transitions it to Outform.
 Later its owners (potentially a networked abstraction) may reactivate it,
