@@ -4,10 +4,12 @@ import json
 import os
 import re
 import struct
+import tarfile
 
 from flask import jsonify, request
 from hardware.thread_design import thread_layout
 from server.boot_image import parse_ns_table_raw
+from server.testing_dna_evidence import InspectionEvidence, BIT_ID, NS_ID, is_bitstream
 
 
 INSTALLED = {"status": "unverified",
@@ -66,6 +68,13 @@ def decode_gt(value, source, register, entries, ordinal, portable=False):
             "targetSlot": slot if typ == 1 else None}
 
 
+def read_bytes(store, kind, revision, name):
+    if hasattr(store, "read_bytes"):
+        return store.read_bytes(kind, revision, name)
+    with open(store.file_path(kind, revision, name), "rb") as stream:
+        return stream.read()
+
+
 def graph(store, revision):
     record = store.read("namespace", revision)
     files, meta = record["files"], record["metadata"]
@@ -73,8 +82,7 @@ def graph(store, revision):
     if not image_name:
         return {"status": "unavailable", "reason": "Frozen Namespace has no retained image bytes.",
                 "nodes": [], "edges": [], "issues": []}
-    with open(store.file_path("namespace", revision, image_name), "rb") as stream:
-        image = stream.read()
+    image = read_bytes(store, "namespace", revision, image_name)
     if len(image) % 4:
         raise ValueError("Frozen image is not word-aligned")
     parsed = parse_ns_table_raw(image)
@@ -94,8 +102,7 @@ def graph(store, revision):
             image_layout = "ascending-native"
     if not parsed:
         raise ValueError("Frozen image Namespace layout is not supported; no live image substituted")
-    with open(store.file_path("namespace", revision, "namespace.json"), encoding="utf-8") as stream:
-        state = json.load(stream)
+    state = json.loads(read_bytes(store, "namespace", revision, "namespace.json"))
     labels = {row["slot"]: row for row in state.get("abstractions", state.get("rows", []))
               if isinstance(row, dict) and isinstance(row.get("slot"), int) and not row.get("archived")}
     entries = {e["slot"]: e for e in parsed["entries"]}
@@ -137,8 +144,7 @@ def graph(store, revision):
             if name and name in files and (not retained_hash or files[name] == retained_hash)), None)
         node["artifactHash"] = retained_hash
         if body is None and filename:
-            with open(store.file_path("namespace", revision, filename), "rb") as stream:
-                data = stream.read()
+            data = read_bytes(store, "namespace", revision, filename)
             if len(data) >= 4 and len(data) % 4 == 0:
                 body = list(struct.unpack(f"<{len(data)//4}I", data))
                 portable = True
@@ -191,7 +197,7 @@ def graph(store, revision):
                      "Arbitrary data/heap words are not assumed to be GTs. Namespace table membership is not a GT edge."}
 
 
-def install(app, store_factory, authorize=None):
+def install(app, store_factory, authorize=None, evidence_factory=InspectionEvidence):
     @app.get("/api/testing/build-dna")
     def testing_build_dna():
         if authorize is not None:
@@ -204,7 +210,17 @@ def install(app, store_factory, authorize=None):
             if bit_id and ns_id:
                 raise ValueError("Select a bitstream or inspect a Namespace separately, not both")
             result = {"ok": True, "installed": INSTALLED}
-            if bit_id:
+            if bit_id == BIT_ID or ns_id == NS_ID:
+                evidence = evidence_factory()
+                result.update(graph(evidence, NS_ID), namespaceRevisionId=NS_ID,
+                              inspectionOnly=True, releaseApproved=False,
+                              association="receipt-backed" if bit_id else "unassociated",
+                              bitstream=evidence.summary() if bit_id else None)
+                result["issues"].append("EXPERIMENTAL — inspection only; not approved for installation or release. "
+                                        "Archived authoring labels use a different layout; objects are identified by exact image slots.")
+            elif bit_id:
+                if not is_bitstream(read_bytes(store, "bitstream", bit_id, "bitstream.bit")):
+                    raise ValueError("Not a structurally valid bitstream")
                 bit = summary(store.read("bitstream", bit_id))
                 result["bitstream"] = bit
                 ns_id = bit["namespaceRevisionId"]
@@ -218,15 +234,26 @@ def install(app, store_factory, authorize=None):
                               association="unassociated", bitstream=None)
             else:
                 issues = []
-                result["bitstreams"] = [summary(r) for r in records(store, "bitstream", issues)]
+                valid_bits = []
+                for r in records(store, "bitstream", issues):
+                    if is_bitstream(read_bytes(store, "bitstream", r["revision_id"], "bitstream.bit")):
+                        valid_bits.append(summary(r))
+                result["bitstreams"] = valid_bits
                 result["namespaces"] = [
                     {"id": r["revision_id"], "label": f"{r['metadata'].get('purpose', 'Frozen Namespace')} · {r['revision_id'][:12]}",
                      "imageAvailable": any(k in r["files"] for k in ("boot-image.bin", "simulation.bin"))}
                     for r in records(store, "namespace", issues)]
                 result["issues"] = issues
+                try:
+                    evidence = evidence_factory()
+                    result["bitstreams"].append(evidence.summary())
+                    result["namespaces"].insert(0, {"id": NS_ID, "label": "Amoeba retry — receipt-backed experimental image (inspection only)",
+                                                    "imageAvailable": True})
+                except (OSError, ValueError, KeyError, TypeError, tarfile.TarError):
+                    issues.append("Experimental archive unavailable or failed verification; no image substituted.")
             response = jsonify(result)
             response.headers["Cache-Control"] = "no-store"
             return response
-        except (ValueError, OSError, KeyError, TypeError, struct.error) as exc:
+        except (ValueError, OSError, KeyError, TypeError, struct.error, tarfile.TarError) as exc:
             app.logger.warning("Build DNA unavailable: %s", type(exc).__name__)
             return jsonify(ok=False, error="Frozen build evidence unavailable, invalid, or failed integrity verification. No live image was substituted."), 409

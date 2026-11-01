@@ -5,6 +5,15 @@ import pytest
 from flask import Flask
 from server.artifact_revisions import RevisionStore
 from server.testing_build_dna import graph, install, decode_gt
+from server.testing_dna_evidence import InspectionEvidence, BIT_ID, NS_ID
+
+
+def bit_bytes(suffix=b""):
+    return bytes.fromhex("00090ff00ff00ff00ff000") + b"\xaa\x99\x55\x66" + b"\x00" * 1024 + suffix
+
+
+def no_archive():
+    raise FileNotFoundError("No experimental fixture")
 
 
 @pytest.fixture
@@ -29,9 +38,9 @@ def evidence(tmp_path):
         "namespace.json": json.dumps({"abstractions": [
             {"slot": 1, "name": "Test.NS"}, {"slot": 2, "name": "Test.Thread"},
             {"slot": 3, "name": "Test.Code"}]}).encode()})
-    bit = store.publish("bitstream", {"namespace_revision_id": ns}, {"bitstream.bit": b"exact-bit"})
+    bit = store.publish("bitstream", {"namespace_revision_id": ns}, {"bitstream.bit": bit_bytes()})
     app = Flask(__name__)
-    install(app, lambda: store)
+    install(app, lambda: store, evidence_factory=no_archive)
     return store, ns, bit, app.test_client()
 
 
@@ -52,7 +61,7 @@ def test_linked_graph_and_registers(evidence):
 
 def test_no_current_namespace_fallback(evidence):
     store, ns, bit, client = evidence
-    unlinked = store.publish("bitstream", {}, {"bitstream.bit": b"unlinked"})
+    unlinked = store.publish("bitstream", {}, {"bitstream.bit": bit_bytes(b"unlinked")})
     d = client.get("/api/testing/build-dna?bitstream=" + unlinked).json
     assert d["status"] == "unavailable" and not d["nodes"]
     inspected = client.get("/api/testing/build-dna?namespace=" + ns).json
@@ -93,3 +102,45 @@ def test_authorization_precedes_store_access():
         pytest.fail("Unauthenticated request must not inspect frozen records")
     install(app, forbidden, lambda: (False, ({"ok": False, "error": "Unauthorized"}, 401)))
     assert app.test_client().get("/api/testing/build-dna").status_code == 401
+
+
+def test_fixture_payloads_excluded_and_not_inspectable(evidence):
+    store, ns, bit, client = evidence
+    fake = store.publish("bitstream", {}, {"bitstream.bit": b"VERIFIED WUKONG BUILD"})
+    catalog = client.get("/api/testing/build-dna").json
+    assert [b["id"] for b in catalog["bitstreams"]] == [bit]
+    assert client.get("/api/testing/build-dna?bitstream=" + fake).status_code == 409
+    assert store.read("bitstream", fake)  # Exclusion is not deletion.
+
+
+def test_real_experimental_pair_read_only(evidence):
+    store, _, _, _ = evidence
+    app = Flask("experimental")
+    install(app, lambda: store)
+    client = app.test_client()
+    before = store.history("namespace"), store.history("bitstream")
+    catalog = client.get("/api/testing/build-dna").json
+    assert any(b["id"] == BIT_ID and b["inspectionOnly"] for b in catalog["bitstreams"])
+    result = client.get("/api/testing/build-dna?bitstream=" + BIT_ID).json
+    assert result["ok"] and result["status"] == "available"
+    assert result["namespaceRevisionId"] == NS_ID
+    assert result["inspectionOnly"] and result["releaseApproved"] is False
+    assert result["installed"]["status"] == "unverified"
+    assert len(result["nodes"]) == 18 and len(result["edges"]) == 69
+    assert result["association"] == "receipt-backed"
+    assert client.get("/api/testing/build-dna?namespace=" + NS_ID).json["association"] == "unassociated"
+    assert client.post("/api/testing/build-dna?bitstream=" + BIT_ID).status_code == 405
+    assert before == (store.history("namespace"), store.history("bitstream"))
+
+
+def test_experimental_corruption_withheld(evidence, monkeypatch):
+    import server.testing_dna_evidence as module
+    store, _, _, _ = evidence
+    monkeypatch.setattr(module, "IMAGE_HASH", "0" * 64)
+    app = Flask("corrupt-experimental")
+    install(app, lambda: store)
+    client = app.test_client()
+    catalog = client.get("/api/testing/build-dna").json
+    assert not any(b["id"] == BIT_ID for b in catalog["bitstreams"])
+    assert catalog["issues"]
+    assert client.get("/api/testing/build-dna?bitstream=" + BIT_ID).status_code == 409

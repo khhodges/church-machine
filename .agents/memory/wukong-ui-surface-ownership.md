@@ -38,3 +38,10 @@ build receipts and input-image bytes before presenting build DNA.
 bitstreams. Real vendor evidence was retained separately in uploaded archives.
 Receipt-backed experimental inspection does not confer release approval,
 installation permission, or proof of what is installed on the board.
+
+The user authorized receipt-backed experimental pairs for DNA inspection only.
+Keep that permission separate from artifact publication, admission, installation,
+release approval and hardware commands.
+
+**Why:** The explicit approval was “Yes, inspection only”; surfacing an archive
+in Testing must not promote it into the live Namespace or approved-build history.
