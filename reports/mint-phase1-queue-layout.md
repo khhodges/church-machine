@@ -4,6 +4,25 @@ Status: offline placement design, not a constructed or executable image.
 This supersedes the eight-word single-object sizing proposal and synchronous
 Mint scratch conversion as the foreground allocation path.
 
+## Latest design direction: one abstraction
+
+The user directs one resident abstraction with methods and private variables,
+not separate abstractions for each queue. Free64, Free128, Free256 and Returned
+are internal data structures. Their heads, tails, counts and object states are
+private variables under the same abstraction.
+
+Preserve CREATE as the synchronous allocation entry and its CR1 result.
+DESTROY/release can be another method on that abstraction, but its implementation
+is still deferred from the initial dequeue-only work. Background refill remains
+later work; this grouping does not authorize a new public refill method.
+
+The eight-object inventory remains approved. The four queue descriptor slots,
+four RW C-list dependencies and exact row numbers below are a historical
+placement proposal, not the selected abstraction interface. Reconcile internal
+variable storage and private access with the compiler before assigning a new
+physical layout. One abstraction does not by itself imply that its code and
+mutable state share one descriptor or that executable authority permits writes.
+
 ## Approved starting inventory
 
 | Queue | Object size | Initial count | Object slots | Object words |

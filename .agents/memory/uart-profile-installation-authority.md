@@ -164,6 +164,18 @@ objects, with a shared return queue sized for eight objects.
 allocator policy. Retain finite-inventory exhaustion until refill is separately
 implemented; queue storage is additional to the 1024-word object pool.
 
+Represent the foreground allocator as one resident abstraction with methods
+and private variables; the size queues and return queue are internal structures.
+
+**Why:** The user corrected the proposed representation: “we should use one
+abstraction with various methods and variables.”
+
+**How to apply:** Preserve the CREATE/CR1 contract and keep queue bookkeeping
+private. Do not turn each queue into a separate abstraction or expose queue
+capabilities to clients. Earlier per-queue descriptor/C-list numbering is
+provisional; reconcile actual variable storage before implementation. Grouping
+methods does not authorize deferred release/refill or hardware operations.
+
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
 The earlier eight-word example is not an accepted allocation contract.
 
