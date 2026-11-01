@@ -7291,3 +7291,21 @@ html.spc-locked #saveNSDialog button, html.spc-locked #lumpSaveStaleConflictDial
 .le-bn-ok { background:#1a3a1a; color:#3fb950; }
 .le-bn-warn { background:#2a2000; color:#daa520; }
 .le-bn-bad { background:#3a1a1a; color:#f87171; }
+
+.le-panel.le-bn .le-bn-tabs { display:flex; flex-wrap:wrap; gap:2px; border-bottom:1px solid #2a2a4a; margin:.6rem 0 .5rem; }
+.le-panel.le-bn .le-bn-tab { background:transparent; border:1px solid transparent; border-bottom:none; color:#8fa8c8; padding:.35rem .8rem; font-size:.78rem; cursor:pointer; border-radius:4px 4px 0 0; }
+.le-panel.le-bn .le-bn-tab:hover { color:#e6e6f5; background:#1a1a2e; }
+.le-panel.le-bn .le-bn-tab[aria-selected="true"] { color:#daa520; border-color:#2a2a4a; background:#14142a; font-weight:700; }
+.le-panel.le-bn .le-bn-tab:focus-visible { outline:2px solid #daa520; outline-offset:-2px; }
+.le-panel.le-bn .le-bn-tab-err { color:#f87171; }
+.le-panel.le-bn .le-bn-tp { width:100%; min-width:0; }
+.le-panel.le-bn .le-bn-tp:focus-visible { outline:1px dashed #2a2a4a; }
+.le-panel.le-bn .le-bn-h4 { margin:.8rem 0 .25rem; font-size:.78rem; color:#daa520; }
+.le-panel.le-bn .le-bn-hexgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(7.5rem,1fr)); gap:.2rem .5rem; margin-top:.4rem; font-size:.72rem; }
+.le-panel.le-bn .le-bn-hw code { font-family:'Courier New',monospace; color:#c8c8e0; }
+.le-panel.le-bn .le-bn-hw.le-bn-zero code { color:#66668a; }
+.le-panel.le-bn .le-bn-hw .le-bn-sub { display:inline; margin-right:.35rem; }
+.le-panel.le-bn .le-bn-heap[open] { min-width:0; }
+.le-panel.le-bn .le-bn-pager { display:flex; gap:.6rem; align-items:center; margin-top:.4rem; font-size:.74rem; color:#77779a; }
+.le-panel.le-bn .le-bn-rt td { opacity:.8; }
+@media (max-width:768px) { .le-panel.le-bn .le-bn-tab { flex:1 1 auto; } }

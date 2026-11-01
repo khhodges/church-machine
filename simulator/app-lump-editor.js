@@ -476,7 +476,8 @@
     // image bytes served by GET /api/boot-image/built-namespace. Names,
     // filenames and hashes come only from hash-matched retained provenance.
     // No catalog, boot-config, or browser design state is consulted here.
-    var _bn = { seq: 0, ctrl: null, data: null, error: '', loading: false };
+    var _bn = { seq: 0, ctrl: null, data: null, error: '', loading: false, tab: 'ns', heapPage: {} };
+    var BN_HEAP_PAGE = 64;
 
     function _bnHex(v) {
         return (typeof v === 'number' && Number.isFinite(v)) ? hex8(v) : '\u2014';
@@ -552,6 +553,7 @@
                 } else {
                     _bn.data = res.body;
                 }
+                _bnValidateTab();
                 renderResidentPanel();
             })
             .catch(function (err) {
@@ -559,8 +561,104 @@
                 _bn.loading = false;
                 _bn.data = null;
                 _bn.error = 'Built Namespace evidence unavailable: ' + (err && err.message ? err.message : err);
+                _bnValidateTab();
                 renderResidentPanel();
             });
+    }
+
+
+    function _bnThreads() {
+        return (_bn.data && Array.isArray(_bn.data.threads)) ? _bn.data.threads.filter(function (t) { return t && typeof t.slot === 'number'; }) : [];
+    }
+    function _bnValidateTab() {
+        var ok = _bnThreads().some(function (t) { return t.slot === _bn.tab; });
+        if (!ok) { _bn.tab = 'ns'; }
+        var keep = {};
+        _bnThreads().forEach(function (t) { if (_bn.heapPage[t.slot] !== undefined) keep[t.slot] = _bn.heapPage[t.slot]; });
+        _bn.heapPage = keep;
+    }
+    function _bnTabLabel(t) {
+        return (t.name !== null && t.name !== undefined && t.name !== '') ? String(t.name) : 'Thread NS[' + t.slot + ']';
+    }
+    function _bnTabId(k) { return 'le-bn-tab-' + k; }
+    function _bnPanelId(k) { return 'le-bn-tp-' + k; }
+    function _bnAddr(abs, rel) {
+        return '<code>' + _bnHex(abs) + '</code><span class="le-bn-sub">+' + (typeof rel === 'number' ? rel + ' (' + hex8(rel) + ')' : '\u2014') + '</span>';
+    }
+    var BN_STATUS = {
+        'resolved': 'resolved', 'name-unavailable': 'Name unavailable', 'slot-missing': 'Slot missing from Namespace',
+        'generation-mismatch': 'Generation mismatch', 'not-resolved': 'Not resolved'
+    };
+    function _bnTarget(c) {
+        if (c.targetStatus === 'null') return '<span class="le-bn-absent">No target (null GT)</span>';
+        if (c.targetStatus === null || c.targetStatus === undefined) return '<span class="le-bn-absent">Target evidence unavailable</span>';
+        var slot = typeof c.targetSlot === 'number' ? 'NS[' + c.targetSlot + ']' : '';
+        if (c.targetStatus === 'resolved' && c.targetName)
+            return '<span class="le-bn-name">' + esc(String(c.targetName)) + '</span><span class="le-bn-sub">' + esc(slot) + '</span>';
+        var cls = c.targetStatus === 'resolved' || c.targetStatus === 'name-unavailable' ? 'warn' : 'bad';
+        return (slot ? '<code>' + esc(slot) + '</code> ' : '') + '<span class="le-bn-badge le-bn-' + cls + '">' +
+            esc(BN_STATUS[c.targetStatus] || String(c.targetStatus)) + '</span>';
+    }
+    function _bnThreadPanel(t) {
+        if (t.error) {
+            return '<div class="le-error-banner" role="alert">Thread NS[' + esc(String(t.slot)) + '] could not be decoded from the image bytes: ' +
+                esc(String(t.error)) + '. No layout, heap or capabilities are shown.</div>';
+        }
+        var out = renderGrid([
+            ['Slot', 'NS[' + esc(String(t.slot)) + ']'],
+            ['Name', t.name ? esc(String(t.name)) : '<span class="le-bn-absent">Unavailable (not verified)</span>'],
+            ['Location', '<code>' + _bnHex(t.location) + '</code>'],
+            ['Header word', '<code>' + _bnHex(t.headerWord) + '</code>'],
+            ['Size', _bnText(t.sizeWords) + ' words'],
+            ['Stack', _bnText(t.stackWords) + ' words']
+        ]);
+        var zones = Array.isArray(t.zones) ? t.zones : [];
+        out += '<h4 class="le-bn-h4">Zones</h4>' + (zones.length ?
+            '<div class="le-bn-scroll"><table class="le-bn-table"><thead><tr><th>Zone</th><th>Start (abs / rel)</th><th>End (abs / rel)</th><th>Words</th></tr></thead><tbody>' +
+            zones.map(function (z) {
+                return '<tr><td>' + esc(String(z.name)) + '</td><td>' + _bnAddr(z.absoluteStart, z.startOffset) + '</td><td>' +
+                    _bnAddr(z.absoluteEnd, z.endOffset) + '</td><td>' + _bnText(z.words) + '</td></tr>';
+            }).join('') + '</tbody></table></div>' : '<p class="le-panel-desc">No zones reported.</p>');
+        var h = t.heap;
+        out += '<h4 class="le-bn-h4">Tuple heap</h4>';
+        if (!h) out += '<p class="le-panel-desc"><span class="le-bn-absent">Heap not reported.</span></p>';
+        else {
+            var words = Array.isArray(h.initialWords) ? h.initialWords : [];
+            var pages = Math.max(1, Math.ceil(words.length / BN_HEAP_PAGE));
+            var pg = Math.min(_bn.heapPage[t.slot] || 0, pages - 1);
+            var base = (typeof t.location === 'number' ? t.location : 0) + (h.startOffset || 0);
+            out += renderGrid([
+                ['Capacity', _bnText(h.words) + ' words'],
+                ['Offsets', _bnText(h.startOffset) + ' \u2013 ' + _bnText(h.endOffset)],
+                ['Nonzero initial words', _bnText(h.nonzeroWords)],
+                ['Named tuple definitions', '<span class="le-bn-absent">Not recorded in this build</span>']
+            ]) + '<p class="le-panel-desc">Exact initial words from the image. A zero word is only a zero value; it does not prove the word is unallocated.</p>' +
+                '<details class="le-bn-details le-bn-heap"><summary>Initial heap words (' + words.length + ')</summary>';
+            if (words.length) {
+                var slice = words.slice(pg * BN_HEAP_PAGE, (pg + 1) * BN_HEAP_PAGE);
+                out += '<div class="le-bn-hexgrid">' + slice.map(function (w, i) {
+                    var off = (h.startOffset || 0) + pg * BN_HEAP_PAGE + i;
+                    return '<span class="le-bn-hw' + (w ? '' : ' le-bn-zero') + '" title="abs ' + hex8(base + pg * BN_HEAP_PAGE + i) + ', rel +' + off + '"><span class="le-bn-sub">+' + off + '</span><code>' + _bnHex(w) + '</code></span>';
+                }).join('') + '</div>';
+                if (pages > 1) out += '<div class="le-bn-pager"><button type="button" class="le-copy-btn" ' + (pg <= 0 ? 'disabled ' : '') +
+                    'onclick="lumpEditorBnHeapPage(' + t.slot + ',-1)">Previous</button><span>Page ' + (pg + 1) + ' / ' + pages +
+                    '</span><button type="button" class="le-copy-btn" ' + (pg >= pages - 1 ? 'disabled ' : '') +
+                    'onclick="lumpEditorBnHeapPage(' + t.slot + ',1)">Following</button></div>';
+            } else out += '<p class="le-panel-desc">Heap has no words.</p>';
+            out += '</details>';
+        }
+        var caps = Array.isArray(t.capabilities) ? t.capabilities : [];
+        out += '<h4 class="le-bn-h4">Initial capability registers (as built, not live)</h4>' +
+            '<div class="le-bn-scroll"><table class="le-bn-table"><thead><tr><th>Register</th><th>Offset</th><th>Address</th><th>GT (raw)</th><th>Type</th><th>Seq</th><th>Target</th></tr></thead><tbody>' +
+            caps.map(function (c) {
+                return '<tr><td class="le-bn-slot">' + esc(String(c.register)) + '</td><td>' + _bnText(c.offset) + '</td><td><code>' + _bnHex(c.address) +
+                    '</code></td><td><code>' + _bnHex(c.value) + '</code></td><td>' + _bnText(c.type) + '</td><td>' + _bnText(c.sequence) +
+                    '</td><td class="le-bn-namecell">' + _bnTarget(c) + '</td></tr>';
+            }).join('') +
+            (Array.isArray(t.runtimeRegisters) ? t.runtimeRegisters : [12, 13, 14, 15]).map(function (r) {
+                return '<tr class="le-bn-rt"><td class="le-bn-slot">CR' + esc(String(r)) + '</td><td colspan="6"><span class="le-bn-absent">Runtime-only \u2014 not stored in the image</span></td></tr>';
+            }).join('') + '</tbody></table></div>';
+        return out;
     }
 
     function _bnProvBadge(s) {
@@ -599,8 +697,7 @@
             ['Built Namespace fingerprint', '<code class="le-bn-hash">' + _bnText(d.builtNamespaceFingerprint) + '</code>'],
             ['Saved Namespace matches built', esc(match)]
         ]);
-        var struct = '<div class="le-bn-struct"><section><h4>Thread</h4>' + _bnFields(d.thread) + '</section>' +
-            '<section><h4>NS header</h4>' + _bnFields(d.nsHeader) + '</section></div>';
+        var struct = '<div class="le-bn-struct"><section><h4>NS header</h4>' + _bnFields(d.nsHeader) + '</section></div>';
         var rows = d.entries.map(function (e) {
             e = e || {};
             var dec = e.decoded || null;
@@ -623,11 +720,27 @@
             '<th>Seq</th><th>F</th><th>G</th><th>Seal</th><th>Access</th><th>Artifact</th><th>Evidence</th></tr></thead><tbody>' +
             rows + '</tbody></table></div>' :
             '<p class="le-panel-desc">The committed image contains no occupied Namespace slots.</p>';
-        el.innerHTML = head + ev + struct +
+        var threads = _bnThreads();
+        var keys = ['ns'].concat(threads.map(function (t) { return t.slot; }));
+        var tabs = '<div class="le-bn-tabs" role="tablist" aria-label="Built Namespace views">' + keys.map(function (k, i) {
+            var sel = _bn.tab === k;
+            var lbl = k === 'ns' ? 'Namespace' : _bnTabLabel(threads[i - 1]);
+            var bad = k !== 'ns' && threads[i - 1].error;
+            return '<button type="button" role="tab" class="le-bn-tab' + (bad ? ' le-bn-tab-err' : '') + '" id="' + _bnTabId(k) + '" aria-controls="' + _bnPanelId(k) +
+                '" aria-selected="' + sel + '" tabindex="' + (sel ? '0' : '-1') + '" data-bn-tab="' + k + '" onclick="lumpEditorBnTab(\'' + k +
+                '\')" onkeydown="lumpEditorBnTabKey(event)">' + esc(lbl) + '</button>';
+        }).join('') + '</div>';
+        if (_bn.tab !== 'ns') {
+            var cur = threads.filter(function (t) { return t.slot === _bn.tab; })[0];
+            el.innerHTML = head + tabs + '<div role="tabpanel" class="le-bn-tp" id="' + _bnPanelId(_bn.tab) + '" aria-labelledby="' + _bnTabId(_bn.tab) +
+                '" tabindex="0">' + _bnThreadPanel(cur) + '</div></div>';
+            return;
+        }
+        el.innerHTML = head + tabs + '<div role="tabpanel" class="le-bn-tp" id="' + _bnPanelId('ns') + '" aria-labelledby="' + _bnTabId('ns') + '" tabindex="0">' + ev + struct +
             '<p class="le-panel-desc">' + d.entries.length + ' committed slot(s). Membership and descriptor words come only from the image. ' +
             'Names appear only when verified (saved Namespace fingerprint equals the image-bound fingerprint, or a build record); otherwise Unavailable. ' +
             'Artifact N/A means a hardware device with no file; Not recorded means no file evidence was retained.</p>' +
-            table + '</div>';
+            table + '</div></div>';
     }
 
     function _bnObsolete(name) {
@@ -2097,6 +2210,33 @@
     };
 
     window.lumpEditorBuiltNamespaceRefresh = function () { return _bnLoad(); };
+    // Local-only view state: no requests or writes.
+    window.lumpEditorBnTab = function (k) {
+        var key = k === 'ns' ? 'ns' : Number(k);
+        if (key !== 'ns' && !_bnThreads().some(function (t) { return t.slot === key; })) key = 'ns';
+        _bn.tab = key;
+        renderResidentPanel();
+        var b = document.getElementById(_bnTabId(key));
+        if (b && typeof b.focus === 'function') b.focus();
+    };
+    window.lumpEditorBnTabKey = function (ev) {
+        var keys = ['ns'].concat(_bnThreads().map(function (t) { return t.slot; }));
+        var i = keys.indexOf(_bn.tab), n = keys.length, j;
+        if (ev.key === 'ArrowRight') j = (i + 1) % n;
+        else if (ev.key === 'ArrowLeft') j = (i - 1 + n) % n;
+        else if (ev.key === 'Home') j = 0;
+        else if (ev.key === 'End') j = n - 1;
+        else return;
+        if (ev.preventDefault) ev.preventDefault();
+        window.lumpEditorBnTab(String(keys[j]));
+    };
+    window.lumpEditorBnHeapPage = function (slot, d) {
+        _bn.heapPage[slot] = Math.max(0, (_bn.heapPage[slot] || 0) + d);
+        renderResidentPanel();
+        var p = document.getElementById(_bnPanelId(slot));
+        var det = p && p.querySelector ? p.querySelector('.le-bn-heap') : null;
+        if (det) det.open = true;
+    };
 
     window.addEventListener('storage', function (ev) {
         if (ev.key === 'fpga_board_target') {

@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+from server.built_thread_view import inspect_threads
 
 
 def _read_json(path):
@@ -83,6 +84,7 @@ def read_built_namespace(image_path, provenance_path, state_path, parse_raw,
     return {
         **raw,
         "entries": entries,
+        "threads": inspect_threads(image, entries, raw.get("nsTableBase", len(image) // 4)),
         "imageSha256": digest,
         "bytes": len(image),
         "provenanceStatus": "verified" if verified else (
