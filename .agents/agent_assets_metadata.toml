@@ -1620,3 +1620,17 @@ mtime_ms = 1793560564230
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6103db36-c55d-483d-be77-566a1752326a/aca9da7e-8bbf-4652-a800-73f645036b1f"
 storage_version_token = "1793560571880537"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "cVOyzyoGn6Q-HDyFBJDCj"
+uri = "file://reports/mint-create-offline-preparation-gates.md"
+type = "text"
+title = "Mint preparation — validation findings"
+description = "Exact offline rejection for the Namespace alias, NULL-binding results, and why preparation stopped without bypassing checks."
+logical_id = "6cb4bb29-f99a-40ed-8de1-b1afee0604f4"
+content_hash = "sha256:7948895f5c2d71fecd29e11fcd852f609084614c314a375ccfd85a7578bcf3ac"
+size = 2460
+mtime_ms = 1793561115799
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6cb4bb29-f99a-40ed-8de1-b1afee0604f4/4e63e1f9-4d7c-47e7-a040-91c84b62d951"
+storage_version_token = "1793561121034473"
+content_type = "text/markdown"

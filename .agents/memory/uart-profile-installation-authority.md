@@ -92,3 +92,14 @@ publication alone does not correct the address later returned to Cleaner.
 the inverse conversion and release checks receive separate review. Preserve
 the original saved artifact; do not silently broaden a descriptor adjustment
 into lifecycle qualification.
+
+The user approved the proposed fresh disposable CREATE layout for offline
+preparation, including separate private services/state and a Namespace RW alias.
+
+**Why:** They selected “Approve offline preparation” after the fresh-state
+boundary and remaining validation/startup checks were presented.
+
+**How to apply:** Treat new slot history as explicitly fresh only in that
+disposable candidate, never as live-board history. Approval covers offline
+preparation, not validator bypasses, startup-design changes, RTL replay,
+upload, reboot, or flash programming.
