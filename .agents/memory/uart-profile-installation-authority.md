@@ -80,3 +80,15 @@ the separate approval-token path was confused with the Inform RW table grant.
 as verified authorization. Keep Inform capability, permission, bounds, sequence,
 and integrity checks intact. This demonstration-specific decision does not
 remove passkey enforcement from other profiles or authorize image installation.
+
+A bounded CREATE word-address adaptation does not qualify DESTROY for the same
+objects. Review the release path's address units separately before enabling it.
+
+**Why:** The frozen BIT consumes resident descriptor bases in words, whereas
+the retained Mint/Cleaner software contract uses physical bytes. Correcting
+publication alone does not correct the address later returned to Cleaner.
+
+**How to apply:** Keep the initial demonstration explicitly CREATE-only unless
+the inverse conversion and release checks receive separate review. Preserve
+the original saved artifact; do not silently broaden a descriptor adjustment
+into lifecycle qualification.

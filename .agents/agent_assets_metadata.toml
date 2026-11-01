@@ -1592,3 +1592,17 @@ mtime_ms = 1793547289991
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/92eb3f8a-9838-442d-ab43-a940554e562a/13c2f9bd-8f92-4c4c-8ef9-21e55aa6d73c"
 storage_version_token = "1793547294938238"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "tNWy8ePLpH6aGJXWcqVZl"
+uri = "file://reports/mint-word-candidate-review.md"
+type = "text"
+title = "Mint CREATE candidate — offline review"
+description = "Verified saved-source adaptation, focused software results, exact hashes, and remaining binding requirements. Not installable or hardware-qualified."
+logical_id = "a825c6e7-9123-41b5-9e4d-6ac462c84ae8"
+content_hash = "sha256:ee18aae8854a8686389a465c7be1e9ad684a9cc21aa8a8d03707f87e7d324f9e"
+size = 3033
+mtime_ms = 1793556459671
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a825c6e7-9123-41b5-9e4d-6ac462c84ae8/ffa7141a-ed44-4ced-8314-f21baa9424d3"
+storage_version_token = "1793556467257627"
+content_type = "text/markdown"
