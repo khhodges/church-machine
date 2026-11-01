@@ -33,15 +33,6 @@ def read_built_namespace(image_path, provenance_path, state_path, parse_raw,
             slot = item["slot"]
             # Ambiguous evidence supplies no display identity.
             bindings[slot] = None if slot in bindings else item
-    entries = []
-    for entry in raw["entries"]:
-        binding = bindings.get(entry["slot"]) or {}
-        entries.append({
-            **entry,
-            "name": binding.get("name") or binding.get("abstraction"),
-            "filename": binding.get("filename"),
-            "artifactSha256": binding.get("artifact_sha256"),
-        })
     built_fingerprint = provenance.get("namespace_fingerprint") if verified else None
     saved = _read_json(state_path)
     matches = None
@@ -50,6 +41,45 @@ def read_built_namespace(image_path, provenance_path, state_path, parse_raw,
             matches = namespace_fingerprint(saved["abstractions"]) == built_fingerprint
         except (ValueError, TypeError, KeyError):
             pass
+    # Names are annotations only. The complete row fingerprint must match the
+    # image-bound build record before saved labels can describe these bytes.
+    saved_rows = {}
+    if matches is True:
+        for row in saved["abstractions"]:
+            if not isinstance(row, dict) or type(row.get("slot")) is not int:
+                continue
+            slot = row["slot"]
+            saved_rows[slot] = None if slot in saved_rows else row
+    entries = []
+    for entry in raw["entries"]:
+        binding = bindings.get(entry["slot"]) or {}
+        row = saved_rows.get(entry["slot"]) or {}
+        name = row.get("name") or binding.get("name") or binding.get("abstraction")
+        filename = binding.get("filename")
+        # Device windows do not have a standalone file. Do not make this
+        # assertion for unidentified entries or infer identity from slot numbers.
+        device = (isinstance(row.get("name"), str)
+                  and row["name"].endswith("_DEV")
+                  and entry["w0"] >= 0x40000000)
+        w1 = entry["w1"]
+        entries.append({
+            **entry,
+            "name": name,
+            "nameSource": ("matched-namespace" if row.get("name") else
+                           "build-record" if name else None),
+            "filename": filename,
+            "artifactSha256": binding.get("artifact_sha256"),
+            "artifactStatus": ("recorded" if filename else
+                               "not-applicable" if device else "unavailable"),
+            # Canonical NS W1: limit[20:0], sequence[29:21], G[30], F[31].
+            # W3 is retained verbatim, not used to invent a type for W1.
+            "decoded": {
+                "location": entry["w0"], "limit": w1 & 0x1FFFFF,
+                "sequence": (w1 >> 21) & 0x1FF,
+                "g": (w1 >> 30) & 1, "f": (w1 >> 31) & 1,
+                "seal": entry["w2"], "accessGt": entry["w3"],
+            },
+        })
     return {
         **raw,
         "entries": entries,

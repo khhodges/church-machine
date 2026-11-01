@@ -8,6 +8,14 @@ The Namespace Table is the sole authoritative source of LUMPs and their metadata
 The built-Namespace inspection page is read-only and represents the Namespace
 encoded in retained image bytes, not a second configuration editor.
 
+Read-only must not mean metadata-poor: retain readable descriptors and verified
+names. A saved Namespace whose complete fingerprint matches the image-bound
+build evidence may supply names, but never replace the image's slot membership
+or descriptor values.
+
+**Why:** The user rejected a raw-word-only view with missing names and approved
+restoring useful information while retaining the read-only boundary.
+
 **Why:** The user explicitly rejected the catalog-based boot-configuration page
 as competing with the Namespace Table and requested a read-only as-built view.
 

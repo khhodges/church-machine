@@ -483,7 +483,41 @@
     }
     function _bnText(v) {
         return (v === null || v === undefined || v === '') ?
-            '<span class="le-bn-absent">absent</span>' : esc(String(v));
+            '<span class="le-bn-absent">Unavailable</span>' : esc(String(v));
+    }
+    function _bnName(e) {
+        if (e.name === null || e.name === undefined || e.name === '')
+            return '<span class="le-bn-absent" title="No verified name: saved Namespace fingerprint does not match this image and no build record names it">Unavailable</span>';
+        var src = e.nameSource === 'matched-namespace' ? 'saved Namespace (fingerprint match)' :
+            (e.nameSource === 'build-record' ? 'build record' : 'source not stated');
+        return '<span class="le-bn-name">' + esc(String(e.name)) + '</span><span class="le-bn-sub">' + esc(src) + '</span>';
+    }
+    function _bnArtifact(e) {
+        if (e.artifactStatus === 'not-applicable')
+            return '<span class="le-bn-na" title="Hardware device entry; no file artifact exists">N/A \u2014 hardware device, no file</span>';
+        if (e.artifactStatus === 'recorded' || e.filename || e.artifactSha256)
+            return (e.filename ? '<span class="le-bn-file">' + esc(String(e.filename)) + '</span>' : '<span class="le-bn-absent">Not recorded</span>');
+        return '<span class="le-bn-absent">Not recorded</span>';
+    }
+    function _bnDec(dec, k, hexy) {
+        if (!dec || dec[k] === null || dec[k] === undefined) return '<span class="le-bn-absent">\u2014</span>';
+        var v = dec[k];
+        if (typeof v === 'boolean') return v ? 'yes' : 'no';
+        if (typeof v === 'number' && hexy) return '<code>' + esc(hex8(v)) + '</code>';
+        if (typeof v === 'object') return esc(JSON.stringify(v));
+        return esc(String(v));
+    }
+    function _bnFields(o) {
+        if (o === null || o === undefined) return _bnText(null);
+        if (typeof o !== 'object') return '<code>' + esc(String(o)) + '</code>';
+        var keys = Object.keys(o);
+        if (!keys.length) return '<span class="le-bn-absent">empty</span>';
+        return '<dl class="le-bn-kv">' + keys.map(function (k) {
+            var v = o[k];
+            var t = (typeof v === 'number') ? esc(String(v)) + (v > 9 ? ' <span class="le-bn-sub">' + esc(hex8(v)) + '</span>' : '') :
+                (v !== null && typeof v === 'object') ? '<code>' + esc(JSON.stringify(v)) + '</code>' : _bnText(v);
+            return '<dt>' + esc(k) + '</dt><dd>' + t + '</dd>';
+        }).join('') + '</dl>';
     }
 
     function _bnLoad() {
@@ -556,33 +590,43 @@
         var match = d.savedNamespaceMatchesBuilt === true ? 'yes' :
             (d.savedNamespaceMatchesBuilt === false ? 'no \u2014 saved Namespace differs from this build' : 'unknown');
         var ev = renderGrid([
-            ['Image SHA-256', '<code>' + _bnText(d.imageSha256) + '</code>'],
+            ['Image SHA-256', '<code class="le-bn-hash">' + _bnText(d.imageSha256) + '</code>'],
             ['Image bytes', _bnText(d.bytes)],
             ['Total words', _bnText(d.totalWords)],
             ['Max entries', _bnText(d.maxEntries)],
             ['NS table base', typeof d.nsTableBase === 'number' ? esc(hex8(d.nsTableBase)) + ' (' + d.nsTableBase + ')' : _bnText(d.nsTableBase)],
-            ['Thread', d.thread === null || d.thread === undefined ? _bnText(null) :
-                '<code>' + esc(typeof d.thread === 'object' ? JSON.stringify(d.thread) : String(d.thread)) + '</code>'],
-            ['NS header', d.nsHeader === null || d.nsHeader === undefined ? _bnText(null) :
-                '<code>' + esc(typeof d.nsHeader === 'object' ? JSON.stringify(d.nsHeader) : String(d.nsHeader)) + '</code>'],
             ['Provenance', _bnProvBadge(d.provenanceStatus)],
-            ['Built Namespace fingerprint', '<code>' + _bnText(d.builtNamespaceFingerprint) + '</code>'],
+            ['Built Namespace fingerprint', '<code class="le-bn-hash">' + _bnText(d.builtNamespaceFingerprint) + '</code>'],
             ['Saved Namespace matches built', esc(match)]
         ]);
+        var struct = '<div class="le-bn-struct"><section><h4>Thread</h4>' + _bnFields(d.thread) + '</section>' +
+            '<section><h4>NS header</h4>' + _bnFields(d.nsHeader) + '</section></div>';
         var rows = d.entries.map(function (e) {
             e = e || {};
+            var dec = e.decoded || null;
             return '<tr><td class="le-bn-slot">' + _bnText(e.slot) + '</td>' +
-                '<td><code>' + _bnHex(e.w0) + '</code></td><td><code>' + _bnHex(e.w1) + '</code></td>' +
-                '<td><code>' + _bnHex(e.w2) + '</code></td><td><code>' + _bnHex(e.w3) + '</code></td>' +
-                '<td>' + _bnText(e.name) + '</td><td>' + _bnText(e.filename) + '</td>' +
-                '<td><code class="le-bn-hash">' + _bnText(e.artifactSha256) + '</code></td></tr>';
+                '<td class="le-bn-namecell">' + _bnName(e) + '</td>' +
+                '<td>' + _bnDec(dec, 'location', true) + '</td><td>' + _bnDec(dec, 'limit', true) + '</td>' +
+                '<td>' + _bnDec(dec, 'sequence') + '</td><td>' + _bnDec(dec, 'f') + '</td><td>' + _bnDec(dec, 'g') + '</td>' +
+                '<td>' + _bnDec(dec, 'seal', true) + '</td><td>' + _bnDec(dec, 'accessGt', true) + '</td>' +
+                '<td>' + _bnArtifact(e) + '</td>' +
+                '<td class="le-bn-evcell"><details class="le-bn-details"><summary>Raw words &amp; hash</summary>' +
+                '<dl class="le-bn-kv"><dt>w0</dt><dd><code>' + _bnHex(e.w0) + '</code></dd><dt>w1</dt><dd><code>' + _bnHex(e.w1) + '</code></dd>' +
+                '<dt>w2</dt><dd><code>' + _bnHex(e.w2) + '</code></dd><dt>w3</dt><dd><code>' + _bnHex(e.w3) + '</code></dd>' +
+                '<dt>Artifact SHA-256</dt><dd><code class="le-bn-hash">' +
+                (e.artifactStatus === 'not-applicable' ? 'N/A (hardware device, no file)' :
+                    (e.artifactSha256 ? esc(String(e.artifactSha256)) : '<span class="le-bn-absent">Not recorded</span>')) +
+                '</code></dd></dl></details></td></tr>';
         }).join('');
         var table = d.entries.length ?
-            '<div class="le-bn-scroll"><table class="le-bn-table"><thead><tr><th>Slot</th><th>w0</th><th>w1</th><th>w2</th><th>w3</th>' +
-            '<th>Name</th><th>Filename</th><th>Artifact SHA-256</th></tr></thead><tbody>' + rows + '</tbody></table></div>' :
+            '<div class="le-bn-scroll"><table class="le-bn-table"><thead><tr><th>Slot</th><th>Name</th><th>Location</th><th>Limit</th>' +
+            '<th>Seq</th><th>F</th><th>G</th><th>Seal</th><th>Access</th><th>Artifact</th><th>Evidence</th></tr></thead><tbody>' +
+            rows + '</tbody></table></div>' :
             '<p class="le-panel-desc">The committed image contains no occupied Namespace slots.</p>';
-        el.innerHTML = head + ev +
-            '<p class="le-panel-desc">' + d.entries.length + ' committed slot(s). Names, filenames and hashes appear only when retained provenance matches the image; otherwise they are shown as absent.</p>' +
+        el.innerHTML = head + ev + struct +
+            '<p class="le-panel-desc">' + d.entries.length + ' committed slot(s). Membership and descriptor words come only from the image. ' +
+            'Names appear only when verified (saved Namespace fingerprint equals the image-bound fingerprint, or a build record); otherwise Unavailable. ' +
+            'Artifact N/A means a hardware device with no file; Not recorded means no file evidence was retained.</p>' +
             table + '</div>';
     }
 

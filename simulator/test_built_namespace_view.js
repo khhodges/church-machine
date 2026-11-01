@@ -43,8 +43,9 @@ const evidence = {
     thread: { lumpWords: 256 }, provenanceStatus: 'missing', builtNamespaceFingerprint: null,
     savedNamespaceMatchesBuilt: false,
     entries: [
-        { slot: 0, w0: 0x11, w1: 0x22, w2: 0x33, w3: 0x44, filename: null, artifactSha256: null, name: null },
-        { slot: 12, w0: 0xDEADBEEF, w1: 1, w2: 2, w3: 3, filename: 'alice.lump', artifactSha256: 'ffee', name: 'Alice' },
+        { slot: 0, w0: 0x11, w1: 0x22, w2: 0x33, w3: 0x44, filename: null, artifactSha256: null, name: null, nameSource: null, artifactStatus: 'unavailable', decoded: { location: 0x100, limit: 0x3F, sequence: 0, f: 1, g: 0, seal: 0xABC, accessGt: 'R' } },
+        { slot: 5, w0: 5, w1: 6, w2: 7, w3: 8, filename: null, artifactSha256: null, name: 'UART', nameSource: 'matched-namespace', artifactStatus: 'not-applicable', decoded: { location: 0xF000, limit: 4, sequence: 2, f: 0, g: 1, seal: 0, accessGt: 'RW' } },
+        { slot: 12, w0: 0xDEADBEEF, w1: 1, w2: 2, w3: 3, filename: 'alice.lump', artifactSha256: 'ffee', name: 'Alice', nameSource: 'build-record', artifactStatus: 'recorded', decoded: null },
     ],
 };
 
@@ -59,7 +60,14 @@ const evidence = {
     await tick(); await tick();
     const html = env.panel.innerHTML;
     check('renders raw words from evidence', html.includes('0xDEADBEEF') && html.includes('0x00000011'));
-    check('renders provenance name only where present', html.includes('Alice') && html.includes('alice.lump') && html.includes('absent'));
+    check('renders provenance name only where present', html.includes('Alice') && html.includes('alice.lump') && html.includes('Unavailable') && !/>absent</.test(html));
+    check('names column precedes raw words', html.indexOf('<th>Name</th>') > 0 && html.indexOf('<th>Name</th>') < html.indexOf('Raw words'));
+    check('decoded fields rendered', html.includes('0x0000F000') && html.includes('RW'));
+    check('name source shown', /saved Namespace \(fingerprint match\)/.test(html) && /build record/.test(html));
+    check('N/A artifact explained', /N\/A \u2014 hardware device, no file/.test(html));
+    check('unknown artifact says Not recorded', html.includes('Not recorded'));
+    check('raw words and full hash in details', /<details/.test(html) && html.includes('ffee') && html.includes('0x00000044'));
+    check('thread/header readable not JSON', html.includes('<dt>lumpWords</dt>') && !html.includes('{"lumpWords"'));
     check('labels built image vs live FPGA', /not the live physical FPGA/.test(html) && /saved Namespace may differ/.test(html));
     check('no write controls', !/Save|Load into Sim|Generate|Upload|<select|<input|draggable|Next/i.test(html.replace(/saved Namespace[^<]*/gi, '')));
     check('no catalog/config requests', env.requests.every(r => r.url === '/api/boot-image/built-namespace'));

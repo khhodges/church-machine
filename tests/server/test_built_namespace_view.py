@@ -88,3 +88,56 @@ def test_route_is_get_only_and_uses_read_only_helper():
     assert "read_built_namespace(" in route
     for forbidden in ("_ensure_ns_state(", "_auto_regen", "_resolve_namespace_saved_artifacts("):
         assert forbidden not in route
+
+
+def test_matching_namespace_supplies_names_without_changing_membership(fixture):
+    image, provenance, state, raw, read = fixture
+    p = json.loads(provenance.read_text())
+    p["namespace_fingerprint"] = "newer"
+    provenance.write_text(json.dumps(p))
+    state.write_text(json.dumps({"abstractions": [
+        {"slot": 1, "name": "Verified.Thread"},
+        {"slot": 99, "name": "Not.In.Image"}]}))
+    before = [x.read_bytes() for x in (image, provenance, state)]
+    result = read()
+    assert len(result["entries"]) == 1
+    assert result["entries"][0]["name"] == "Verified.Thread"
+    assert result["entries"][0]["nameSource"] == "matched-namespace"
+    assert [x.read_bytes() for x in (image, provenance, state)] == before
+
+
+def test_unmatched_namespace_cannot_supply_names(fixture):
+    _, _, state, _, read = fixture
+    state.write_text(json.dumps({"abstractions": [{"slot": 1, "name": "New.Name"}]}))
+    assert read()["entries"][0]["name"] is None
+
+
+def test_descriptor_decoding_uses_all_authority_bits(fixture):
+    _, _, _, raw, read = fixture
+    raw["entries"][0]["w1"] = (1 << 31) | (1 << 30) | (345 << 21) | 0x123456
+    decoded = read()["entries"][0]["decoded"]
+    assert decoded == {"location": 12, "limit": 0x123456, "sequence": 345,
+                       "f": 1, "g": 1, "seal": 3, "accessGt": 4}
+
+
+def test_device_artifact_is_not_applicable_only_with_verified_label(fixture):
+    _, provenance, state, raw, read = fixture
+    p = json.loads(provenance.read_text())
+    p.update(namespace_fingerprint="newer", resident_bindings=[])
+    provenance.write_text(json.dumps(p))
+    state.write_text(json.dumps({"abstractions": [{"slot": 1, "name": "UART_DEV"}]}))
+    raw["entries"][0]["w0"] = 0x40000014
+    assert read()["entries"][0]["artifactStatus"] == "not-applicable"
+    p["namespace_fingerprint"] = "different"
+    provenance.write_text(json.dumps(p))
+    assert read()["entries"][0]["artifactStatus"] == "unavailable"
+
+
+def test_duplicate_verified_labels_do_not_supply_identity(fixture):
+    _, provenance, state, _, read = fixture
+    p = json.loads(provenance.read_text())
+    p["namespace_fingerprint"] = "newer"
+    provenance.write_text(json.dumps(p))
+    state.write_text(json.dumps({"abstractions": [
+        {"slot": 1, "name": "One"}, {"slot": 1, "name": "Two"}]}))
+    assert read()["entries"][0]["name"] is None
