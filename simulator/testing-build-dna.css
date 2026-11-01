@@ -40,6 +40,9 @@
 .tbd-dialog.tbd-unassoc { border:2px solid #f59e0b; }
 .tbd-banner strong { display:inline-block; background:#241b0d; color:#fbbf24; border:1px solid #8a5a12; padding:4px 10px; border-radius:4px; letter-spacing:.8px; }
 .tbd-tools { display:flex; gap:6px; }
+.tbd-dlg-heading { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.tbd-layout { background:#0d1320; color:#e8f0fe; border:1px solid #2d3f5a; border-radius:5px; padding:4px 8px; font:inherit; }
+.tbd-layout:focus-visible { outline:2px solid #5eead4; outline-offset:2px; }
 .tbd-meta { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:0 16px; background:#111827; border:1px solid #1f2b3e; border-radius:6px; padding:6px 12px; }
 .tbd-dlg-main { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:10px; }
 .tbd-stage { position:relative; overflow:hidden; background:#0d1320; background-image:radial-gradient(#1a2436 1px, transparent 1px); background-size:22px 22px; border:1px solid #1f2b3e; border-radius:6px; cursor:grab; touch-action:none; min-height:260px; }

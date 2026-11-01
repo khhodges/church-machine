@@ -14,7 +14,7 @@
     if (!kind) return API;
     return API + '?' + kind + '=' + encodeURIComponent(id);
   }
-  function layoutGraph(nodes, cols) {
+  function layoutGraph(nodes, cols, mode) {
     var list = (nodes || []).slice().sort(function (a, b) {
       var sa = a.slot == null ? 1e9 : a.slot, sb = b.slot == null ? 1e9 : b.slot;
       return sa - sb || String(a.id).localeCompare(String(b.id));
@@ -22,6 +22,22 @@
     var n = list.length;
     cols = cols || Math.max(1, Math.ceil(Math.sqrt(n * 1.6)));
     var W = 190, H = 64, GX = 70, GY = 70, pos = {};
+    if (mode === 'organized') {
+      var groups = [[], [], []], row = 0;
+      list.forEach(function (nd) {
+        var kind = String(nd.kind || '').toLowerCase();
+        var group = kind === 'namespace' || kind === 'thread' ? 0 :
+          kind === 'hardware' || kind === 'mmio' || nd.availability === 'hardware-address' ? 2 : 1;
+        groups[group].push(nd);
+      });
+      groups.forEach(function (group) {
+        group.forEach(function (nd, i) {
+          pos[nd.id] = { x: (i % cols) * (W + GX), y: (row + Math.floor(i / cols)) * (H + GY), w: W, h: H };
+        });
+        row += Math.ceil(group.length / cols);
+      });
+      return { pos: pos, order: [].concat.apply([], groups), width: Math.max(W, cols * (W + GX) - GX), height: Math.max(H, row * (H + GY) - GY) };
+    }
     list.forEach(function (nd, i) {
       var c = i % cols, r = Math.floor(i / cols);
       pos[nd.id] = { x: c * (W + GX), y: r * (H + GY), w: W, h: H };
@@ -72,7 +88,7 @@
   }
 
   var gate = makeRequestGate();
-  var state = { catalog: null, mode: null, graph: null, selectedNode: null };
+  var state = { catalog: null, mode: null, graph: null, selectedNode: null, layoutMode: 'default' };
   var ui = {};
 
   function getJSON(url) {
@@ -264,7 +280,18 @@
     var d = el('dialog', 'tbd-dialog'); d.setAttribute('aria-labelledby', 'tbdDlgTitle');
     var top = el('div', 'tbd-dlg-head');
     var t = el('h2', null, 'Build DNA'); t.id = 'tbdDlgTitle';
-    top.appendChild(t);
+    var heading = el('div', 'tbd-dlg-heading');
+    heading.appendChild(t);
+    ui.layoutSel = el('select', 'tbd-layout'); ui.layoutSel.id = 'tbdLayout';
+    ui.layoutSel.setAttribute('aria-label', 'Build DNA layout');
+    [['default', 'Default'], ['organized', 'Organized']].forEach(function (option) {
+      var opt = el('option', null, option[1]); opt.value = option[0]; ui.layoutSel.appendChild(opt);
+    });
+    ui.layoutSel.addEventListener('change', function () {
+      state.layoutMode = ui.layoutSel.value;
+      if (state.graph) renderGraph(state.mode, state.graphId);
+    });
+    heading.appendChild(ui.layoutSel); top.appendChild(heading);
     ui.dlgBanner = el('div', 'tbd-banner');
     top.appendChild(ui.dlgBanner);
     var tools = el('div', 'tbd-tools');
@@ -338,7 +365,7 @@
 
   function loadGraph(kind, id) {
     var t = gate.next();
-    state.mode = kind; state.graph = null; state.selectedNode = null; state.layout = null;
+    state.mode = kind; state.graphId = id; state.graph = null; state.selectedNode = null; state.layout = null;
     openDialog();
     ui.dlgBanner.textContent = ''; ui.dlgMeta.textContent = ''; ui.detail.textContent = '';
     ui.dlg.classList.toggle('tbd-unassoc', kind === 'namespace');
@@ -362,6 +389,7 @@
   function renderGraph(kind, id) {
     var g = state.graph;
     var meta = ui.dlgMeta;
+    meta.textContent = '';
     if (kind === 'bitstream') {
       var b = findBs(id) || {};
       kv(meta, 'Bitstream', (g.bitstream && g.bitstream.label) || id, true);
@@ -385,7 +413,7 @@
     }
     var nodes = g.nodes || [], edges = g.edges || [];
     if (!nodes.length) { ui.stage.appendChild(el('div', 'tbd-empty', 'No objects in this image.')); return; }
-    var L = state.layout = layoutGraph(nodes);
+    var L = state.layout = layoutGraph(nodes, null, state.layoutMode);
     var s = svg('svg', { class: 'tbd-svg', role: 'img', 'aria-label': nodes.length + ' objects, ' + edges.length + ' GT links' });
     var defs = svg('defs', {});
     [['tbdArrow', 'tbd-arrow'], ['tbdArrowBad', 'tbd-arrow-bad']].forEach(function (m) {
@@ -438,6 +466,7 @@
     ui.stage.appendChild(s);
     ui.detail.textContent = '';
     ui.detail.appendChild(el('p', 'tbd-dim', 'Select an object to see its descriptor and every GT, including unresolved ones.'));
+    if (state.selectedNode) selectNode(state.selectedNode);
     requestAnimationFrame(fit);
   }
 
