@@ -9,3 +9,4 @@ description: Pointers for layout, browser events, dialog behavior and visible pr
 - [Visible binding progress](binding-progress-visibility.md): verify real paint frames, not DOM changes alone.
 - [Resize evidence](resize-error-evidence.md): attribute actual failures before changing layout.
 - [Persistent Thread strip](thread-strip-visibility.md): configured Threads stay visible across views and execution states.
+- [Built Namespace headings](built-namespace-header-visibility.md): title, Refresh and Thread tabs stay visible while content scrolls.

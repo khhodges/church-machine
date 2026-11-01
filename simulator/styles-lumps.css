@@ -7264,6 +7264,16 @@ html.spc-locked #saveNSDialog button, html.spc-locked #lumpSaveStaleConflictDial
 /* Built Namespace (read-only, as built) */
 .le-bn-head { display:flex; align-items:center; gap:.75rem; }
 .le-panel.le-bn { width:100%; max-width:none; box-sizing:border-box; }
+#lumpResidentPanel { min-height:0; overflow:hidden; }
+#lumpResidentPanel > .le-panel.le-bn {
+  display:flex; flex-direction:column; height:100%; min-height:0;
+}
+#lumpResidentPanel > .le-bn > .le-bn-head,
+#lumpResidentPanel > .le-bn > .le-panel-desc,
+#lumpResidentPanel > .le-bn > .le-bn-tabs { flex-shrink:0; }
+#lumpResidentPanel > .le-bn > .le-bn-tp {
+  flex:1 1 0; min-height:0; overflow:auto; padding-bottom:1rem;
+}
 .le-bn-scroll { overflow-x:auto; margin-top:.5rem; width:100%; }
 .le-bn-table { width:100%; border-collapse:collapse; font-size:.76rem; }
 .le-bn-table th { text-align:left; color:#77779a; font-weight:600; padding:.25rem .5rem; border-bottom:1px solid #2a2a4a; white-space:nowrap; }
