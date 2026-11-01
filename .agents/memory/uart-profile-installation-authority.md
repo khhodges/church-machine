@@ -126,23 +126,22 @@ does not establish isolation from other writers or later allocation/reuse.
 before adopting it. Bounds and descriptor integrity do not establish that the
 writer was entitled to choose the loaded capability.
 
-Start with the simplest synchronous Mint CALL/RETURN design: protected scratch
-with Mint resident. The user subsequently specified scratch “bolted down in
-CR6”; the working interpretation is a reserved row in Mint's resident C-list,
-loaded through CR6.M, with a private writable view of that word.
-Defer a dedicated Mint service Thread to Phase X.
+Use preconfigured free-object queues by size for foreground allocation.
+Move Mint's creation work to an independent background Thread that can be
+finished later to refill those queues. This supersedes the synchronous
+scratch/C-list minting design.
 
-**Why:** After reviewing the alternatives, the user selected the simplest
-synchronous option and explicitly deferred the dedicated Thread.
+**Why:** The user proposed a faster allocation path with preconfigured queues
+and background Mint, separating clients from the conversion authority discussed
+in the scratch review.
 
-**How to apply:** Preserve write/LOAD/clear semantics, but reconcile the selected
-C-list row with the saved source before implementation. CR6 is Mint's view only
-while Mint executes; normal RETURN restores the caller's view. Residency does
-not grant write authority or concurrency safety. Keep scratch outside client
-allocation storage; verify capability custody and exclusive use. Synchronous CALL alone
-does not prevent concurrent calls from other Threads. Scope the initial
-demonstration to one caller, not a claim of multi-Thread service safety.
-This choice does not authorize hardware installation or flash changes.
+**How to apply:** First review preprovisioned, zeroed objects with existing GTs
+and a bounded dequeue/return path; do not implement background refill yet.
+Retain CR1 as the result register and the 64-word minimum. Queue custody,
+exclusive dequeue, exhaustion behavior, and safe reclamation remain contracts
+to establish; a separate Thread alone does not prove complete threat removal.
+This direction does not authorize installation, hardware changes, or reuse of
+objects while old capabilities remain valid.
 
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
 The earlier eight-word example is not an accepted allocation contract.
