@@ -116,8 +116,7 @@ requiring every data view to contain a LUMP header. Preserve integrity, bounds,
 required boot-object checks and runtime enforcement. This agreement does not
 authorize board operations or a new hardware mapping.
 
-Do not proceed with the proposed heap-resident GT scratch word and L alias.
-The data-to-capability conversion design remains unresolved.
+Do not place GT scratch storage in the client allocation heap.
 
 **Why:** The user withdrew that direction because it would create a
 “system wide threat of Heap attacks.” Merely describing a heap word as private
@@ -125,5 +124,18 @@ does not establish isolation from other writers or later allocation/reuse.
 
 **How to apply:** Review all write authority over any proposed GT-load source
 before adopting it. Bounds and descriptor integrity do not establish that the
-writer was entitled to choose the loaded capability. Do not treat earlier
-heap placement, M-bit or WL discussions as an approved implementation.
+writer was entitled to choose the loaded capability.
+
+Start with the simplest synchronous Mint CALL/RETURN design: protected scratch
+in Mint's private state, written through its RW view and loaded through a
+one-word L view. Defer a dedicated Mint service Thread to Phase X.
+
+**Why:** After reviewing the alternatives, the user selected the simplest
+synchronous option and explicitly deferred the dedicated Thread.
+
+**How to apply:** Reuse the saved Mint write/LOAD/clear pattern rather than
+redesign CR6 or introduce WL permissions. Keep scratch outside client allocation
+storage; verify capability custody and exclusive use. Synchronous CALL alone
+does not prevent concurrent calls from other Threads. Scope the initial
+demonstration to one caller, not a claim of multi-Thread service safety.
+This choice does not authorize hardware installation or flash changes.
