@@ -52,6 +52,19 @@ if(fs.existsSync(imagePath)){
     const image=fs.readFileSync(imagePath);
     assert.equal(crypto.createHash('sha256').update(image).digest('hex'),reference.image);
     assert.equal(image.readUInt32LE(reference.malloryLoad.nia),reference.malloryLoad.word);
+    const binding = reference.lumps['ide.Mallory'];
+    const manifest = JSON.parse(fs.readFileSync('server/lumps/manifest.json','utf8'));
+    const selected = manifest.find(row=>row.token===binding.token);
+    assert.equal(selected.lump_version,binding.revision);
+    const binary=fs.readFileSync('server/lumps/'+selected.filename);
+    assert.equal(crypto.createHash('sha256').update(binary).digest('hex'),binding.sha256);
+    // Primary artifact is big-endian; bound image is little-endian. Only the
+    // final two destination-localized capability rows differ.
+    assert.equal(binary.length,512);
+    for(let offset=0;offset<504;offset+=4)
+        assert.equal(binary.readUInt32BE(offset),image.readUInt32LE(0x3a00+offset));
+    assert.equal(image.readUInt32LE(0x3bf8),0x4a000011);
+    assert.equal(image.readUInt32LE(0x3bfc),0x32000011);
     for(const [slot,row] of Object.entries(reference.slots)){
         assert.equal(image.readUInt32LE(Number(slot)*16)*4,row[1]);
         assert.equal(image.readUInt32LE(Number(slot)*16+4),row[2]);

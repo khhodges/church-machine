@@ -5399,6 +5399,7 @@ function showFaultModal(f) {
     const _lumpLabel = !_isHw && locationNs && locationNs.label ? _escHtml(locationNs.label) : '';
     const _hasRegs = !!(crSection || drSection || gtSnapshotSection);
     const _actions = _isHw ? `
+            <button class="btn btn-muted" onclick="faultModalOpenLumpSummary()" ${_faultSummaryName(f) ? '' : 'disabled'} title="Open the exact LUMP revision recorded for the selected FPGA build.">Open build LUMP summary</button>
             <button class="btn btn-primary" onclick="_wukongUseGoldenFaultReference()" ${f._goldenReference ? 'disabled' : ''} title="Select the static hash-linked golden reference. This is not hardware attestation.">${f._goldenReference ? 'Golden reference selected' : 'Use golden reference'}</button>
             <button class="btn btn-muted" onclick="_faultSelectTab(this,'regs')">Inspect C-list</button>
             <button class="btn btn-muted" onclick="_faultSelectTab(this,'trace')">Instruction</button>
@@ -5610,6 +5611,55 @@ function _autoGrowFaultNote(input) {
     if (!input) return;
     input.style.height = 'auto';
     input.style.height = `${input.scrollHeight}px`;
+}
+
+function _faultSummaryName(f) {
+    if (!f) return null;
+    const label = f._hardwareTrace && f._hardwareTrace.gt_label || '';
+    const match = /^@phase1 event FAULT [^/]+ \/ [^/]+ \/ (.+)$/.exec(label);
+    if (match && match[1].trim() !== 'unresolved') return match[1].trim();
+    if (f._goldenReference && f._acceptedSnapshot) {
+        const gt = f._acceptedSnapshot.cr?.[14]?.[0];
+        const row = gt && _FAULT_GOLDEN_REFERENCE.slots[gt & 0xffffff];
+        if (row) return row[0];
+    }
+    return null;
+}
+
+async function faultModalOpenLumpSummary() {
+    const overlay = document.getElementById('faultModalOverlay');
+    const record = overlay && overlay._faultRecord;
+    const name = _faultSummaryName(record);
+    if (!name) return;
+    try {
+        const binding = record._goldenReference && _FAULT_GOLDEN_REFERENCE.lumps[name];
+        if (!binding) throw new Error('No exact saved-revision binding is recorded for this object in the selected build');
+        const response = await fetch('/api/lumps/' + binding.token + '/detail', {cache: 'no-store'});
+        if (!response.ok) throw new Error('The build’s exact LUMP revision is unavailable (HTTP ' + response.status + ')');
+        const lump = await response.json();
+        if (lump.abstraction !== name || lump.token !== binding.token ||
+            lump.lump_version !== binding.revision || lump.binary_hash !== binding.sha256)
+            throw new Error('The saved LUMP does not match the selected build’s exact revision and binary hash');
+        if (document.getElementById('faultModalOverlay')?._faultRecord !== record) return;
+        // Explicit library inspection avoids the selected Namespace substituting
+        // its own assigned revision. showLumpDetail cancels asynchronous auto-focus.
+        window._lumpLibraryBrowsing = true;
+        switchView('lumps');
+        showLumpDetail(binding.token, {assignedLump: {...lump, read_only: true}});
+        const content = document.getElementById('lumpsDetailContent');
+        const evidence = document.createElement('div');
+        evidence.className = 'fault-build-lump-evidence';
+        evidence.setAttribute('role', 'note');
+        evidence.textContent = `Selected FPGA build: ${name} v${binding.revision} · token ${binding.token}. ` +
+            `Exact saved binary verified: ${binding.sha256}. ` +
+            `Golden BIT ${_FAULT_GOLDEN_REFERENCE.bit}. C-list entries are destination-bound in the build image.`;
+        evidence.style.cssText = 'padding:10px;margin-bottom:10px;border:1px solid #8a773e;color:#eedc99;overflow-wrap:anywhere';
+        if (content) content.prepend(evidence);
+        faultModalDismiss();
+    } catch (error) {
+        _showFpgaToast('Could not open LUMP summary',
+            error.message + '. Nothing changed; retry from the fault report.', 'error', 10000);
+    }
 }
 
 function faultModalDismiss() {
@@ -21686,6 +21736,10 @@ function _wukongBuildHwFaultObj(data) {
 const _FAULT_GOLDEN_REFERENCE = {
     bit: 'a4acb0ef9a39ba985d7769031cf146edb68fb65ff96e0b4f4a895093b54e5d4e',
     image: '5603d8e105e47ca0f6524e4553989387c088de19ac0e6b3f6fd9897e170cf16d',
+    lumps: {
+        'ide.Mallory': {token: '0fe63f75', revision: 3,
+            sha256: '11341685017d1852f514d1af6fda990edf87c89cbd082be8df83ccfb8a677fb5'},
+    },
     slots: {
         1: ['Boot.NS', 0, 255], 2: ['Boot.Thread', 0x400, 255],
         6: ['ide.SelfTest', 0x800, 1023], 7: ['ide.WukongCallHome', 0x1800, 1023],

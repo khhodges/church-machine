@@ -64,3 +64,22 @@ alongside genuine UART fault output and requested explicit bridge-only labels.
 
 **How to apply:** Keep actual queue drops distinguishable from missing HTTP
 acknowledgements, and never imply a transport warning is another FPGA fault.
+
+Fault-to-LUMP navigation must open the exact saved revision used by the selected
+build, verified against its binary hash; never substitute the latest by name.
+
+**Why:** The user rejected introducing uncertainty when preserved build evidence
+already identifies the actual LUMP version.
+
+**How to apply:** Separate destination-localized C-list words from immutable
+artifact content when checking a bound image. If the exact revision is unavailable,
+report that explicitly instead of navigating to another revision.
+
+Asynchronous fault actions should track ownership by incident record, not modal
+DOM identity: an evidence refresh can replace the modal without changing the fault.
+
+**Why:** A valid summary lookup was discarded when the same fault's modal
+re-rendered while its request was pending.
+
+**How to apply:** Continue only for the same fault record; cancellation or a
+different incident must still prevent delayed navigation.
