@@ -116,23 +116,15 @@ requiring every data view to contain a LUMP header. Preserve integrity, bounds,
 required boot-object checks and runtime enforcement. This agreement does not
 authorize board operations or a new hardware mapping.
 
-The Mint demonstration should use M-bit authority for loading the constructed
-GT, rather than introduce a separate scratch L capability.
+Use a reserved word in Mint's private RW heap/tuple with a one-word L view
+of that same location for constructing and loading a GT.
 
-**Why:** The user explicitly directed “We should use the M-Bit” after reviewing
-scratch aliases, CR6 rows, and the reserved Namespace metadata word.
+**Why:** After reviewing M-bit and PP250-style WL alternatives, the user chose
+“hide it in the heap that has RW and create a one word L to a tuple location.”
+This supersedes the earlier M-bit-only direction for this demonstration.
 
-**How to apply:** Review an M-based software sequence against the frozen BIT
-before implementation. This is design direction, not evidence that arbitrary
-register M elevation or DWRITE elevation exists, nor approval to change the BIT.
-Scratch placement and how M is established/restored remain to be resolved.
-
-If a dedicated one-word scratch object is necessary, the user proposes
-PP250-style WL “alchemist” permissions for that object.
-
-**Why:** They want the data-write and GT-load operation expressed as one bounded
-authority, rather than proliferating separate scratch grants.
-
-**How to apply:** Treat this as an architectural proposal, not an implemented
-permission combination or permission to change the frozen BIT. Its domain-coded
-GT format distinguishes W from L; review feasibility explicitly.
+**How to apply:** Write and clear through the existing RW view; LOAD through
+the one-word L view (inclusive limit zero). Reserve the word against allocation
+to callers; privacy comes from capability custody, not obscurity. Exact placement
+still needs reconciliation with the saved Mint's scratch-address calculation.
+Do not repurpose Namespace metadata or change the BIT for this design.
