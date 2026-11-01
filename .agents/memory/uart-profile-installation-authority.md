@@ -116,15 +116,14 @@ requiring every data view to contain a LUMP header. Preserve integrity, bounds,
 required boot-object checks and runtime enforcement. This agreement does not
 authorize board operations or a new hardware mapping.
 
-Use a reserved word in Mint's private RW heap/tuple with a one-word L view
-of that same location for constructing and loading a GT.
+Do not proceed with the proposed heap-resident GT scratch word and L alias.
+The data-to-capability conversion design remains unresolved.
 
-**Why:** After reviewing M-bit and PP250-style WL alternatives, the user chose
-“hide it in the heap that has RW and create a one word L to a tuple location.”
-This supersedes the earlier M-bit-only direction for this demonstration.
+**Why:** The user withdrew that direction because it would create a
+“system wide threat of Heap attacks.” Merely describing a heap word as private
+does not establish isolation from other writers or later allocation/reuse.
 
-**How to apply:** Write and clear through the existing RW view; LOAD through
-the one-word L view (inclusive limit zero). Reserve the word against allocation
-to callers; privacy comes from capability custody, not obscurity. Exact placement
-still needs reconciliation with the saved Mint's scratch-address calculation.
-Do not repurpose Namespace metadata or change the BIT for this design.
+**How to apply:** Review all write authority over any proposed GT-load source
+before adopting it. Bounds and descriptor integrity do not establish that the
+writer was entitled to choose the loaded capability. Do not treat earlier
+heap placement, M-bit or WL discussions as an approved implementation.
