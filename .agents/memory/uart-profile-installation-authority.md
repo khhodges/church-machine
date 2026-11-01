@@ -68,3 +68,15 @@ Mint to create RW data objects and move setup online.
 Distinguish the user's slot-zero terminology from the frozen image's metadata
 and self-descriptor layout. Investigation is not permission to install the
 grant, alter the live Namespace, or run board commands.
+
+For this boot-bitstream Mint bootstrap demonstration, include the passkey
+parameter in the interface but ignore it, as with Mint.CREATE. Do not require
+Abstract-passkey loading or verification on this path.
+
+**Why:** The user explicitly directed “include but ignore the passkey” after
+the separate approval-token path was confused with the Inform RW table grant.
+
+**How to apply:** Preserve the interface without treating the ignored parameter
+as verified authorization. Keep Inform capability, permission, bounds, sequence,
+and integrity checks intact. This demonstration-specific decision does not
+remove passkey enforcement from other profiles or authorize image installation.

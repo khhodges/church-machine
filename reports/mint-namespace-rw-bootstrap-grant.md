@@ -69,8 +69,19 @@ Mint's software owns that policy. Four descriptor writes are not atomic.
    ordinary DREAD/DWRITE at the stated bounds. Encoder arithmetic is not
    execution or hardware acceptance.
 4. Review the remaining Mint bindings: pool/Cleaner, allocation state,
-   scratch, caller approval, result delivery and lawful invocation.
+   scratch, result delivery and lawful invocation.
    This grant supplies table access only; it does not by itself complete CREATE.
+
+## Passkey scope for this demonstration
+
+The user directs that the passkey parameter remain in the interface but be
+ignored, as with Mint.CREATE. This path must not require an Abstract-passkey
+load or verifier call, and must not report the ignored passkey as verified.
+The Namespace-table grant remains an Inform RW capability. Normal capability
+permissions, bounds, sequence, and integrity checks remain in force.
+This is a demonstration-specific interface decision, not removal of passkey
+enforcement from other profiles. Executable changes and installation remain
+separate steps.
 
 The next proposed check is read-only verification of this grant against the
 frozen BIT's source contract and the chosen Mint artifact. No RTL replay or
