@@ -1634,3 +1634,17 @@ mtime_ms = 1793561115799
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6cb4bb29-f99a-40ed-8de1-b1afee0604f4/4e63e1f9-4d7c-47e7-a040-91c84b62d951"
 storage_version_token = "1793561121034473"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "5Mi32TMUY6YW44lmequiW"
+uri = "file://reports/mint-alias-validation-review.md"
+type = "text"
+title = "Mint alias validation — proposed changes"
+description = "Review-only proposal separating storage allocations from capability views, preserving NULL-binding diagnostics and runtime checks."
+logical_id = "f629125b-1a20-4c13-ab25-f0f1d9e15952"
+content_hash = "sha256:7b937c0ddbe3825bf3b5381b53d83f9284eca719504d2179e7f626a909d64bd4"
+size = 6326
+mtime_ms = 1793561487566
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f629125b-1a20-4c13-ab25-f0f1d9e15952/d07181f3-6466-43e7-bf79-b20d59802d16"
+storage_version_token = "1793561492877551"
+content_type = "text/markdown"
