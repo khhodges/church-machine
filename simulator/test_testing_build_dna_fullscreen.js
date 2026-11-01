@@ -46,12 +46,31 @@ const { chromium } = require('playwright');
     let bounds = await page.locator('.tbd-dialog').boundingBox();
     assert.deepStrictEqual(bounds, { x: 0, y: 0, width: 1200, height: 800 });
     assert.equal(await frame.locator('.tbd-dialog').count(), 0);
+    async function checkFit() {
+      await page.waitForFunction(() => {
+        const stage = document.querySelector('.tbd-stage').getBoundingClientRect();
+        const graph = document.querySelector('.tbd-svg > g').getBoundingClientRect();
+        return graph.width > 0 && graph.left >= stage.left + 20 &&
+          graph.right <= stage.right - 20 && graph.top >= stage.top + 20 &&
+          graph.bottom <= stage.bottom - 20 &&
+          (Math.abs(graph.width - (stage.width - 48)) < 3 ||
+           Math.abs(graph.height - (stage.height - 48)) < 3);
+      });
+    }
+    await checkFit();
+    assert.equal(await page.locator('.tbd-detail').isVisible(), false);
+    await page.locator('.tbd-node').first().click();
+    assert.equal(await page.locator('.tbd-detail').isVisible(), true);
+    await checkFit();
+    await page.getByRole('button', { name: 'Close details', exact: true }).click();
+    await checkFit();
     await page.locator('#tbdLayout').selectOption('organized');
     assert.deepStrictEqual(await page.locator('.tbd-node title').allTextContents(), ['t', 'm']);
     await page.setViewportSize({ width: 390, height: 844 });
     bounds = await page.locator('.tbd-dialog').boundingBox();
     assert.equal(bounds.width, 390);
     assert.equal(bounds.height, 844);
+    await checkFit();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await page.locator('.tbd-dialog').getAttribute('open'), null);
     await frame.getByRole('button', { name: 'Inspect Namespace', exact: true }).click();

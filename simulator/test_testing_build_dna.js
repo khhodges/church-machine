@@ -28,6 +28,12 @@ assert.ok(wrapped.pos.code.y > wrapped.pos.thread.y);
 assert.ok(wrapped.pos.mmio.y > wrapped.pos.other.y);
 assert.deepStrictEqual(m.layoutGraph([], null, 'organized').order, []);
 assert.strictEqual(m.layoutGraph([{ id: 'only', kind: 'MMIO' }], null, 'organized').pos.only.y, 0);
+const many = Array.from({ length: 12 }, (_, i) => ({ id: String(i), slot: i, kind: 'Abstraction' }));
+const wide = m.viewportLayout(many, 'default', 1400, 350);
+const tall = m.viewportLayout(many, 'default', 350, 1400);
+assert.ok(wide.width > tall.width);
+assert.ok(wide.height < tall.height);
+assert.deepStrictEqual(m.viewportLayout([], 'organized', 0, 0).order, []);
 const edges = [
   { id: 'e1', source: 'a', target: 'b', raw: 1, register: 'CR0', status: 'resolved' },
   { id: 'e2', source: 'a', target: null, raw: 0xffffffff, register: 'CR1', status: 'unresolved' },

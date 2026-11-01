@@ -49,6 +49,18 @@
     return [e.id, e.source, e.target == null ? 'unresolved' : e.target, hex32(e.raw), e.register, e.kind,
       e.permissions, e.status, e.targetSlot].join(' ').toLowerCase();
   }
+  function viewportLayout(nodes, mode, width, height) {
+    var best, score = -1;
+    for (var cols = 1; cols <= Math.max(1, nodes.length); cols++) {
+      var candidate = layoutGraph(nodes, cols, mode);
+      // Use occupied bounds, not empty columns in partially filled tiers.
+      candidate.width = Math.max(190, ...Object.values(candidate.pos).map(function (p) { return p.x + p.w; }));
+      var fitScale = Math.min(Math.max(1, width - 48) / (candidate.width + 60),
+        Math.max(1, height - 48) / (candidate.height + 70));
+      if (fitScale > score) { score = fitScale; best = candidate; }
+    }
+    return best;
+  }
   function filterDetail(node, edges, q) {
     q = (q || '').trim().toLowerCase();
     var out = (edges || []).filter(function (e) { return e.source === node.id; });
@@ -64,7 +76,7 @@
     var seq = 0;
     return { next: function () { return ++seq; }, isCurrent: function (t) { return t === seq; } };
   }
-  var pure = { hex32: hex32, buildUrl: buildUrl, layoutGraph: layoutGraph, filterDetail: filterDetail, clampZoom: clampZoom, makeRequestGate: makeRequestGate };
+  var pure = { hex32: hex32, buildUrl: buildUrl, layoutGraph: layoutGraph, viewportLayout: viewportLayout, filterDetail: filterDetail, clampZoom: clampZoom, makeRequestGate: makeRequestGate };
   if (typeof module !== 'undefined' && module.exports) { module.exports = pure; return; }
 
   // ---------- DOM ----------
@@ -318,11 +330,19 @@
     top.appendChild(tools);
     d.appendChild(top);
     ui.dlgMeta = el('div', 'tbd-meta'); d.appendChild(ui.dlgMeta);
-    var main = el('div', 'tbd-dlg-main');
+    var main = ui.main = el('div', 'tbd-dlg-main');
     ui.stage = el('div', 'tbd-stage'); ui.stage.tabIndex = 0;
     ui.stage.setAttribute('aria-label', 'GT object graph. Drag to pan, wheel to zoom.');
     main.appendChild(ui.stage);
-    var side = el('aside', 'tbd-detail');
+    var side = ui.side = el('aside', 'tbd-detail');
+    side.hidden = true;
+    var hideDetail = el('button', 'tbd-btn', 'Close details'); hideDetail.type = 'button';
+    hideDetail.addEventListener('click', function () {
+      state.selectedNode = null;
+      side.hidden = true; main.classList.remove('has-selection');
+      renderGraph(state.mode, state.graphId);
+    });
+    side.appendChild(hideDetail);
     ui.search = el('input'); ui.search.type = 'search'; ui.search.placeholder = 'Search GTs (raw, register, target, status)…';
     ui.search.setAttribute('aria-label', 'Search object GTs');
     ui.search.addEventListener('input', renderDetail);
@@ -348,7 +368,7 @@
     // Remove the promoted dialog if its owning Testing page is unloaded.
     root.addEventListener('pagehide', function () { d.remove(); });
     if (root.ResizeObserver) new root.ResizeObserver(function () {
-      if (d.open) fit();
+      if (d.open && state.graph) renderGraph(state.mode, state.graphId);
     }).observe(ui.stage);
 
     var drag = null;
@@ -385,11 +405,15 @@
     view.x = cx - (cx - view.x) * k; view.y = cy - (cy - view.y) * k; view.z = nz; applyView();
   }
   function fit() {
-    if (!state.layout) return;
-    var r = ui.stage.getBoundingClientRect(), L = state.layout, pad = 60;
-    var w = L.width + pad * 2 + 120, hgt = L.height + pad * 2 + 60;
-    view.z = clampZoom(Math.min(r.width / w, r.height / hgt));
-    view.x = (r.width - L.width * view.z) / 2; view.y = (r.height - L.height * view.z) / 2; applyView();
+    if (!state.layout || !ui.gRoot || !ui.gRoot.isConnected) return;
+    var r = ui.stage.getBoundingClientRect(), bounds = ui.gRoot.getBBox(), pad = 24;
+    if (!bounds.width || !bounds.height || !r.width || !r.height) return;
+    // Include actual curved links and unresolved stubs, with a small screen-space margin.
+    view.z = Math.min(Math.max(1, r.width - pad * 2) / bounds.width,
+      Math.max(1, r.height - pad * 2) / bounds.height);
+    view.x = (r.width - bounds.width * view.z) / 2 - bounds.x * view.z;
+    view.y = (r.height - bounds.height * view.z) / 2 - bounds.y * view.z;
+    applyView();
   }
 
   function openDialog() {
@@ -402,6 +426,7 @@
   function loadGraph(kind, id) {
     var t = gate.next();
     state.mode = kind; state.graphId = id; state.graph = null; state.selectedNode = null; state.layout = null;
+    ui.side.hidden = true; ui.main.classList.remove('has-selection');
     openDialog();
     ui.dlgBanner.textContent = ''; ui.dlgMeta.textContent = ''; ui.detail.textContent = '';
     ui.dlg.classList.toggle('tbd-unassoc', kind === 'namespace');
@@ -449,7 +474,8 @@
     }
     var nodes = g.nodes || [], edges = g.edges || [];
     if (!nodes.length) { ui.stage.appendChild(el('div', 'tbd-empty', 'No objects in this image.')); return; }
-    var L = state.layout = layoutGraph(nodes, null, state.layoutMode);
+    var viewport = ui.stage.getBoundingClientRect();
+    var L = state.layout = viewportLayout(nodes, state.layoutMode, viewport.width, viewport.height);
     var s = svg('svg', { class: 'tbd-svg', role: 'img', 'aria-label': nodes.length + ' objects, ' + edges.length + ' GT links' });
     var defs = svg('defs', {});
     [['tbdArrow', 'tbd-arrow'], ['tbdArrowBad', 'tbd-arrow-bad']].forEach(function (m) {
@@ -508,6 +534,7 @@
 
   function selectNode(id) {
     state.selectedNode = id;
+    ui.side.hidden = false; ui.main.classList.add('has-selection');
     Array.prototype.forEach.call(ui.stage.querySelectorAll('.tbd-node'), function (g) {
       g.classList.toggle('is-sel', g.querySelector('title').textContent === id);
     });
