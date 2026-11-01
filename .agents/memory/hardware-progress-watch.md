@@ -13,3 +13,12 @@ not just inferred from repeated faults or boot messages.
 catalog values. Distinguish sampling from observing every update, and distinguish
 retained observations from memory actually retained across reboot. This request
 does not authorize flashing hardware or changing capability enforcement.
+
+The user specifies that the stash/reporting software changes belong to Alice,
+running in Thread.2, using its CR5 heap tuple storage.
+
+**Why:** The user explicitly narrowed the program-side changes to Alice/Thread.2.
+
+**How to apply:** Keep Mallory/Thread.3 unchanged for this reporting feature.
+Distinguish Alice's reporting changes from the separate host-side monitoring
+and fault-recovery controls. This scope clarification is not flash authorization.
