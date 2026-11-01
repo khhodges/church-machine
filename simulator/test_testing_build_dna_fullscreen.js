@@ -29,9 +29,11 @@ const { chromium } = require('playwright');
         contentType = 'application/json';
         body = JSON.stringify(url.search ? {
           ok: true, status: 'available',
+          namespaceRevisionId: 'fixture',
           nodes: [{ id: 'm', slot: 1, name: 'MMIO', kind: 'Hardware' },
             { id: 't', slot: 2, name: 'Thread', kind: 'Thread' }], edges: [],
-        } : { ok: true, bitstreams: [], namespaces: [{ id: 'fixture', label: 'Fixture', imageAvailable: true }] });
+        } : { ok: true, bitstreams: [{ id: 'bit', label: 'Bit fixture', namespaceRevisionId: 'fixture' }],
+          namespaces: [{ id: 'fixture', label: 'Fixture', imageAvailable: true }] });
       } else {
         throw new Error('Unexpected request: ' + url);
       }
@@ -40,10 +42,10 @@ const { chromium } = require('playwright');
     await page.goto('http://dna.test/');
     const frame = page.frameLocator('iframe');
     await frame.locator('#tbdNamespace').selectOption('fixture');
-    await frame.getByRole('button', { name: 'Inspect Namespace', exact: true }).click();
+    await frame.getByRole('button', { name: 'Open Namespace DNA', exact: true }).click();
     await page.locator('.tbd-node').first().waitFor();
-    await page.waitForFunction(() => document.querySelector('.tbd-dialog').getBoundingClientRect().width === innerWidth);
-    let bounds = await page.locator('.tbd-dialog').boundingBox();
+    await page.waitForFunction(() => document.querySelector('.tbd-workspace').getBoundingClientRect().width === innerWidth);
+    let bounds = await page.locator('.tbd-workspace').boundingBox();
     assert.deepStrictEqual(bounds, { x: 0, y: 0, width: 1200, height: 800 });
     assert.equal(await frame.locator('.tbd-dialog').count(), 0);
     async function checkFit() {
@@ -64,19 +66,40 @@ const { chromium } = require('playwright');
     await checkFit();
     await page.getByRole('button', { name: 'Close details', exact: true }).click();
     await checkFit();
-    await page.locator('#tbdLayout').selectOption('organized');
+    await page.locator('#tbdLayout-namespace').selectOption('organized');
     assert.deepStrictEqual(await page.locator('.tbd-node title').allTextContents(), ['t', 'm']);
+    await page.locator('#tbdBitstream').selectOption('bit');
+    await page.getByRole('button', { name: 'Open Bitstream DNA', exact: true }).click();
+    const bit = page.locator('[data-viewer="bitstream"]');
+    const ns = page.locator('[data-viewer="namespace"]');
+    await bit.locator('.tbd-node').first().waitFor();
+    assert.equal(await page.locator('.tbd-dialog').count(), 2);
+    assert.equal(await ns.locator('.tbd-layout').inputValue(), 'organized');
+    assert.equal(await bit.locator('.tbd-layout').inputValue(), 'default');
+    await ns.locator('.tbd-node').first().click();
+    assert.equal(await ns.locator('.tbd-detail').isVisible(), true);
+    assert.equal(await bit.locator('.tbd-detail').isVisible(), false);
+    const oldBitTransform = await bit.locator('.tbd-svg > g').getAttribute('transform');
+    await ns.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    assert.equal(await bit.locator('.tbd-svg > g').getAttribute('transform'), oldBitTransform);
+    await page.getByRole('button', { name: 'Open Bitstream DNA', exact: true }).click();
+    assert.equal(await page.locator('.tbd-dialog').count(), 2);
+    await bit.getByRole('button', { name: 'Close', exact: true }).click();
+    assert.equal(await page.locator('.tbd-dialog').count(), 1);
+    assert.equal(await ns.locator('.tbd-layout').inputValue(), 'organized');
+    await ns.getByRole('button', { name: 'Close details', exact: true }).click();
     await page.setViewportSize({ width: 390, height: 844 });
-    bounds = await page.locator('.tbd-dialog').boundingBox();
+    bounds = await page.locator('.tbd-workspace').boundingBox();
     assert.equal(bounds.width, 390);
     assert.equal(bounds.height, 844);
     await checkFit();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
-    assert.equal(await page.locator('.tbd-dialog').getAttribute('open'), null);
-    await frame.getByRole('button', { name: 'Inspect Namespace', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('.tbd-workspace').open);
+    await frame.getByRole('button', { name: 'Open Namespace DNA', exact: true }).click();
     await page.locator('.tbd-node').first().waitFor();
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('.tbd-dialog').open);
+    await page.waitForFunction(() => !document.querySelector('.tbd-workspace').open);
+    assert.equal(await frame.locator('#tbdNamespace').count(), 1);
     assert.deepStrictEqual(errors, []);
     console.log('Build DNA full-window iframe escape, mobile sizing, layout and close: passed');
   } finally {

@@ -131,13 +131,14 @@
     head.appendChild(ui.headState);
     panel.appendChild(head);
 
-    var controls = el('div', 'tbd-controls');
+    var controls = ui.controls = el('div', 'tbd-controls');
     var l1 = el('label', 'tbd-field');
     l1.appendChild(el('span', 'tbd-lbl', 'Bitstream'));
     ui.bsSel = el('select'); ui.bsSel.id = 'tbdBitstream';
     l1.appendChild(ui.bsSel);
     controls.appendChild(l1);
-    ui.viewBtn = el('button', 'tbd-btn', 'View Build DNA');
+    ui.viewBtn = el('button', 'tbd-btn', 'DNA');
+    ui.viewBtn.setAttribute('aria-label', 'Open Bitstream DNA');
     ui.viewBtn.type = 'button'; ui.viewBtn.disabled = true;
     controls.appendChild(ui.viewBtn);
     ui.clearBtn = el('button', 'tbd-btn tbd-btn-quiet', 'Clear selection');
@@ -149,7 +150,8 @@
     ui.nsSel = el('select'); ui.nsSel.id = 'tbdNamespace';
     l2.appendChild(ui.nsSel);
     controls.appendChild(l2);
-    ui.nsBtn = el('button', 'tbd-btn tbd-btn-warn', 'Inspect Namespace');
+    ui.nsBtn = el('button', 'tbd-btn tbd-btn-warn', 'DNA');
+    ui.nsBtn.setAttribute('aria-label', 'Open Namespace DNA');
     ui.nsBtn.type = 'button'; ui.nsBtn.disabled = true;
     controls.appendChild(ui.nsBtn);
     panel.appendChild(controls);
@@ -169,7 +171,6 @@
     ui.nsSel.addEventListener('change', function () { ui.nsBtn.disabled = !ui.nsSel.value; });
     ui.viewBtn.addEventListener('click', function () { if (ui.bsSel.value) loadGraph('bitstream', ui.bsSel.value); });
     ui.nsBtn.addEventListener('click', function () { if (ui.nsSel.value) loadGraph('namespace', ui.nsSel.value); });
-    buildDialog();
     loadCatalog();
   }
 
@@ -287,7 +288,6 @@
   }
 
   // ---------- graph dialog ----------
-  var view = { z: 1, x: 0, y: 0 };
   // Render in the outermost same-origin app document, not the Testing iframe.
   // The Replit preview shell is cross-origin and remains outside our control.
   function dialogHost() {
@@ -301,13 +301,65 @@
     }
     return host.document;
   }
+  var viewers = {}, workspace, panes, controlsHome;
+  function openWorkspace() {
+    if (!workspace) {
+      var hostDoc = dialogHost();
+      if (hostDoc !== doc && !hostDoc.querySelector('link[data-build-dna-style]')) {
+        var style = hostDoc.createElement('link');
+        style.rel = 'stylesheet';
+        style.href = new URL('/simulator/testing-build-dna.css', root.location.href).href;
+        style.setAttribute('data-build-dna-style', '');
+        hostDoc.head.appendChild(style);
+      }
+      workspace = el('dialog', 'tbd-workspace');
+      workspace.setAttribute('aria-label', 'Build DNA comparison');
+      var closeAll = el('button', 'tbd-btn tbd-close-all', 'Close all DNA');
+      closeAll.type = 'button'; closeAll.addEventListener('click', function () { workspace.close(); });
+      workspace.appendChild(closeAll);
+      panes = el('div', 'tbd-panes'); workspace.appendChild(panes);
+      hostDoc.body.appendChild(workspace);
+      workspace.addEventListener('keydown', function (event) { event.stopPropagation(); });
+      workspace.addEventListener('close', function () {
+        Object.keys(viewers).forEach(function (key) { viewers[key].close(); });
+        if (controlsHome) controlsHome.replaceWith(ui.controls);
+        if (ui.workspaceFocus && ui.workspaceFocus.isConnected) ui.workspaceFocus.focus();
+      });
+      root.addEventListener('pagehide', function () { workspace.remove(); });
+    }
+    if (!workspace.open) {
+      ui.workspaceFocus = doc.activeElement;
+      controlsHome = doc.createComment('DNA selection controls');
+      ui.controls.replaceWith(controlsHome);
+      workspace.insertBefore(ui.controls, panes);
+      workspace.showModal();
+    }
+  }
+  function loadGraph(kind, id) {
+    openWorkspace();
+    if (!viewers[kind]) viewers[kind] = createViewer(kind);
+    viewers[kind].load(kind, id);
+  }
+  function createViewer(viewerKind) {
+  var ui = {}, state = { graph: null, selectedNode: null, layoutMode: 'default' };
+  var gate = makeRequestGate(), view = { z: 1, x: 0, y: 0 }, resizeObserver;
+  function closeViewer() {
+    gate.next();
+    ui.dlg.open = false; ui.dlg.remove();
+    if (resizeObserver) resizeObserver.disconnect();
+    delete viewers[viewerKind];
+    panes.classList.toggle('tbd-pair', panes.children.length === 2);
+    if (!panes.children.length && workspace.open) workspace.close();
+  }
   function buildDialog() {
-    var d = el('dialog', 'tbd-dialog'); d.setAttribute('aria-labelledby', 'tbdDlgTitle');
+    var d = el('section', 'tbd-dialog'); d.setAttribute('aria-labelledby', 'tbdDlgTitle-' + viewerKind);
+    d.dataset.viewer = viewerKind;
     var top = el('div', 'tbd-dlg-head');
-    var t = el('h2', null, 'Build DNA'); t.id = 'tbdDlgTitle';
+    var t = el('h2', null, viewerKind === 'bitstream' ? 'Bitstream — Build DNA' : 'Namespace — Build DNA');
+    t.id = 'tbdDlgTitle-' + viewerKind;
     var heading = el('div', 'tbd-dlg-heading');
     heading.appendChild(t);
-    ui.layoutSel = el('select', 'tbd-layout'); ui.layoutSel.id = 'tbdLayout';
+    ui.layoutSel = el('select', 'tbd-layout'); ui.layoutSel.id = 'tbdLayout-' + viewerKind;
     ui.layoutSel.setAttribute('aria-label', 'Build DNA layout');
     [['default', 'Default'], ['organized', 'Organized']].forEach(function (option) {
       var opt = el('option', null, option[1]); opt.value = option[0]; ui.layoutSel.appendChild(opt);
@@ -325,7 +377,7 @@
       bt.addEventListener('click', s[2]); tools.appendChild(bt);
     });
     var close = el('button', 'tbd-btn', 'Close'); close.type = 'button';
-    close.addEventListener('click', function () { d.close(); });
+    close.addEventListener('click', closeViewer);
     tools.appendChild(close);
     top.appendChild(tools);
     d.appendChild(top);
@@ -350,26 +402,16 @@
     ui.detail = el('div', 'tbd-detail-body'); side.appendChild(ui.detail);
     main.appendChild(side);
     d.appendChild(main);
-    var hostDoc = dialogHost();
-    if (hostDoc !== doc && !hostDoc.querySelector('link[data-build-dna-style]')) {
-      var style = hostDoc.createElement('link');
-      style.rel = 'stylesheet';
-      style.href = new URL('/simulator/testing-build-dna.css', root.location.href).href;
-      style.setAttribute('data-build-dna-style', '');
-      style.addEventListener('load', fit);
-      hostDoc.head.appendChild(style);
-    }
-    hostDoc.body.appendChild(d);
+    panes.appendChild(d);
+    panes.classList.toggle('tbd-pair', panes.children.length === 2);
     ui.dlg = d;
     d.addEventListener('keydown', function (event) { event.stopPropagation(); });
-    d.addEventListener('close', function () {
-      if (ui.returnFocus && ui.returnFocus.isConnected) ui.returnFocus.focus();
-    });
-    // Remove the promoted dialog if its owning Testing page is unloaded.
-    root.addEventListener('pagehide', function () { d.remove(); });
-    if (root.ResizeObserver) new root.ResizeObserver(function () {
+    if (root.ResizeObserver) {
+      resizeObserver = new root.ResizeObserver(function () {
       if (d.open && state.graph) renderGraph(state.mode, state.graphId);
-    }).observe(ui.stage);
+      });
+      resizeObserver.observe(ui.stage);
+    }
 
     var drag = null;
     ui.stage.addEventListener('pointerdown', function (e) {
@@ -417,10 +459,8 @@
   }
 
   function openDialog() {
-    if (!ui.dlg.open) {
-      ui.returnFocus = doc.activeElement;
-      if (ui.dlg.showModal) ui.dlg.showModal(); else ui.dlg.setAttribute('open', '');
-    }
+    ui.dlg.open = true;
+    ui.dlg.setAttribute('open', '');
   }
 
   function loadGraph(kind, id) {
@@ -479,7 +519,7 @@
     var s = svg('svg', { class: 'tbd-svg', role: 'img', 'aria-label': nodes.length + ' objects, ' + edges.length + ' GT links' });
     var defs = svg('defs', {});
     [['tbdArrow', 'tbd-arrow'], ['tbdArrowBad', 'tbd-arrow-bad']].forEach(function (m) {
-      var mk = svg('marker', { id: m[0], viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' });
+      var mk = svg('marker', { id: m[0] + '-' + viewerKind, viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' });
       mk.appendChild(svg('path', { d: 'M0 0 L10 5 L0 10 z', class: m[1] })); defs.appendChild(mk);
     });
     s.appendChild(defs);
@@ -505,7 +545,7 @@
         d = 'M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + (my + bend) + ' ' + x2 + ' ' + (my + bend) + ' ' + x2 + ' ' + y2;
       }
       if (e.status && e.status !== 'resolved' && b) cls += ' tbd-edge-warn';
-      var p = svg('path', { d: d, class: cls, 'marker-end': b ? 'url(#tbdArrow)' : 'url(#tbdArrowBad)' });
+      var p = svg('path', { d: d, class: cls, 'marker-end': 'url(#' + (b ? 'tbdArrow' : 'tbdArrowBad') + '-' + viewerKind + ')' });
       p.dataset.src = e.source; p.dataset.tgt = e.target == null ? '' : e.target;
       var tt = svg('title', {}); tt.textContent = (e.register || '') + ' ' + hex32(e.raw) + ' → ' + (e.target == null ? 'UNRESOLVED' : e.target);
       p.appendChild(tt); eg.appendChild(p);
@@ -579,6 +619,10 @@
     var f = filterDetail(n, g.edges, ui.search.value);
     d.appendChild(gtTable('Outgoing GTs', f.outgoing));
     d.appendChild(gtTable('Incoming GTs', f.incoming));
+  }
+
+  buildDialog();
+  return { load: loadGraph, close: closeViewer };
   }
 
   function init() {
