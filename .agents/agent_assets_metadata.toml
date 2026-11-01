@@ -1578,3 +1578,17 @@ mtime_ms = 1793472761219
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/bb288a8a-4878-40ed-9776-d39de189f013/ddf06e1e-7a0c-43bc-a1be-42e0b9b6195c"
 storage_version_token = "1793472779734227"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "Rc7GZ8h0-DuzIh9ny8C-I"
+uri = "file://reports/mint-namespace-rw-bootstrap-grant.md"
+type = "text"
+title = "Mint Namespace RW bootstrap grant"
+description = "Review-only specification: proposed descriptor, RW token, Mint binding, and remaining checks. No image or hardware changes."
+logical_id = "92eb3f8a-9838-442d-ab43-a940554e562a"
+content_hash = "sha256:6822f69c1121928e27e00fb1d85a2866ff1ff0e9384dd0342cdb778eacdaeb33"
+size = 3825
+mtime_ms = 1793547289991
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/92eb3f8a-9838-442d-ab43-a940554e562a/13c2f9bd-8f92-4c4c-8ef9-21e55aa6d73c"
+storage_version_token = "1793547294938238"
+content_type = "text/markdown"
