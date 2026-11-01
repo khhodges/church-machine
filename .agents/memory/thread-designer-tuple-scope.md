@@ -40,6 +40,19 @@ definitions; design-only definitions must not be presented as built evidence.
 The tuple heap and initialized GTs are also per-Thread, including Alice and
 Mallory's initial capabilities.
 
+Initial Data Register values and CR capability assignments must be configurable
+per Thread on the Thread design page, carried through the explicit build, and
+displayed from the resulting bytes on Namespace — as built.
+
+**Why:** The user explicitly rejected separate scripted Alice/Mallory
+initialization as a substitute for the IDE workflow: both Data Registers and
+CRs can be customized by the IDE.
+
+**How to apply:** Treat initialization as authored Thread design, not just
+browser drafts or lab setup. Preserve independent values per Thread and the
+distinction between editable intent, committed initialization and live state.
+This requirement does not authorize flashing hardware.
+
 **Why:** The user explicitly clarified that each Thread has its own tuple heap
 and initialized GTs; displaying one common layout loses those distinctions.
 
