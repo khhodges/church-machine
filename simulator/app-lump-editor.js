@@ -67,6 +67,7 @@
     }
     var V20_NS_TOTAL_N        = 1;   // 2^(1+14) = 32K words = 128 KiB
     var V20_THREAD_LUMP_POW2  = 8;   // 256 words: the complete defined Thread layout
+    if (!window.ThreadRegisterDesign) throw new Error('ThreadRegisterDesign (thread-register-design.js) must load before app-lump-editor.js');
     var THREAD = window.ThreadDesign;
     if (!THREAD || !THREAD.normative) {
         throw new Error('Normative Thread design is unavailable');
@@ -183,8 +184,12 @@
         ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN },
         // Design-intent tuple definitions for the Heap zone (browser-saved
         // with this Thread design; explicit approval can retain build annotations).
-        tuples: []
+        tuples: [],
+        // Raw register text per Thread draft (see thread-register-design.js).
+        regDraft: window.ThreadRegisterDesign ? window.ThreadRegisterDesign.blankDraft() : { dr: [], cr: [], crTargets: {} }
     };
+    var _regMsg = null;        // { err: bool, text } | null
+    var _regBusy = false;
 
     var _hadSavedState = false;   // true when a previously saved design exists in localStorage
     var _threadDesigns = Object.create(null);
@@ -193,7 +198,8 @@
     function rememberThreadDesign() {
         _threadDesigns[_threadDesignKey] = JSON.parse(JSON.stringify({
             thread: state.thread, tuples: state.tuples,
-            tuplesUnreadable: state.tuplesUnreadable
+            tuplesUnreadable: state.tuplesUnreadable,
+            regDraft: state.regDraft
         }));
     }
 
@@ -205,8 +211,10 @@
         if (d.tuplesUnreadable !== undefined) state.tuplesUnreadable = d.tuplesUnreadable;
         try { state.tuples = window.ThreadTupleDesign.normalize(d.tuples || []); }
         catch (e) { state.tuplesUnreadable = d.tuples; }
+        state.regDraft = window.ThreadRegisterDesign.normalizeDraft(d.regDraft);
         _threadDesignKey = key;
         _tupleMsg = null;
+        _regMsg = null;
         _threadLumpClampedInfo = null;
         _threadCountClampedInfo = null;
     }
@@ -279,6 +287,7 @@
                 // to the nearest valid power-of-two capacity (min 64).
                 state.ns.slots = snapNSCap(s.ns.slots || NS_CAP_MIN);
             }
+            state.regDraft = window.ThreadRegisterDesign.normalizeDraft(s.regDraft);
             if (s.tuplesUnreadable !== undefined) state.tuplesUnreadable = s.tuplesUnreadable;
             if (Array.isArray(s.tuples) && window.ThreadTupleDesign) {
                 try { state.tuples = window.ThreadTupleDesign.normalize(s.tuples); }
@@ -720,16 +729,16 @@
                 ['Offsets', _bnText(h.startOffset) + ' \u2013 ' + _bnText(h.endOffset)],
                 ['Nonzero initial words', _bnText(h.nonzeroWords)],
                 ['Named tuple definitions', h.definitionsStatus === 'recorded'
-                    ? esc(String((h.definitions || []).length)) + ' recorded (design intent only)'
+                    ? esc(String((h.definitions || []).length)) + ' recorded definitions'
                     : '<span class="le-bn-absent">Not recorded in this build</span>']
             ]) + (h.definitionsStatus === 'recorded' ?
-                '<table class="le-bn-table"><thead><tr><th>Tuple</th><th>Heap offset</th><th>Thread offset</th><th>Words</th><th>Startup intent (not applied)</th></tr></thead><tbody>' +
+                '<table class="le-bn-table"><thead><tr><th>Tuple</th><th>Heap offset</th><th>Thread offset</th><th>Words</th><th>Declared startup policy</th></tr></thead><tbody>' +
                 (h.definitions || []).map(function (d) {
                     return '<tr><td>' + esc(d.name) + '</td><td>' + _bnText(d.offset) +
                         '</td><td>' + _bnText(h.startOffset + d.offset) + '</td><td>' +
                         _bnText(d.words) + '</td><td>' + esc(d.policy) + '</td></tr>';
                 }).join('') + '</tbody></table>' : '') + renderGrid([
-                ['Evidence scope', 'Exact image and Thread body; no runtime initialization claim']
+                ['Evidence scope', 'Definitions bound to this image and Thread body. Initial heap words below show actual built contents, not live runtime state.']
             ]) + '<p class="le-panel-desc">Exact initial words from the image. A zero word is only a zero value; it does not prove the word is unallocated.</p>' +
                 '<details class="le-bn-details le-bn-heap"><summary>Initial heap words (' + words.length + ')</summary>';
             if (words.length) {
@@ -744,6 +753,14 @@
                     'onclick="lumpEditorBnHeapPage(' + t.slot + ',1)">Following</button></div>';
             } else out += '<p class="le-panel-desc">Heap has no words.</p>';
             out += '</details>';
+        }
+        if (Array.isArray(t.dataRegisters)) {
+            out += '<h4 class="le-bn-h4">Initial data registers (as built, not live)</h4>' +
+                '<div class="le-bn-scroll"><table class="le-bn-table le-bn-dr"><thead><tr><th>Register</th><th>Offset</th><th>Address</th><th>Value</th><th>Decimal</th></tr></thead><tbody>' +
+                t.dataRegisters.map(function (d) {
+                    return '<tr><td class="le-bn-slot">' + esc(String(d.register)) + '</td><td>' + _bnText(d.offset) + '</td><td><code>' + _bnHex(d.address) +
+                        '</code></td><td><code>' + _bnHex(d.value) + '</code></td><td>' + (typeof d.value === 'number' ? String(d.value >>> 0) : '\u2014') + '</td></tr>';
+                }).join('') + '</tbody></table></div>';
         }
         var caps = Array.isArray(t.capabilities) ? t.capabilities : [];
         out += '<h4 class="le-bn-h4">Initial capability registers (as built, not live)</h4>' +
@@ -1020,7 +1037,7 @@
         }
 
         var saveBtn = _threadDesignKey !== 'legacy'
-            ? '<p class="le-panel-desc">Layout and tuples are saved locally for this Thread. They are design intent only, not an installed layout. Global boot changes remain separate under the legacy shared boot layout and require explicit review.</p>'
+            ? '<p class="le-panel-desc">Layout, tuples and register values are drafts for this Thread. Save for next build approves a snapshot; Build approved Thread designs writes that snapshot into the image. Neither editing nor saving activates the simulator or hardware.</p>'
             : '<p class="le-panel-desc"><strong>Boot layout — separate from tuple definitions.</strong> Only the button below submits Thread sizes for review. Tuple edits are saved in this browser; viewing the next page does not apply them to a boot image.</p><div class="le-save-row">' +
             '<button class="le-save-btn"' + (overCapacity ? ' disabled' : '') +
             ' onclick="lumpEditorSaveThread()"' +
@@ -1871,7 +1888,8 @@
             renderDesignSection('thread') +
             renderThreadSelector() +
             '<div class="le-design-editor-caption">Interactive build settings</div>' +
-            renderThreadPanel();
+            renderThreadPanel() +
+            renderRegisterPanel();
         if (nEl) nEl.innerHTML =
             renderDesignHero('ns') +
             renderDesignSection('ns') +
@@ -2004,6 +2022,235 @@
         } catch (error) {
             if (owner !== _threadDesignKey) return;
             _tupleMsg = {err: true, text: 'Tuple approval failed: ' + error.message + ' No build or hardware action was requested. Retry after correcting the error.'};
+        }
+        render();
+    };
+    // ── Per-Thread initial registers + full design approval/build ───────────
+
+    function _regBinding() {
+        return threadBindings().find(function (b) { return b.key === _threadDesignKey; }) || null;
+    }
+    function _regNsRow() {
+        return (_nsDrill.entries || []).find(function (r) { return Number(r.slot) === 0; }) || null;
+    }
+    function _regTargetRows() {
+        return (_nsDrill.entries || []).filter(function (r) {
+            return r && r.name && Number.isInteger(Number(r.slot)) && Number.isInteger(Number(r.seq));
+        });
+    }
+    function _regSave(okText) {
+        if (saveState()) _regMsg = okText ? { err: false, text: okText } : null;
+        else _regMsg = { err: true, text: 'Change kept on this page but NOT saved: browser storage is unavailable or full.' };
+    }
+
+    function renderRegisterPanel() {
+        var RD = window.ThreadRegisterDesign;
+        var d = state.regDraft = RD.normalizeDraft(state.regDraft);
+        var binding = _regBinding();
+        var cell = function (kind, i, text) {
+            var r = RD.parseWord(text), id = 'le-reg-' + kind + '-' + i;
+            var hint = r.error ? '<span class="le-reg-err" id="' + id + '-e">' + esc(r.error) + '</span>'
+                : (r.value === null ? '<span class="le-reg-dflt">build default</span>'
+                    : '<span class="le-reg-dec">' + RD.hex8(r.value) + ' = ' + r.value + '</span>');
+            return '<input type="text" class="le-reg-in' + (r.error ? ' le-reg-bad' : '') + '" id="' + id + '" value="' + esc(text) +
+                '" placeholder="default" spellcheck="false" autocomplete="off" aria-invalid="' + (r.error ? 'true' : 'false') + '"' +
+                (r.error ? ' aria-describedby="' + id + '-e"' : '') +
+                ' onchange="lumpEditorRegSet(\'' + kind + '\',' + i + ',this.value)">' + hint;
+        };
+        var dr = d.dr.map(function (t, i) {
+            return '<tr><td class="le-reg-name">DR' + i + '</td><td>' + cell('dr', i, t) + '</td></tr>';
+        }).join('');
+        var rows = _regTargetRows();
+        var cr = d.cr.map(function (t, i) {
+            var tg = d.crTargets[String(i)], cur = RD.parseWord(t);
+            var stillTarget = tg && cur.value !== null && cur.value === RD.informGT({ slot: tg.slot, seq: tg.seq });
+            var opts = '<option value="">Populate from Namespace target...</option>' + rows.map(function (r) {
+                return '<option value="' + Number(r.slot) + '">' + esc(r.name) + ' \u2014 NS[' + Number(r.slot) + '] seq ' + Number(r.seq) + '</option>';
+            }).join('');
+            return '<tr><td class="le-reg-name">CR' + i + '</td><td>' + cell('cr', i, t) + '</td><td>' +
+                '<select class="le-select le-reg-tgt" aria-label="CR' + i + ' target" onchange="lumpEditorRegTarget(' + i + ',this.value)">' + opts + '</select>' +
+                (stillTarget ? '<span class="le-reg-target">E-only Inform \u2192 ' + esc(tg.name) + ' (NS[' + tg.slot + '], seq ' + tg.seq + ')</span>' : '') +
+                '</td></tr>';
+        }).join('');
+        var rt = [12, 13, 14, 15].map(function (n) {
+            return '<tr class="le-reg-rt"><td class="le-reg-name">CR' + n + '</td><td colspan="2">Runtime-only \u2014 set by the machine at run time; not serialized into the Thread image.</td></tr>';
+        }).join('');
+        var errs = RD.errors(d);
+        var named = !!binding;
+        var msg = _regMsg ? '<div class="le-reg-msg ' + (_regMsg.err ? 'le-reg-msg-err' : 'le-reg-msg-ok') + '" role="' + (_regMsg.err ? 'alert' : 'status') + '">' + esc(_regMsg.text) + '</div>' : '';
+        var dis = _regBusy ? ' disabled' : '';
+        return '<div class="le-divider"></div>' +
+            '<section class="le-reg" aria-labelledby="le-reg-title">' +
+            '<h3 class="le-tu-title" id="le-reg-title">Initial registers <span class="le-tu-mono">' +
+                (named ? esc(binding.row.name) + ' \u2014 NS[' + Number(binding.row.slot) + ']' : 'legacy draft (unassigned)') + '</span></h3>' +
+            '<p class="le-panel-desc">Values written into this Thread\'s DR and CR homes when the approved design is built. Hex (0x...) or decimal, 0..0xFFFFFFFF. ' +
+            'Blank keeps the build default for this register of this Thread only; no other Thread is touched. Invalid entries are kept as typed and block saving.</p>' +
+            msg +
+            (errs.length ? '<div class="le-warn-banner" role="alert">' + errs.length + ' register entr' + (errs.length === 1 ? 'y is' : 'ies are') + ' invalid. Fix before saving.</div>' : '') +
+            '<div class="le-reg-grid">' +
+                '<div><h4 class="le-bn-h4">Data registers DR0\u2013DR15</h4><table class="le-reg-table"><tbody>' + dr + '</tbody></table></div>' +
+                '<div><h4 class="le-bn-h4">Capability registers CR0\u2013CR11 (raw GT)</h4><table class="le-reg-table"><tbody>' + cr + rt + '</tbody></table></div>' +
+            '</div>' +
+            '<div class="le-tu-actions" role="group" aria-label="Lab presets">' +
+                '<button type="button" class="le-next-btn" onclick="lumpEditorRegPreset(\'alice\')"' + (named ? '' : ' disabled') + '>Alice setup draft</button>' +
+                '<button type="button" class="le-next-btn" onclick="lumpEditorRegPreset(\'mallory\')"' + (named ? '' : ' disabled') + '>Mallory setup draft</button>' +
+                '<span class="le-tu-lbl">Sets DR1 and CR1 (E-only Inform to the actor) in this draft only. Boot, saving and building are unchanged.</span>' +
+            '</div>' +
+            '<div class="le-tu-actions">' +
+                '<button type="button" class="le-next-btn" onclick="lumpEditorDesignSave()"' + (named && !errs.length ? '' : ' disabled') + dis + '>Save for next build</button>' +
+                '<button type="button" class="le-next-btn" onclick="lumpEditorDesignLoadApproved()"' + (named ? '' : ' disabled') + dis + '>Load approved design</button>' +
+                '<button type="button" class="le-next-btn le-reg-build" onclick="lumpEditorDesignBuild()"' + dis + '>Build approved Thread designs</button>' +
+            '</div>' +
+            '<p class="le-tu-lbl">Save freezes this exact draft (layout, tuples, registers) as the approved design; it does not build. ' +
+            'Build uses saved approvals only, never unsaved drafts, and does not load or activate the simulator. ' +
+            'A fresh build has no runtime heap, so the server rejects tuples with the preserve policy.' +
+            (named ? '' : ' Select a named Thread to save or load a design.') + '</p>' +
+            '</section>';
+    }
+
+    window.lumpEditorRegSet = function (kind, i, v) {
+        var d = state.regDraft;
+        if ((kind !== 'dr' && kind !== 'cr') || !d[kind] || i < 0 || i >= d[kind].length) return;
+        d[kind][i] = String(v);
+        var r = window.ThreadRegisterDesign.parseWord(v);
+        _regSave(null);
+        if (r.error && _regMsg === null) _regMsg = { err: true, text: (kind === 'dr' ? 'DR' : 'CR') + i + ': ' + r.error + ' Kept as typed; not saved for build.' };
+        render();
+    };
+
+    window.lumpEditorRegTarget = function (i, slot) {
+        if (slot === '') return;
+        var RD = window.ThreadRegisterDesign;
+        var row = _regTargetRows().find(function (r) { return Number(r.slot) === Number(slot); });
+        try {
+            if (!row) throw new Error('Namespace target NS[' + slot + '] is no longer present.');
+            var gt = RD.informGT(row);
+            state.regDraft.cr[i] = RD.hex8(gt);
+            state.regDraft.crTargets[String(i)] = { slot: Number(row.slot), seq: Number(row.seq), name: row.name };
+            _regSave('CR' + i + ' draft set to E-only Inform ' + RD.hex8(gt) + ' for ' + row.name + ' (NS[' + row.slot + '], seq ' + row.seq + '). Not saved for build.');
+        } catch (e) { _regMsg = { err: true, text: 'CR' + i + ': ' + e.message + ' Nothing changed.' }; }
+        render();
+    };
+
+    window.lumpEditorRegPreset = function (key) {
+        var RD = window.ThreadRegisterDesign;
+        try {
+            if (!_regBinding()) throw new Error('Select a named Thread first.');
+            if (Number(_regBinding().row.slot) === 1) throw new Error('Select Thread.2 or Thread.3 for an actor preset. Boot.Thread is unchanged.');
+            var res = RD.applyPreset(state.regDraft, _nsDrill.entries || [], key);
+            state.regDraft = res.draft;
+            _regSave(RD.PRESETS[key].petname + ' setup draft: DR1=' + RD.hex8(RD.PRESETS[key].dr1) + ', CR1=' + RD.hex8(res.gt) +
+                ' (E-only Inform to ' + res.row.name + ', NS[' + res.row.slot + '], seq ' + res.row.seq + '). Draft only: not saved for build, not built, Boot unchanged.');
+        } catch (e) { _regMsg = { err: true, text: 'Preset failed: ' + e.message }; }
+        render();
+    };
+
+    function _regPayload() {
+        var TT = window.ThreadTupleDesign, RD = window.ThreadRegisterDesign;
+        var binding = _regBinding();
+        if (!binding) throw new Error('Select a currently bound named Thread.');
+        var ns = _regNsRow();
+        if (!ns) throw new Error('Namespace binding unavailable; refresh the Namespace.');
+        var problems = TT.validate(state.tuples, currentHeapWords());
+        if (problems.length) throw new Error(problems.join(' '));
+        return JSON.parse(JSON.stringify({
+            sizeWords: Math.pow(2, state.thread.lumpPow2), stackWords: state.thread.stackFrames * 2,
+            target: { slot: Number(binding.row.slot), sequence: Number(binding.row.seq || 0),
+                namespaceSequence: Number(ns.seq || 0), name: binding.row.name, namespaceName: ns.name },
+            tuples: TT.normalize(state.tuples),
+            initialization: RD.initialization(state.regDraft)
+        }));
+    }
+
+    function _regHeaders() {
+        return Object.assign({ 'Content-Type': 'application/json' },
+            (window.BuildApprovalView && window.BuildApprovalView._authHeaders ? window.BuildApprovalView._authHeaders() : {}));
+    }
+    async function _regJson(resp) {
+        var body = null;
+        try { body = await resp.json(); } catch (e) { body = null; }
+        if (!resp.ok || !body || body.ok === false) throw new Error((body && body.error) || ('The server rejected the request (status ' + resp.status + ') without an explanation.'));
+        return body;
+    }
+
+    window.lumpEditorDesignSave = async function () {
+        var owner = _threadDesignKey;
+        try {
+            var snap = _regPayload();
+            var set = snap.initialization.dataRegisters.filter(function (v) { return v !== null; }).length +
+                snap.initialization.capabilityRegisters.filter(function (v) { return v !== null; }).length;
+            if (!window.confirm('Freeze this exact design for ' + snap.target.name + ' (NS[' + snap.target.slot + ']) as the approved design for the next build?\n' +
+                snap.sizeWords + ' words, ' + snap.tuples.length + ' tuples, ' + set + ' initial registers set.\nThis does not build.')) return;
+            _regBusy = true; render();
+            await _regJson(await fetch('/api/boot-config/thread-designs', { method: 'POST', headers: _regHeaders(), body: JSON.stringify(snap) }));
+            _regBusy = false;
+            if (owner !== _threadDesignKey) { render(); return; }
+            _regMsg = { err: false, text: 'Approved design saved for ' + snap.target.name + '. Nothing was built; use Build approved Thread designs when ready.' };
+        } catch (e) {
+            _regBusy = false;
+            if (owner !== _threadDesignKey) { render(); return; }
+            _regMsg = { err: true, text: 'Save rejected: ' + e.message + ' The approved design and build are unchanged.' };
+        }
+        render();
+    };
+
+    function _regFindApproved(list, target) {
+        var arr = Array.isArray(list) ? list : (list && typeof list === 'object' ? Object.keys(list).map(function (k) { return list[k]; }) : []);
+        return arr.find(function (d) {
+            var t = d && d.target;
+            return t && Number(t.slot) === target.slot && Number(t.sequence) === target.sequence &&
+                Number(t.namespaceSequence) === target.namespaceSequence && t.name === target.name;
+        }) || null;
+    }
+
+    window.lumpEditorDesignLoadApproved = async function () {
+        var owner = _threadDesignKey;
+        try {
+            var b = _regBinding(), ns = _regNsRow();
+            if (!b || !ns) throw new Error('Select a bound named Thread with a loaded Namespace.');
+            var target = { slot: Number(b.row.slot), sequence: Number(b.row.seq || 0), namespaceSequence: Number(ns.seq || 0), name: b.row.name };
+            _regBusy = true; render();
+            var resp = await fetch('/api/boot-config', { cache: 'no-store' });
+            var body = await resp.json().catch(function () { return null; });
+            _regBusy = false;
+            if (!resp.ok || !body) throw new Error((body && body.error) || ('Could not read the boot configuration (status ' + resp.status + ').'));
+            var found = _regFindApproved(body.config && body.config.threadInitialDesigns, target);
+            if (owner !== _threadDesignKey) { render(); return; }
+            if (!found) throw new Error('No approved design exists for ' + target.name + ' (NS[' + target.slot + ']).');
+            if (!window.confirm('Replace the current draft for ' + target.name + ' with the approved design? Unsaved draft edits will be lost.')) { render(); return; }
+            var tuples = window.ThreadTupleDesign.normalize(found.tuples || []);
+            var exp = Math.log2(Number(found.sizeWords));
+            if (!Number.isInteger(exp)) throw new Error('Approved size ' + found.sizeWords + ' is not a power of two.');
+            state.thread.lumpPow2 = exp;
+            state.thread.stackFrames = Math.round(Number(found.stackWords) / 2);
+            state.tuples = tuples;
+            delete state.tuplesUnreadable;
+            state.regDraft = window.ThreadRegisterDesign.draftFromInitialization(found.initialization);
+            _regSave('Approved design loaded into this draft. Nothing was built.');
+        } catch (e) {
+            _regBusy = false;
+            if (owner === _threadDesignKey) _regMsg = { err: true, text: 'Load failed: ' + e.message + ' Draft unchanged.' };
+        }
+        render();
+    };
+
+    window.lumpEditorDesignBuild = async function () {
+        try {
+            var boots = (_nsDrill.entries || []).filter(function (r) { return r && r.boot === true; });
+            if (boots.length !== 1) throw new Error('Exactly one boot marker is required in the Namespace; found ' + boots.length + '.');
+            var entrySlot = Number(boots[0].slot);
+            if (!Number.isInteger(entrySlot)) throw new Error('Boot marker slot is invalid.');
+            if (!window.confirm('Build a new boot image from the saved approved Thread designs (entry NS[' + entrySlot + '] ' + (boots[0].name || '') + ')?\n' +
+                'Unsaved drafts are NOT included. The simulator is not loaded or activated.')) return;
+            _regBusy = true; render();
+            var body = await _regJson(await fetch('/api/boot-image/generate', { method: 'POST', headers: _regHeaders(),
+                body: JSON.stringify({ entrySlot: entrySlot, forHardware: false }) }));
+            _regBusy = false;
+            _regMsg = { err: false, text: 'Build succeeded from approved designs' + (body.message ? ': ' + body.message : '.') + ' Simulator not activated. As-built view refreshed.' };
+            if (typeof window.lumpEditorBuiltNamespaceRefresh === 'function') window.lumpEditorBuiltNamespaceRefresh();
+        } catch (e) {
+            _regBusy = false;
+            _regMsg = { err: true, text: 'Build failed: ' + e.message + ' No new image was installed; the as-built view is unchanged.' };
         }
         render();
     };

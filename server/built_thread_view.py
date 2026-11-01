@@ -53,7 +53,7 @@ def inspect_threads(image, entries, table_base, tuple_evidence=None):
         item = {
             "slot": entry["slot"], "name": entry.get("name"), "location": base,
             "headerWord": header, "sizeWords": size, "stackWords": stack,
-            "error": None, "zones": [], "heap": None, "capabilities": [],
+            "error": None, "zones": [], "heap": None, "capabilities": [], "dataRegisters": [],
             "runtimeRegisters": THREAD_DESIGN["runtimeCapabilityRegisters"],
         }
         result.append(item)
@@ -77,6 +77,11 @@ def inspect_threads(image, entries, table_base, tuple_evidence=None):
              "words": end - start + 1, "absoluteStart": base + start,
              "absoluteEnd": base + end}
             for name, start, end in ranges
+        ]
+        item["dataRegisters"] = [
+            {"register": f"DR{i}", "offset": offset, "address": base + offset,
+             "value": words[base + offset]}
+            for i, offset in enumerate(range(layout["dr_start"], layout["dr_end"] + 1))
         ]
         heap = list(words[base + layout["heap_start"]:base + layout["heap_end"] + 1])
         item["heap"] = {

@@ -47,6 +47,7 @@ function makeEnv() {
         },
         ThreadDesign: require('./thread_design.js'),
         ThreadTupleDesign: null,
+        ThreadRegisterDesign: require('./thread-register-design.js'),
         BOARD_PROFILES: { 'wukong-xc7a100t': { label: 'W', totalRamWords: 16384 } },
         Math, JSON, Number, String, Array, Object, Promise, Error, parseInt, isNaN,
     };
@@ -124,7 +125,8 @@ const evidence = {
         { slot: 7, name: null, location: 0x1000, headerWord: 0x11110000, sizeWords: 256, stackWords: 32, error: null,
           zones: [{ name: 'heap', startOffset: 64, endOffset: 164, words: 100, absoluteStart: 0x1040, absoluteEnd: 0x10A4 }],
           heap: { startOffset: 64, endOffset: 164, words: 100, initialWords: heapA, nonzeroWords: 1, definitionsStatus: 'not-recorded' },
-          capabilities: caps(0x1000, 5), runtimeRegisters: [12, 13, 14, 15] },
+          capabilities: caps(0x1000, 5), runtimeRegisters: [12, 13, 14, 15],
+          dataRegisters: Array.from({ length: 16 }, (_, i) => ({ register: 'DR' + i, offset: 240 + i, address: 0x10F0 + i, value: i === 1 ? 0xA11CE002 : 0 })) },
         { slot: 9, name: 'Worker', location: 0x2000, headerWord: 0x22220000, sizeWords: 512, stackWords: 64, error: null,
           zones: [], heap: { startOffset: 100, endOffset: 300, words: 200, initialWords: [0x77777777, 0], nonzeroWords: 1, definitionsStatus: 'not-recorded' },
           capabilities: caps(0x2000, 0), runtimeRegisters: [12, 13, 14, 15] },
@@ -143,6 +145,7 @@ const evidence = {
     h2 = env.panel.innerHTML;
     check('thread 7 heap + exact words incl zeros', h2.includes('0xCAFEBABE') && h2.includes('0x00000000') && /Not recorded in this build/.test(h2) && /does not prove/.test(h2));
     check('thread 7 GT table with target name and statuses', h2.includes('CR11') && h2.includes('UART') && /Generation mismatch/.test(h2) && /No target/.test(h2));
+    check('as-built DR table for own thread', /Initial data registers/.test(h2) && h2.includes('0xA11CE002') && h2.includes('DR15') && h2.indexOf('Initial data registers') < h2.indexOf('Initial capability registers'));
     check('CR12-15 runtime-only', /CR15<\/td><td colspan="6"><span class="le-bn-absent">Runtime-only/.test(h2));
     check('heap paginated', /Page 1 \/ 2/.test(h2) && !h2.includes('rel +130'));
     env.ctx.lumpEditorBnHeapPage(7, 1);
@@ -173,7 +176,7 @@ const evidence = {
     check('matching retained definitions show named offsets and sizes',
         /Counter<\/td><td>7<\/td><td>107<\/td><td>4<\/td><td>preserve/.test(env.panel.innerHTML));
     check('retained design is not claimed as initialization',
-        /Startup intent \(not applied\)/.test(env.panel.innerHTML));
+        /Declared startup policy/.test(env.panel.innerHTML));
     env.ctx.lumpEditorBuiltNamespaceRefresh();
     reply(env.pending[env.pending.length - 1], 200, ev2);
     await tick(); await tick();

@@ -41,6 +41,11 @@ def preserve_prepared_entries(candidate, prepared, cfg, lumps_dir):
         return words[at:at + 4]
 
     for slot in slots:
+        # An explicitly approved initial design owns the fresh body's entry
+        # and geometry. Do not replace it with an older retained continuation.
+        if any(d.get("target", {}).get("slot") == slot
+               for d in cfg.get("threadInitialDesigns", [])):
+            continue
         od, nd = descriptor(old, slot), descriptor(new, slot)
         ob, nb = od[0], nd[0]
         # Word 2 authenticates placement and legitimately changes on relocation.

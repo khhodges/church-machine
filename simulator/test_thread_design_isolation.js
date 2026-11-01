@@ -13,7 +13,7 @@ const rows = [
 ];
 let writes = 0;
 function open() {
-    const window = {ThreadTupleDesign: T,
+    const window = {ThreadTupleDesign: T, ThreadRegisterDesign: require('./thread-register-design.js'),
         ThreadDesign: JSON.parse(fs.readFileSync(__dirname + '/../shared/thread_design.json')),
         addEventListener() {}};
     const ctx = vm.createContext({window, console, setTimeout,

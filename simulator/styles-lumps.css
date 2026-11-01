@@ -7319,3 +7319,20 @@ html.spc-locked #saveNSDialog button, html.spc-locked #lumpSaveStaleConflictDial
 .le-panel.le-bn .le-bn-pager { display:flex; gap:.6rem; align-items:center; margin-top:.4rem; font-size:.74rem; color:#77779a; }
 .le-panel.le-bn .le-bn-rt td { opacity:.8; }
 @media (max-width:768px) { .le-panel.le-bn .le-bn-tab { flex:1 1 auto; } }
+
+/* Per-Thread initial register design */
+.le-reg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; }
+.le-reg-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+.le-reg-table td { padding: 0.2rem 0.4rem; vertical-align: top; border-bottom: 1px solid rgba(127,127,127,0.18); }
+.le-reg-name { font-family: ui-monospace, "Space Mono", monospace; font-weight: 600; width: 3.5rem; }
+.le-reg-in { font-family: ui-monospace, "Space Mono", monospace; width: 9.5rem; padding: 0.15rem 0.35rem; border: 1px solid rgba(127,127,127,0.4); border-radius: 3px; background: transparent; color: inherit; }
+.le-reg-bad { border-color: #d0544a; background: rgba(208,84,74,0.08); }
+.le-reg-err { display: block; color: #d0544a; font-size: 0.75rem; }
+.le-reg-dflt, .le-reg-dec, .le-reg-target { display: block; font-size: 0.72rem; opacity: 0.75; }
+.le-reg-target { opacity: 0.9; color: #4a8fb0; }
+.le-reg-tgt { max-width: 16rem; font-size: 0.75rem; }
+.le-reg-rt td { opacity: 0.6; font-style: italic; }
+.le-reg-msg { padding: 0.45rem 0.7rem; border-radius: 4px; margin: 0.5rem 0; font-size: 0.82rem; }
+.le-reg-msg-err { background: rgba(208,84,74,0.12); border-left: 3px solid #d0544a; }
+.le-reg-msg-ok { background: rgba(74,143,176,0.12); border-left: 3px solid #4a8fb0; }
+@media (max-width: 767px) { .le-reg-grid { grid-template-columns: 1fr; } }

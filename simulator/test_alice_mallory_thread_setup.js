@@ -24,6 +24,7 @@ if (inNode) {
 }
 const FixtureSimulator = inNode ? require('./simulator.js') : ChurchSimulator;
 const FixtureThreadDesign = inNode ? require('./thread_design.js') : ThreadDesign;
+const FixtureRegisterDesign = inNode ? require('./thread-register-design.js') : ThreadRegisterDesign;
 
 const ROOT = inNode ? path.resolve(__dirname, '..') : null;
 const manifest = inNode ? JSON.parse(fs.readFileSync(
@@ -218,8 +219,20 @@ for (const [index, role] of roles.entries()) {
     const dr1Home = base + layout.drStart + 1;
     assert(cr1Home <= base + layout.capsEnd && dr1Home <= base + layout.drEnd,
         `${role.name} homes must be inside its Thread body`);
-    sim.memory[cr1Home] = role.gt;
-    sim.memory[dr1Home] = role.sentinel;
+    // Use exactly the IDE's authored preset, not a second hidden grant recipe.
+    const authored = FixtureRegisterDesign.applyPreset(
+        FixtureRegisterDesign.blankDraft(),
+        [{name: role.abstraction, slot: role.slot,
+          seq: sim.parseNSWord1(sim.readNSEntry(role.slot).word1_limit).gtSeq}],
+        role.name.toLowerCase());
+    const initialization = FixtureRegisterDesign.initialization(authored.draft);
+    role.initializationDesign = initialization;
+    initialization.dataRegisters.forEach((value, register) => {
+        if (value !== null) sim.memory[base + layout.drStart + register] = value;
+    });
+    initialization.capabilityRegisters.forEach((value, register) => {
+        if (value !== null) sim.memory[base + layout.capsStart + register] = value;
+    });
     const cap = sim.parseGT(sim.memory[cr1Home] >>> 0);
     assert.strictEqual(cap.type, 1, `${role.name} CR1 must be Inform`);
     assert.strictEqual(cap.index, role.slot, `${role.name} CR1 must target its code slot`);

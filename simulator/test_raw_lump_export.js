@@ -43,6 +43,7 @@ const context = {
     },
     CapabilityTokens: strictCapabilityTokens,
     window: {
+        ThreadRegisterDesign: require('./thread-register-design.js'),
         ThreadDesign: {
             normative: true,
             dataRegisters: { words: 16 },

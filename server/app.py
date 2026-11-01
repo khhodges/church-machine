@@ -4738,6 +4738,15 @@ def _validated_boot_config_candidate(data, existing=None, authority_rows=None,
         cfg["step1"]["threadCount"] = int(step1["threadCount"])
     cfg["step1"]["threadStackWords"] = int(step1.get("threadStackWords", 32))
     tuple_design = existing.get("threadTupleDesign")
+    initial_designs = existing.get("threadInitialDesigns", [])
+    if "threadInitialDesigns" in data and data["threadInitialDesigns"] != initial_designs:
+        return None, "Thread initialization changed; use the explicit Thread design approval action"
+    if initial_designs:
+        from server.thread_initial_design import validate_designs
+        try:
+            cfg["threadInitialDesigns"] = validate_designs(initial_designs)
+        except ValueError as exc:
+            return None, str(exc)
     if "threadTupleDesign" in data and data["threadTupleDesign"] != tuple_design:
         return None, "Tuple annotations changed; use the explicit tuple-definition approval action"
     if tuple_design is not None:
@@ -4818,6 +4827,11 @@ def approve_thread_tuple_design():
                 raise ValueError(error)
             rows, _ = _read_authoritative_namespace_rows()
             validate_target(design, rows)
+            from server.thread_tuple_evidence import validate_design as tuple_snapshot
+            for initial in cfg.get("threadInitialDesigns", []):
+                if (initial["target"]["slot"] == design["target"]["slot"]
+                        and tuple_snapshot(initial) != design):
+                    raise ValueError("This Thread has approved initialization. Use Save for next build to change definitions and initial values together.")
             previous = validate_approvals(cfg.get("threadTupleDesign", []))
             cfg["threadTupleDesign"] = [
                 d for d in previous if d["target"]["slot"] != design["target"]["slot"]
@@ -4828,6 +4842,40 @@ def approve_thread_tuple_design():
         return jsonify(ok=False, error=str(exc)), 400
     except OSError:
         return jsonify(ok=False, error="Could not save tuple approval; retry. No build was requested."), 500
+
+
+@app.route("/api/boot-config/thread-designs", methods=["POST"])
+def approve_thread_initial_design():
+    """Approve exact build inputs; no generation, activation or FPGA writes."""
+    from server.thread_initial_design import validate_design, validate_designs, validate_bindings
+    try:
+        design = validate_design(request.get_json(silent=True))
+        with _namespace_commit_guard():
+            cfg, error = _read_saved_boot_config()
+            if error:
+                raise ValueError(error)
+            rows, _ = _read_authoritative_namespace_rows()
+            validate_bindings(design, rows)
+            generated = {1, *_boot_image_gen.generated_thread_slots(
+                _boot_image_gen.configured_thread_count(cfg["step1"]))}
+            if design["target"]["slot"] not in generated:
+                raise ValueError("Selected slot is not a generated Thread in this build")
+            previous = validate_designs(cfg.get("threadInitialDesigns", []))
+            cfg["threadInitialDesigns"] = [
+                d for d in previous if d["target"]["slot"] != design["target"]["slot"]
+            ] + [design]
+            # Definitions and their initialization are one approved snapshot.
+            from server.thread_tuple_evidence import validate_design as tuple_design
+            cfg["threadTupleDesign"] = [
+                d for d in cfg.get("threadTupleDesign", [])
+                if d["target"]["slot"] != design["target"]["slot"]
+            ] + [tuple_design(design)]
+            _atomic_write_json(BOOT_CONFIG_PATH, cfg)
+        return jsonify(ok=True, design=design, imageChanged=False, hardwareChanged=False)
+    except (ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 400
+    except OSError:
+        return jsonify(ok=False, error="Could not save Thread design. Retry; no build was requested."), 500
 
 
 @app.route("/api/boot-config", methods=["POST"])
@@ -28578,6 +28626,21 @@ def _describe_namespace_review_changes(before_rows, proposed_rows, manifest):
 
 def _describe_protected_change(payload):
     """Show proposed text/Namespace deltas without leaking approval credentials."""
+    if request.path == "/api/boot-config/thread-designs":
+        from server.thread_initial_design import validate_design, validate_bindings
+        design = validate_design(payload)
+        rows, _ = _read_authoritative_namespace_rows()
+        validate_bindings(design, rows)
+        init = design["initialization"]
+        return [
+            f"Approve initial state for {design['target']['name']} at NS[{design['target']['slot']}].",
+            f"Geometry: {design['sizeWords']} words; stack {design['stackWords']} words.",
+            "This saves future build inputs only. No existing image, running simulation or hardware changes.",
+            *[f"DR{i} = 0x{v:08X}" for i, v in enumerate(init["dataRegisters"]) if v is not None],
+            *[f"CR{i} = 0x{v:08X}" for i, v in enumerate(init["capabilityRegisters"]) if v is not None],
+            *[f"Initialize tuple {t['name']} at heap offset {t['offset']}: {t['fields']}"
+              for t in design["tuples"]],
+        ]
     if request.path == "/api/boot-config/thread-tuples":
         from server.thread_tuple_evidence import validate_design, validate_target, tuple_words
         design = validate_design(payload)

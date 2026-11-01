@@ -2710,6 +2710,19 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                          if row.get("filename") is not None}
     _generated_thread_slots = tuple(slot for slot in _generated_thread_slots
                                     if slot not in _saved_body_slots)
+    from server.thread_initial_design import validate_designs, validate_bindings, apply_initialization
+    _initial_designs = {}
+    for _design in validate_designs(cfg.get("threadInitialDesigns", [])):
+        validate_bindings(_design, _bootstrap_rows)
+        _design_slot = _design["target"]["slot"]
+        if _design_slot not in (1, *_generated_thread_slots) or _design_slot in _saved_body_slots:
+            raise ValueError(f"NS[{_design_slot}] approved initialization is not a generated Thread")
+        _initial_designs[_design_slot] = _design
+    _default_thread_size, _default_thread_stack = thread_size, thread_stack_words
+    if 1 in _initial_designs:
+        thread_size = _initial_designs[1]["sizeWords"]
+        thread_stack_words = _initial_designs[1]["stackWords"]
+        layout = thread_layout(thread_size, thread_stack_words)
     if _selftest_slot in _generated_thread_slots:
         raise ValueError(
             f"generate_boot_image: authoritative SelfTest slot {_selftest_slot} "
@@ -3192,9 +3205,10 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     # simulator.js fallback initialization exactly.
     extra_thread_locs = []
     for _ordinal, _thread_slot in enumerate(_generated_thread_slots, start=2):
+        _individual_size = _initial_designs.get(_thread_slot, {}).get("sizeWords", _default_thread_size)
         _thread_loc = _namespace_location(_thread_slot, running_offset)
-        _claim_resident_range(_thread_slot, _thread_loc, thread_size)
-        _thread_end = _thread_loc + thread_size
+        _claim_resident_range(_thread_slot, _thread_loc, _individual_size)
+        _thread_end = _thread_loc + _individual_size
         # Keep all resident bodies below the three metadata sentinel words.
         if _thread_end > _metadata_start:
             raise ValueError(
@@ -3205,7 +3219,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                 f"totalNamespaceWords."
             )
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _thread_slot, _thread_loc,
-                       (thread_size - 1) & 0x1FFFF, 0, 0, 1,
+                       (_individual_size - 1) & 0x1FFFFF, 0, 0, 1,
                        retained_sequences.get(_thread_slot, 0) if simulation_only else 0, 0, 0)
         locations[_thread_slot] = _thread_loc
         extra_thread_locs.append(_thread_loc)
@@ -3334,24 +3348,29 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     # context. Thread.2/3 explicitly start CapabilityTest through an initial
     # continuation frame, not an implicit CALL. This formats new images only.
     for _ordinal, _thread_loc in enumerate(extra_thread_locs, start=2):
+        _thread_slot = _generated_thread_slots[_ordinal - 2]
+        _individual_size = _initial_designs.get(_thread_slot, {}).get("sizeWords", _default_thread_size)
+        _individual_stack = _initial_designs.get(_thread_slot, {}).get("stackWords", _default_thread_stack)
+        _individual_layout = thread_layout(_individual_size, _individual_stack)
+        _individual_resume = _individual_layout["stack_end"] - 2
         _secondary_thread_gt = create_gt(
             retained_sequences.get(CAPABILITY_TEST_NS_SLOT, 0) if _ordinal <= 3 else _selftest_sequence,
             CAPABILITY_TEST_NS_SLOT if _ordinal <= 3 else _selftest_slot, {"E": 1}, 1)
         mem[_thread_loc] = pack_lump_header(
-            _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
-        mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | _resume_sto
-        mem[_thread_loc + layout["caps_start"]] = _secondary_thread_gt
-        mem[_thread_loc + _resume_sto + 1] = _secondary_thread_gt
-        mem[_thread_loc + _resume_sto + 2] = (
-            (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
+            _ns_n_minus_6(_individual_size), _individual_stack, THREAD_CAP_WORDS, 2)
+        mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | _individual_resume
+        mem[_thread_loc + _individual_layout["caps_start"]] = _secondary_thread_gt
+        mem[_thread_loc + _individual_resume + 1] = _secondary_thread_gt
+        mem[_thread_loc + _individual_resume + 2] = (
+            (0x7FFF << 13) | (1 << 12) | _individual_layout["stack_end"]
         )
         # CHANGE restores this real PC-0 continuation, leaving the poison
         # root beneath it. Unlike boot, ordinary CHANGE has no following CALL.
-        if thread_stack_words < 4:
+        if _individual_stack < 4:
             raise ValueError("secondary Thread startup requires two two-word frames")
-        mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | (_resume_sto - 2)
-        mem[_thread_loc + _resume_sto - 1] = _secondary_thread_gt
-        mem[_thread_loc + _resume_sto] = (1 << 12) | _resume_sto
+        mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | (_individual_resume - 2)
+        mem[_thread_loc + _individual_resume - 1] = _secondary_thread_gt
+        mem[_thread_loc + _individual_resume] = (1 << 12) | _individual_resume
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
@@ -3746,6 +3765,8 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                 "NS W3 differs from SELF GT")
 
     # ----- Pack ----------------------------------------------------------
+    for _slot, _design in _initial_designs.items():
+        apply_initialization(mem, locations[_slot], _design, boot=(_slot == 1))
     image = struct.pack(f"<{total}I", *mem)
 
     # Pre-flight sanity check: catch a zeroed mandatory NS slot now rather
