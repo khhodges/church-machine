@@ -28,3 +28,13 @@ inspection distinct from evidence for a bitstream.
 **Why:** Retained descending and ascending images coexist. Ascending metadata
 occupies slot zero; treating the following self descriptor as slot zero shifts
 every GT target. Localization can legitimately change the inspected body hash.
+
+Treat revision-store integrity and valid FPGA artifacts as separate checks.
+Do not call catalog entries real builds solely because their stored hashes
+verify. Validate the bitstream format and trace its exact bytes to retained
+build receipts and input-image bytes before presenting build DNA.
+
+**Why:** The Testing catalog exposed checksum-valid, tiny unit-test payloads as
+bitstreams. Real vendor evidence was retained separately in uploaded archives.
+Receipt-backed experimental inspection does not confer release approval,
+installation permission, or proof of what is installed on the board.
