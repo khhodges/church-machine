@@ -180,7 +180,10 @@
     // cw/sw = stack words and cc = the 12 capability-home count.
     var state = {
         thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, count: 1 },
-        ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN }
+        ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN },
+        // Design-intent tuple definitions for the Heap zone (browser-saved
+        // with this Thread design only; never sent to boot-config/binary).
+        tuples: []
     };
 
     var _hadSavedState = false;   // true when a previously saved design exists in localStorage
@@ -206,6 +209,11 @@
                 // Migrate legacy non-power-of-two slot counts (old 1–64 slider)
                 // to the nearest valid power-of-two capacity (min 64).
                 state.ns.slots = snapNSCap(s.ns.slots || NS_CAP_MIN);
+            }
+            if (s.tuplesUnreadable !== undefined) state.tuplesUnreadable = s.tuplesUnreadable;
+            if (Array.isArray(s.tuples) && window.ThreadTupleDesign) {
+                try { state.tuples = window.ThreadTupleDesign.normalize(s.tuples); }
+                catch (te) { state.tuples = []; state.tuplesUnreadable = s.tuples; _tupleMsg = { err: true, text: 'Saved tuple definitions were unreadable and were not loaded.' }; }
             }
             // Migrate the old page defaults, but preserve deliberate user
             // choices.  This keeps an existing browser profile from silently
@@ -233,7 +241,8 @@
             var payload = JSON.parse(JSON.stringify(state));
             payload.nsSizeClampedInfo = _nsSizeClampedInfo || null;
             localStorage.setItem('lump_editor_state', JSON.stringify(payload));
-        } catch (e) {}
+            return true;
+        } catch (e) { return false; }
     }
 
     // ── memory bar ────────────────────────────────────────────────────────────
@@ -1162,9 +1171,189 @@
             (zones.length ? renderMagBar(zones) : '') +
             '<div class="le-divider"></div>' +
             grid +
+            renderTuplePanel(overCapacity ? 0 : heap, overCapacity) +
             saveBtn +
         '</div>';
     }
+
+    // ── Heap tuple definitions (design intent) ───────────────────────────────
+
+    var _tupleMsg = null;      // { err: bool, text } | null
+    var _tupleHeapWords = 0;   // heap size used by the last render
+
+    function currentHeapWords() {
+        var profile  = getBoardProfile();
+        var budget   = Math.floor(profile.totalRamWords / 2);
+        var count    = clamp(state.thread.count, 1, boardThreadCountLimit(profile));
+        var maxPow2  = maxExpForWords(Math.min(Math.max(64, Math.floor(budget / count)), 8192));
+        var lumpSize = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, maxPow2));
+        var stackW   = clamp(state.thread.stackFrames, 10, 255) * 2;
+        return Math.max(0, lumpSize - CAP_WORDS - stackW - 18);
+    }
+
+    function renderTuplePanel(heapWords, overCapacity) {
+        var TT = window.ThreadTupleDesign;
+        _tupleHeapWords = heapWords;
+        if (!TT) return '';
+        var tuples = state.tuples || [];
+        var problems = TT.validate(tuples, heapWords);
+        var used = tuples.reduce(function (s, t) { return s + TT.tupleWords(t); }, 0);
+        var tplOpts = Object.keys(TT.TEMPLATES).map(function (k) {
+            return '<option value="' + esc(k) + '">' + esc(TT.TEMPLATES[k].label) + '</option>';
+        }).join('');
+        var typeOpts = function (sel) {
+            return Object.keys(TT.TYPES).map(function (k) {
+                return '<option value="' + esc(k) + '"' + (k === sel ? ' selected' : '') + '>' + esc(k) + '</option>';
+            }).join('');
+        };
+        var polOpts = function (sel) {
+            return Object.keys(TT.POLICIES).map(function (k) {
+                return '<option value="' + esc(k) + '"' + (k === sel ? ' selected' : '') + '>' + esc(TT.POLICIES[k]) + '</option>';
+            }).join('');
+        };
+        var list = tuples.map(function (t, i) {
+            var w = TT.tupleWords(t), lay = TT.layout(t), id = 'le-tu-' + i;
+            var rows = t.fields.map(function (f, j) {
+                var fid = id + '-f' + j, L = lay[j];
+                var sizeCell = (f.type === 'utf8' || f.type === 'words')
+                    ? '<input type="number" class="le-number" id="' + fid + '-size" min="1" max="' + (f.type === 'utf8' ? 1024 : 4096) + '" value="' + esc(f.size) + '" aria-label="' + esc(t.name + '.' + f.name + (f.type === 'utf8' ? ' capacity in bytes' : ' size in words')) + '" onchange="lumpEditorTupleField(' + i + ',' + j + ',\'size\',this.value)">'
+                    : '<span class="le-tu-fixed">1 w</span>';
+                var initCell = f.type === 'words'
+                    ? '<span class="le-tu-fixed">zero</span>'
+                    : '<input type="' + (f.type === 'utf8' ? 'text' : 'number') + '" class="le-tu-input' + (f.type === 'utf8' ? '' : ' le-tu-num') + '" id="' + fid + '-init" value="' + esc(f.initial) + '" aria-label="' + esc(t.name + '.' + f.name + ' initial value') + '" onchange="lumpEditorTupleField(' + i + ',' + j + ',\'initial\',this.value)">';
+                return '<tr>' +
+                    '<td class="le-tu-mono">+' + L.offset + '</td>' +
+                    '<td><input type="text" class="le-tu-input" id="' + fid + '-name" value="' + esc(f.name) + '" maxlength="32" aria-label="' + esc(t.name + ' field ' + (j + 1) + ' name') + '" onchange="lumpEditorTupleField(' + i + ',' + j + ',\'name\',this.value)"></td>' +
+                    '<td><select class="le-select" aria-label="' + esc(t.name + '.' + f.name + ' type') + '" onchange="lumpEditorTupleField(' + i + ',' + j + ',\'type\',this.value)">' + typeOpts(f.type) + '</select></td>' +
+                    '<td>' + sizeCell + '</td>' +
+                    '<td>' + initCell + '</td>' +
+                    '<td class="le-tu-mono">' + L.words + '</td>' +
+                    '<td><button type="button" class="le-copy-btn" onclick="lumpEditorTupleRemoveField(' + i + ',' + j + ')" aria-label="' + esc('Remove field ' + f.name + ' from ' + t.name) + '"' + (t.fields.length < 2 ? ' disabled' : '') + '>remove</button></td>' +
+                '</tr>';
+            }).join('');
+            return '<fieldset class="le-tu-card">' +
+                '<legend class="le-tu-legend">' + esc(t.name) + ' <span class="le-tu-mono">heap +' + esc(t.offset) + ' \u2026 +' + esc(t.offset + w - 1) + ' \u00b7 ' + w + ' w \u00b7 ' + esc(t.template) + '</span></legend>' +
+                '<div class="le-tu-head">' +
+                    '<label class="le-tu-lbl" for="' + id + '-name">Name</label>' +
+                    '<input type="text" class="le-tu-input" id="' + id + '-name" maxlength="32" value="' + esc(t.name) + '" onchange="lumpEditorTupleSet(' + i + ',\'name\',this.value)">' +
+                    '<label class="le-tu-lbl" for="' + id + '-off">Heap offset</label>' +
+                    '<input type="number" class="le-number" id="' + id + '-off" min="0" max="' + Math.max(0, heapWords - 1) + '" value="' + esc(t.offset) + '" onchange="lumpEditorTupleSet(' + i + ',\'offset\',this.value)">' +
+                    '<label class="le-tu-lbl" for="' + id + '-pol">Start-up intent</label>' +
+                    '<select class="le-select" id="' + id + '-pol" onchange="lumpEditorTupleSet(' + i + ',\'policy\',this.value)">' + polOpts(t.policy) + '</select>' +
+                '</div>' +
+                '<div class="le-tu-scroll"><table class="le-tu-table"><caption class="le-tu-sr">Fields of ' + esc(t.name) + '</caption>' +
+                    '<thead><tr><th scope="col">Rel</th><th scope="col">Field</th><th scope="col">Type</th><th scope="col">Size</th><th scope="col">Initial</th><th scope="col">Words</th><th scope="col"><span class="le-tu-sr">Actions</span></th></tr></thead>' +
+                    '<tbody>' + rows + '</tbody></table></div>' +
+                '<div class="le-tu-actions">' +
+                    '<button type="button" class="le-next-btn" onclick="lumpEditorTupleAddField(' + i + ')">Add field</button>' +
+                    '<button type="button" class="le-copy-btn" onclick="lumpEditorTupleDelete(' + i + ')" aria-label="' + esc('Delete tuple ' + t.name) + '">Delete tuple</button>' +
+                '</div>' +
+            '</fieldset>';
+        }).join('');
+        var empty = tuples.length ? '' :
+            '<div class="le-tu-empty">No tuples defined. The whole ' + heapWords + '-word Heap is unassigned design space. Pick a template to begin.</div>';
+        var msg = _tupleMsg ? '<div class="' + (_tupleMsg.err ? 'le-error-banner' : 'le-tu-ok') + '">' + esc(_tupleMsg.text) + '</div>' : '';
+        var probs = problems.length
+            ? '<div class="le-warn-banner"><strong>Saved tuples no longer fit this geometry.</strong> ' + esc(problems.join(' ')) + ' Adjust offsets or Thread geometry; nothing was deleted.</div>' : '';
+        var unreadable = state.tuplesUnreadable !== undefined
+            ? '<div class="le-warn-banner">Unreadable saved tuple data is kept untouched in browser storage.</div>' : '';
+        return '<div class="le-divider"></div>' +
+            '<section class="le-tu" aria-labelledby="le-tu-title">' +
+            '<h3 class="le-tu-title" id="le-tu-title">Heap tuple definitions <span class="le-tu-mono">' + used + ' / ' + heapWords + ' heap words assigned</span></h3>' +
+            '<p class="le-panel-desc" id="le-tu-scope"><strong>Scope:</strong> design intent for the Heap zone (CR5) of this Thread design. ' +
+            'Definitions are saved in this browser together with the Thread design and apply to every Thread built from it, not to one individual Thread. ' +
+            'They are <strong>not</strong> included in the boot config, the Thread header, the built .lump file, simulator memory or hardware; ' +
+            'nothing initializes or preserves them at run time yet, so the start-up intent is a recorded plan only. Use Export JSON to carry them to another browser. ' +
+            'Offsets are relative to Heap start (Thread +18). Tuples add no capability or privacy boundary: every abstraction on the Thread can reach the whole heap; isolate state with a separate Thread.</p>' +
+            unreadable + probs + msg +
+            '<div class="le-tu-add" role="group" aria-label="Add tuple">' +
+                '<label class="le-tu-lbl" for="le-tu-template">Template</label>' +
+                '<select class="le-select" id="le-tu-template">' + tplOpts + '</select>' +
+                '<button type="button" class="le-next-btn" id="le-tu-add-btn" onclick="lumpEditorTupleAdd()"' + (overCapacity ? ' disabled' : '') + '>Add tuple</button>' +
+            '</div>' +
+            '<div aria-live="polite">' + empty + list + '</div>' +
+            '<details class="le-tu-io" id="le-tu-io"><summary>Export / import definitions (JSON)</summary>' +
+                '<div class="le-tu-actions">' +
+                    '<button type="button" class="le-next-btn" onclick="lumpEditorTupleExport()">Export JSON</button>' +
+                    '<label class="le-copy-btn le-tu-file">Load file<input type="file" accept="application/json,.json" class="le-tu-sr" onchange="lumpEditorTupleFile(this)"></label>' +
+                    '<button type="button" class="le-next-btn" onclick="lumpEditorTupleImport()">Validate and replace</button>' +
+                '</div>' +
+                '<label class="le-tu-lbl" for="le-tu-json">Definitions JSON (validated against the current Heap before anything is replaced)</label>' +
+                '<textarea id="le-tu-json" class="le-tu-json" rows="6" spellcheck="false"></textarea>' +
+            '</details>' +
+            '</section>';
+    }
+
+    function _tupleApply(res, okText) {
+        if (res.error) { _tupleMsg = { err: true, text: res.error + ' Nothing changed.' }; }
+        else {
+            state.tuples = res.tuples;
+            if (saveState()) _tupleMsg = okText ? { err: false, text: okText } : null;
+            else _tupleMsg = { err: true, text: 'Change kept on this page but NOT saved: browser storage is unavailable or full. Use Export JSON to keep a copy.' };
+        }
+        render();
+    }
+    function _num(v) { var s = String(v).trim(); return /^-?\d+$/.test(s) ? Number(s) : NaN; }
+
+    window.lumpEditorTupleAdd = function () {
+        var sel = document.getElementById('le-tu-template');
+        var key = sel ? sel.value : 'custom';
+        _tupleApply(window.ThreadTupleDesign.addFromTemplate(state.tuples, key, currentHeapWords()), 'Tuple added and saved with this browser\u2019s Thread design.');
+    };
+    window.lumpEditorTupleSet = function (i, key, v) {
+        var patch = {}; patch[key] = key === 'offset' ? _num(v) : String(v);
+        _tupleApply(window.ThreadTupleDesign.updateTuple(state.tuples, i, patch, currentHeapWords()));
+    };
+    window.lumpEditorTupleDelete = function (i) {
+        var t = state.tuples[i]; if (!t) return;
+        if (typeof confirm === 'function' && !confirm('Delete tuple definition "' + t.name + '"? This changes only the saved design.')) return;
+        _tupleApply(window.ThreadTupleDesign.removeTuple(state.tuples, i), 'Tuple deleted.');
+    };
+    window.lumpEditorTupleAddField = function (i) {
+        _tupleApply(window.ThreadTupleDesign.addField(state.tuples, i, currentHeapWords()));
+    };
+    window.lumpEditorTupleRemoveField = function (i, j) {
+        _tupleApply(window.ThreadTupleDesign.removeField(state.tuples, i, j, currentHeapWords()));
+    };
+    window.lumpEditorTupleField = function (i, j, key, v) {
+        var f = state.tuples[i] && state.tuples[i].fields[j];
+        var patch = {};
+        if (key === 'size') patch.size = _num(v);
+        else if (key === 'initial') patch.initial = (f && f.type === 'utf8') ? String(v) : _num(v);
+        else patch[key] = String(v);
+        _tupleApply(window.ThreadTupleDesign.updateField(state.tuples, i, j, patch, currentHeapWords()));
+    };
+    window.lumpEditorTupleExport = function () {
+        var json = window.ThreadTupleDesign.exportJson(state.tuples, currentHeapWords());
+        var ta = document.getElementById('le-tu-json'); if (ta) ta.value = json;
+        try {
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+            a.download = 'thread-design-tuples.json';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        } catch (e) {}
+    };
+    window.lumpEditorTupleFile = function (input) {
+        var file = input && input.files && input.files[0]; if (!file) return;
+        var r = new FileReader();
+        r.onload = function () { var ta = document.getElementById('le-tu-json'); if (ta) ta.value = String(r.result); };
+        r.readAsText(file);
+    };
+    window.lumpEditorTupleImport = function () {
+        var ta = document.getElementById('le-tu-json');
+        var text = ta ? ta.value : '';
+        try {
+            var list = window.ThreadTupleDesign.importJson(text, currentHeapWords());
+            if (state.tuples.length && typeof confirm === 'function' &&
+                    !confirm('Replace ' + state.tuples.length + ' tuple definition(s) with ' + list.length + ' imported?')) return;
+            _tupleApply({ tuples: list, error: null }, 'Imported ' + list.length + ' tuple definition(s).');
+        } catch (e) {
+            _tupleMsg = { err: true, text: 'Import rejected: ' + e.message + ' Nothing changed.' };
+            render();
+            ta = document.getElementById('le-tu-json'); if (ta) ta.value = text;
+        }
+    };
 
     // ── Namespace panel ───────────────────────────────────────────────────────
 
@@ -1737,9 +1926,35 @@
 
     // ── top-level render ──────────────────────────────────────────────────────
 
+    // Capture focus/selection and draft UI state that innerHTML would destroy.
+    function _captureUi(doc) {
+        var a = doc.activeElement, io = doc.getElementById('le-tu-io'), ta = doc.getElementById('le-tu-json');
+        var snap = { id: a && a.id ? a.id : null, start: null, end: null,
+            ioOpen: io ? !!io.open : null, json: ta ? ta.value : null };
+        try { if (a && typeof a.selectionStart === 'number') { snap.start = a.selectionStart; snap.end = a.selectionEnd; } } catch (e) {}
+        return snap;
+    }
+    function _restoreUi(doc, snap) {
+        if (!snap) return;
+        var io = doc.getElementById('le-tu-io'), ta = doc.getElementById('le-tu-json');
+        if (io && snap.ioOpen !== null) io.open = snap.ioOpen;
+        if (ta && snap.json !== null && !ta.value) ta.value = snap.json;
+        var el = snap.id && doc.getElementById(snap.id);
+        if (!el || typeof el.focus !== 'function') return;
+        try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+        if (snap.start !== null && typeof el.setSelectionRange === 'function') {
+            try {
+                var n = String(el.value || '').length;
+                el.setSelectionRange(Math.min(snap.start, n), Math.min(snap.end, n));
+            } catch (e) {}
+        }
+    }
+    window._lumpEditorUiState = { capture: _captureUi, restore: _restoreUi };
+
     function render() {
         var tEl = document.getElementById('lumpThreadPanel');
         var nEl = document.getElementById('lumpNSPanel');
+        var snap = _captureUi(document);
         if (tEl) tEl.innerHTML =
             renderDesignHero('thread') +
             renderDesignSection('thread') +
@@ -1750,6 +1965,7 @@
             renderDesignSection('ns') +
             '<div class="le-design-editor-caption">Interactive build settings</div>' +
             renderNSPanel();
+        _restoreUi(document, snap);
     }
 
     // ── public handlers ───────────────────────────────────────────────────────

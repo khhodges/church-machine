@@ -122,3 +122,22 @@ manager, cross-Thread handoff protocol, or private multi-tenant call database.
 External software must respect the explicitly reserved pool. Raw writes through
 CR5 remain possible under the existing ISA; no new authority or protection is
 introduced.
+
+## Design-time tuple definitions (Thread design page)
+
+**Builder → Thread Lump — Design Page → Heap tuple definitions** lets you lay
+out named, typed tuples (uint32, int32, UTF-8 text, raw word arrays) at
+heap-relative word offsets (offset 0 = Thread +18). Templates: **Telephone**
+(this exact 58-word layout, header words 0–3 included), **Counter**, **Custom**.
+Edits that overlap another tuple, extend past the derived Heap, or contain
+invalid names/sizes/initial values are rejected without change.
+
+Scope: definitions are saved in this browser with the Thread design
+(`lump_editor_state`) and describe every Thread of that design, not one
+individual Thread. They are not sent to boot-config and are not in the Thread
+header, built `.lump`, simulator memory or hardware. The per-tuple start-up
+intent (initialize/preserve) is recorded design intent only; no runtime
+initialization or recovery exists yet. Export/import JSON (schema
+`church.thread-design.tuples` v1) carries definitions between browsers; import
+is fully validated against the current Heap before replacing anything.
+Tuples add no capability or privacy boundary.

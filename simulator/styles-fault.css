@@ -2979,3 +2979,46 @@
     .fault-compact .fault-detail-label { flex: 0 0 72px; width: auto; border-bottom: 0; border-right: 1px solid rgba(180,160,100,0.10); padding: 4px 6px; font-size: 0.66rem; }
     .fault-compact .fault-detail-value { padding: 4px 6px; font-size: 0.74rem; }
 }
+
+/* Heap tuple definitions (Thread design page) */
+.le-tu-title { font-size: 0.9rem; color: var(--church-gold); margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; }
+.le-tu-mono { font-family: var(--mono); font-size: 0.72rem; color: var(--text-secondary); font-weight: normal; }
+.le-tu-add, .le-tu-head, .le-tu-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.5rem 0; }
+.le-tu-add .le-select, .le-tu-head .le-select { flex: 0 1 auto; min-width: 12rem; }
+.le-tu-lbl { font-size: 0.78rem; color: var(--text-secondary); }
+.le-tu-input { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.8rem; font-family: var(--mono); min-width: 0; width: 9rem; }
+.le-tu-num { width: 7rem; text-align: right; }
+.le-tu-input:focus, .le-tu-json:focus { outline: none; border-color: rgba(218,165,32,0.5); }
+.le-tu-input:focus-visible, .le-tu-json:focus-visible, .le-tu-file:focus-within { outline: 2px solid rgba(218,165,32,0.7); outline-offset: 1px; }
+.le-tu-card { border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.6rem 0; }
+.le-tu-legend { font-family: var(--mono); font-size: 0.82rem; color: var(--text-primary); padding: 0 0.3rem; }
+.le-tu-scroll { overflow-x: auto; }
+.le-tu-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.le-tu-table th { text-align: left; color: var(--text-secondary); font-weight: normal; border-bottom: 1px solid var(--border); padding: 0.2rem 0.3rem; }
+.le-tu-table td { padding: 0.2rem 0.3rem; vertical-align: middle; }
+.le-tu-table .le-select { min-width: 5.5rem; }
+.le-tu-fixed { font-family: var(--mono); font-size: 0.75rem; color: var(--text-secondary); }
+.le-tu-empty { font-size: 0.8rem; color: var(--text-secondary); border: 1px dashed var(--border); border-radius: 6px; padding: 0.75rem; }
+.le-tu-ok { font-size: 0.78rem; color: var(--church-gold); margin: 0.4rem 0; }
+.le-tu-io summary { cursor: pointer; font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem; }
+.le-tu-json { width: 100%; box-sizing: border-box; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); font-family: var(--mono); font-size: 0.75rem; border-radius: 4px; padding: 0.4rem; }
+.le-tu-file { cursor: pointer; }
+.le-tu-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 767px) { .le-tu-head .le-select, .le-tu-add .le-select { min-width: 0; width: 100%; } .le-tu-input { width: 100%; } }
+
+/* Narrow-layout fixes for heap tuple definitions */
+.le-tu, .le-tu-card { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.le-tu-card { width: auto; }
+.le-tu-legend { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.le-tu-head .le-tu-input { width: min(100%, 16rem); }
+.le-tu-scroll { max-width: 100%; -webkit-overflow-scrolling: touch; }
+.le-tu-table { min-width: 34rem; }
+.le-tu-table .le-tu-input { width: 9rem; min-width: 9rem; }
+.le-tu-table .le-tu-num { width: 7.5rem; min-width: 7.5rem; }
+.le-tu-table .le-number { min-width: 4.5rem; }
+.le-tu-table .le-select { min-width: 6rem; flex: none; }
+@media (max-width: 767px) {
+    .le-tu-head { flex-direction: column; align-items: stretch; }
+    .le-tu-head .le-tu-input, .le-tu-head .le-number, .le-tu-head .le-select { width: 100%; min-width: 0; box-sizing: border-box; text-align: left; }
+    .le-tu-table .le-tu-input { width: 9rem; }
+}
