@@ -1606,3 +1606,17 @@ mtime_ms = 1793556459671
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a825c6e7-9123-41b5-9e4d-6ac462c84ae8/ffa7141a-ed44-4ced-8314-f21baa9424d3"
 storage_version_token = "1793556467257627"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "YdcQFbzipqIZqKI5NSy_i"
+uri = "file://reports/mint-create-private-layout-proposal.md"
+type = "text"
+title = "Mint CREATE — private bindings and layout"
+description = "Review proposal with exact placements, private GTs, initial allocator state, expected CREATE result, and remaining gates. No image or hardware changes."
+logical_id = "6103db36-c55d-483d-be77-566a1752326a"
+content_hash = "sha256:d95438208ccb08e4b16f01cddb4559b7731e4a0198ccc56b3324fa37a2bde530"
+size = 8171
+mtime_ms = 1793560564230
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6103db36-c55d-483d-be77-566a1752326a/aca9da7e-8bbf-4652-a800-73f645036b1f"
+storage_version_token = "1793560571880537"
+content_type = "text/markdown"
