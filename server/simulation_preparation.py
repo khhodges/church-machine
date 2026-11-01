@@ -503,6 +503,13 @@ class PreparationStore:
                 "imageHash": hashlib.sha256(image).hexdigest(),
                 **(provenance_extra or {}),
             }
+            if cfg.get("threadTupleDesign") is not None:
+                from server import boot_image
+                from server.thread_tuple_evidence import capture
+                provenance["thread_tuple_evidence"] = capture(
+                    image, boot_image.parse_ns_table_raw(image), cfg["threadTupleDesign"],
+                    (1,) + boot_image.generated_thread_slots(
+                        boot_image.configured_thread_count(cfg["step1"])), prepared)
             provenance["configurationHash"] = digest({"provenance": provenance, "config": cfg})
             self.records[provenance["preparationId"]] = {
                 "provenance": provenance, "image": image, "source": source,

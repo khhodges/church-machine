@@ -3,6 +3,28 @@ name: Thread designer tuple and rollback scope
 description: User-directed extension of Thread design and its Alice acceptance example.
 ---
 
+Build-retained tuple definitions are annotations, never initialization authority.
+Only explicit approval may freeze a design for a future build; inspection must
+not retrofit browser definitions onto historical bytes or infer allocation from
+nonzero heap contents.
+
+**Why:** The user requires named tuple evidence tied to the exact image and
+individual Thread identity while leaving heap initialization and hardware unchanged.
+
+**How to apply:** Preserve approval and byte-generation as separate actions.
+Display retained names only when image and Thread-body evidence match; otherwise
+say the definitions were not recorded.
+
+Tuple approvals must retain the complete browser design identity, including
+Thread and Namespace names as well as slot and generations.
+
+**Why:** Renaming or rebinding a saved Namespace row does not necessarily advance
+its sequence; slot plus generation alone can transfer another Thread's annotations.
+
+**How to apply:** Recheck authoritative names during approval and new-build
+capture. A same-generation replacement must leave old definitions unrecorded,
+not inherit them merely because its geometry matches.
+
 The Thread designer must cover the Tuple Store and rollback/checkpoint concepts, not only the Thread's register and stack layout. Use the Alice Save LUMP rejection as a concrete diagnostic and tuple-storage acceptance example.
 
 Treat Threads as individually designed objects: the user states that all three

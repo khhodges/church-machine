@@ -2484,7 +2484,8 @@ def validate_resident_artifact_bindings(
     return True
 
 
-def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
+def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None,
+                                tuple_design=None, tuple_slots=()):
     """Bind a generated image to exact selected artifacts and localized rows.
 
     ``ns_state_path`` permits the boot transaction to bind provenance to its
@@ -2545,11 +2546,15 @@ def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
             "localized_clist_sha256": hashlib.sha256(struct.pack(
                 f"<{len(localized_rows)}I", *localized_rows)).hexdigest(),
         })
+    from server.thread_tuple_evidence import capture
+    tuple_evidence = capture(image_bytes, parse_ns_table_raw(image_bytes),
+                             tuple_design, tuple_slots, entries)
     return {
         "version": 1,
         "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
         "namespace_fingerprint": namespace_fingerprint(entries),
         "resident_bindings": sorted(rows, key=lambda row: row["slot"]),
+        **({"thread_tuple_evidence": tuple_evidence} if tuple_evidence is not None else {}),
     }
 
 

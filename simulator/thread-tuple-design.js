@@ -6,8 +6,9 @@
 // the CR5 Heap zone of the normative Thread design.  They are saved with the
 // browser's independently keyed Thread designs (localStorage 'lump_editor_state') and can be
 // exported/imported as portable JSON.  They are NOT written into the boot
-// config, the Thread header, the built .lump binary, simulator memory or
-// hardware.  Tuples introduce no capability, ACL or privacy boundary: every
+// Thread header, the built .lump binary, simulator memory or hardware.
+// Explicit approval may copy them into display-only build evidence.
+// Tuples introduce no capability, ACL or privacy boundary: every
 // abstraction running on the Thread can reach the whole CR5 heap.
 (function (root) {
     var SCHEMA = 'church.thread-design.tuples';

@@ -182,7 +182,7 @@
         thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, count: 1 },
         ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN },
         // Design-intent tuple definitions for the Heap zone (browser-saved
-        // with this Thread design only; never sent to boot-config/binary).
+        // with this Thread design; explicit approval can retain build annotations).
         tuples: []
     };
 
@@ -719,7 +719,17 @@
                 ['Capacity', _bnText(h.words) + ' words'],
                 ['Offsets', _bnText(h.startOffset) + ' \u2013 ' + _bnText(h.endOffset)],
                 ['Nonzero initial words', _bnText(h.nonzeroWords)],
-                ['Named tuple definitions', '<span class="le-bn-absent">Not recorded in this build</span>']
+                ['Named tuple definitions', h.definitionsStatus === 'recorded'
+                    ? esc(String((h.definitions || []).length)) + ' recorded (design intent only)'
+                    : '<span class="le-bn-absent">Not recorded in this build</span>']
+            ]) + (h.definitionsStatus === 'recorded' ?
+                '<table class="le-bn-table"><thead><tr><th>Tuple</th><th>Heap offset</th><th>Thread offset</th><th>Words</th><th>Startup intent (not applied)</th></tr></thead><tbody>' +
+                (h.definitions || []).map(function (d) {
+                    return '<tr><td>' + esc(d.name) + '</td><td>' + _bnText(d.offset) +
+                        '</td><td>' + _bnText(h.startOffset + d.offset) + '</td><td>' +
+                        _bnText(d.words) + '</td><td>' + esc(d.policy) + '</td></tr>';
+                }).join('') + '</tbody></table>' : '') + renderGrid([
+                ['Evidence scope', 'Exact image and Thread body; no runtime initialization claim']
             ]) + '<p class="le-panel-desc">Exact initial words from the image. A zero word is only a zero value; it does not prove the word is unallocated.</p>' +
                 '<details class="le-bn-details le-bn-heap"><summary>Initial heap words (' + words.length + ')</summary>';
             if (words.length) {
@@ -1148,8 +1158,8 @@
             '<section class="le-tu" aria-labelledby="le-tu-title">' +
             '<h3 class="le-tu-title" id="le-tu-title">Heap tuple definitions <span class="le-tu-mono">' + used + ' / ' + heapWords + ' heap words assigned</span></h3>' +
             '<p class="le-panel-desc" id="le-tu-scope"><strong>Scope:</strong> design intent for the Heap zone (CR5) of this Thread design. ' +
-            'Definitions are saved in this browser together with the Thread design and apply to every Thread built from it, not to one individual Thread. ' +
-            'They are <strong>not</strong> included in the boot config, the Thread header, the built .lump file, simulator memory or hardware; ' +
+            'Definitions belong to the selected Thread only. The legacy shared layout is an unassigned draft and cannot supply build annotations. ' +
+            'Use the separate approval button to retain a snapshot as annotations for future matching Thread builds. Definitions never change the Thread header, built .lump bytes, simulator memory or hardware; ' +
             'nothing initializes or preserves them at run time yet, so the start-up intent is a recorded plan only. Use Export JSON to carry them to another browser. ' +
             'Offsets are relative to Heap start (Thread +18). Tuples add no capability or privacy boundary: every abstraction on the Thread can reach the whole heap; isolate state with a separate Thread.</p>' +
             unreadable + probs + msg +
@@ -1160,6 +1170,7 @@
             '</div>' +
             '<div aria-live="polite">' + empty + list + '</div>' +
             '<div class="le-tu-actions"><button type="button" class="le-next-btn" onclick="lumpEditorTupleSave()">Save tuple definitions locally</button><span class="le-tu-lbl">No boot-configuration change, compilation, or hardware action.</span></div>' +
+            '<div class="le-tu-actions"><button type="button" class="le-next-btn" onclick="lumpEditorTupleApprove()">Approve definitions for future builds</button><span class="le-tu-lbl">Records this selected Thread snapshot for matching future builds. Does not build, initialize, activate, or annotate historical images.</span></div>' +
             '<details class="le-tu-io" id="le-tu-io"><summary>Export / import definitions (JSON)</summary>' +
                 '<div class="le-tu-actions">' +
                     '<button type="button" class="le-next-btn" onclick="lumpEditorTupleExport()">Export JSON</button>' +
@@ -1962,6 +1973,40 @@
     };
 
     window.lumpEditorRender = function () { render(); };
+    window.lumpEditorTupleApprove = async function () {
+        var owner = _threadDesignKey;
+        try {
+            var TT = window.ThreadTupleDesign;
+            var problems = TT.validate(state.tuples, currentHeapWords());
+            if (problems.length) throw new Error(problems.join(' '));
+            var binding = threadBindings().find(function (b) { return b.key === owner; });
+            if (!binding) throw new Error('Select a currently bound named Thread before approving definitions.');
+            var ns = (_nsDrill.entries || []).find(function (r) { return Number(r.slot) === 0; });
+            if (!ns) throw new Error('Namespace binding unavailable; refresh before approving.');
+            var snapshot = JSON.parse(JSON.stringify({
+                sizeWords: Math.pow(2, state.thread.lumpPow2), stackWords: state.thread.stackFrames * 2,
+                target: {slot: Number(binding.row.slot), sequence: Number(binding.row.seq || 0),
+                    namespaceSequence: Number(ns.seq || 0),
+                    name: binding.row.name, namespaceName: ns.name},
+                tuples: TT.normalize(state.tuples)
+            }));
+            if (!window.confirm('Approve these ' + snapshot.tuples.length +
+                    ' tuple definitions for future matching builds of NS[' + snapshot.target.slot +
+                    ']? Existing builds and heap bytes will not change.')) return;
+            var response = await fetch('/api/boot-config/thread-tuples', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(snapshot)
+            });
+            var saved = await response.json();
+            if (!response.ok || saved.ok === false) throw new Error(saved.error || 'Approval save failed.');
+            if (owner !== _threadDesignKey) return;
+            _tupleMsg = {err: false, text: 'Approved snapshot saved for future matching builds. Existing build evidence and heap bytes are unchanged.'};
+        } catch (error) {
+            if (owner !== _threadDesignKey) return;
+            _tupleMsg = {err: true, text: 'Tuple approval failed: ' + error.message + ' No build or hardware action was requested. Retry after correcting the error.'};
+        }
+        render();
+    };
     window.lumpEditorRenderResidentPanel = function () {
         var panel = document.getElementById('lumpResidentPanel');
         if (panel && panel.offsetParent !== null) renderResidentPanel();

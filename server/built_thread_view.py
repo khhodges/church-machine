@@ -36,7 +36,7 @@ def _capability(value, register, offset, base, entries):
     return result
 
 
-def inspect_threads(image, entries, table_base):
+def inspect_threads(image, entries, table_base, tuple_evidence=None):
     words = struct.unpack(f"<{len(image) // 4}I", image)
     body_end = min(len(words), table_base)
     by_slot = {e["slot"]: e for e in entries}
@@ -85,6 +85,10 @@ def inspect_threads(image, entries, table_base):
             "nonzeroWords": sum(value != 0 for value in heap),
             "definitionsStatus": "not-recorded",
         }
+        from server.thread_tuple_evidence import matching_definitions
+        definitions = matching_definitions(image, entry, item, tuple_evidence)
+        if definitions is not None:
+            item["heap"].update(definitionsStatus="recorded", definitions=definitions)
         first_register = THREAD_DESIGN["capabilityHomes"]["firstRegister"]
         item["capabilities"] = [
             _capability(words[base + offset], first_register + i, offset, base, by_slot)

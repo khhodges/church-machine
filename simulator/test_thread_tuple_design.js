@@ -84,7 +84,8 @@ const src = fs.readFileSync(__dirname + '/app-lump-editor.js', 'utf8');
 assert.match(src, /renderTuplePanel\(overCapacity \? 0 : heap/);
 assert.match(src, /esc\(t\.name\)/);
 assert.match(src, /value="' \+ esc\(f\.initial\)/);
-assert.match(src, /not<\/strong> included in the boot config/);
+assert.match(src, /separate approval button to retain a snapshot/);
+assert.match(src, /Definitions never change the Thread header/);
 const step1 = src.slice(src.indexOf('function _getStep1Payload'), src.indexOf('function _postStep1'));
 assert.ok(!/tuple/i.test(step1), 'tuples must not be sent to boot-config');
 // Exercise the page esc() on a hostile name to confirm rendered output is inert.

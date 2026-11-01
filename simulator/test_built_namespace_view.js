@@ -162,6 +162,23 @@ const evidence = {
     reply(env.pending[env.pending.length - 1], 200, ev2);
     await tick(); await tick();
     check('selected thread preserved across refresh', /aria-selected="true"[^>]*data-bn-tab="9"/.test(env.panel.innerHTML));
+    const recorded = JSON.parse(JSON.stringify(ev2));
+    recorded.threads[1].heap.definitionsStatus = 'recorded';
+    recorded.threads[1].heap.definitions = [
+        { name: 'Counter', offset: 7, words: 4, policy: 'preserve' }
+    ];
+    env.ctx.lumpEditorBuiltNamespaceRefresh();
+    reply(env.pending[env.pending.length - 1], 200, recorded);
+    await tick(); await tick();
+    check('matching retained definitions show named offsets and sizes',
+        /Counter<\/td><td>7<\/td><td>107<\/td><td>4<\/td><td>preserve/.test(env.panel.innerHTML));
+    check('retained design is not claimed as initialization',
+        /Startup intent \(not applied\)/.test(env.panel.innerHTML));
+    env.ctx.lumpEditorBuiltNamespaceRefresh();
+    reply(env.pending[env.pending.length - 1], 200, ev2);
+    await tick(); await tick();
+    check('missing evidence removes earlier names',
+        !env.panel.innerHTML.includes('Counter') && /Not recorded in this build/.test(env.panel.innerHTML));
     env.ctx.lumpEditorBuiltNamespaceRefresh();
     reply(env.pending[env.pending.length - 1], 200, Object.assign({}, ev2, { threads: ev2.threads.slice(0, 1) }));
     await tick(); await tick();

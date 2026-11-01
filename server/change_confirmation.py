@@ -706,6 +706,9 @@ def install(app, paths, commit_guard, describe=None, store_path=None,
             audit_changes.extend(extra_changes)
             affected.extend(extra_affected)
         reason = "You requested a persisted change. It may update source, repository history, Namespace bindings or the generated boot image."
+        if request.path == "/api/boot-config/thread-tuples":
+            reason = ("Approve a tuple-definition snapshot for future matching Thread builds. "
+                      "No existing image, heap bytes, simulation or hardware will change.")
         if request.path == "/api/boot-config":
             reason = ("Review the boot configuration fields and affected pet names / saved LUMP versions below. "
                       "This does not publish a new LUMP revision. Reject if any identity is unresolved.")

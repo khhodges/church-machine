@@ -4737,6 +4737,15 @@ def _validated_boot_config_candidate(data, existing=None, authority_rows=None,
     if step1.get("threadCount") is not None:
         cfg["step1"]["threadCount"] = int(step1["threadCount"])
     cfg["step1"]["threadStackWords"] = int(step1.get("threadStackWords", 32))
+    tuple_design = existing.get("threadTupleDesign")
+    if "threadTupleDesign" in data and data["threadTupleDesign"] != tuple_design:
+        return None, "Tuple annotations changed; use the explicit tuple-definition approval action"
+    if tuple_design is not None:
+        from server.thread_tuple_evidence import validate_approvals
+        try:
+            cfg["threadTupleDesign"] = validate_approvals(tuple_design)
+        except ValueError as exc:
+            return None, str(exc)
     if step2 is not None:
         norm = []
         for e in (step2.get("lumps") or []):
@@ -4795,6 +4804,30 @@ def _validated_boot_config_candidate(data, existing=None, authority_rows=None,
     # survive a Boot Image Designer save.
     cfg.pop("nextAfterSelfTestSlot", None)
     return cfg, None
+
+
+@app.route("/api/boot-config/thread-tuples", methods=["POST"])
+def approve_thread_tuple_design():
+    """Approve annotations only; no image publication or hardware operation."""
+    from server.thread_tuple_evidence import validate_design, validate_approvals, validate_target
+    try:
+        design = validate_design(request.get_json(silent=True))
+        with _namespace_commit_guard():
+            cfg, error = _read_saved_boot_config()
+            if error:
+                raise ValueError(error)
+            rows, _ = _read_authoritative_namespace_rows()
+            validate_target(design, rows)
+            previous = validate_approvals(cfg.get("threadTupleDesign", []))
+            cfg["threadTupleDesign"] = [
+                d for d in previous if d["target"]["slot"] != design["target"]["slot"]
+            ] + [design]
+            _atomic_write_json(BOOT_CONFIG_PATH, cfg)
+        return jsonify(ok=True, design=design)
+    except (ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    except OSError:
+        return jsonify(ok=False, error="Could not save tuple approval; retry. No build was requested."), 500
 
 
 @app.route("/api/boot-config", methods=["POST"])
@@ -5618,7 +5651,7 @@ def _boot_config_freshness_digest(cfg):
         raise ValueError("boot-image provenance requires a saved boot configuration")
     image_inputs = {
         key: value for key, value in cfg.items()
-        if key not in ("slotLabels",)
+        if key not in ("slotLabels", "threadTupleDesign")
     }
     return hashlib.sha256(json.dumps(
         image_inputs, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
@@ -5630,7 +5663,8 @@ def _file_sha256(path):
 
 
 def _write_boot_image_bytes(image_bytes, *, provenance_origin="generated",
-                            invalidate_ns_state=True, boot_config=None):
+                            invalidate_ns_state=True, boot_config=None,
+                            retain_tuple_design=False):
     """Atomically replace the committed boot image under the Namespace lock.
 
     ``provenance_origin`` distinguishes a server-prepared composite from an
@@ -5706,7 +5740,12 @@ def _write_boot_image_bytes(image_bytes, *, provenance_origin="generated",
                 }
             else:
                 provenance = _boot_image_gen.build_boot_image_provenance(
-                    image_bytes, LUMPS_DIR, ns_state_path=NS_STATE_PATH)
+                    image_bytes, LUMPS_DIR, ns_state_path=NS_STATE_PATH,
+                    tuple_design=(boot_config or {}).get("threadTupleDesign")
+                    if retain_tuple_design else None,
+                    tuple_slots=((1,) + _boot_image_gen.generated_thread_slots(
+                        _boot_image_gen.configured_thread_count(boot_config["step1"])))
+                    if retain_tuple_design else ())
                 provenance["origin"] = provenance_origin
                 if boot_config is None:
                     boot_config, config_error = _read_saved_boot_config()
@@ -6155,7 +6194,8 @@ def boot_image_generate():
                             pass
                     _write_ns_state(prepared_rows, allocation_config=cfg)
                     _write_boot_image_bytes(
-                        blob, invalidate_ns_state=False, boot_config=cfg)
+                        blob, invalidate_ns_state=False, boot_config=cfg,
+                        retain_tuple_design=True)
                     next_fingerprint = _namespace_state_fingerprint(prepared_rows)
                     execution_freshness = _boot_execution_freshness(
                         {"abstractions": prepared_rows}, LUMPS_DIR)
@@ -6224,7 +6264,7 @@ def boot_image_generate():
     except Exception as e:
         return jsonify({"ok": False, "error": f"Generator failed: {e}"}), 500
     try:
-        _write_boot_image_bytes(blob)
+        _write_boot_image_bytes(blob, boot_config=cfg, retain_tuple_design=True)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {e}"}), 500
     _load_boot_abstr_lump()
@@ -8116,7 +8156,8 @@ def boot_image_save_ns(_review_only=False):
                 # and binds provenance to the final committed inputs.  It
                 # deliberately leaves that matching raw fingerprint intact.
                 _write_boot_image_bytes(
-                    _img_bytes, invalidate_ns_state=False, boot_config=cfg)
+                    _img_bytes, invalidate_ns_state=False, boot_config=cfg,
+                    retain_tuple_design=_generate)
             except Exception:
                 for _path, _bytes in _before.items():
                     try:
@@ -28537,6 +28578,20 @@ def _describe_namespace_review_changes(before_rows, proposed_rows, manifest):
 
 def _describe_protected_change(payload):
     """Show proposed text/Namespace deltas without leaking approval credentials."""
+    if request.path == "/api/boot-config/thread-tuples":
+        from server.thread_tuple_evidence import validate_design, validate_target, tuple_words
+        design = validate_design(payload)
+        rows, _ = _read_authoritative_namespace_rows()
+        validate_target(design, rows)
+        return [
+            "Retain this tuple-definition snapshot for future generated Threads only.",
+            f"Thread {design['target']['name']} at NS[{design['target']['slot']}], "
+            f"generation {design['target']['sequence']}; Namespace {design['target']['namespaceName']}.",
+            f"Thread geometry: {design['sizeWords']} words; stack {design['stackWords']} words.",
+            "Existing builds, heap initialization, running simulation and hardware are unchanged.",
+            *[f"Tuple {t['name']}: heap offset {t['offset']}, {tuple_words(t)} words; "
+              f"startup intent {t['policy']} (not applied)." for t in design["tuples"]],
+        ]
     import difflib
     from pathlib import Path
     if not isinstance(payload, dict):

@@ -207,11 +207,16 @@ def reconstruct(config, rows, directory, *, compact=False):
     image = struct.pack(f"<{total}I", *mem)
     boot.validate_boot_image(image, saved_namespace_only=True)
     validate_simulator_resident_inventory(image)
+    from server.thread_tuple_evidence import capture
+    tuple_evidence = capture(image, boot.parse_ns_table_raw(image),
+                             config.get("threadTupleDesign"),
+                             {r["slot"] for r in thread_rows if not r.get("filename")}, rows)
     return image, {
         "purpose": "generic-simulator-image", "profile": PROFILE, "hardwareCertified": False,
         "namespace_fingerprint": namespace_fingerprint(rows),
         "image_sha256": sha(image), "bootEntrySlot": entry,
         "artifactBindings": derivatives,
+        **({"thread_tuple_evidence": tuple_evidence} if tuple_evidence is not None else {}),
         **({"compactedRows": rows, "relocations": relocations} if compact else {}),
         "stages": ["Frozen saved Namespace/configuration and exact artifacts",
                    "Reconstructed numeric slots from zero-initialized memory",
