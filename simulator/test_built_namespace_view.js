@@ -9,6 +9,28 @@ function check(name, v) { if (v) { passed++; console.log('PASS ' + name); } else
 
 const src = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
 
+// Shared position survives a short panel's scroll clamping, but scrolling in
+// that panel deliberately changes the shared position for all subsequent tabs.
+{
+    const pane = { scrollTop: 350, scrollLeft: 20 };
+    const state = { scroll: { top: 0, left: 0, appliedTop: 0, appliedLeft: 0 } };
+    const c = vm.createContext({ _bn: state,
+        document: { getElementById: () => ({ querySelector: () => pane }) } });
+    vm.runInContext(src.slice(src.indexOf('    function _bnCaptureScroll()'),
+        src.indexOf('    function renderResidentPanel()')), c);
+    c._bnCaptureScroll();
+    pane.scrollTop = pane.scrollLeft = 0;
+    c._bnRestoreScroll();
+    check('tabs share vertical and horizontal position', pane.scrollTop === 350 && pane.scrollLeft === 20);
+    state.scroll.appliedTop = pane.scrollTop = 80; // shorter tab clamps at 80
+    c._bnCaptureScroll();
+    check('shorter tab preserves requested shared position', state.scroll.top === 350);
+    pane.scrollTop = 30;
+    c._bnCaptureScroll();
+    c._bnRestoreScroll();
+    check('scrolling another tab updates the shared position', state.scroll.top === 30);
+}
+
 function makeEnv() {
     const panel = { innerHTML: '', offsetParent: {} };
     const requests = [];

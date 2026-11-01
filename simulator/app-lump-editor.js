@@ -563,7 +563,8 @@
     // image bytes served by GET /api/boot-image/built-namespace. Names,
     // filenames and hashes come only from hash-matched retained provenance.
     // No catalog, boot-config, or browser design state is consulted here.
-    var _bn = { seq: 0, ctrl: null, data: null, error: '', loading: false, tab: 'ns', heapPage: {} };
+    var _bn = { seq: 0, ctrl: null, data: null, error: '', loading: false, tab: 'ns', heapPage: {},
+        scroll: { top: 0, left: 0, appliedTop: 0, appliedLeft: 0 } };
     var BN_HEAP_PAGE = 64;
 
     function _bnHex(v) {
@@ -753,9 +754,28 @@
         return '<span class="le-bn-badge le-bn-' + cls + '">' + esc(s || 'unknown') + '</span>';
     }
 
+    function _bnCaptureScroll() {
+        var root = document.getElementById('lumpResidentPanel');
+        var pane = root && root.querySelector ? root.querySelector('.le-bn-tp') : null;
+        if (!pane) return;
+        // Preserve the shared requested position when a shorter tab clamps it.
+        if (pane.scrollTop !== _bn.scroll.appliedTop) _bn.scroll.top = pane.scrollTop;
+        if (pane.scrollLeft !== _bn.scroll.appliedLeft) _bn.scroll.left = pane.scrollLeft;
+    }
+    function _bnRestoreScroll() {
+        var root = document.getElementById('lumpResidentPanel');
+        var pane = root && root.querySelector ? root.querySelector('.le-bn-tp') : null;
+        if (!pane) return;
+        pane.scrollTop = _bn.scroll.top;
+        pane.scrollLeft = _bn.scroll.left;
+        _bn.scroll.appliedTop = pane.scrollTop;
+        _bn.scroll.appliedLeft = pane.scrollLeft;
+    }
+
     function renderResidentPanel() {
         var el = document.getElementById('lumpResidentPanel');
         if (!el) return;
+        _bnCaptureScroll();
         var head = '<div class="le-panel le-bn">' +
             '<div class="le-bn-head"><h3 class="le-panel-title">Namespace \u2014 as built</h3>' +
             '<button type="button" class="le-copy-btn" data-bn-refresh="1" onclick="lumpEditorBuiltNamespaceRefresh()">Refresh</button></div>' +
@@ -821,6 +841,7 @@
             var cur = threads.filter(function (t) { return t.slot === _bn.tab; })[0];
             el.innerHTML = head + tabs + '<div role="tabpanel" class="le-bn-tp" id="' + _bnPanelId(_bn.tab) + '" aria-labelledby="' + _bnTabId(_bn.tab) +
                 '" tabindex="0">' + _bnThreadPanel(cur) + '</div></div>';
+            _bnRestoreScroll();
             return;
         }
         el.innerHTML = head + tabs + '<div role="tabpanel" class="le-bn-tp" id="' + _bnPanelId('ns') + '" aria-labelledby="' + _bnTabId('ns') + '" tabindex="0">' + ev + struct +
@@ -828,6 +849,7 @@
             'Names appear only when verified (saved Namespace fingerprint equals the image-bound fingerprint, or a build record); otherwise Unavailable. ' +
             'Artifact N/A means a hardware device with no file; Not recorded means no file evidence was retained.</p>' +
             table + '</div></div>';
+        _bnRestoreScroll();
     }
 
     function _bnObsolete(name) {
@@ -2318,7 +2340,7 @@
         _bn.tab = key;
         renderResidentPanel();
         var b = document.getElementById(_bnTabId(key));
-        if (b && typeof b.focus === 'function') b.focus();
+        if (b && typeof b.focus === 'function') b.focus({ preventScroll: true });
     };
     window.lumpEditorBnTabKey = function (ev) {
         var keys = ['ns'].concat(_bnThreads().map(function (t) { return t.slot; }));
@@ -2337,6 +2359,7 @@
         var p = document.getElementById(_bnPanelId(slot));
         var det = p && p.querySelector ? p.querySelector('.le-bn-heap') : null;
         if (det) det.open = true;
+        _bnRestoreScroll();
     };
 
     window.addEventListener('storage', function (ev) {

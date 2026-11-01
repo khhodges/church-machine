@@ -10,3 +10,11 @@ away with the inspected content.
 
 **How to apply:** Keep navigation outside the content scroll area, including on
 small screens and when switching between Namespace and individual Threads.
+
+All as-built tabs share one scroll position rather than resetting or remembering
+separate positions.
+
+**Why:** The user wants to switch Threads to cross-check values at the same level.
+
+**How to apply:** Apply the last scrolled position to the next tab, keep headings
+pinned, and do not discard that position merely because a shorter tab clamps it.
