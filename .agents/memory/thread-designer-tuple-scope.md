@@ -15,6 +15,16 @@ heterogeneous build.
 descriptor and built body. Show tuple capacity separately from named tuple
 definitions; design-only definitions must not be presented as built evidence.
 
+The tuple heap and initialized GTs are also per-Thread, including Alice and
+Mallory's initial capabilities.
+
+**Why:** The user explicitly clarified that each Thread has its own tuple heap
+and initialized GTs; displaying one common layout loses those distinctions.
+
+**How to apply:** Inspect each Thread's own built storage and capability homes.
+Keep initialized image contents distinct from live runtime contents, and resolve
+GT names only against matching Namespace evidence.
+
 The user identifies the existing five-zone Thread page as the location for
 defining tuples, associated with the CR5 heap zone.
 
