@@ -5,6 +5,16 @@ description: User-directed extension of Thread design and its Alice acceptance e
 
 The Thread designer must cover the Tuple Store and rollback/checkpoint concepts, not only the Thread's register and stack layout. Use the Alice Save LUMP rejection as a concrete diagnostic and tuple-storage acceptance example.
 
+Treat Threads as individually designed objects: the user states that all three
+Threads in a build can differ, including tuple stores and design sizes.
+
+**Why:** One Thread layout accompanied by a Thread count does not describe a
+heterogeneous build.
+
+**How to apply:** As-built inspection must follow each Thread's own Namespace
+descriptor and built body. Show tuple capacity separately from named tuple
+definitions; design-only definitions must not be presented as built evidence.
+
 The user identifies the existing five-zone Thread page as the location for
 defining tuples, associated with the CR5 heap zone.
 
