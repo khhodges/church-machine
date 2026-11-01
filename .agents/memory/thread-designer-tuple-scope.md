@@ -5,6 +5,16 @@ description: User-directed extension of Thread design and its Alice acceptance e
 
 The Thread designer must cover the Tuple Store and rollback/checkpoint concepts, not only the Thread's register and stack layout. Use the Alice Save LUMP rejection as a concrete diagnostic and tuple-storage acceptance example.
 
+The user identifies the existing five-zone Thread page as the location for
+defining tuples, associated with the CR5 heap zone.
+
+**Why:** Tuple definitions should be configured alongside the Thread's storage
+layout, rather than confused with the existing live-simulator record editor.
+
+**How to apply:** Extend that existing page for saved-design tuple definitions;
+keep runtime inspection and deployment separate. This location decision alone
+does not authorize hardware changes.
+
 **Why:** The user identified the unexplained browser-alert failure as an opportunity to test the tuple-store mechanism and explicitly requested extending the Thread designer.
 
 **How to apply:** Connect source diagnostics to visible storage definitions and allocation review. Preserve Alice's intended authority boundaries; shared Thread storage is not automatically abstraction-private. Distinguish design reservations, runtime tuple edits, saved LUMPs, and continuation restoration. This scope direction does not resolve the outstanding checkpoint, running-bit, or hardware contracts.
