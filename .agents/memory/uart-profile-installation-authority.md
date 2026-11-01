@@ -143,3 +143,14 @@ allocation storage; verify capability custody and exclusive use. Synchronous CAL
 does not prevent concurrent calls from other Threads. Scope the initial
 demonstration to one caller, not a claim of multi-Thread service safety.
 This choice does not authorize hardware installation or flash changes.
+
+The Mint CREATE demonstration must respect a minimum allocation of 64 words.
+The earlier eight-word example is not an accepted allocation contract.
+
+**Why:** The user corrected the proposed size: “64 is the minimum.”
+Raw data was incorrectly assumed exempt without establishing that exception.
+
+**How to apply:** Use at least 64 words for the demonstration and reconcile
+request encoding, Cleaner accounting, descriptor limit, and boundary tests
+before execution. Do not confuse a one-word capability view into existing
+storage with an independently allocated one-word object.
