@@ -143,6 +143,18 @@ to establish; a separate Thread alone does not prove complete threat removal.
 This direction does not authorize installation, hardware changes, or reuse of
 objects while old capabilities remain valid.
 
+Version-based reuse is acceptable for Phase 1; the initial queues need not be
+restricted permanently to consume-once objects.
+
+**Why:** In response to the stale-capability concern for free queues, the user
+said “Using the version # that is fine for Phase 1.”
+
+**How to apply:** Software advances the slot generation before reissue and
+publishes matching descriptors/GTs; hardware does not change versions.
+Do not wrap generations into old identities. Verify stale loaded as well as
+stored GT behavior on the frozen profile before claiming revocation is proven.
+This acceptance does not authorize implementation of the deferred refill Thread.
+
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
 The earlier eight-word example is not an accepted allocation contract.
 
