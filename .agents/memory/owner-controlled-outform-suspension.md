@@ -22,7 +22,7 @@ when discussing new architecture.
 **Why:** The user explicitly required that architectural agreement not displace
 present priorities or obscure what must be finished next.
 
-**How to apply:** Consult `docs/network-capability-lifecycle-contract.md` for the
+**How to apply:** Consult `Phase 2/docs/network-capability-lifecycle-contract.md` for the
 contract and priority record; refresh evidence rather than treating a merge as
 physical acceptance. Record current work status there, not in memory.
 

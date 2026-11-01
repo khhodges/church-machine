@@ -1,6 +1,6 @@
 # Network Transparency
 
-> **Current direction:** See [Common networked capability lifecycle](network-capability-lifecycle-contract.md)
+> **Current direction:** See [Common networked capability lifecycle](../Phase%202/docs/network-capability-lifecycle-contract.md)
 > for the agreed shared model, implementation gap map and release-first ordering.
 > This older design remains historical context; its transport proposals are not
 > proof of implemented save/load or cross-FPGA reactivation.

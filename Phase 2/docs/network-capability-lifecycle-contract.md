@@ -39,10 +39,10 @@ ahead of the handoff. Historical workflow failures require diagnosis before
 they can be called current release blockers.
 
 Evidence anchors:
-- [Authored Thread RTL scope](../tests/hardware/AUTHORED_THREAD_STARTUP.md).
+- [Authored Thread RTL scope](../../tests/hardware/AUTHORED_THREAD_STARTUP.md).
 - Reviewed selection: `server/alice-mallory-thread-selection.json`;
   preparation: `scripts/prepare_alice_mallory_threads.py`.
-- [Earlier combined validation status](phase-1/combined-validation-status-20261029.md)
+- [Earlier combined validation status](../../docs/phase-1/combined-validation-status-20261029.md)
   is dated historical evidence, not a live build-status report.
 - `docs/phase-1/CTMM_W7_Threat_Test_Plan.xlsx`: reconcile freshness before
   claiming current threat or release closure.
