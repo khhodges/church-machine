@@ -1211,11 +1211,47 @@ const _threadRunOutcomes = new Map();
 // DesignSimulation machine. traceContext checks exact displayed-machine identity.
 function _threadDisplayStatus(row) {
     if (!row) return 'unavailable';
+    if (row.hardwareFault) return row.hardwareFault;
     if (row.lifecycleStatus !== 'running') return row.lifecycleStatus || 'unavailable';
     const privateMachine = typeof window !== 'undefined' && !!window.DesignSimulation?.traceContext?.();
     const normalRun = !privateMachine && typeof _simRunActive !== 'undefined' && _simRunActive;
     return 'current · ' + (sim && !sim.halted && (normalRun || sim.running || sim.walkActive)
         ? 'running' : 'stopped');
+}
+
+function _threadHardwareFaultDisplay(configuredRows) {
+    const target = window.TargetState?.resolve?.();
+    if (!target || target.mode === 'simulator-ram') return null;
+    const status = window._threadHardwareStatus;
+    const rows = configuredRows.map(row => ({...row, active: false,
+        lifecycleStatus: 'configured', runtimeUnavailable: true, nia: null,
+        physicalAddress: null, indicatorFlags: null, hardwareFault: null}));
+    const display = {rows, label: 'Hardware Threads · runtime unavailable'};
+    if (target.deviceUid && status?.boot_info?.device_uid !== target.deviceUid) return display;
+    const trace = status && status.latest_trace;
+    const snap = status && status.last_accepted_fault;
+    if (!status?.halt?.active_fault || !trace?.fault_valid ||
+        !_wukongFaultSnapshotMatches(trace, snap) ||
+        (status.bridge?.session_id && status.bridge.session_id !== trace.bridge_session)) return display;
+    const slot = snap.cr[12][0] & 0xffffff;
+    if (!snap.cr[12][0]) return display;
+    const names = /^@phase1 event FAULT ([^/]+) \/ ([^/]+) \/ (.+)$/.exec(trace.gt_label || '');
+    // Match both captured slot and named Thread when bridge-map evidence exists.
+    // Never relabel a different configured occupant merely because its slot fits.
+    const row = rows.find(r => r.slot === slot &&
+        (!names || r.name === names[2].trim()));
+    if (!row) return display;
+    const object = names ? names[3].trim() : 'object unavailable';
+    const faultName = status.halt.fault_name || 'fault';
+    row.lifecycleStatus = 'hardware-fault';
+    row.hardwareFault = `Hardware fault — ${object} — ${faultName}`;
+    row.nia = snap.nia;
+    row.physicalAddress = snap.nia;
+    row.gtPetName = object + (names ? ' (bridge reference)' : '');
+    row.indicatorFlags = {N: !!(snap.flags & 8), Z: !!(snap.flags & 4),
+        C: !!(snap.flags & 2), V: !!(snap.flags & 1)};
+    display.label = 'Hardware fault snapshot · ' + row.name + ' · not running';
+    return display;
 }
 
 function updateThreadControl() {
@@ -1258,8 +1294,10 @@ function updateThreadIdentityStrip() {
     const strip = document.getElementById('threadIdentityStrip');
     if (!strip) return;
     const selectedDisplay = window.DesignSimulation?.threadDisplay?.();
-    const allRows = selectedDisplay ? selectedDisplay.rows :
+    let allRows = selectedDisplay ? selectedDisplay.rows :
         sim && typeof sim.threadStatusRows === 'function' ? sim.threadStatusRows(10) : [];
+    const hardwareDisplay = _threadHardwareFaultDisplay(allRows);
+    if (hardwareDisplay) allRows = hardwareDisplay.rows;
     const pageSize = 4;
     const pageCount = Math.max(1, Math.ceil(allRows.length / pageSize));
     _threadIdentityPage = Math.min(_threadIdentityPage, pageCount - 1);
@@ -1270,7 +1308,8 @@ function updateThreadIdentityStrip() {
     strip.hidden = false;
     const summary = document.createElement('span');
     summary.className = 'thread-identity-summary';
-    summary.textContent = selectedDisplay ? selectedDisplay.label : 'Simulator Threads';
+    summary.textContent = hardwareDisplay ? hardwareDisplay.label :
+        selectedDisplay ? selectedDisplay.label : 'Simulator Threads';
     if (!allRows.length) summary.textContent += ' · No configured Threads available';
     strip.appendChild(summary);
     rows.forEach((row) => {
@@ -1282,6 +1321,7 @@ function updateThreadIdentityStrip() {
         card.className = `thread-identity-card thread-status-${displayClass}` +
             `${row.active ? ' is-active' : ''}` +
             `${selected ? ' is-selected' : ''}`;
+        if (row.hardwareFault) card.setAttribute('aria-current', 'true');
         card.dataset.threadSlot = String(row.slot);
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
@@ -1295,8 +1335,8 @@ function updateThreadIdentityStrip() {
             ? `0x${(row.physicalAddress >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
             : 'unavailable';
         const gtName = row.gtPetName || (row.runtimeUnavailable ? 'unavailable' : 'No entry GT');
-        const gtKeyText = row.active ? 'Current code' : 'Saved entry code';
-        const flagsKeyText = row.active ? 'Current FLAGS' : 'Saved FLAGS';
+        const gtKeyText = row.hardwareFault ? 'Faulting code' : row.active ? 'Current code' : 'Saved entry code';
+        const flagsKeyText = row.hardwareFault ? 'Fault FLAGS' : row.active ? 'Current FLAGS' : 'Saved FLAGS';
         const indicatorFlags = row.indicatorFlags &&
             typeof row.indicatorFlags === 'object' ? row.indicatorFlags : null;
         const flagText = indicatorFlags
@@ -20597,6 +20637,8 @@ async function _wukongRefreshHealthStrip() {
         var r = await fetch('/hardware/wukong/status');
         if (!r.ok) return;
         var s = await r.json();
+        window._threadHardwareStatus = s;
+        updateThreadIdentityStrip();
         // Capture relay state from the server so the banner stays in sync.
         if (s.relay_enabled !== undefined) {
             _wukongRelayEnabled   = !!s.relay_enabled;

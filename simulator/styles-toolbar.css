@@ -1289,6 +1289,14 @@
     outline-offset: 1px;
 }
 
+.thread-identity-card.thread-status-hardware-fault {
+    border-color: #ef6674;
+    background: rgba(150, 35, 50, .24);
+    box-shadow: inset 3px 0 #ef6674;
+}
+.thread-status-hardware-fault .thread-identity-marker { background: #ef6674; }
+.thread-status-hardware-fault .thread-identity-lifecycle { color: #ff9ca6; }
+
 .thread-identity-card.is-active {
     border-color: rgba(218, 165, 32, 0.72);
     background: linear-gradient(135deg, rgba(77, 56, 12, 0.52), rgba(16, 30, 48, 0.92));

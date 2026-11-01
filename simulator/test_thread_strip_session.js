@@ -41,5 +41,34 @@ strip.querySelector('.thread-identity-card').dispatchEvent(new dom.window.Keyboa
 rows.length=0; scope.updateThreadControl();
 assert.match(strip.textContent,/No configured Threads available/);
 assert.equal(strip.hidden,false);
+vm.runInContext(run.slice(run.indexOf('function _wukongFaultSnapshotMatches('),
+    run.indexOf('function _wukongFaultDiagnosis(')),scope);
+const {trace,snapshot}=require('./test_hardware_fault_diagnosis');
+rows.push({slot:2,name:'Boot.Thread'},{slot:11,name:'Thread.2'},{slot:12,name:'Thread.3'});
+scope.TargetState={resolve:()=>({mode:'hardware'})};
+scope._threadHardwareStatus={
+    latest_trace:{...trace,fault_valid:true,gt_label:'@phase1 event FAULT Boot.NS / Thread.3 / ide.Mallory'},
+    last_accepted_fault:snapshot, halt:{active_fault:true,fault_name:'BOUNDS'},
+    bridge:{session_id:trace.bridge_session},
+};
+scope.updateThreadIdentityStrip();
+assert.equal(strip.querySelectorAll('.thread-identity-card').length,3);
+const fault=strip.querySelector('.thread-status-hardware-fault');
+assert(fault);
+assert.equal(fault.dataset.threadSlot,'12');
+assert.match(fault.textContent,/Hardware fault — ide.Mallory — BOUNDS/);
+assert(!fault.classList.contains('is-active'),'fault is not running');
+assert.equal(scope.sim,machine,'hardware evidence must not replace simulator');
+assert(!rows[2].hardwareFault,'configured rows must not mutate');
+scope._threadHardwareStatus.halt.active_fault=false;
+scope.updateThreadIdentityStrip();
+assert(!strip.querySelector('.thread-status-hardware-fault'),'reset/running clears fault highlight');
+scope._threadHardwareStatus.halt.active_fault=true;
+scope._threadHardwareStatus.bridge.session_id='new-session';
+scope.updateThreadIdentityStrip();
+assert(!strip.querySelector('.thread-status-hardware-fault'),'old session must not highlight');
+scope.TargetState={resolve:()=>({mode:'simulator-ram'})};
+scope.updateThreadIdentityStrip();
+assert.match(strip.textContent,/configured/);
 dom.window.close();
 console.log('PASS shared Thread strip: CR12/CR14/CR6 inspection, paging, unavailable and empty states');
