@@ -15,6 +15,17 @@ layout, rather than confused with the existing live-simulator record editor.
 keep runtime inspection and deployment separate. This location decision alone
 does not authorize hardware changes.
 
+Tuple-definition saving must remain separate from boot-layout submission.
+Browsing to another design page must not implicitly submit geometry; rejecting
+a layout review must leave the user on the page where they requested it.
+
+**Why:** The user approved separating these actions after tuple work exposed an
+unrelated proposed Thread/stack resize and rejection still navigated onward.
+
+**How to apply:** Keep local design persistence, boot-configuration review, and
+page navigation explicit. Never compile unrelated editor source as part of a
+Thread geometry save.
+
 **Why:** The user identified the unexplained browser-alert failure as an opportunity to test the tuple-store mechanism and explicitly requested extending the Thread designer.
 
 **How to apply:** Connect source diagnostics to visible storage definitions and allocation review. Preserve Alice's intended authority boundaries; shared Thread storage is not automatically abstraction-private. Distinguish design reservations, runtime tuple edits, saved LUMPs, and continuation restoration. This scope direction does not resolve the outstanding checkpoint, running-bit, or hardware contracts.

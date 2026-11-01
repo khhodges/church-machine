@@ -1124,15 +1124,15 @@
             '</div>';
         }
 
-        var saveBtn = '<div class="le-save-row">' +
+        var saveBtn = '<p class="le-panel-desc"><strong>Boot layout — separate from tuple definitions.</strong> Only the button below submits Thread sizes for review. Tuple edits are saved in this browser; viewing the next page does not apply them to a boot image.</p><div class="le-save-row">' +
             '<button class="le-save-btn"' + (overCapacity ? ' disabled' : '') +
             ' onclick="lumpEditorSaveThread()"' +
-            ' title="Build and download a .lump binary with the current Thread LUMP header, and save step 1 sizes to boot config">' +
-            '\u2B07 Save\u00a0/\u00a0Build LUMP' +
+            ' title="Review and save the page geometry to boot configuration. Does not save tuple definitions or compile editor source.">' +
+            'Review / save boot layout' +
             '</button>' +
              '<button class="le-next-btn" onclick="lumpEditorNextStep(\'lump-resident\')"' +
-             ' title="Save this step and continue to Resident LUMPs">' +
-             'Next: Resident LUMPs \u2192' +
+             ' title="View boot-image configuration without saving or changing the Thread layout">' +
+             'View boot-image configuration \u2192' +
              '</button>' +
             '<span id="le-t-step1-status" class="le-rl-status" style="margin-left:0.75rem;"></span>' +
             '<span id="le-t-step1-err" class="le-rl-status" style="margin-left:0.5rem;color:#f77;"></span>' +
@@ -1272,6 +1272,7 @@
                 '<button type="button" class="le-next-btn" id="le-tu-add-btn" onclick="lumpEditorTupleAdd()"' + (overCapacity ? ' disabled' : '') + '>Add tuple</button>' +
             '</div>' +
             '<div aria-live="polite">' + empty + list + '</div>' +
+            '<div class="le-tu-actions"><button type="button" class="le-next-btn" onclick="lumpEditorTupleSave()">Save tuple definitions locally</button><span class="le-tu-lbl">No boot-configuration change, compilation, or hardware action.</span></div>' +
             '<details class="le-tu-io" id="le-tu-io"><summary>Export / import definitions (JSON)</summary>' +
                 '<div class="le-tu-actions">' +
                     '<button type="button" class="le-next-btn" onclick="lumpEditorTupleExport()">Export JSON</button>' +
@@ -1294,6 +1295,12 @@
         render();
     }
     function _num(v) { var s = String(v).trim(); return /^-?\d+$/.test(s) ? Number(s) : NaN; }
+
+    window.lumpEditorTupleSave = function () {
+        var errors = window.ThreadTupleDesign.validate(state.tuples, currentHeapWords());
+        _tupleApply({ tuples: state.tuples, error: errors.length ? errors.join(' ') : null },
+            'Tuple definitions saved in this browser. Boot configuration and hardware are unchanged.');
+    };
 
     window.lumpEditorTupleAdd = function () {
         var sel = document.getElementById('le-tu-template');
@@ -1498,7 +1505,7 @@
                 '\u2714\ufe0e Save to boot config' +
                 '</button>' +
                 '<button class="le-next-btn" onclick="lumpEditorNextStep(\'lump-thread\')"' +
-                ' title="Save this step and continue to Thread LUMP">' +
+                ' title="View Thread LUMP without saving boot-layout changes">' +
                 'Next: Thread LUMP \u2192' +
                 '</button>' +
                 '<span id="le-ns-step1-status" class="le-rl-status" style="margin-left:0.75rem;"></span>' +
@@ -2123,24 +2130,21 @@
     // ── Thread + NS step1 save helpers ────────────────────────────────────────
 
     window.lumpEditorSaveThread = function () {
-        if (typeof compileAndBuild === 'function') compileAndBuild();
         var statusEl = document.getElementById('le-t-step1-status');
         var errEl    = document.getElementById('le-t-step1-err');
-        _postStep1(statusEl, errEl);
+        return _postStep1(statusEl, errEl);
     };
 
     window.lumpEditorPostStep1 = function () {
         var statusEl = document.getElementById('le-ns-step1-status');
         var errEl    = document.getElementById('le-ns-step1-err');
-        _postStep1(statusEl, errEl);
+        return _postStep1(statusEl, errEl);
     };
 
     window.lumpEditorNextStep = function (tab) {
-        if (tab === 'lump-thread') {
-            lumpEditorPostStep1();
-        } else if (tab === 'lump-resident') {
-            lumpEditorSaveThread();
-        } else if (tab === 'build') {
+        // Geometry review is an explicit action, never a side effect of
+        // browsing. Rejection therefore cannot strand the user on another page.
+        if (tab === 'build') {
             var err = _rlValidate();
             if (err) {
                 _rl.errorMsg = err;
