@@ -56,3 +56,15 @@ execute only that action, then review the result together. Do not launch a new
 RTL simulation without separate approval; omitted tests remain omitted, not
 passed. Keep image preparation, software testing, board commands and flash writes
 as separately reviewed steps.
+
+Start the next Mint bootstrap review with the user's proposed manually created
+RW data capability matching the Namespace Table's base and limit, before the
+broader programmable-image demonstration.
+
+**Why:** The user identified this authority as the missing starting point for
+Mint to create RW data objects and move setup online.
+
+**How to apply:** Review exact table geometry and private provisioning first.
+Distinguish the user's slot-zero terminology from the frozen image's metadata
+and self-descriptor layout. Investigation is not permission to install the
+grant, alter the live Namespace, or run board commands.
