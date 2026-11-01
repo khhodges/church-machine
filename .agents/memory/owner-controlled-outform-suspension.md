@@ -2,6 +2,17 @@
 name: Owner-controlled Outform suspension
 description: Intended Amoeba Self.Save lifecycle for portable Thread and Namespace state.
 ---
+Use one simple, standardized set of networked capability mechanisms for
+Abstractions, Threads and Namespaces. Establish common semantics in dependency
+order rather than inventing separate networking mechanisms for each case.
+
+**Why:** The user explicitly set uniform network transparency as the architectural
+rule. Coverage is a goal to verify, not a claim that current code achieves it.
+
+**How to apply:** Keep object-specific state/layout handling distinct from the
+common capability identity, authority and Outform/Inform lifecycle. Resolve
+apparent exceptions against the common contract before adding special cases.
+
 The user's intended model is program-controlled Amoeba Self.Save, which saves
 the Thread including machine register state and transitions it to Outform.
 Later its owners (potentially a networked abstraction) may reactivate it,

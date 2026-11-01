@@ -155,6 +155,3 @@
 - [UART profile authority](uart-profile-installation-authority.md) — pin software-image compatibility to the installed BIT, not mutable hardware sources; keep flash approval separate.
 - [Readable Mint calls](mint-readable-call-approval.md) — bounded compiler implementation authorized; saved artifacts, live bindings and hardware remain outside approval.
 - [Hardware progress watch](hardware-progress-watch.md) — programmable GT + offset monitoring of the stash counter across free-run and fault recovery.
-- [Thread design drafts](thread-design-draft-boundary.md) — independent browser drafts are not global boot geometry; legacy tuples remain unassigned.
-- [Owner-controlled suspension](owner-controlled-outform-suspension.md) — Amoeba Self.Save saves execution state to Outform; owners may reactivate Threads or Namespaces on another FPGA.
-- [Generated Thread RTL evidence](generated-thread-rtl-evidence.md) — unchanged Thread-body replay is not proof of complete public-image dependencies or full-core acceptance.
