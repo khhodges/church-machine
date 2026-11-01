@@ -156,3 +156,4 @@
 - [Readable Mint calls](mint-readable-call-approval.md) — bounded compiler implementation authorized; saved artifacts, live bindings and hardware remain outside approval.
 - [Hardware progress watch](hardware-progress-watch.md) — programmable GT + offset monitoring of the stash counter across free-run and fault recovery.
 - [Thread design drafts](thread-design-draft-boundary.md) — independent browser drafts are not global boot geometry; legacy tuples remain unassigned.
+- [Owner-controlled suspension](owner-controlled-outform-suspension.md) — Amoeba Self.Save saves execution state to Outform; owners may reactivate Threads or Namespaces on another FPGA.
