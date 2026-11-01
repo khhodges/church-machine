@@ -34,7 +34,7 @@
 .tbd-skel-line { height:10px; border-radius:3px; background:#1a2436; animation:tbdPulse 1.2s ease-in-out infinite alternate; }
 .tbd-skel-line:nth-child(2n) { width:70%; }
 @keyframes tbdPulse { from { opacity:.4 } to { opacity:1 } }
-.tbd-dialog { width:96vw; height:92dvh; max-width:none; max-height:none; margin:auto; background:#0a0e17; color:#c8d6e5; border:1px solid #30415e; border-radius:10px; padding:12px; display:none; flex-direction:column; gap:8px; font-family:inherit; font-size:12px; }
+.tbd-dialog { box-sizing:border-box; width:100vw; height:100dvh; max-width:none; max-height:none; margin:0; background:#0a0e17; color:#c8d6e5; border:1px solid #30415e; border-radius:0; padding:12px; display:none; flex-direction:column; gap:8px; font-family:inherit; font-size:12px; }
 .tbd-dialog[open] { display:flex; }
 .tbd-dialog::backdrop { background:rgba(3,6,12,.72); }
 .tbd-dialog.tbd-unassoc { border:2px solid #f59e0b; }

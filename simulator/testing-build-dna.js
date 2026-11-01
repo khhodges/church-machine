@@ -276,6 +276,19 @@
 
   // ---------- graph dialog ----------
   var view = { z: 1, x: 0, y: 0 };
+  // Render in the outermost same-origin app document, not the Testing iframe.
+  // The Replit preview shell is cross-origin and remains outside our control.
+  function dialogHost() {
+    var host = root;
+    while (host.parent !== host) {
+      try {
+        if (host.parent.location.origin !== root.location.origin) break;
+        void host.parent.document.body;
+        host = host.parent;
+      } catch (_) { break; }
+    }
+    return host.document;
+  }
   function buildDialog() {
     var d = el('dialog', 'tbd-dialog'); d.setAttribute('aria-labelledby', 'tbdDlgTitle');
     var top = el('div', 'tbd-dlg-head');
@@ -317,8 +330,26 @@
     ui.detail = el('div', 'tbd-detail-body'); side.appendChild(ui.detail);
     main.appendChild(side);
     d.appendChild(main);
-    doc.body.appendChild(d);
+    var hostDoc = dialogHost();
+    if (hostDoc !== doc && !hostDoc.querySelector('link[data-build-dna-style]')) {
+      var style = hostDoc.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = new URL('/simulator/testing-build-dna.css', root.location.href).href;
+      style.setAttribute('data-build-dna-style', '');
+      style.addEventListener('load', fit);
+      hostDoc.head.appendChild(style);
+    }
+    hostDoc.body.appendChild(d);
     ui.dlg = d;
+    d.addEventListener('keydown', function (event) { event.stopPropagation(); });
+    d.addEventListener('close', function () {
+      if (ui.returnFocus && ui.returnFocus.isConnected) ui.returnFocus.focus();
+    });
+    // Remove the promoted dialog if its owning Testing page is unloaded.
+    root.addEventListener('pagehide', function () { d.remove(); });
+    if (root.ResizeObserver) new root.ResizeObserver(function () {
+      if (d.open) fit();
+    }).observe(ui.stage);
 
     var drag = null;
     ui.stage.addEventListener('pointerdown', function (e) {
@@ -361,7 +392,12 @@
     view.x = (r.width - L.width * view.z) / 2; view.y = (r.height - L.height * view.z) / 2; applyView();
   }
 
-  function openDialog() { if (!ui.dlg.open) { if (ui.dlg.showModal) ui.dlg.showModal(); else ui.dlg.setAttribute('open', ''); } }
+  function openDialog() {
+    if (!ui.dlg.open) {
+      ui.returnFocus = doc.activeElement;
+      if (ui.dlg.showModal) ui.dlg.showModal(); else ui.dlg.setAttribute('open', '');
+    }
+  }
 
   function loadGraph(kind, id) {
     var t = gate.next();
