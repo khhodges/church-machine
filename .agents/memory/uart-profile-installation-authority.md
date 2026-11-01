@@ -127,15 +127,19 @@ before adopting it. Bounds and descriptor integrity do not establish that the
 writer was entitled to choose the loaded capability.
 
 Start with the simplest synchronous Mint CALL/RETURN design: protected scratch
-in Mint's private state, written through its RW view and loaded through a
-one-word L view. Defer a dedicated Mint service Thread to Phase X.
+with Mint resident. The user subsequently specified scratch “bolted down in
+CR6”; the working interpretation is a reserved row in Mint's resident C-list,
+loaded through CR6.M, with a private writable view of that word.
+Defer a dedicated Mint service Thread to Phase X.
 
 **Why:** After reviewing the alternatives, the user selected the simplest
 synchronous option and explicitly deferred the dedicated Thread.
 
-**How to apply:** Reuse the saved Mint write/LOAD/clear pattern rather than
-redesign CR6 or introduce WL permissions. Keep scratch outside client allocation
-storage; verify capability custody and exclusive use. Synchronous CALL alone
+**How to apply:** Preserve write/LOAD/clear semantics, but reconcile the selected
+C-list row with the saved source before implementation. CR6 is Mint's view only
+while Mint executes; normal RETURN restores the caller's view. Residency does
+not grant write authority or concurrency safety. Keep scratch outside client
+allocation storage; verify capability custody and exclusive use. Synchronous CALL alone
 does not prevent concurrent calls from other Threads. Scope the initial
 demonstration to one caller, not a claim of multi-Thread service safety.
 This choice does not authorize hardware installation or flash changes.
