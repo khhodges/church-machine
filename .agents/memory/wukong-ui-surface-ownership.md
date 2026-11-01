@@ -19,3 +19,12 @@ section must not be described as already present.
 **How to apply:** Distinguish selected build identity from verified installed
 identity and unavailable provenance. Honour the user's step-by-step review
 before executing the proposed release-review work.
+
+Build-DNA inspection must decode the coordinate system of the frozen image,
+not borrow the current Namespace's slot numbering or labels. Keep binary-body
+hashes distinct from portable artifact hashes and keep unassociated Namespace
+inspection distinct from evidence for a bitstream.
+
+**Why:** Retained descending and ascending images coexist. Ascending metadata
+occupies slot zero; treating the following self descriptor as slot zero shifts
+every GT target. Localization can legitimately change the inspected body hash.
