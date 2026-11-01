@@ -126,3 +126,13 @@ scratch aliases, CR6 rows, and the reserved Namespace metadata word.
 before implementation. This is design direction, not evidence that arbitrary
 register M elevation or DWRITE elevation exists, nor approval to change the BIT.
 Scratch placement and how M is established/restored remain to be resolved.
+
+If a dedicated one-word scratch object is necessary, the user proposes
+PP250-style WL “alchemist” permissions for that object.
+
+**Why:** They want the data-write and GT-load operation expressed as one bounded
+authority, rather than proliferating separate scratch grants.
+
+**How to apply:** Treat this as an architectural proposal, not an implemented
+permission combination or permission to change the frozen BIT. Its domain-coded
+GT format distinguishes W from L; review feasibility explicitly.
