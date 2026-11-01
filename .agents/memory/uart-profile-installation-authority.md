@@ -155,6 +155,15 @@ Do not wrap generations into old identities. Verify stale loaded as well as
 stored GT behavior on the frozen profile before claiming revocation is proven.
 This acceptance does not authorize implementation of the deferred refill Thread.
 
+Phase 1 starting inventory is four 64-word, two 128-word, and two 256-word RW
+objects, with a shared return queue sized for eight objects.
+
+**Why:** The user approved that initial sizing proposal with “ok proceed.”
+
+**How to apply:** Treat these as initial demonstration capacities, not a general
+allocator policy. Retain finite-inventory exhaustion until refill is separately
+implemented; queue storage is additional to the 1024-word object pool.
+
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
 The earlier eight-word example is not an accepted allocation contract.
 
