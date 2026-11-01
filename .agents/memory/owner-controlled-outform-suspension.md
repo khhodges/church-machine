@@ -8,6 +8,8 @@ order rather than inventing separate networking mechanisms for each case.
 
 **Why:** The user explicitly set uniform network transparency as the architectural
 rule. Coverage is a goal to verify, not a claim that current code achieves it.
+The user confirmed the ordering: networked identity/authority, local Namespace
+representation, common Outform/Inform transitions, then object-specific behavior.
 
 **How to apply:** Keep object-specific state/layout handling distinct from the
 common capability identity, authority and Outform/Inform lifecycle. Resolve
