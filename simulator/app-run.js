@@ -21690,6 +21690,20 @@ function _wukongFaultDiagnosis(f) {
             ? ['Selected control-flow packets preceding this fault; not a complete instruction history.', ...f._controlFlowHistory]
             : ['No complete caller history was captured in this fault record. CR14 identifies the active callee, not its caller.'],
     };
+    // Names already carried by the selected bridge map do not depend on the
+    // later CR-bank snapshot. Do not discard them while awaiting correlation.
+    const namedTrace = /^@phase1 event FAULT ([^/]+) \/ ([^/]+) \/ (.+)$/.exec(t.gt_label || '');
+    if (namedTrace) {
+        d.context[0][1] = namedTrace[1].trim() + ' (bridge reference)';
+        d.context[1][1] = namedTrace[2].trim() + ' (bridge reference)';
+        d.context[2][1] = namedTrace[3].trim() + ' (bridge reference)';
+        d.provenance += ' PetNames come from the bridge’s operator-selected image map, independently of snapshot availability.';
+    }
+    if (f._supersededFaultTrace) {
+        d.history.unshift('Report advanced from fault packet ' +
+            f._supersededFaultTrace.bridge_trace_counter + ' to accepted current fault packet ' +
+            t.bridge_trace_counter + '; registers belong only to the latter incident.');
+    }
     if (s) {
         d.facts.push(['CR6 GT / base / limit', s.cr[6].map(hex).join(' / ')],
             ['DR0', hex(s.dr[0])], ['Incident', s.incident_id]);
@@ -21728,6 +21742,19 @@ function _wukongFaultDiagnosis(f) {
     return d;
 }
 
+function _wukongCurrentFaultReplacement(trace, status) {
+    const latest = status.latest_trace;
+    // Explicitly advance the displayed record; NEVER attach another incident's
+    // registers to the old one. Limit this to adjacent fault packets in the same
+    // bridge session with identical fault location/type and accepted evidence.
+    return latest && trace && latest.is_current === true && latest.fault_valid === true &&
+        latest.bridge_session === trace.bridge_session &&
+        latest.nia === trace.nia && latest.fault_code === trace.fault_code &&
+        Number.isInteger(trace.bridge_trace_counter) &&
+        latest.bridge_trace_counter === trace.bridge_trace_counter + 1 &&
+        _wukongFaultSnapshotMatches(latest, status.last_accepted_fault) ? latest : null;
+}
+
 async function _wukongEnrichFaultReport(f) {
     if (f._diagnosticLoaded) return;
     f._diagnosticLoaded = true;
@@ -21736,6 +21763,14 @@ async function _wukongEnrichFaultReport(f) {
         if (!response.ok) throw new Error('Status lookup failed');
         const status = await response.json();
         const snap = status.last_accepted_fault;
+        if (!_wukongFaultSnapshotMatches(f._hardwareTrace, snap)) {
+            const replacement = _wukongCurrentFaultReplacement(f._hardwareTrace, status);
+            if (replacement) {
+                f._supersededFaultTrace = f._hardwareTrace;
+                f._hardwareTrace = {...replacement};
+                f._goldenReference = f._goldenReference || /^@phase1 /.test(replacement.gt_label || '');
+            }
+        }
         if (_wukongFaultSnapshotMatches(f._hardwareTrace, snap)) {
             f._acceptedSnapshot = snap;
             f.crSnapshot = snap.cr.map(row => ({word0: row[0], word1: row[1], word2: row[2]}));
@@ -21758,7 +21793,21 @@ async function _wukongEnrichFaultReport(f) {
     }
     f.programmerDiagnosis = _wukongFaultDiagnosis(f);
     const overlay = document.getElementById('faultModalOverlay');
-    if (overlay && overlay._faultRecord === f) showFaultModal(f);
+    if (overlay && overlay._faultRecord === f) {
+        showFaultModal(f);
+        // Snapshot delivery follows trace delivery. Retry only while this exact
+        // report remains open; never reopen a dismissed or replaced modal.
+        f._diagnosticAttempts = (f._diagnosticAttempts || 0) + 1;
+        if (!f._acceptedSnapshot && f._diagnosticAttempts < 5) {
+            setTimeout(() => {
+                const current = document.getElementById('faultModalOverlay');
+                if (current && current._faultRecord === f) {
+                    f._diagnosticLoaded = false;
+                    void _wukongEnrichFaultReport(f);
+                }
+            }, 1000);
+        }
+    }
 }
 
 function _wukongUseGoldenFaultReference() {

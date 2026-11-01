@@ -20,6 +20,22 @@ for (const change of [{incident_id:'other'}, {bridge_session:'other'}, {nia:0x40
     assert(!context._wukongFaultSnapshotMatches(trace,{...snapshot,...change}));
 }
 const f = {type:'BOUNDS', physicalPC:trace.nia,faultCode:8,_hardwareTrace:trace,_acceptedSnapshot:snapshot};
+const namedTrace = {...trace, gt_label:'@phase1 event FAULT Boot.NS / Thread.3 / ide.Mallory'};
+const pending = context._wukongFaultDiagnosis({...f,_hardwareTrace:namedTrace,_acceptedSnapshot:null,_goldenReference:true});
+assert(pending.context[0][1].includes('Boot.NS'));
+assert(pending.context[1][1].includes('Thread.3'));
+assert(pending.context[2][1].includes('ide.Mallory'));
+assert.equal(pending.instruction,'Not captured by UART');
+const older = {...trace, incident_id:'previous-incident',bridge_trace_counter:1906};
+const latest = {...namedTrace, is_current:true,fault_valid:true};
+const status = {latest_trace:latest,last_accepted_fault:snapshot};
+assert.equal(context._wukongCurrentFaultReplacement(older,status),latest);
+assert(!context._wukongFaultSnapshotMatches(older,snapshot));
+for (const change of [{bridge_session:'other'},{nia:12},{fault_code:9},
+    {bridge_trace_counter:1905}]) {
+    assert.equal(context._wukongCurrentFaultReplacement({...older,...change},status),null);
+}
+assert.equal(context._wukongCurrentFaultReplacement(older,{...status,latest_trace:{...latest,is_current:false}}),null);
 assert(!context._wukongFaultDiagnosis(f).title.includes('Mallory'));
 f._goldenReference=true;
 let d=context._wukongFaultDiagnosis(f);

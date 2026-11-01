@@ -45,3 +45,13 @@ instruction and provenance evidence. Hardware annotations require an explicitly
 selected immutable image reference and must not be described as UART capture
 or hardware attestation. Correlate register snapshots by incident and bridge
 session, not just a matching NIA.
+
+Known bridge-map PetNames must remain visible even when register evidence is
+pending. Name availability and snapshot correlation are separate questions.
+
+**Why:** The user correctly challenged “unresolved” labels when the bridge had
+already supplied the full Namespace/Thread/object path.
+
+**How to apply:** Label the name's reference provenance independently. Never
+weaken incident correlation to fill a register gap; explicitly advance a report
+when a superseding current incident supplies the accepted snapshot.
