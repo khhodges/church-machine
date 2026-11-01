@@ -4,7 +4,7 @@
 //
 // Tuples are named, typed regions laid out at heap-relative word offsets in
 // the CR5 Heap zone of the normative Thread design.  They are saved with the
-// browser's Thread design (localStorage 'lump_editor_state') and can be
+// browser's independently keyed Thread designs (localStorage 'lump_editor_state') and can be
 // exported/imported as portable JSON.  They are NOT written into the boot
 // config, the Thread header, the built .lump binary, simulator memory or
 // hardware.  Tuples introduce no capability, ACL or privacy boundary: every
@@ -124,6 +124,19 @@
     }
 
     function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+    // Stable design ownership, not artifact revision identity: recompiling a
+    // Thread must not discard its draft; another occupant must not inherit it.
+    function bindingKey(namespace, row, namespaceSequence) {
+        return JSON.stringify([String(namespace), Number(namespaceSequence || 0),
+            Number(row.slot), String(row.name), Number(row.seq || 0)]);
+    }
+    function newDesign(row) {
+        var words = Number(row && row.limit) + 1;
+        var exp = Math.log2(words);
+        return { thread: { lumpPow2: Number.isInteger(exp) && exp >= 8 && exp <= 13 ? exp : 8,
+            stackFrames: 16, count: 1 }, tuples: [] };
+    }
 
     // Telephone template: exact copy of ThreadHeapRecord's 58-word call record.
     function telephone(offset) {
@@ -280,7 +293,8 @@
         fieldWords: fieldWords, layout: layout, tupleWords: tupleWords, validate: validate, normalize: normalize,
         addFromTemplate: addFromTemplate, updateTuple: updateTuple, removeTuple: removeTuple,
         addField: addField, updateField: updateField, removeField: removeField,
-        exportJson: exportJson, importJson: importJson, utf8Len: utf8Len };
+        exportJson: exportJson, importJson: importJson, utf8Len: utf8Len,
+        bindingKey: bindingKey, newDesign: newDesign };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.ThreadTupleDesign = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

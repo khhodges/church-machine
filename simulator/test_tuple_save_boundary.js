@@ -17,6 +17,7 @@ function loadHandler(context, name) {
         window: {ThreadTupleDesign: {validate: () => []}},
         document: {getElementById: id => statuses[id] ||= {textContent: ''}},
         state: {tuples: [{name: 'AliceProgress'}]},
+        _threadDesignKey: 'legacy',
         currentHeapWords: () => 194,
         _tupleApply: (result, message) => {
             assert.equal(result.error, null);

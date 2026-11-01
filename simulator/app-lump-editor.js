@@ -187,12 +187,81 @@
     };
 
     var _hadSavedState = false;   // true when a previously saved design exists in localStorage
+    var _threadDesigns = Object.create(null);
+    var _threadDesignKey = 'legacy';
+
+    function rememberThreadDesign() {
+        _threadDesigns[_threadDesignKey] = JSON.parse(JSON.stringify({
+            thread: state.thread, tuples: state.tuples,
+            tuplesUnreadable: state.tuplesUnreadable
+        }));
+    }
+
+    function restoreThreadDesign(key) {
+        var d = _threadDesigns[key];
+        state.thread = JSON.parse(JSON.stringify(d.thread));
+        state.tuples = [];
+        delete state.tuplesUnreadable;
+        if (d.tuplesUnreadable !== undefined) state.tuplesUnreadable = d.tuplesUnreadable;
+        try { state.tuples = window.ThreadTupleDesign.normalize(d.tuples || []); }
+        catch (e) { state.tuplesUnreadable = d.tuples; }
+        _threadDesignKey = key;
+        _tupleMsg = null;
+        _threadLumpClampedInfo = null;
+        _threadCountClampedInfo = null;
+    }
+
+    function threadBindings() {
+        var rows = _nsDrill.entries || [];
+        var ns = rows.find(function (r) { return Number(r.slot) === 0; });
+        return rows.filter(function (r) {
+            return r.name && (r.header_typ === 2 || r.type === 'Thread' || r.typ === 2 ||
+                r.name === 'Boot.Thread' || /^Thread\.\d+$/.test(r.name));
+        }).map(function (r) {
+            return { row: r, key: window.ThreadTupleDesign.bindingKey(ns ? ns.name : 'Namespace', r, ns && ns.seq) };
+        });
+    }
+
+    function renderThreadSelector() {
+        var bindings = threadBindings();
+        var options = '<option value="legacy">Legacy shared boot layout (unassigned draft)</option>';
+        bindings.forEach(function (b) {
+            options += '<option value="' + esc(b.key) + '"' +
+                (b.key === _threadDesignKey ? ' selected' : '') + '>' +
+                esc(b.row.name) + ' — NS[' + Number(b.row.slot) + ']</option>';
+        });
+        if (_threadDesignKey !== 'legacy' && !bindings.some(function (b) { return b.key === _threadDesignKey; })) {
+            options += '<option selected value="' + esc(_threadDesignKey) + '">Saved Thread (binding unavailable)</option>';
+        }
+        return '<div class="le-panel"><label for="le-thread-design">Thread design</label> ' +
+            '<select id="le-thread-design" onchange="lumpEditorSelectThread(this.value)">' + options + '</select>' +
+            '<p>Each named Thread has an independent browser-saved layout and tuple reservations. Selection never builds, installs, or activates a Thread.</p>' +
+            (_nsDrill.errorMsg ? '<p>' + esc(_nsDrill.errorMsg) + '</p>' : '') + '</div>';
+    }
+
+    window.lumpEditorSelectThread = function (key) {
+        var binding = threadBindings().find(function (b) { return b.key === key; });
+        if (key !== 'legacy' && !binding) return;
+        if (!saveState()) {
+            _tupleMsg = { err: true, text: 'Cannot switch: browser storage failed. Export your tuples and retry. The current design is unchanged.' };
+            render();
+            return;
+        }
+        if (!_threadDesigns[key]) _threadDesigns[key] = window.ThreadTupleDesign.newDesign(binding && binding.row);
+        restoreThreadDesign(key);
+        var ta = document.getElementById('le-tu-json');
+        if (ta) ta.value = '';
+        saveState();
+        render();
+    };
 
     function loadState() {
         try {
             var raw = localStorage.getItem('lump_editor_state');
             _hadSavedState = !!raw;
             var s = JSON.parse(raw || '{}');
+            _threadDesignKey = 'legacy';
+            _threadDesigns = Object.create(null);
             if (s.thread) {
                 if (s.thread.lumpPow2 !== undefined) {
                     state.thread.lumpPow2 = clamp(s.thread.lumpPow2, 6, 13);
@@ -233,12 +302,25 @@
                     state.ns.n_minus_6 === s.nsSizeClampedInfo.clampedN) {
                 _nsSizeClampedInfo = s.nsSizeClampedInfo;
             }
+            rememberThreadDesign();
+            if (s.threadDesigns && typeof s.threadDesigns === 'object') {
+                Object.keys(s.threadDesigns).forEach(function (key) {
+                    var d = s.threadDesigns[key];
+                    if (d && d.thread) _threadDesigns[key] = d;
+                });
+                if (_threadDesigns[s.selectedThreadDesign]) restoreThreadDesign(s.selectedThreadDesign);
+            }
         } catch (e) {}
     }
 
     function saveState() {
         try {
+            rememberThreadDesign();
             var payload = JSON.parse(JSON.stringify(state));
+            // Preserve the old top-level contract as the unassigned boot draft.
+            Object.assign(payload, _threadDesigns.legacy);
+            payload.threadDesigns = _threadDesigns;
+            payload.selectedThreadDesign = _threadDesignKey;
             payload.nsSizeClampedInfo = _nsSizeClampedInfo || null;
             localStorage.setItem('lump_editor_state', JSON.stringify(payload));
             return true;
@@ -292,6 +374,7 @@
     // ── step1 boot-config POST helper ────────────────────────────────────────
 
     function _getStep1Payload() {
+        var buildThread = _threadDesignKey === 'legacy' ? state.thread : _threadDesigns.legacy.thread;
         var board    = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'wukong-xc7a100t';
         var profile  = BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
         var boardRam = profile.totalRamWords;
@@ -299,18 +382,18 @@
         var maxN               = validPresets[validPresets.length - 1].n;
         var n                  = clamp(state.ns.n_minus_6, 0, maxN);
         var totalNamespaceWords = Math.pow(2, n + 14);
-        var threadLumpWords     = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
+        var threadLumpWords     = Math.pow(2, clamp(buildThread.lumpPow2, MIN_EXP, MAX_EXP));
         var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
         var maxSl               = Math.min(totalNamespaceWords / 64, serverMax, NS_CAP_MAX);
         var nsSlotsMax          = Math.min(snapNSCap(state.ns.slots), maxSl);
-        var threadCount         = clamp(state.thread.count, 1, boardThreadCountLimit(profile));
+        var threadCount         = clamp(buildThread.count, 1, boardThreadCountLimit(profile));
         return {
             targetBoard: board,
             step1: {
                 totalNamespaceWords: totalNamespaceWords,
                 namespaceLumpWords:  64,
                 threadLumpWords:     threadLumpWords,
-                threadStackWords:    clamp(state.thread.stackFrames, 10, 255) * 2,
+                threadStackWords:    clamp(buildThread.stackFrames, 10, 255) * 2,
                 nsSlotsMax:          nsSlotsMax,
                 threadCount:         threadCount
             }
@@ -318,6 +401,10 @@
     }
 
     function _postStep1(statusEl, errEl) {
+        if (_threadDesignKey !== 'legacy') {
+            if (errEl) errEl.textContent = 'Select the legacy shared boot layout before reviewing global geometry. No build changed.';
+            return Promise.resolve(false);
+        }
         var s1payload = _getStep1Payload();
         if (statusEl) statusEl.textContent = 'Saving step 1\u2026';
         if (errEl)    errEl.textContent    = '';
@@ -900,7 +987,9 @@
             '</div>';
         }
 
-        var saveBtn = '<p class="le-panel-desc"><strong>Boot layout — separate from tuple definitions.</strong> Only the button below submits Thread sizes for review. Tuple edits are saved in this browser; viewing the next page does not apply them to a boot image.</p><div class="le-save-row">' +
+        var saveBtn = _threadDesignKey !== 'legacy'
+            ? '<p class="le-panel-desc">Layout and tuples are saved locally for this Thread. They are design intent only, not an installed layout. Global boot changes remain separate under the legacy shared boot layout and require explicit review.</p>'
+            : '<p class="le-panel-desc"><strong>Boot layout — separate from tuple definitions.</strong> Only the button below submits Thread sizes for review. Tuple edits are saved in this browser; viewing the next page does not apply them to a boot image.</p><div class="le-save-row">' +
             '<button class="le-save-btn"' + (overCapacity ? ' disabled' : '') +
             ' onclick="lumpEditorSaveThread()"' +
             ' title="Review and save the page geometry to boot configuration. Does not save tuple definitions or compile editor source.">' +
@@ -928,13 +1017,13 @@
                 '<div class="le-thread-sync-note">' +
                 '<span class="le-thread-sync-badge">Thread = ' + esc(fmtWords(lumpSize)) + ' words (2^' + lumpPow2 + ') \u00b7 cw/sw=' + stackWords + ' \u00b7 cc=12 homes \u00b7 Heap=' + heap + ' words \u00b7 CR0\u2013CR11 @ +' + capsStart + '\u2026+' + capsEnd + '</span>' +
             '</div>' +
-            '<div class="le-field-row">' +
+            (_threadDesignKey === 'legacy' ? '<div class="le-field-row">' +
                 '<label class="le-label">Thread count<span class="le-range-hint">' + esc(countHint) + '</span></label>' +
                 '<div class="le-input-group">' +
                     '<input type="range"  class="le-slider" id="le-t-count-sl"  min="1" max="' + maxCount + '" value="' + count + '" oninput="lumpEditorThreadCount(this.value)">' +
                     '<input type="number" class="le-number" id="le-t-count-num" min="1" max="' + maxCount + '" value="' + count + '" oninput="lumpEditorThreadCount(this.value)">' +
                 '</div>' +
-            '</div>' +
+            '</div>' : '') +
             '<div class="le-field-row">' +
                 '<label class="le-label">Stack frames<span class="le-range-hint"> 10\u2013255  (' + stackWords + ' words)</span></label>' +
                 '<div class="le-input-group">' +
@@ -1120,7 +1209,8 @@
     window.lumpEditorTupleFile = function (input) {
         var file = input && input.files && input.files[0]; if (!file) return;
         var r = new FileReader();
-        r.onload = function () { var ta = document.getElementById('le-tu-json'); if (ta) ta.value = String(r.result); };
+        var owner = _threadDesignKey;
+        r.onload = function () { if (owner !== _threadDesignKey) return; var ta = document.getElementById('le-tu-json'); if (ta) ta.value = String(r.result); };
         r.readAsText(file);
     };
     window.lumpEditorTupleImport = function () {
@@ -1141,6 +1231,11 @@
     // ── Namespace panel ───────────────────────────────────────────────────────
 
     function renderNSPanel() {
+        if (_threadDesignKey !== 'legacy') {
+            return '<div class="le-panel"><p>The selected named Thread is a local draft. ' +
+                'Namespace build settings use the separate shared boot layout. Switch to that layout before editing or saving global geometry.</p>' +
+                '<button type="button" class="le-save-btn" onclick="lumpEditorSelectThread(\'legacy\')">Edit shared boot layout</button></div>';
+        }
         var profile    = getBoardProfile();
         var boardRam   = profile.totalRamWords;
         var budget     = Math.floor(boardRam / 2);
@@ -1336,7 +1431,7 @@
                     // Seed thread geometry from the committed Thread.1 block too,
                     // so the memory-truth checks open clean on a valid image.
                     var ct = _nsDrill.committed.thread;
-                    if (ct) {
+                    if (ct && _threadDesignKey === 'legacy') {
                         var tlg = Math.log2(ct.size || 0);
                         if (Number.isInteger(tlg) && tlg >= MIN_EXP && tlg <= MAX_EXP) state.thread.lumpPow2 = tlg;
                         if (typeof ct.count === 'number' && ct.count >= 1 && ct.count <= 9) state.thread.count = ct.count;
@@ -1741,6 +1836,7 @@
         if (tEl) tEl.innerHTML =
             renderDesignHero('thread') +
             renderDesignSection('thread') +
+            renderThreadSelector() +
             '<div class="le-design-editor-caption">Interactive build settings</div>' +
             renderThreadPanel();
         if (nEl) nEl.innerHTML =
@@ -1776,6 +1872,7 @@
     };
 
     window.lumpEditorThreadCount = function (v) {
+        if (_threadDesignKey !== 'legacy') return;
         state.thread.count = clamp(v, 1, boardThreadCountLimit(getBoardProfile()));
         _threadCountClampedInfo = null;
         saveState();
@@ -1842,7 +1939,7 @@
         }
     };
 
-    window.lumpEditorRender = function () { clampThreadStateToBoard(); clampNSStateToBoard(); render(); };
+    window.lumpEditorRender = function () { render(); };
     window.lumpEditorRenderResidentPanel = function () {
         var panel = document.getElementById('lumpResidentPanel');
         if (panel && panel.offsetParent !== null) renderResidentPanel();
@@ -1865,6 +1962,10 @@
     window.lumpEditorSaveThread = function () {
         var statusEl = document.getElementById('le-t-step1-status');
         var errEl    = document.getElementById('le-t-step1-err');
+        if (_threadDesignKey !== 'legacy') {
+            if (errEl) errEl.textContent = 'This Thread design is saved locally only. The shared boot-layout endpoint cannot apply individual Thread layouts. No build changed; select the legacy shared boot layout to review global geometry.';
+            return Promise.resolve(false);
+        }
         return _postStep1(statusEl, errEl);
     };
 
