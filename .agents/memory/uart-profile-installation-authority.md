@@ -103,3 +103,15 @@ boundary and remaining validation/startup checks were presented.
 disposable candidate, never as live-board history. Approval covers offline
 preparation, not validator bypasses, startup-design changes, RTL replay,
 upload, reboot, or flash programming.
+
+Treat the demonstration's Namespace RW grant as a RAM view, not an MMIO
+workaround. Report overlapping capability ranges as warnings rather than
+assuming each descriptor owns a separate allocation.
+
+**Why:** The user proposed overlap warnings and accepted describing access to
+existing RAM directly after discussing the MMIO alternative.
+
+**How to apply:** Distinguish data views from executable/Thread bodies without
+requiring every data view to contain a LUMP header. Preserve integrity, bounds,
+required boot-object checks and runtime enforcement. This agreement does not
+authorize board operations or a new hardware mapping.
