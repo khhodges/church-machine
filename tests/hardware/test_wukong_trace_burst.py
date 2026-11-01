@@ -54,7 +54,9 @@ def test_overflow_is_explicit_and_nonblocking(monkeypatch, capsys):
             assert worker.submit("trace", {"bridge_trace_counter": counter})
         assert worker.submit("trace", {}) is False
         assert worker.telemetry_overflows == 1
-        assert "TRACE INCOMPLETE" in capsys.readouterr().out
+        output = capsys.readouterr().out
+        assert "BRIDGE DELIVERY ONLY" in output
+        assert "events rejected" in output
         assert worker.submit("trace_fault", {"fault_valid": True})
     finally:
         worker.close()
@@ -72,7 +74,12 @@ def test_http_failure_is_explicit(monkeypatch, capsys):
                          daemon=True).start()
         assert done.wait(2)
         assert worker.telemetry_delivery_failures == 1
-        assert "TRACE INCOMPLETE" in capsys.readouterr().out
+        output = capsys.readouterr().out
+        assert "BRIDGE DELIVERY ONLY" in output
+        assert "unconfirmed" in output
+        assert "does not prove packet loss" in output
+        assert "TRACE INCOMPLETE" not in output
+        assert "IDE history is incomplete" not in output
     finally:
         worker.close()
         worker._thread.join(2)

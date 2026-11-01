@@ -55,3 +55,12 @@ already supplied the full Namespace/Thread/object path.
 **How to apply:** Label the name's reference provenance independently. Never
 weaken incident correlation to fill a register gap; explicitly advance a report
 when a superseding current incident supplies the accepted snapshot.
+
+Label host-to-IDE transport diagnostics “BRIDGE DELIVERY ONLY,” separately from
+machine faults. An HTTP timeout means delivery is unconfirmed, not proven loss.
+
+**Why:** The user found TRACE INCOMPLETE and fault-upload chatter misleading
+alongside genuine UART fault output and requested explicit bridge-only labels.
+
+**How to apply:** Keep actual queue drops distinguishable from missing HTTP
+acknowledgements, and never imply a transport warning is another FPGA fault.

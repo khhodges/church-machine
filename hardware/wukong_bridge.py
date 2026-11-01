@@ -296,7 +296,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 23
+BRIDGE_VERSION    = 24
 # Hold a complete bounded acceptance run while HTTPS catches up. This does
 # not promise unlimited recording; any overflow must be explicitly reported.
 TRACE_BACKLOG_CAPACITY = 8192
@@ -1482,7 +1482,7 @@ class FaultDeliveryWorker:
                             pass
                     except queue.Full:
                         pass
-            print(f'  [{kind}] reserved delivery queue full; retry pending',
+            print(f'  [BRIDGE DELIVERY ONLY] {kind}: reserved delivery queue full; retry pending',
                   flush=True)
             return False
         try:
@@ -1493,9 +1493,9 @@ class FaultDeliveryWorker:
             self.telemetry_overflows += 1
             n = self.telemetry_overflows
             if n == 1 or n & (n - 1) == 0:
-                print(f'  [TRACE INCOMPLETE] telemetry backlog full: {n} '
+                print(f'  [BRIDGE DELIVERY ONLY] telemetry backlog full: {n} '
                       'events rejected this session; IDE history is incomplete. '
-                      'UART reading and fault delivery remain active.', flush=True)
+                      'Not an FPGA fault. UART reading and fault delivery remain active.', flush=True)
             return False
 
     def poll(self):
@@ -1569,19 +1569,22 @@ class FaultDeliveryWorker:
                         if not (200 <= response.status_code < 300):
                             reply = None
                     except Exception as exc:
-                        print(f'  [trace POST error] {exc}', flush=True)
+                        print(f'  [BRIDGE DELIVERY ONLY] Trace upload unconfirmed: {exc}. '
+                              'This is not an FPGA fault.', flush=True)
                         reply = None
             except Exception as exc:
                 # A malformed response or unexpected worker error must not
                 # terminate telemetry delivery or the serial bridge.
-                print(f'  [{kind} delivery error] {exc}', flush=True)
+                print(f'  [BRIDGE DELIVERY ONLY] {kind} delivery unconfirmed: {exc}. '
+                      'This is not an FPGA fault.', flush=True)
                 reply = None
             if kind == 'trace' and reply is None:
                 self.telemetry_delivery_failures += 1
                 n = self.telemetry_delivery_failures
                 if n == 1 or n & (n - 1) == 0:
-                    print(f'  [TRACE INCOMPLETE] {n} trace deliveries failed '
-                          'this session; IDE history is incomplete.', flush=True)
+                    print(f'  [BRIDGE DELIVERY ONLY] {n} trace uploads unconfirmed '
+                          'this session; IDE history may have gaps. '
+                          'A missing HTTP acknowledgement does not prove packet loss.', flush=True)
             result = {
                 'kind': kind, 'payload': payload, 'reply': reply}
             target = self._fault_results if critical else self._telemetry_results
@@ -2172,7 +2175,8 @@ def main():
                 # A result from an older delivery attempt is diagnostic only:
                 # it must never lend its server sequence to the active fault.
                 if not fault_recovery.owns_trace_payload(payload):
-                    print('  [fault delivery] stale trace result discarded',
+                    print('  [BRIDGE DELIVERY ONLY] Earlier fault-upload response ignored; '
+                          'it does not belong to the current incident.',
                           flush=True)
                     continue
                 trace_seq = int(reply.get('seq', 0)) if reply else None
@@ -2180,14 +2184,14 @@ def main():
                 accepted = fault_recovery.note_trace(
                     payload, trace_seq, trace_boot_id, session_id)
                 if accepted:
-                    print('  [fault delivery] trace accepted; '
+                    print('  [BRIDGE DELIVERY ONLY] Fault trace accepted; '
                           'complete snapshot still required', flush=True)
                     _bridge_status(
                         'fault_trace_accepted', 'fault_hold',
                         'fault trace accepted; complete snapshot pending',
                         fault_delivery=_fault_delivery_status())
                 else:
-                    print('  [fault delivery] local fault remains pending '
+                    print('  [BRIDGE DELIVERY ONLY] Local fault remains pending '
                           '— IDE trace delivery has not been confirmed',
                           flush=True)
                     _bridge_status(
@@ -2207,7 +2211,8 @@ def main():
             elif kind == 'snapshot_fault':
                 snapshot = result['payload']
                 if not fault_recovery.owns_snapshot_payload(snapshot):
-                    print('  [fault delivery] stale snapshot result discarded',
+                    print('  [BRIDGE DELIVERY ONLY] Earlier snapshot-upload response ignored; '
+                          'it does not belong to the current incident.',
                           flush=True)
                     continue
                 accepted = bool(reply)
@@ -2215,7 +2220,7 @@ def main():
                     # Fail closed: promotion is durable evidence only. Do not
                     # emit `g` automatically; an operator must explicitly
                     # choose Reboot (`f`) or testing-only Skip (`k`).
-                    print('  [fault recovery] complete fault snapshot stored '
+                    print('  [BRIDGE DELIVERY ONLY] Complete fault snapshot stored '
                           '— board remains held awaiting operator disposition',
                           flush=True)
                     _bridge_status(
@@ -2229,10 +2234,10 @@ def main():
                     # fail-closed.
                     if reply:
                         fault_recovery.clear_pending()
-                        print('  [fault delivery] snapshot was not correlated '
+                        print('  [BRIDGE DELIVERY ONLY] Snapshot was not correlated '
                               '— recovery remains blocked', flush=True)
                     else:
-                        print('  [fault delivery] snapshot delivery failed '
+                        print('  [BRIDGE DELIVERY ONLY] Snapshot delivery unconfirmed '
                               '— recovery remains blocked', flush=True)
                         delivery_worker.submit('snapshot_fault', snapshot)
             elif kind == 'snapshot':
