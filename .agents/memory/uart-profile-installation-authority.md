@@ -115,3 +115,14 @@ existing RAM directly after discussing the MMIO alternative.
 requiring every data view to contain a LUMP header. Preserve integrity, bounds,
 required boot-object checks and runtime enforcement. This agreement does not
 authorize board operations or a new hardware mapping.
+
+The Mint demonstration should use M-bit authority for loading the constructed
+GT, rather than introduce a separate scratch L capability.
+
+**Why:** The user explicitly directed “We should use the M-Bit” after reviewing
+scratch aliases, CR6 rows, and the reserved Namespace metadata word.
+
+**How to apply:** Review an M-based software sequence against the frozen BIT
+before implementation. This is design direction, not evidence that arbitrary
+register M elevation or DWRITE elevation exists, nor approval to change the BIT.
+Scratch placement and how M is established/restored remain to be resolved.
