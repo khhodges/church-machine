@@ -23,3 +23,13 @@ a new revision, not in-place alteration.
 
 **Why:** Designer values must reach the actual build, while unchanged immutable
 artifacts and unrelated Threads retain their ownership boundaries.
+
+The user approved saving the reviewed Alice/Mallory bindings and per-Thread
+initialization, separately from adopting an executable image.
+
+**Why:** The reviewed preparation explicitly preserved Boot.Thread and left
+the current image and hardware untouched; saving inputs is not activation.
+
+**How to apply:** Keep generated-candidate inspection separate from the
+committed-image tabs. Carry environment-local approved inputs across merges
+only when the exact reviewed Namespace and unchanged target designs still match.

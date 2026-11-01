@@ -142,6 +142,16 @@ const roles = [
     { name: 'Mallory', abstraction: 'ide.Mallory', slot: 31, sentinel: 0x0BAD0003 },
 ];
 const sim = new FixtureSimulator();
+// The standalone constructor deliberately supplies a non-executable SelfTest
+// placeholder. Give this disposable setup lab an explicit callable boot stub;
+// do not weaken CALL admission or pretend this is the saved SelfTest artifact.
+// No stub instruction is executed: setup stops immediately after boot CALL.
+const bootEntry = sim.readNSEntry(sim.bootEntrySlot);
+assert(bootEntry, 'isolated boot fixture requires its placeholder binding');
+const bootBase = bootEntry.word0_location;
+assert.strictEqual(sim.memory[bootBase + 1], 0, 'expected empty boot placeholder');
+sim.memory[bootBase + 1] = 2; // public method 1 enters word 2
+sim.memory[bootBase + 2] = 0x1f000000; // RETURN (not executed by setup)
 for (let safety = 0; !sim.bootComplete && !sim.halted && safety < 32; safety++) {
     sim._bootStep();
 }

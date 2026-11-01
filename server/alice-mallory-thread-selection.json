@@ -1,0 +1,25 @@
+{
+  "namespaceFingerprint": "e7fea8d2f35b220ebcae860e3a3400d9c480c046a453c01bc52d1156d0c254e3",
+  "designs": [
+    {
+      "sizeWords": 256,
+      "stackWords": 32,
+      "tuples": [{"name": "TurnState", "offset": 0, "policy": "initialize", "fields": [{"name": "turns", "type": "uint32", "size": 1, "initial": 0}]}],
+      "target": {"slot": 11, "sequence": 0, "namespaceSequence": 0, "name": "Thread.2", "namespaceName": "Boot.NS"},
+      "initialization": {
+        "dataRegisters": [null, 2703024130, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        "capabilityRegisters": [null, 1241514000, null, null, null, null, null, null, null, null, null, null]
+      }
+    },
+    {
+      "sizeWords": 256,
+      "stackWords": 32,
+      "tuples": [{"name": "TurnState", "offset": 0, "policy": "initialize", "fields": [{"name": "turns", "type": "uint32", "size": 1, "initial": 0}]}],
+      "target": {"slot": 12, "sequence": 0, "namespaceSequence": 0, "name": "Thread.3", "namespaceName": "Boot.NS"},
+      "initialization": {
+        "dataRegisters": [null, 195887107, null, null, null, null, null, null, null, null, null, null, null, null, null, null],
+        "capabilityRegisters": [null, 1241514001, null, null, null, null, null, null, null, null, null, null]
+      }
+    }
+  ]
+}

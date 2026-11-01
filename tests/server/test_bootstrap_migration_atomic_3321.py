@@ -16,6 +16,13 @@ from bootstrap_test_support import select_bootstrap_residents
 def _historical_migration_fixture(catalog):
     """Reconstruct the reviewed migration inputs, retaining immutable bodies."""
     select_bootstrap_residents(catalog)
+    # The historical fixture removes non-bootstrap residents. Its configuration
+    # must likewise be private, not fall back to today's actor initialization.
+    source_config = Path(__file__).resolve().parents[2] / "server" / "boot-config.json"
+    config = json.loads(source_config.read_text())
+    config.pop("threadInitialDesigns", None)
+    config.pop("threadTupleDesign", None)
+    (catalog.parent / "boot-config.json").write_text(json.dumps(config))
     manifest_path = catalog / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
     for artifact in (SOURCE_CAPABILITY, CURRENT_CAPABILITY):

@@ -7,11 +7,11 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from server.namespace_authority import validate_namespace_rows
+from server.namespace_authority import validate_namespace_rows, namespace_fingerprint
 from server.boot_image import validate_boot_image, validate_resident_artifact_bindings
 
 
-def audit(lumps_dir, state_path=None, image_path=None):
+def audit(lumps_dir, state_path=None, image_path=None, reviewed_design=None):
     root = Path(lumps_dir)
     state_path = Path(state_path) if state_path else root / "ns-state.json"
     image_path = Path(image_path) if image_path else root / "boot-image.bin"
@@ -19,8 +19,26 @@ def audit(lumps_dir, state_path=None, image_path=None):
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
         validate_namespace_rows(state.get("abstractions") if isinstance(state, dict) else None)
-    except (OSError, ValueError, TypeError) as error:
+        if reviewed_design:
+            # A narrowly pinned table-only preparation is not an image release.
+            # Never apply this exception to an arbitrary stale Namespace.
+            receipt = json.loads(Path(reviewed_design).read_text())
+            if (state.get("save_mode") != "table-only" or
+                    namespace_fingerprint(state["abstractions"]) != receipt["namespaceFingerprint"]):
+                raise ValueError("Namespace is not the exact reviewed table-only design")
+            from server.boot_image import _require_approved_executable_lump
+            import hashlib
+            for slot in (16, 17):
+                row = next(r for r in state["abstractions"] if r["slot"] == slot)
+                path = root / row["filename"]
+                if hashlib.sha256(path.read_bytes()).hexdigest() != row["binary_hash"]:
+                    raise ValueError("Selected actor hash differs from reviewed binding")
+                _require_approved_executable_lump(str(path), str(root), row["name"])
+    except (OSError, ValueError, TypeError, KeyError, StopIteration) as error:
         errors.append("Namespace state: " + str(error))
+    if reviewed_design:
+        return {"ok": not errors, "errors": errors, "readOnly": True,
+                "scope": "exact reviewed design only; installed image not certified"}
     try:
         image = image_path.read_bytes()
         validate_boot_image(image)
@@ -35,8 +53,9 @@ def main(argv=None):
     parser.add_argument("--lumps-dir", default="server/lumps")
     parser.add_argument("--state")
     parser.add_argument("--image")
+    parser.add_argument("--reviewed-design")
     args = parser.parse_args(argv)
-    result = audit(args.lumps_dir, args.state, args.image)
+    result = audit(args.lumps_dir, args.state, args.image, args.reviewed_design)
     print(json.dumps(result, indent=2))
     return 0 if result["ok"] else 1
 

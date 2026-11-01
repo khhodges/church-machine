@@ -63,6 +63,16 @@ def test_real_generator_uses_per_thread_design(tmp_path):
     cfg = json.loads((root / "server/boot-config.json").read_text())
     rows = json.loads((lumps / "ns-state.json").read_text())["abstractions"]
     by_slot = {r["slot"]: r for r in rows}
+    # Enlarging this private test Thread must not consume a subsequently
+    # selected actor's allocation. Place it after all retained resident bodies.
+    ends = []
+    for row in rows:
+        if row.get("resident"):
+            size = ((lumps / row["filename"]).stat().st_size // 4
+                    if row.get("filename") else cfg["step1"]["threadLumpWords"])
+            ends.append(int(row["location"], 0) + size)
+    by_slot[12]["location"] = hex(max(ends))
+    (lumps / "ns-state.json").write_text(json.dumps({"abstractions": rows}))
     d = design(12, 512)
     d["target"].update(name=by_slot[12]["name"], sequence=by_slot[12]["seq"],
                        namespaceName=by_slot[0]["name"], namespaceSequence=by_slot[0]["seq"])

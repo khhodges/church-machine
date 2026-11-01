@@ -7,6 +7,10 @@ echo "Post-merge setup complete (no dependencies to install)"
 # normal authenticated selection/CAS save, not an installed-image migration.
 python3 -m server.wukong_callhome_selection
 
+# Replay only approved per-Thread inputs through the ordinary review endpoint.
+# Configuration is environment-local; existing images and newer designs stay put.
+python3 -m server.alice_mallory_thread_selection
+
 # A task merge may include saved runtime artifacts. Refuse to publish a changed
 # Namespace/image bundle unless the checked-out bundle passes the same read-only
 # semantic and image-admission rules as the server. Code-only merges do not
@@ -15,7 +19,13 @@ python3 -m server.wukong_callhome_selection
 CHANGED_RUNTIME=$(git diff-tree --root -m --no-commit-id --name-only -r HEAD -- server/lumps/)
 if [ -n "$CHANGED_RUNTIME" ]; then
     echo "post-merge: validating changed Namespace/artifact bundle before publication"
-    if ! python3 scripts/check_namespace_authority.py --lumps-dir server/lumps; then
+    # Only the exact reviewed table-only transition may leave its prior image
+    # untouched. Any binary/catalog/provenance change still takes the full gate.
+    if [ "$(printf '%s\n' "$CHANGED_RUNTIME" | sort -u)" = "server/lumps/ns-state.json" ] &&
+        python3 scripts/check_namespace_authority.py --lumps-dir server/lumps \
+            --reviewed-design server/alice-mallory-thread-selection.json; then
+        echo "post-merge: reviewed preparation only; existing image not certified or replaced"
+    elif ! python3 scripts/check_namespace_authority.py --lumps-dir server/lumps; then
         echo "post-merge: publication blocked; review Namespace diagnostics. No repair was attempted." >&2
         exit 1
     fi

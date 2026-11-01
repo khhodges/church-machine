@@ -181,6 +181,38 @@
       "seq": 0,
       "slot": 13,
       "type": "Inform"
+    },
+    {
+      "slot": 16,
+      "name": "ide.Alice",
+      "seq": 0,
+      "type": "Inform",
+      "filename": "ide.Alice.1.4f5f9b06.lump",
+      "binary_hash": "31bbddb5d20fe8ccd32d60b7c0d554b2af45ba80a85a9de56e3f6af8351ed93f",
+      "token": "07eae44c",
+      "lump_version": 7,
+      "load_policy": "Resident",
+      "resident": true,
+      "f": 0,
+      "g": 0,
+      "location": "0x1310",
+      "limit": "0xff"
+    },
+    {
+      "slot": 17,
+      "name": "ide.Mallory",
+      "seq": 0,
+      "type": "Inform",
+      "filename": "ide.Mallory.1.3a5e7373.lump",
+      "binary_hash": "11341685017d1852f514d1af6fda990edf87c89cbd082be8df83ccfb8a677fb5",
+      "token": "0fe63f75",
+      "lump_version": 3,
+      "load_policy": "Resident",
+      "resident": true,
+      "f": 0,
+      "g": 0,
+      "location": "0x1410",
+      "limit": "0x7f"
     }
   ],
   "generated_at": 1791294481.0514784,
