@@ -236,29 +236,11 @@ function response(status, body) {
         step2Rows[0].abstraction === 'UserProgram' &&
         step2Rows[0].physAddr === 4096 && step2Rows[0].lumpSize === 64);
 
-    const saveStart = editorSource.indexOf('window.lumpEditorRLSave = function ()');
-    const saveEnd = editorSource.indexOf('window.lumpEditorRLGenerate', saveStart);
-    const saveBody = editorSource.slice(saveStart, saveEnd);
-    check('Resident Save rejects duplicate clicks while request is unresolved',
-        saveBody.includes('if (_rl.saveInFlight) return;') &&
-        saveBody.includes('_rl.saveInFlight = true;'));
-    check('Resident Save clears in-flight state for every terminal outcome',
-        saveBody.includes('.finally(function()') &&
-        saveBody.includes('_rl.saveInFlight = false;'));
-    check('Resident Save surfaces server-provided failure reasons',
-        saveBody.includes('res.body.error'));
-    check('Resident Save does not persist the Lightning Bolt slot through config',
-        !saveBody.includes('bootEntrySlot: (function ()') &&
-        !saveBody.includes("localStorage.getItem('bootEntrySlot')"));
-    const residentLoadStart = editorSource.indexOf('function _rlLoad()');
-    const residentLoadEnd = editorSource.indexOf('function _rlInitStep2(', residentLoadStart);
-    const residentLoadBody = editorSource.slice(residentLoadStart, residentLoadEnd);
-    check('Resident config load projects the Namespace Lightning Bolt for display only',
-        residentLoadBody.includes("fetch('/api/boot-image/ns-state'") &&
-        residentLoadBody.includes('bootRow = _rl.namespaceRows.find') &&
-        residentLoadBody.includes('_rl.bootEntrySlot = bootRow') &&
-        !residentLoadBody.includes('setBootEntrySlot(') &&
-        !residentLoadBody.includes('sim.bootEntrySlot'));
+    check('obsolete Resident Save handler is a read-only guard',
+        editorSource.includes("window.lumpEditorRLSave = _bnObsolete('lumpEditorRLSave');"));
+    check('Resident page no longer loads catalog or ns-state',
+        !editorSource.includes('function _rlLoad(') &&
+        editorSource.includes("fetch('/api/boot-image/built-namespace'"));
 
     console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
     if (failed) process.exit(1);

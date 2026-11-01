@@ -5,6 +5,16 @@ description: The serialized Namespace Table, not the catalog manifest or loose f
 
 The Namespace Table is the sole authoritative source of LUMPs and their metadata in a bitstream. Truth is ordered as: (1) the Namespace Table, then (2) the assigned slots and LUMPs represented by that table. The manifest is not authoritative for membership, metadata, identity, version, slot, size, or any other property.
 
+The built-Namespace inspection page is read-only and represents the Namespace
+encoded in retained image bytes, not a second configuration editor.
+
+**Why:** The user explicitly rejected the catalog-based boot-configuration page
+as competing with the Namespace Table and requested a read-only as-built view.
+
+**How to apply:** Do not regenerate on inspection or substitute current saved
+assignments for historical image contents. Attach names only from evidence bound
+to that exact image; distinguish a built workspace image from installed hardware.
+
 The user reaffirmed this specifically for Phase 1 when rejecting manifests as
 competing sources of truth.
 

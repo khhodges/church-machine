@@ -409,122 +409,7 @@
         statusMsg:      ''
     };
 
-    function _rlLoad() {
-        if (_rl.loading) return;
-        _rl.loading   = true;
-        _rl.loaded    = false;
-        _rl.errorMsg  = '';
-        _rl.statusMsg = '';
-        var el = document.getElementById('lumpResidentPanel');
-        if (el) el.innerHTML = '<div class="le-panel"><p class="le-panel-desc">Loading catalog\u2026</p></div>';
-        fetch('/api/boot-config', { cache: 'no-store' })
-            .then(function(r) { return r.json(); })
-            .then(async function(data) {
-                const nsResponse = await fetch('/api/boot-image/ns-state', {
-                    cache: 'no-store',
-                });
-                const nsState = await nsResponse.json();
-                if (!nsResponse.ok || !nsState ||
-                        typeof nsState.namespaceFingerprint !== 'string') {
-                    throw new Error((nsState && nsState.error) ||
-                        'authoritative Namespace state is unavailable');
-                }
-                window._nsState = nsState;
-                if (typeof window._applyNamespaceBootProjection === 'function') {
-                    window._applyNamespaceBootProjection(nsState);
-                }
-                _rl.loading = false;
-                _rl.loaded  = true;
-                _rl.catalog = typeof _normalizeLumpCatalogEntries === 'function'
-                    ? _normalizeLumpCatalogEntries((data && data.lumpCatalog) || [])
-                    : ((data && data.lumpCatalog) || []);
-                _rl.limits  = (data && data.limits) || { maxNsEntries: 256, baseNamedNsCount: 47 };
-                _rl.namespaceFingerprint = nsState.namespaceFingerprint;
-                _rl.namespaceRows = Array.isArray(nsState.abstractions)
-                    ? nsState.abstractions : [];
-                var bootRow = _rl.namespaceRows.find(function(row) {
-                    return row && row.boot === true && Number.isInteger(Number(row.slot));
-                });
-                _rl.bootEntrySlot = bootRow ? Number(bootRow.slot) : null;
-                // boot-config supplies editor geometry/policy projections only;
-                // Namespace state supplies the sole boot target.
-                var cfg = (data && data.config) || (data && data.defaults) || {};
-                _rlInitStep2(cfg);
-                var s3 = cfg.step3 || {};
-                _rl.emptySlotCount = Number.isFinite(s3.emptySlotCount) ? s3.emptySlotCount : 0;
-                renderResidentPanel();
-            })
-            .catch(function(err) {
-                _rl.loading  = false;
-                _rl.loaded   = false;
-                _rl.errorMsg = 'Failed to load boot config: ' + err;
-                renderResidentPanel();
-            });
-    }
 
-    function _rlInitStep2(cfg) {
-        _rl.step2State = {};
-        var savedLumps = (cfg && cfg.step2 && cfg.step2.lumps) || [];
-        var savedMap = {};
-        for (var i = 0; i < savedLumps.length; i++) {
-            savedMap[savedLumps[i].nsSlot] = savedLumps[i];
-        }
-        for (var j = 0; j < _rl.catalog.length; j++) {
-            var cat = _rl.catalog[j];
-            if (cat.nsSlotPolicy === 'dynamic' || cat.floating || cat.nsSlot == null) continue;
-            if (_isFixedBootStep2Slot(cat.nsSlot)) continue;
-            var saved = savedMap[cat.nsSlot];
-            var nsRow = _rl.namespaceRows.find(function(row) {
-                return row && Number(row.slot) === Number(cat.nsSlot);
-            });
-            var nsPolicy = nsRow && (nsRow.load_policy || nsRow.loadPolicy);
-            var headerTyp = Number(cat.headerTyp ?? cat.header_typ);
-            if (headerTyp === 2) nsPolicy = 'Resident';
-            if (!['Empty', 'Resident', 'Preload', 'Lazy'].includes(nsPolicy) &&
-                    nsRow && nsRow.resident === true && nsRow.boot_resident === true) {
-                nsPolicy = 'Resident';
-            }
-            _rl.step2State[cat.nsSlot] = {
-                // The catalog owns all transport and binary metadata.  This
-                // is the programmer-facing decision: exactly one policy.
-                loadPolicy: nsPolicy || (saved && (saved.loadPolicy || saved.load_policy)) ||
-                    (saved && saved.resident ? 'Resident' :
-                        (saved && saved.prefetch ? 'Preload' : 'Lazy')),
-                physAddr:    (saved && Number.isFinite(saved.physAddr)) ? saved.physAddr : null,
-                lumpSize:    cat.lumpSize,
-                abstraction: cat.abstraction,
-                lumpToken:   (saved && saved.lumpToken) || cat.token,
-                binaryHash:  (saved && (saved.binaryHash || saved.binary_hash)) || cat.binaryHash,
-                identityHash:(saved && (saved.identityHash || saved.identity_hash)) || cat.identityHash,
-                grants:      (saved && (saved.grants || saved.rights)) || cat.grants || [],
-                capabilityType: (saved && (saved.capabilityType ?? saved.capability_type ??
-                    saved.gtType ?? saved.type)) ?? cat.capabilityType,
-                authorized:  (saved && saved.authorized === true) || cat.authorized === true
-            };
-        }
-    }
-
-    function _rlAddrRange() {
-        var p    = _getStep1Payload();
-        var s1   = p.step1;
-        var board        = p.targetBoard || 'wukong-xc7a100t';
-        var boardProfile = BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
-        // SelfTest at fixed slot 6 is the physical Boot.Abstr body. It stays
-        // reserved even when the lightning bolt targets a different entry.
-        var bootAbstrSz = (_rl.limits && _rl.limits.bootAbstrLumpWords) || 64;
-        var nsReserve = Math.max(16, Math.round(state.ns.slots) * 4);
-        var threadCount = Math.max(1, Math.min(
-            boardThreadCountLimit(boardProfile), parseInt(s1.threadCount, 10) || 1));
-        var sum = (s1.threadLumpWords || 0) * threadCount + bootAbstrSz + (4 * 64);
-        var total  = s1.totalNamespaceWords || 0;
-        var usable = total - nsReserve;
-        var boardTotalWords = boardProfile.totalRamWords;
-        return {
-            min:        sum,
-            max:        Math.min(usable, boardTotalWords) - 1,
-            boardLabel: boardProfile.label
-        };
-    }
 
     function _rlValidate() {
         var p    = _getStep1Payload();
@@ -586,392 +471,126 @@
         return '';
     }
 
-    function _rlOnChange(ev) {
-        var slot  = parseInt(ev.target.getAttribute('data-rl-slot'), 10);
-        if (_isFixedBootStep2Slot(slot)) {
-            _rl.errorMsg = 'NS slot ' + slot + ' is a fixed boot artifact and cannot be configured in Step 2.';
-            renderResidentPanel();
-            return;
+    // ── Built Namespace (read-only, AS BUILT) ─────────────────────────────────
+    // Membership and raw descriptor words come only from the committed boot
+    // image bytes served by GET /api/boot-image/built-namespace. Names,
+    // filenames and hashes come only from hash-matched retained provenance.
+    // No catalog, boot-config, or browser design state is consulted here.
+    var _bn = { seq: 0, ctrl: null, data: null, error: '', loading: false };
+
+    function _bnHex(v) {
+        return (typeof v === 'number' && Number.isFinite(v)) ? hex8(v) : '\u2014';
+    }
+    function _bnText(v) {
+        return (v === null || v === undefined || v === '') ?
+            '<span class="le-bn-absent">absent</span>' : esc(String(v));
+    }
+
+    function _bnLoad() {
+        _bn.seq += 1;
+        var mySeq = _bn.seq;
+        if (_bn.ctrl && typeof _bn.ctrl.abort === 'function') {
+            try { _bn.ctrl.abort(); } catch (e) {}
         }
-        var field = ev.target.getAttribute('data-rl-field');
-        var st    = _rl.step2State[slot] || {};
-        if (field === 'loadPolicy') {
-            var policy = ev.target.value;
-            st.loadPolicy = ['Empty', 'Resident', 'Preload', 'Lazy'].indexOf(policy) >= 0
-                ? policy : 'Lazy';
-        } else if (field === 'physAddr') {
-            var v = ev.target.value;
-            st.physAddr = (v === '' ? null : parseInt(v, 10));
-        }
-        _rl.step2State[slot] = st;
+        _bn.ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+        // Clear the previous table: a failed refresh must never show stale evidence.
+        _bn.data = null;
+        _bn.error = '';
+        _bn.loading = true;
         renderResidentPanel();
+        var opts = { method: 'GET', cache: 'no-store' };
+        if (_bn.ctrl) opts.signal = _bn.ctrl.signal;
+        return fetch('/api/boot-image/built-namespace', opts)
+            .then(function (r) {
+                return r.json().catch(function () { return null; })
+                    .then(function (j) { return { status: r.status, ok: r.ok, body: j }; });
+            })
+            .then(function (res) {
+                if (mySeq !== _bn.seq) return;
+                _bn.loading = false;
+                if (!res.ok) {
+                    var detail = (res.body && res.body.error) ? ': ' + res.body.error : '';
+                    if (res.status === 404) _bn.error = 'No built boot image exists' + detail + '.';
+                    else if (res.status === 422) _bn.error = 'Committed boot-image bytes are invalid or unrecognizable' + detail + '.';
+                    else _bn.error = 'Built Namespace evidence unavailable (HTTP ' + res.status + ')' + detail + '.';
+                } else if (!res.body || !Array.isArray(res.body.entries)) {
+                    _bn.error = 'Built Namespace evidence response is malformed.';
+                } else {
+                    _bn.data = res.body;
+                }
+                renderResidentPanel();
+            })
+            .catch(function (err) {
+                if (mySeq !== _bn.seq) return;
+                _bn.loading = false;
+                _bn.data = null;
+                _bn.error = 'Built Namespace evidence unavailable: ' + (err && err.message ? err.message : err);
+                renderResidentPanel();
+            });
+    }
+
+    function _bnProvBadge(s) {
+        var cls = s === 'verified' ? 'ok' : (s === 'mismatch' ? 'bad' : 'warn');
+        return '<span class="le-bn-badge le-bn-' + cls + '">' + esc(s || 'unknown') + '</span>';
     }
 
     function renderResidentPanel() {
         var el = document.getElementById('lumpResidentPanel');
         if (!el) return;
-
-        if (!_rl.loaded && !_rl.errorMsg) {
-            _rlLoad();
+        var head = '<div class="le-panel le-bn">' +
+            '<div class="le-bn-head"><h3 class="le-panel-title">Namespace \u2014 as built</h3>' +
+            '<button type="button" class="le-copy-btn" data-bn-refresh="1" onclick="lumpEditorBuiltNamespaceRefresh()">Refresh</button></div>' +
+            '<p class="le-panel-desc">Read-only. Decoded from the committed boot-image bytes in this workspace. ' +
+            'This is the built image, not the live physical FPGA, and the currently saved Namespace may differ.</p>';
+        if (_bn.loading) {
+            el.innerHTML = head + '<p class="le-panel-desc">Reading committed boot image\u2026</p></div>';
             return;
         }
-
-        var err    = _rlValidate();
-        var maxNs  = _rl.limits.maxNsEntries    || 256;
-        var baseNs = 11 + Math.max(0, _getStep1Payload().step1.threadCount - 1);
-
-        // The resident profile is a projection of the authoritative current
-        // bindings. It is intentionally separate from the editable catalog:
-        // history and nonresident growth remain available below.
-        var residentCore = [
-            { name: 'SelfTest', slot: 6 },
-            { name: 'WukongCallHome', slot: 7 },
-            { name: 'CapabilityTest', slot: 10 }
-        ];
-        var residentSummaryRows = '';
-        for (var ri = 0; ri < residentCore.length; ri++) {
-            var profileEntry = residentCore[ri];
-            var profileCat = null;
-            for (var pci = 0; pci < _rl.catalog.length; pci++) {
-                if (_rl.catalog[pci].nsSlot === profileEntry.slot) {
-                    profileCat = _rl.catalog[pci];
-                    break;
-                }
-            }
-            var currentBuild = profileCat && (profileCat.lumpVersion || profileCat.issueN);
-            var buildLabel = currentBuild ? 'Current build ' + currentBuild : 'Current build unavailable';
-            var sourceAvailable = profileCat && (
-                profileCat.sourceAvailable === true ||
-                Number(profileCat.sourceStorageTier) > 0
-            );
-            var sourceLabel = sourceAvailable
-                ? 'Source available'
-                : 'Source unavailable (binary-only)';
-            var deploymentLabel = profileCat
-                ? 'Deployed at NS slot ' + profileEntry.slot
-                : 'Deployment unavailable';
-            residentSummaryRows +=
-                '<tr class="le-resident-profile-row" data-resident-slot="' +
-                profileEntry.slot + '">' +
-                '<td class="le-rl-td"><strong>' + esc(profileEntry.name) + '</strong></td>' +
-                '<td class="le-rl-td le-rl-td-num">' + profileEntry.slot + '</td>' +
-                '<td class="le-rl-td">' + esc(buildLabel) + '</td>' +
-                '<td class="le-rl-td">' + esc(sourceLabel) + '</td>' +
-                '<td class="le-rl-td">' + esc(deploymentLabel) + '</td>' +
-                '</tr>';
+        if (_bn.error || !_bn.data) {
+            el.innerHTML = head + '<div class="le-error-banner" role="alert">' +
+                esc(_bn.error || 'Built Namespace evidence has not been loaded.') +
+                ' No table is shown.</div></div>';
+            return;
         }
-        var residentSummary =
-            '<section class="le-resident-profile" data-resident-profile="three-lump-core-v1">' +
-            '<h3 class="le-section-title">Resident core</h3>' +
-            '<p class="le-panel-desc">Current deployment only. Older approved builds remain in History; source edits are drafts until built.</p>' +
-            '<div class="le-rl-table-wrap"><table class="le-resident-summary-table">' +
-            '<thead><tr><th class="le-rl-th">LUMP</th><th class="le-rl-th">NS</th>' +
-            '<th class="le-rl-th">Build</th><th class="le-rl-th">Source</th>' +
-            '<th class="le-rl-th">Deployment</th></tr></thead>' +
-            '<tbody>' + residentSummaryRows + '</tbody></table></div></section>';
+        var d = _bn.data;
+        var match = d.savedNamespaceMatchesBuilt === true ? 'yes' :
+            (d.savedNamespaceMatchesBuilt === false ? 'no \u2014 saved Namespace differs from this build' : 'unknown');
+        var ev = renderGrid([
+            ['Image SHA-256', '<code>' + _bnText(d.imageSha256) + '</code>'],
+            ['Image bytes', _bnText(d.bytes)],
+            ['Total words', _bnText(d.totalWords)],
+            ['Max entries', _bnText(d.maxEntries)],
+            ['NS table base', typeof d.nsTableBase === 'number' ? esc(hex8(d.nsTableBase)) + ' (' + d.nsTableBase + ')' : _bnText(d.nsTableBase)],
+            ['Thread', d.thread === null || d.thread === undefined ? _bnText(null) :
+                '<code>' + esc(typeof d.thread === 'object' ? JSON.stringify(d.thread) : String(d.thread)) + '</code>'],
+            ['NS header', d.nsHeader === null || d.nsHeader === undefined ? _bnText(null) :
+                '<code>' + esc(typeof d.nsHeader === 'object' ? JSON.stringify(d.nsHeader) : String(d.nsHeader)) + '</code>'],
+            ['Provenance', _bnProvBadge(d.provenanceStatus)],
+            ['Built Namespace fingerprint', '<code>' + _bnText(d.builtNamespaceFingerprint) + '</code>'],
+            ['Saved Namespace matches built', esc(match)]
+        ]);
+        var rows = d.entries.map(function (e) {
+            e = e || {};
+            return '<tr><td class="le-bn-slot">' + _bnText(e.slot) + '</td>' +
+                '<td><code>' + _bnHex(e.w0) + '</code></td><td><code>' + _bnHex(e.w1) + '</code></td>' +
+                '<td><code>' + _bnHex(e.w2) + '</code></td><td><code>' + _bnHex(e.w3) + '</code></td>' +
+                '<td>' + _bnText(e.name) + '</td><td>' + _bnText(e.filename) + '</td>' +
+                '<td><code class="le-bn-hash">' + _bnText(e.artifactSha256) + '</code></td></tr>';
+        }).join('');
+        var table = d.entries.length ?
+            '<div class="le-bn-scroll"><table class="le-bn-table"><thead><tr><th>Slot</th><th>w0</th><th>w1</th><th>w2</th><th>w3</th>' +
+            '<th>Name</th><th>Filename</th><th>Artifact SHA-256</th></tr></thead><tbody>' + rows + '</tbody></table></div>' :
+            '<p class="le-panel-desc">The committed image contains no occupied Namespace slots.</p>';
+        el.innerHTML = head + ev +
+            '<p class="le-panel-desc">' + d.entries.length + ' committed slot(s). Names, filenames and hashes appear only when retained provenance matches the image; otherwise they are shown as absent.</p>' +
+            table + '</div>';
+    }
 
-        // Boot entry controls remain available, but the resident summary above
-        // is the user-facing source/build/deployment model.
-        // The current boot target is projected from committed Namespace state.
-        // Do not fall back to config or browser storage here.
-        var bootSlot = Number.isInteger(_rl.bootEntrySlot) ? _rl.bootEntrySlot : null;
-        var bootCatEntry = null;
-        for (var bi = 0; bi < _rl.catalog.length; bi++) {
-            if (_rl.catalog[bi].nsSlot === bootSlot) { bootCatEntry = _rl.catalog[bi]; break; }
-        }
-
-        var p1 = _getStep1Payload();
-        var nsSize     = p1.step1.namespaceLumpWords || 64;
-        var threadSize = Math.pow(2, state.thread.lumpPow2);
-        var bootEntrySize = bootCatEntry ? (bootCatEntry.lumpSize != null ? bootCatEntry.lumpSize : '\u2014') : '\u2014';
-        var bootEntryNsSlot = bootCatEntry ? bootCatEntry.nsSlot : bootSlot;
-
-        var bootEntryCell;
-        if (!_rl.catalog.length) {
-            bootEntryCell = '<td class="le-rl-td"><span class="le-rl-boot-note">\u2014 loading catalog \u2014</span></td>';
-        } else {
-            var showAll = _rl.showAllBootTargets === true;
-            var validBootTarget = function (ce) {
-                if (ce.nsSlotPolicy === 'dynamic' || !ce.hasExecutableMethods) return false;
-                var nsRow = _rl.namespaceRows.find(function(row) {
-                    return row && Number(row.slot) === Number(ce.nsSlot);
-                });
-                return !!(nsRow && nsRow.resident === true &&
-                    nsRow.boot_resident === true &&
-                    (nsRow.load_policy || nsRow.loadPolicy) === 'Resident');
-            };
-            var hiddenCount = 0;
-            for (var hci = 0; hci < _rl.catalog.length; hci++) {
-                var hce = _rl.catalog[hci];
-                if (hce.nsSlotPolicy === 'dynamic' || hce.floating || !Number.isFinite(hce.nsSlot)) continue;
-                if (!validBootTarget(hce) && hce.nsSlot !== bootSlot) hiddenCount++;
-            }
-            var selectOpts = '';
-            for (var ci = 0; ci < _rl.catalog.length; ci++) {
-                var ce = _rl.catalog[ci];
-                if (ce.nsSlotPolicy === 'dynamic' || ce.floating || !Number.isFinite(ce.nsSlot)) continue;
-                var isValid = validBootTarget(ce);
-                if (!showAll && !isValid && ce.nsSlot !== bootSlot) continue;
-                var optSuffix = (!isValid) ? ' \u26a0 not a boot target' : '';
-                var optLabel = esc((ce.abstraction || 'Slot ' + ce.nsSlot) +
-                    ' (NS slot ' + ce.nsSlot + ', ' + (ce.lumpSize != null ? ce.lumpSize : '?') + ' words)' + optSuffix);
-                selectOpts += '<option value="' + ce.nsSlot + '"' +
-                    (ce.nsSlot === bootSlot ? ' selected' : '') + '>' + optLabel + '</option>';
-            }
-            var showAllToggle = hiddenCount > 0
-                ? '<label class="le-rl-show-all-toggle">' +
-                  '<input type="checkbox" onchange="lumpEditorBootShowAllToggle(this.checked)"' +
-                  (showAll ? ' checked' : '') + '> show all (' + hiddenCount + ' hidden)</label>'
-                : '';
-            var bootWarn = '';
-            if (bootCatEntry && !validBootTarget(bootCatEntry)) {
-                var warnReasons = [];
-                if (bootCatEntry.nsSlotPolicy === 'dynamic') {
-                    warnReasons.push('dynamic-policy lump \u2014 NS slot is ephemeral and cannot serve as the boot entry');
-                }
-                if (!bootCatEntry.hasExecutableMethods) {
-                    warnReasons.push('no executable methods \u2014 nothing to run at boot');
-                }
-                bootWarn = '<div class="le-rl-boot-warn">\u26a0\ufe0f ' + esc(warnReasons.join('; ')) + '</div>';
-            }
-            bootEntryCell = '<td class="le-rl-td">' +
-                '<select class="le-rl-boot-select" onchange="lumpEditorBootEntryChange(parseInt(this.value,10))">' +
-                selectOpts + '</select>' + showAllToggle + bootWarn + '</td>';
-        }
-
-        var rows =
-            '<tr class="le-rl-row le-rl-boot-row">' +
-                '<td class="le-rl-td">Boot.NS <span class="le-rl-boot-note">Namespace root</span></td>' +
-                '<td class="le-rl-td le-rl-td-num">0</td>' +
-                '<td class="le-rl-td le-rl-td-num">' + esc(String(nsSize)) + '</td>' +
-                '<td class="le-rl-td"><span class="le-rl-boot-badge">Boot</span></td>' +
-                '<td class="le-rl-td le-rl-addr-na">\u2014</td>' +
-                '<td class="le-rl-td le-rl-addr-na">\u2014</td>' +
-            '</tr>' +
-            '<tr class="le-rl-row le-rl-boot-row">' +
-                '<td class="le-rl-td">Boot.Thread <span class="le-rl-boot-note">Initial thread \u00b7 size set on Thread tab</span></td>' +
-                '<td class="le-rl-td le-rl-td-num">1</td>' +
-                '<td class="le-rl-td le-rl-td-num">' + esc(String(threadSize)) + '</td>' +
-                '<td class="le-rl-td"><span class="le-rl-boot-badge">Boot</span></td>' +
-                '<td class="le-rl-td le-rl-addr-na">\u2014</td>' +
-                '<td class="le-rl-td le-rl-addr-na">\u2014</td>' +
-            '</tr>' +
-            '<tr class="le-rl-row le-rl-boot-row le-rl-boot-entry-row">' +
-                bootEntryCell +
-                '<td class="le-rl-td le-rl-td-num">' + esc(String(bootEntryNsSlot)) + '</td>' +
-                '<td class="le-rl-td le-rl-td-num">' + esc(String(bootEntrySize)) + '</td>' +
-                '<td class="le-rl-td"><span class="le-rl-boot-badge">Boot</span></td>' +
-                '<td class="le-rl-td le-rl-addr-na">\u2014</td>' +
-                '<td class="le-rl-td le-rl-addr-na">\u2014</td>' +
-            '</tr>';
-
-        var addrRange    = _rlAddrRange();
-        var addrHintText = 'Valid range: 0x' + addrRange.min.toString(16).toUpperCase() +
-                           '\u20130x' + addrRange.max.toString(16).toUpperCase() +
-                           ' for ' + addrRange.boardLabel;
-
-        var _bootBadge = function (cat) {
-            if (cat.nsSlotPolicy === 'dynamic') {
-                return '<span class="le-rl-badge le-rl-badge-floating"' +
-                    ' data-tooltip="Allocated dynamically at runtime — NS slot assigned on first use">\u2014 Floating</span>';
-            }
-            if (cat.hasExecutableMethods) {
-                return '<span class="le-rl-badge le-rl-badge-bootable le-rl-badge-bootable-click"' +
-                    ' onclick="lumpEditorBootBadgeClick(' + cat.nsSlot + ')"' +
-                    ' data-tooltip="Click to set as boot entry">\u2713 Bootable</span>';
-            }
-            return '<span class="le-rl-badge le-rl-badge-data"' +
-                ' data-tooltip="No executable methods — cannot be set as boot entry">\u2014 Data only</span>';
+    function _bnObsolete(name) {
+        return function () {
+            if (typeof console !== 'undefined') console.warn('[lump-editor] ' + name + ' ignored: built Namespace view is read-only.');
+            return false;
         };
-
-        var _fixedCatalog    = [];
-        var _floatingCatalog = [];
-        for (var _ci = 0; _ci < _rl.catalog.length; _ci++) {
-            var _ce = _rl.catalog[_ci];
-            if (_ce.nsSlotPolicy === 'dynamic' || _ce.floating || _ce.nsSlot == null) {
-                _floatingCatalog.push(_ce);
-            } else if (_ce.nsSlot === 6 || _ce.nsSlot === 7 || _ce.nsSlot === 10) {
-                // The three profile rows are shown once in Resident core.
-            } else {
-                _fixedCatalog.push(_ce);
-            }
-        }
-
-        if (!_fixedCatalog.length) {
-            rows += '<tr><td colspan="7" class="le-rl-empty-msg">No catalog lumps available ' +
-                   '(server/lumps/manifest.json has no assignable entries).</td></tr>';
-        } else {
-            for (var i = 0; i < _fixedCatalog.length; i++) {
-                var cat = _fixedCatalog[i];
-                var isFixedBoot = _isFixedBootStep2Slot(cat.nsSlot);
-                var st  = _rl.step2State[cat.nsSlot] || {};
-                var isThread = Number(cat.headerTyp ?? cat.header_typ) === 2;
-                if (isThread) st.loadPolicy = 'Resident';
-                var isResident = st.loadPolicy === 'Resident';
-                var physVal = (st.physAddr != null && Number.isFinite(st.physAddr))
-                              ? st.physAddr : '';
-                var policyCell = isFixedBoot
-                    ? '<span class="le-rl-badge le-rl-badge-bootable" data-tooltip="Foundational boot artifact; not configured in Step 2">Fixed boot</span>'
-                    : isThread
-                    ? '<span class="le-rl-badge le-rl-badge-bootable" data-tooltip="Thread objects are resident by design (word-0 typ=2)">Resident · Thread</span>'
-                    : '<select class="le-rl-policy"' +
-                      ' data-rl-slot="' + cat.nsSlot + '" data-rl-field="loadPolicy"' +
-                      ' aria-label="Load policy for ' + esc(cat.abstraction || ('slot ' + cat.nsSlot)) + '">' +
-                      '<option value="Empty"' + (st.loadPolicy === 'Empty' ? ' selected' : '') + '>Empty</option>' +
-                      '<option value="Resident"' + (isResident ? ' selected' : '') + '>Resident</option>' +
-                      '<option value="Preload"' + (st.loadPolicy === 'Preload' ? ' selected' : '') + '>Preload</option>' +
-                      '<option value="Lazy"' + (st.loadPolicy === 'Lazy' ? ' selected' : '') + '>Lazy load</option>' +
-                      '</select>';
-                var addressCell = isFixedBoot
-                    ? '<span class="le-rl-addr-na">\u2014</span>'
-                    : '<input type="number" min="' + addrRange.min + '" max="' + addrRange.max + '" step="1"' +
-                        ' class="le-rl-addr"' +
-                        ' data-rl-slot="' + cat.nsSlot + '"' +
-                        ' data-rl-field="physAddr"' +
-                        ' value="' + esc(String(physVal)) + '"' +
-                        (isResident ? '' : ' disabled') + '>' +
-                      '<div class="le-rl-addr-hint' + (isResident ? '' : ' le-rl-addr-hint-inactive') + '">' +
-                        esc(addrHintText) +
-                      '</div>';
-                rows +=
-                    '<tr class="le-rl-row">' +
-                    '<td class="le-rl-td">' + esc(cat.abstraction || '?') + '</td>' +
-                    '<td class="le-rl-td le-rl-td-num">' + esc(String(cat.nsSlot)) + '</td>' +
-                    '<td class="le-rl-td le-rl-td-num">' + esc(cat.lumpSize != null ? String(cat.lumpSize) : '?') + '</td>' +
-                    '<td class="le-rl-td">' + policyCell + '</td>' +
-                    '<td class="le-rl-td">' + addressCell + '</td>' +
-                    '<td class="le-rl-td le-rl-td-boot">' + _bootBadge(cat) + '</td>' +
-                    '</tr>';
-            }
-        }
-
-        var floatingSection = '';
-        if (_floatingCatalog.length) {
-            var floatRows = '';
-            for (var fi = 0; fi < _floatingCatalog.length; fi++) {
-                var fc = _floatingCatalog[fi];
-                var fcToken = fc.token || '';
-                var fcName  = fc.abstraction || fcToken || '?';
-                var fcSize  = fc.lumpSize != null ? String(fc.lumpSize) : '?';
-                var loadBtn = fcToken
-                    ? '<button class="le-rl-load-sim-btn"' +
-                      ' onclick="_loadLumpBinaryIntoSim(\'' + esc(fcToken) + '\',\'' + esc(fcName.replace(/'/g, '')) + '\',this)"' +
-                      ' title="Load into Sim \u2014 Fetch this LUMP binary and run it in the simulator">' +
-                      'Load into Sim &#x25b6;</button>'
-                    : '<span class="le-rl-badge" style="color:#6b7280;">no token</span>';
-                floatRows +=
-                    '<tr class="le-rl-row le-rl-floating-row">' +
-                    '<td class="le-rl-td">' + esc(fcName) + '</td>' +
-                    '<td class="le-rl-td le-rl-td-num" style="color:#6b7280;font-style:italic;">dynamic</td>' +
-                    '<td class="le-rl-td le-rl-td-num">' + esc(fcSize) + '</td>' +
-                    '<td class="le-rl-td" colspan="2">' +
-                      '<span class="le-rl-badge le-rl-badge-floating"' +
-                      ' data-tooltip="Loads on demand \u2014 NS slot assigned at runtime, not baked into boot image">' +
-                      '\u2014\u202fLoads on demand</span>' +
-                    '</td>' +
-                    '<td class="le-rl-td le-rl-td-boot">' + loadBtn + '</td>' +
-                    '</tr>';
-            }
-            floatingSection =
-                '<div class="le-divider"></div>' +
-                '<div class="le-rl-floating-header">Test &amp; Utility LUMPs' +
-                  '<span class="le-rl-floating-note">These lumps have no fixed NS slot \u2014 they load on demand at runtime and cannot be baked into a boot image. Use <strong>Load into Sim</strong> to test them directly.</span>' +
-                '</div>' +
-                '<div class="le-rl-table-wrap">' +
-                '<table class="le-rl-table">' +
-                '<thead><tr>' +
-                '<th class="le-rl-th">Lump</th>' +
-                '<th class="le-rl-th le-rl-th-narrow">NS</th>' +
-                '<th class="le-rl-th le-rl-th-narrow">Size&nbsp;(w)</th>' +
-                '<th class="le-rl-th le-rl-th-mode" colspan="2">Policy</th>' +
-                '<th class="le-rl-th le-rl-th-boot">Action</th>' +
-                '</tr></thead>' +
-                '<tbody>' + floatRows + '</tbody>' +
-                '</table>' +
-                '</div>';
-        }
-
-        var errorBanner  = err
-            ? '<div class="le-error-banner">\u26A0 ' + esc(err) + '</div>'
-            : '';
-        var rlErrorMsg   = _rl.errorMsg
-            ? '<div class="le-error-banner">' + esc(_rl.errorMsg) + '</div>'
-            : '';
-        var statusBanner = (_rl.statusMsg && !err)
-            ? '<div class="le-rl-status">' + esc(_rl.statusMsg) + '</div>'
-            : '';
-
-        el.innerHTML =
-            '<div class="le-panel le-panel-wide">' +
-            residentSummary +
-            '<p class="le-panel-desc">Choose one loading policy per Namespace slot: ' +
-            '<strong style="color:var(--church-gold)">Empty</strong>, <strong style="color:var(--church-gold)">Resident</strong>, ' +
-            '<strong style="color:var(--church-gold)">Preload</strong>, or <strong>Lazy load</strong>. ' +
-            'The IDE derives identity, size, hash, and transport details. Resident lumps require a physical address inside the usable region.</p>' +
-            rlErrorMsg +
-            '<div class="le-rl-table-wrap">' +
-            '<table class="le-rl-table">' +
-            '<thead><tr>' +
-            '<th class="le-rl-th">Lump</th>' +
-            '<th class="le-rl-th le-rl-th-narrow">NS</th>' +
-            '<th class="le-rl-th le-rl-th-narrow">Size&nbsp;(w)</th>' +
-                '<th class="le-rl-th le-rl-th-mode">Load policy</th>' +
-            '<th class="le-rl-th">Phys addr&nbsp;(resident only)</th>' +
-            '<th class="le-rl-th le-rl-th-boot">Boot?</th>' +
-            '</tr></thead>' +
-            '<tbody>' + rows + '</tbody>' +
-            '</table>' +
-            '</div>' +
-            floatingSection +
-            '<div class="le-divider"></div>' +
-            '<div class="le-field-row">' +
-                '<label class="le-label">Empty NS slots<span class="le-range-hint">Reserve N extra slots at boot for runtime growth</span></label>' +
-                '<div class="le-input-group">' +
-                    '<input type="number" class="le-number" id="le-rl-empty-slots" min="0" step="1"' +
-                        ' value="' + esc(String(_rl.emptySlotCount)) + '"' +
-                        ' oninput="lumpEditorRLEmptySlots(this.value)">' +
-                    '<span class="le-rl-hint">baseline ' + baseNs + ' named + reserve \u2264 ' + maxNs + ' total</span>' +
-                '</div>' +
-            '</div>' +
-            errorBanner +
-            statusBanner +
-            '<div id="le-rl-save-status" class="le-rl-status" style="min-height:1.2em;"></div>' +
-            '<div id="le-rl-gen-result" class="le-rl-status" style="min-height:1em;"></div>' +
-            '<div class="le-save-row le-rl-btn-row">' +
-                '<button class="le-save-btn"' + ((err || _rl.saveInFlight) ? ' disabled' : '') + ' onclick="lumpEditorRLSave()">' +
-                    (_rl.saveInFlight ? 'Saving\u2026' : '\u2714\ufe0e Save boot config') +
-                '</button>' +
-                '<button class="le-rl-gen-btn" id="le-rl-gen-btn" onclick="lumpEditorRLGenerate()"' +
-                    ' title="Generate the binary boot image from the saved config and produce a downloadable .bin">' +
-                    '\u2699\ufe0e Generate Boot Image' +
-                '</button>' +
-                '<button class="le-rl-gen-btn" onclick="lumpEditorRLUpload()"' +
-                    ' title="Upload a pre-built boot-image.bin from your computer">' +
-                    '\u2B06\ufe0e Upload .bin' +
-                '</button>' +
-                '<button class="le-next-btn" onclick="lumpEditorNextStep(\'build\')"' +
-                    ' title="Save the boot configuration and continue to Build Bitstream">' +
-                    'Next: Build Bitstream \u2192' +
-                '</button>' +
-            '</div>' +
-            '<div class="le-rl-drop-zone" id="le-rl-drop-zone"' +
-                ' ondragover="event.preventDefault();event.dataTransfer.dropEffect=\'copy\';this.classList.add(\'le-rl-drop-active\')"' +
-                ' ondragleave="this.classList.remove(\'le-rl-drop-active\')"' +
-                ' ondrop="event.preventDefault();this.classList.remove(\'le-rl-drop-active\');' +
-                          'var _f=event.dataTransfer.files&&event.dataTransfer.files[0];' +
-                          'if(_f){if(!_f.name.toLowerCase().endsWith(\'.bin\')&&_f.type!==\'application/octet-stream\'){' +
-                          'document.getElementById(\'le-rl-gen-result\').textContent=\'Only .bin boot image files are accepted.\';' +
-                          '}else{document.getElementById(\'le-rl-gen-result\').textContent=\'\';' +
-                          'if(typeof uploadBootImageFile===\'function\')uploadBootImageFile(_f);}}">' +
-                'Drop a <code>.bin</code> boot image file here to upload' +
-            '</div>' +
-            '<input type="file" id="le-rl-upload-input" accept=".bin,application/octet-stream"' +
-                ' style="display:none;" onchange="lumpEditorRLHandleUpload(this)">' +
-            '</div>';
-
-        el.querySelectorAll('.le-rl-policy, .le-rl-addr').forEach(function(inp) {
-            inp.oninput = inp.onchange = _rlOnChange;
-        });
     }
 
     // ── Thread panel ──────────────────────────────────────────────────────────
@@ -1131,8 +750,8 @@
             'Review / save boot layout' +
             '</button>' +
              '<button class="le-next-btn" onclick="lumpEditorNextStep(\'lump-resident\')"' +
-             ' title="View boot-image configuration without saving or changing the Thread layout">' +
-             'View boot-image configuration \u2192' +
+             ' title="View the Namespace as built in the committed boot image (read-only)">' +
+             'View built Namespace \u2192' +
              '</button>' +
             '<span id="le-t-step1-status" class="le-rl-status" style="margin-left:0.75rem;"></span>' +
             '<span id="le-t-step1-err" class="le-rl-status" style="margin-left:0.5rem;color:#f77;"></span>' +
@@ -2072,54 +1691,11 @@
         if (panel && panel.offsetParent !== null) renderResidentPanel();
     };
 
-    window.lumpEditorBootEntryChange = function (nsSlot) {
-        if (!Number.isFinite(nsSlot) || nsSlot < 0) return;
-        if (typeof setBootEntrySlot !== 'function') {
-            _rl.errorMsg = 'Boot-entry preparation is unavailable. The selection was not saved.';
-            renderResidentPanel();
-            return;
-        }
-        _rl.errorMsg = '';
-        _rl.statusMsg = 'Saving Namespace Lightning Bolt…';
-        renderResidentPanel();
-        return Promise.resolve(setBootEntrySlot(nsSlot)).then(function(ok) {
-            if (ok === true) {
-                _rl.bootEntrySlot = Number(nsSlot);
-                if (window._nsState &&
-                        Array.isArray(window._nsState.abstractions)) {
-                    _rl.namespaceRows = window._nsState.abstractions.slice();
-                    _rl.namespaceFingerprint =
-                        window._nsState.namespaceFingerprint || _rl.namespaceFingerprint;
-                }
-                _rl.statusMsg = 'Namespace Lightning Bolt saved. Generate the image before reset.';
-            } else {
-                _rl.statusMsg = '';
-                _rl.errorMsg = 'Namespace Lightning Bolt was not saved. See the Namespace status for the next action.';
-            }
-            renderResidentPanel();
-        }).catch(function(error) {
-            _rl.statusMsg = '';
-            _rl.errorMsg = 'Namespace Lightning Bolt was not saved: ' +
-                (error && error.message ? error.message : String(error));
-            renderResidentPanel();
-        });
-    };
+    window.lumpEditorBootEntryChange = _bnObsolete('lumpEditorBootEntryChange');
 
-    window.lumpEditorBootBadgeClick = function (nsSlot) {
-        lumpEditorBootEntryChange(nsSlot);
-        var targetRow = document.querySelector('.le-rl-boot-entry-row');
-        if (targetRow) {
-            targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            targetRow.classList.remove('le-rl-boot-row-flash');
-            void targetRow.offsetWidth;
-            targetRow.classList.add('le-rl-boot-row-flash');
-        }
-    };
+    window.lumpEditorBootBadgeClick = _bnObsolete('lumpEditorBootBadgeClick');
 
-    window.lumpEditorBootShowAllToggle = function (checked) {
-        _rl.showAllBootTargets = checked === true;
-        renderResidentPanel();
-    };
+    window.lumpEditorBootShowAllToggle = _bnObsolete('lumpEditorBootShowAllToggle');
 
     window.initLumpEditor = function () {
         loadState();
@@ -2160,119 +1736,12 @@
 
     // ── Resident Lumps panel public handlers ──────────────────────────────────
 
-    window.lumpEditorRLEmptySlots = function (v) {
-        _rl.emptySlotCount = Math.max(0, parseInt(v, 10) || 0);
-        var err = _rlValidate();
-        _rl.errorMsg = err || '';
-        var errBanner = document.querySelector('#lumpResidentPanel .le-error-banner');
-        var saveBtn   = document.querySelector('#lumpResidentPanel .le-save-row .le-save-btn');
-        if (errBanner) {
-            errBanner.textContent = err ? '\u26A0 ' + err : '';
-        } else {
-            renderResidentPanel();
-        }
-        if (saveBtn) saveBtn.disabled = !!err || _rl.saveInFlight;
-    };
+    window.lumpEditorRLEmptySlots = _bnObsolete('lumpEditorRLEmptySlots');
 
-    function _rlBuildStep2Lumps(step2State) {
-        var step2Lumps = [];
-        for (var slotStr in step2State) {
-            var slot = parseInt(slotStr, 10);
-            if (_isFixedBootStep2Slot(slot)) continue;
-            var st = step2State[slotStr];
-            var row = {
-                nsSlot: slot,
-                loadPolicy: ['Empty', 'Resident', 'Preload', 'Lazy'].indexOf(st.loadPolicy) >= 0
-                    ? st.loadPolicy : 'Lazy',
-                abstraction: st.abstraction,
-                lumpToken: st.lumpToken
-            };
-            if (row.loadPolicy === 'Resident') {
-                row.physAddr = st.physAddr;
-                if (st.lumpSize) row.lumpSize = st.lumpSize;
-            } else if (row.loadPolicy === 'Preload') {
-                // Catalog-derived bridge bindings, never programmer inputs.
-                if (st.lumpSize) row.lumpSize = st.lumpSize;
-                if (st.binaryHash) row.binaryHash = st.binaryHash;
-                if (st.identityHash) row.identityHash = st.identityHash;
-            }
-            step2Lumps.push(row);
-        }
-        return step2Lumps;
-    }
 
-    window.lumpEditorRLSave = function () {
-        if (_rl.saveInFlight) return;
-        var err = _rlValidate();
-        if (err) {
-            _rl.errorMsg = err;
-            renderResidentPanel();
-            return;
-        }
-        var step2Lumps = _rlBuildStep2Lumps(_rl.step2State);
+    window.lumpEditorRLSave = _bnObsolete('lumpEditorRLSave');
 
-        var p = _getStep1Payload();
-        var payload = {
-            targetBoard: p.targetBoard,
-            step1:       p.step1,
-            step2:       { lumps: step2Lumps },
-            step3:       { emptySlotCount: _rl.emptySlotCount || 0 }
-        };
-
-        _rl.saveInFlight = true;
-        _rl.statusMsg = 'Saving\u2026';
-        _rl.errorMsg = '';
-        renderResidentPanel();
-
-        fetch('/api/boot-config', {
-            method:  'POST',
-            headers: Object.assign({'Content-Type': 'application/json'},
-                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
-                    ? window.BuildApprovalView._authHeaders() : {})),
-            body:    JSON.stringify(payload)
-        })
-        .then(function(r) {
-            return r.text().then(function(text) {
-                var body;
-                try {
-                    body = text ? JSON.parse(text) : {};
-                } catch (parseErr) {
-                    throw new Error(_formatActionableHttpError('Save the resident layout', r.status, text, {
-                        dataChanged: null,
-                        nextAction: 'Reload the resident layout to verify it before retrying Save.',
-                    }));
-                }
-                return { ok: r.ok, body: body };
-            });
-        })
-        .then(function(res) {
-            if (!res.ok || res.body.ok === false) {
-                throw new Error((res.body && res.body.error) || 'Save failed.');
-            }
-            if (typeof window._setActiveBootConfig === 'function') {
-                window._setActiveBootConfig(
-                    res.body.config, res.body.bootImageInvalidated === true,
-                    res.body.invalidatedBootImageWords);
-            } else {
-                window.bootConfig = res.body.config;
-            }
-            _rl.statusMsg = 'Saved. Reset the simulator to apply the new boot config.';
-            _rl.errorMsg  = '';
-        })
-        .catch(function(saveErr) {
-            var message = saveErr && saveErr.message ? saveErr.message : String(saveErr);
-            _rl.statusMsg = '';
-            _rl.errorMsg = /^Save failed:/.test(message) ? message : 'Save failed: ' + message;
-        })
-        .finally(function() {
-            _rl.saveInFlight = false;
-            renderResidentPanel();
-        });
-    };
-
-    window.lumpEditorRLGenerate = function () {
-        if (typeof generateBootImage === 'function') generateBootImage();
-    };
+    window.lumpEditorRLGenerate = _bnObsolete('lumpEditorRLGenerate');
 
     // ── _computeLumpToken ──────────────────────────────────────────────────
     // Shared helper: given instruction words + capability declarations,
@@ -2546,43 +2015,50 @@
         return { ok: true, token: token };
     };
 
-    window.lumpEditorRLUpload = function () {
-        var inp = document.getElementById('le-rl-upload-input');
-        if (inp) inp.click();
-    };
+    window.lumpEditorRLUpload = _bnObsolete('lumpEditorRLUpload');
 
-    window.lumpEditorRLHandleUpload = function (input) {
-        var file = input.files && input.files[0];
-        if (!file) return;
-        input.value = '';
-        if (!file.name.toLowerCase().endsWith('.bin') && file.type !== 'application/octet-stream') {
-            var genRes = document.getElementById('le-rl-gen-result');
-            if (genRes) genRes.textContent = 'Only .bin boot image files are accepted.';
-            return;
+    window.lumpEditorRLHandleUpload = _bnObsolete('lumpEditorRLHandleUpload');
+
+    // Retained pure helper (no I/O); used only by legacy-format tests.
+    function _rlBuildStep2Lumps(step2State) {
+        var step2Lumps = [];
+        for (var slotStr in step2State) {
+            var slot = parseInt(slotStr, 10);
+            if (_isFixedBootStep2Slot(slot)) continue;
+            var st = step2State[slotStr];
+            var row = {
+                nsSlot: slot,
+                loadPolicy: ['Empty', 'Resident', 'Preload', 'Lazy'].indexOf(st.loadPolicy) >= 0
+                    ? st.loadPolicy : 'Lazy',
+                abstraction: st.abstraction,
+                lumpToken: st.lumpToken
+            };
+            if (row.loadPolicy === 'Resident') {
+                row.physAddr = st.physAddr;
+                if (st.lumpSize) row.lumpSize = st.lumpSize;
+            } else if (row.loadPolicy === 'Preload') {
+                // Catalog-derived bridge bindings, never programmer inputs.
+                if (st.lumpSize) row.lumpSize = st.lumpSize;
+                if (st.binaryHash) row.binaryHash = st.binaryHash;
+                if (st.identityHash) row.identityHash = st.identityHash;
+            }
+            step2Lumps.push(row);
         }
-        if (typeof uploadBootImageFile === 'function') {
-            uploadBootImageFile(file);
-        }
-    };
+        return step2Lumps;
+    }
 
     window.initResidentPanel = function () {
         loadState();
-        _rl.loaded    = false;
-        _rl.loading   = false;
-        _rl.statusMsg = '';
-        _rl.errorMsg  = '';
-        _rlLoad();
+        _bnLoad();
     };
+
+    window.lumpEditorBuiltNamespaceRefresh = function () { return _bnLoad(); };
 
     window.addEventListener('storage', function (ev) {
         if (ev.key === 'fpga_board_target') {
             clampThreadStateToBoard();
             clampNSStateToBoard();
             render();
-            var panel = document.getElementById('lumpResidentPanel');
-            if (panel && panel.offsetParent !== null) {
-                renderResidentPanel();
-            }
         }
     });
 

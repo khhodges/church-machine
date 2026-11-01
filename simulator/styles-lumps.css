@@ -7260,3 +7260,18 @@ html.spc-locked #saveNSDialog button, html.spc-locked #lumpSaveStaleConflictDial
   .spc-panel { right:8px; bottom:8px; width:calc(100vw - 16px); max-height:30vh; }
   .spc-panel[data-dock="top"] .spc-log { max-height:44px; }
 }
+
+/* Built Namespace (read-only, as built) */
+.le-bn-head { display:flex; align-items:center; gap:.75rem; }
+.le-bn-scroll { overflow-x:auto; margin-top:.5rem; }
+.le-bn-table { width:100%; border-collapse:collapse; font-size:.76rem; }
+.le-bn-table th { text-align:left; color:#77779a; font-weight:600; padding:.25rem .5rem; border-bottom:1px solid #2a2a4a; white-space:nowrap; }
+.le-bn-table td { padding:.22rem .5rem; border-bottom:1px solid #1a1a2e; vertical-align:middle; }
+.le-bn-table code { font-family:'Courier New',monospace; color:#c8c8e0; }
+.le-bn-slot { color:#daa520; font-weight:700; }
+.le-bn-hash { word-break:break-all; font-size:.7rem; }
+.le-bn-absent { color:#55557a; font-style:italic; }
+.le-bn-badge { display:inline-block; font-size:.7rem; padding:1px 6px; border-radius:3px; }
+.le-bn-ok { background:#1a3a1a; color:#3fb950; }
+.le-bn-warn { background:#2a2000; color:#daa520; }
+.le-bn-bad { background:#3a1a1a; color:#f87171; }

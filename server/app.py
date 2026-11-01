@@ -7458,6 +7458,27 @@ def boot_image_update_to_latest():
                 shutil.rmtree(stage)
 
 
+@app.route("/api/boot-image/built-namespace", methods=["GET"])
+def boot_image_built_namespace():
+    """Inspect retained bytes without preparation, regeneration, or catalog lookup."""
+    from built_namespace_view import read_built_namespace
+    try:
+        result = read_built_namespace(
+            BOOT_IMAGE_PATH, BOOT_IMAGE_PROVENANCE_PATH, NS_STATE_PATH,
+            _boot_image_gen.parse_ns_table_raw, _namespace_state_fingerprint)
+        response = jsonify(result)
+    except FileNotFoundError:
+        response = jsonify(error="No committed Namespace image is available. "
+                           "No saved design or catalog was substituted.", dataChanged=False)
+        response.status_code = 404
+    except (OSError, ValueError, TypeError, KeyError, struct.error) as exc:
+        response = jsonify(error=f"Cannot inspect the committed Namespace image: {exc}",
+                           dataChanged=False)
+        response.status_code = 422
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.route("/api/boot-image/ns-state", methods=["GET"])
 def boot_image_ns_state():
     """Return the committed NS table snapshot (ns-state.json).

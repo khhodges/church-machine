@@ -118,7 +118,7 @@
     <link rel="stylesheet" href="styles-editor.css?v=sha256-b8ca7a206aa7">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
     <link rel="stylesheet" href="styles-heap-record.css?v=1">
-    <link rel="stylesheet" href="styles-lumps.css?v=sha256-d06b6215893f">
+    <link rel="stylesheet" href="styles-lumps.css?v=sha256-5153c0b77660">
     <link rel="stylesheet" href="styles-gatelog.css?v=sha256-4c4361f1c960">
     <link rel="stylesheet" href="styles-fault.css?v=sha256-84c6256a291d">
     <link rel="stylesheet" href="styles-tools.css?v=20260831-wukong-download-layout1">
@@ -472,7 +472,7 @@
                                     <button class="ham-item" id="hamItem-buildlog" onclick="switchView('builder');switchBuilderViewTab('buildlog');closeHamburger()">Build Log</button>
                                     <button class="ham-item" id="hamItem-lump-thread" onclick="switchView('builder');switchBuilderViewTab('lump-thread');closeHamburger()">Thread LUMP</button>
                                     <button class="ham-item" id="hamItem-lump-ns" onclick="switchView('builder');switchBuilderViewTab('lump-ns');closeHamburger()">Namespace LUMP</button>
-                                    <button class="ham-item" id="hamItem-lump-resident" onclick="switchView('builder');switchBuilderViewTab('lump-resident');closeHamburger()">Resident LUMP</button>
+                                    <button class="ham-item" id="hamItem-lump-resident" onclick="switchView('builder');switchBuilderViewTab('lump-resident');closeHamburger()">Built Namespace</button>
                                     <button class="ham-item" id="hamItem-versions" onclick="switchView('builder');switchBuilderViewTab('versions');closeHamburger()">Versions</button>
                                     <button class="ham-item" id="hamItem-build" onclick="switchView('builder');switchBuilderViewTab('build');closeHamburger()">Build</button>
                                     <button class="ham-item" id="hamItem-testing" onclick="switchView('builder');switchBuilderViewTab('testing');closeHamburger()">Testing</button>
@@ -1598,7 +1598,7 @@
             <button class="builder-view-tab" id="builderViewTab-buildlog" onclick="switchBuilderViewTab('buildlog')">&#x1F9F1; Log</button>
             <button class="builder-view-tab" id="builderViewTab-lump-thread" onclick="switchBuilderViewTab('lump-thread')" title="Thread Lump design page — header bit fields, memory layout, and interactive build settings">&#x1F9F5; Thread Lump</button>
             <button class="builder-view-tab" id="builderViewTab-lump-ns" onclick="switchBuilderViewTab('lump-ns')" title="Namespace Lump design page — header bit fields, NS table layout, and interactive build settings">&#x1F9E9; Namespace Lump</button>
-            <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')" style="display:none;">&#x1F3E0; Resident</button>
+            <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')" style="display:none;">Built Namespace</button>
             <button class="builder-view-tab active" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
             <button class="builder-view-tab" id="builderViewTab-versions" onclick="switchBuilderViewTab('versions')">&#x1F9ED; Versions</button>
             <button class="builder-view-tab" id="builderViewTab-build" onclick="switchBuilderViewTab('build')" title="Build Approval — NS map verification and Vivado synthesis launch">&#x1F528; Build Approval</button>
@@ -3691,7 +3691,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-compile.js?v=sha256-f6d9e8a2e8fd"></script>
     <script src="thread-heap-record.js?v=sha256-f2ffaee97f5c"></script>
     <script src="thread-tuple-design.js?v=sha256-3bcb670469de"></script>
-    <script src="app-lump-editor.js?v=sha256-9dde7bbe1bcd"></script>
+    <script src="app-lump-editor.js?v=sha256-41fa41f50d0e"></script>
     <script src="app-editor-find.js?v=sha256-aeb1fa51e855"></script>
     <script src="lump_save_handler.js?v=sha256-7d0b65c6b93b"></script>
     <script src="lump_lease_ui.js?v=sha256-622b3d8a575c"></script>
