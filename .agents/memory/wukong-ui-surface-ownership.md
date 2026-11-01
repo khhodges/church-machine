@@ -8,3 +8,14 @@ Physical Wukong controls belong exclusively on the Builder > Testing page. The s
 **Why:** The user explicitly separated the physical testing workflow from software simulation. Mirroring simulator actions to hardware or exposing hardware controls on the simulator makes it unclear which machine is executing and creates accidental board-command paths.
 
 **How to apply:** Add or change Step HW, HW Run/Pause, immediate Stop, Load/upload, breakpoint, reboot, and call-depth controls in the Testing page. When touching simulator controls, add guards proving they do not call Wukong command or upload endpoints.
+
+The user requires Bitstream Under Test on the Testing view itself, with the
+associated frozen Namespace/build-DNA link there rather than only in download
+or build-approval pages.
+
+**Why:** Test identity must be visible where tests are operated. A proposed
+section must not be described as already present.
+
+**How to apply:** Distinguish selected build identity from verified installed
+identity and unavailable provenance. Honour the user's step-by-step review
+before executing the proposed release-review work.
