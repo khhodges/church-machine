@@ -1878,3 +1878,8 @@ The [operation review](../security-regulator-operation-review.md) retains
 the supporting observations and earlier hypotheses; this appendix is the
 current three-method proposal for review.
 
+The supporting [Mint and FreeHandler authority review](../security-regulator-operation-review.md#mint-and-freehandler-authority-review)
+distinguishes the raw M-control GT, regulator invocation GT, register M state
+and Passcode audit identity, including current source gaps and provisioning
+questions. It is review evidence, not an implementation claim.
+

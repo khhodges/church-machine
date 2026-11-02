@@ -198,3 +198,122 @@ Resolve the SAVE destination-M rule and source-transfer scope against the ISA.
 Then freeze the primitive's ABI and M lifecycle and implement it without a
 global privilege shortcut. Expand the operation set only from similarly
 explicit machine contracts. No new caller-purpose policy is required.
+
+## Mint and FreeHandler authority review
+
+**Status:** Static source/contract review, 2026-11-02; no runtime or hardware
+qualification and no saved-artifact migration.
+
+### Four distinct concepts
+
+| Item | Meaning | Custody / use |
+|---|---|---|
+| M-control GT | Capability addressing the hardware control object; not an M bit embedded in a GT | Intended private regulator authority; concrete canonical name/binding remains to be established |
+| `ide.SecurityRegulator E` | Proposed capability to invoke the regulator's methods | Explicitly provisioned to trusted consumers such as Mint and FreeHandler if adopted |
+| CRn.M | Actual architectural register state | Established/consumed by the specified operation; not an issued GT permission |
+| Passcode audit identity | Identity against which regulator actions are recorded and sent Home | Must remain attributable across nested service calls; exact representation/ABI not yet selected |
+
+Do not call all four “the M-bit GT.” Granting a consumer regulator E is itself
+a substantial authority grant, not a harmless wrapper: the methods are general
+mechanisms with no hidden per-target policy. Keeping raw device authority
+private provides an operation/audit boundary, not proof that a consumer cannot
+request a powerful action.
+
+### Intended relationship
+
+```text
+Trusted provisioning
+    -> raw M-control GT held by SecurityRegulator
+    -> regulator invocation GT held by explicitly trusted consumers
+
+Mint or FreeHandler
+    -> regulator method + explicit operands + Passcode audit association
+    -> defined LOAD / Golden Token Save / SWITCH effect
+    -> detailed action/outcome record sent to Home IDE
+```
+
+This diagram does not authorize ordinary Mint CREATE to manufacture or
+distribute M-control authority. Mint's role in provisioning this special
+device grant, if any, needs an explicit bootstrap contract. It is not a
+normal allocation from FreeHandler's inventory, and neither service's ordinary
+result should silently include it.
+
+### Mint: what the source establishes
+
+`simulator/cloomc/mint.cloomc` currently declares MintState RW, MintScratch L,
+MintPool RW, PkVerify E, MintNamespace RW, MintCleaner E and MintApproval SL,
+plus SELF. It does not declare SecurityRegulator E or the M-control GT.
+
+The implemented CREATE slice is DATA RW only; it does not prove a general
+Thread or regulator-device constructor. Mint selects its trusted approval
+reference from its own C-list before calling PkVerify. The current
+`simulator/cloomc/pkverify.cloomc` contract compares the supplied proof and
+trusted reference with EXACT. This is Mint's established service boundary,
+not a reason to add a policy engine to SecurityRegulator.
+
+Mint also holds Namespace-write authority and uses a scratch L view to
+materialize a result GT. Review those paths separately from regulator custody:
+moving M-control into a private C-list alone does not prove Mint cannot
+construct another route to that device. Trace actual descriptor reach,
+binding and integrity checks before claiming exclusive access. This review
+identifies a proof obligation, not a demonstrated exploit or permission to
+remove Mint's approved authority.
+
+Any later replacement of a Mint scratch/transfer mechanism with LOADM or
+SAVEM must identify the exact instruction-level need. Ordinary DWRITE through
+MintNamespace RW does not become an M operation merely because Mint performs it.
+
+### FreeHandler: first consumer, not issuer of M authority
+
+`simulator/examples/free_handler.cloomc` holds directory L/R views and finds
+each Block's private Inventory. FreeThread currently loads row 10's
+ThreadSetup S and performs ordinary SAVE into home 1; it then marks issuance
+in that Block's State. It does not invoke SecurityRegulator.
+
+The proposed replacement is:
+
+```text
+SAVEM(ide.B1.FreeThread, 1, applicationE_GT)
+```
+
+Before adopting it, define how the added call preserves the selected Thread,
+State GT and application operand. Freeze the SAVE M contract and audit ABI;
+then revise the private Inventory to remove ThreadSetup S. Do not remove the
+grant first, activate unbound artifacts, or use global simulator elevation.
+Returned Data/C-list/Thread GTs remain ordinary object grants, not regulator
+or M-control grants.
+
+FreeHandler's current source explicitly ignores its passkey parameter.
+Therefore it cannot be cited as evidence of implemented Passcode attribution
+or admission. Do not silently equate that parameter with Mint's Abstract
+Passkey or the regulator's new audit identity.
+
+### Current M-control implementation discrepancy
+
+`simulator/device_abstractions.js` exposes `issueNamespaceMBitCapability` and
+`writeMBitWord`. The helper recognizes a Navana/Namespace owner and a
+JavaScript object capability for the slot-13 M-bit device; writes replace
+CR0.M–CR15.M from one word. That is not evidence of a saved, ordinary
+SecurityRegulator-owned GT path. It conflicts with treating regulator custody
+as already implemented. The fixed helper port/slot must not become the new
+API merely by copying it into a document.
+
+### Cross-service audit and review priorities
+
+For a nested call, distinguish the **immediate executor** (Mint or FreeHandler)
+from the Passcode identity to which the action is attributable. Define whether
+the association identifies the service itself or an originating requester,
+and how that association is carried without spoofing or leaking a secret.
+Record both where applicable; do not silently substitute the service identity
+for the required attribution. This is evidence binding, not purpose policy.
+
+Review in order:
+
+1. Exact M-control custody/provisioning, including Mint's Namespace-write reach.
+2. Destination/source M semantics for the first SAVEM use and normal return.
+3. Passcode association through nested calls and Home IDE delivery/fault rules.
+4. Explicit consumer bindings and preserved-register ABI.
+5. Exact-artifact migration and independent simulator/RTL evidence.
+
+No method implementations, grants, Namespace state or hardware were changed
+by this review.
