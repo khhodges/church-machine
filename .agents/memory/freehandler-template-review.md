@@ -87,3 +87,12 @@ does not collide with the first; the user proposed ide.B1.FreeData.
 **How to apply:** Keep block identity separate from per-object numbering and
 the established #issue suffix. B1/B2 is the proposed block component, not a
 Namespace slot, physical address or GT version.
+
+Keep the C-list at 64 total entries, including protected row 0; ordinary SAVE
+has 63 writable entries. Do not enlarge it to obtain 64 writable entries.
+
+**Why:** The user explicitly selected “Keep 64 total entries” after reviewing
+the protected-row consequence.
+
+**How to apply:** Retain the existing capacity and all-NULL initialization;
+describe total capacity separately from writable capacity.
