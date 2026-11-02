@@ -115,3 +115,14 @@ only one code base abstraction.”
 **How to apply:** Review block-specific inventory and bookkeeping as private
 data managed by the shared abstraction. Do not equate B1/B2 naming with
 duplicated handler code or newly approved public block-selection parameters.
+
+Use one private block directory under the shared FreeHandler. Each block has
+its own capability list and allocation state. Allocation searches registered
+blocks; Release matches the issued GT and quarantines it in its owning block.
+Initially populate B1 only, without automatic block creation or refill.
+
+**Why:** The user explicitly accepted this proposal with “Thats better -
+Agreed, next.”
+
+**How to apply:** Adding B2 registers new prepared inventory without resetting
+B1 or duplicating handler code. Keep block selection private to FreeHandler.
