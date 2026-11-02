@@ -6576,6 +6576,173 @@
         "signature": "be3c7dc398251cd88d1240725c7357ffc3a4561220bff959c00fafa77d05299f"
       },
       "identity_hash": "76f01cde9a0eb85559ce96e0bc76a8b5ea549a3a112a0808626b3e8c7747165d"
+    },
+    "939f671013e0c3ce0fec82b046b18244b6ffb3bf5cb02849a7e7b1e10fafd2e0": {
+      "binary_hash": "939f671013e0c3ce0fec82b046b18244b6ffb3bf5cb02849a7e7b1e10fafd2e0",
+      "dot_name": "ide.FreeHandler",
+      "issue_n": 1,
+      "abstraction": "ide.FreeHandler",
+      "filename": "ide.FreeHandler.1.48018d46.lump",
+      "compiled_at": 1793621324.2949877,
+      "portable_binding": {
+        "schema": "church.symbolic-lump-binding/v1",
+        "owner": "ide.FreeHandler",
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.FreeHandlerState",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject0",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject1",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 3,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject2",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 4,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject3",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 5,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject4",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 6,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject5",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 7,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject6",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 8,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.FreeObject7",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 9,
+            "symbolic_self": false
+          }
+        ],
+        "calls": []
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "939f671013e0c3ce0fec82b046b18244b6ffb3bf5cb02849a7e7b1e10fafd2e0",
+        "source_hash": "b2eeef9ca348ec5d778b815174d93a7db12a89db7ce374b62221f2b22e5afba7",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "38bc7c1d159e37063e522dd102a4c5e3df179ca2d3e42600ddc31a66dea93c67",
+          "inputs": {
+            "language": "auto",
+            "_resolved_call_api_authorities": {},
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [
+          {
+            "offset": 63,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "Free64: inconsistent private state or missing prepared capability",
+            "method": "Free64",
+            "sourceLine": 100
+          },
+          {
+            "offset": 116,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "Free128: inconsistent private state or missing prepared capability",
+            "method": "Free128",
+            "sourceLine": 161
+          },
+          {
+            "offset": 169,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "Free256: inconsistent private state or missing prepared capability",
+            "method": "Free256",
+            "sourceLine": 222
+          },
+          {
+            "offset": 250,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "FreeHandler: inconsistent private state or missing prepared capability",
+            "method": "Release",
+            "sourceLine": 318
+          }
+        ],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "735221c39af7412e15cda4f288f16d8f28486c5570f4ba56a86e1abb30e513b6"
+      },
+      "identity_hash": "3ab4c371e3aca99ddf2c5390af489c27358f22141e425bb1933117579dd138c1"
     }
   }
 }
