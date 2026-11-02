@@ -23,7 +23,7 @@ function setup(saved) {
     await w.fetch('/hardware/wukong/status');
     assert.equal(calls.length, 1);
     w.IDEBridge.toggle();
-    assert.equal(w.document.querySelector('button').textContent, 'Bridge: Off');
+    assert.equal(w.document.querySelector('button').textContent, 'Wukong: Off');
     assert.equal(w.document.querySelector('button').getAttribute('aria-checked'), 'false');
     assert.equal(w.localStorage.getItem('church.ide.bridge.enabled'), 'false');
     for (const path of ['status', 'events?after=0', 'command', 'load']) {
@@ -33,6 +33,7 @@ function setup(saved) {
     await w.fetch('/api/boot-image/ns-state');
     assert.equal(calls.length, 2, 'software IDE still works');
     w.IDEBridge.toggle();
+    assert.equal(w.document.querySelector('button').textContent, 'Wukong: On');
     let finish;
     t.setHandler(() => new Promise(resolve => {finish = resolve;}));
     const old = w.fetch('/hardware/wukong/events');
@@ -51,5 +52,8 @@ function setup(saved) {
     assert.equal(restored.w.IDEBridge.isEnabled(), false);
     await assert.rejects(restored.w.fetch('/hardware/wukong/status'), /Bridge is Off/);
     restored.close();
+    const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
+    assert.equal((html.match(/id="ideBridgeToggle"/g) || []).length, 1);
+    assert(!html.includes('id="toolbarWukongBtn"'), 'no duplicate Wukong button');
     console.log('PASS: bridge switch, persistence, request blocking, simulator independence, abort and stale responses');
 })().catch(error => {console.error(error); process.exitCode = 1;});

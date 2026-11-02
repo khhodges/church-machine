@@ -48,7 +48,7 @@
     function render() {
         const button = document.getElementById('ideBridgeToggle');
         if (!button) return;
-        button.textContent = enabled ? 'Bridge: On' : 'Bridge: Off';
+        button.textContent = enabled ? 'Wukong: On' : 'Wukong: Off';
         button.setAttribute('aria-checked', String(enabled));
         button.title = 'IDE hardware connection only. Off stops monitoring and blocks new hardware requests. It does not stop the board or the external bridge.';
     }

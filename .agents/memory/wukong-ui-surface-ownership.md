@@ -11,6 +11,8 @@ Physical Wukong controls belong exclusively on the Builder > Testing page. The s
 
 The IDE Bridge On/Off switch controls this browser's hardware connection,
 not board power, execution, or the external bridge process.
+Present this as one combined **Wukong: On / Off** button, not separate Bridge
+and Wukong controls, as explicitly requested by the user.
 
 **Why:** The user requested an IDE on/off switch after repeated reconnect-failure
 messages were being presented as board connection transitions.

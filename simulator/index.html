@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Church Machine IDE — Capability-Based Secure Computing</title>
     <script src="/simulator/browser_diagnostics.js?v=sha256-269c2a52ac49"></script>
-    <script src="/simulator/bridge-connection.js?v=sha256-2cd08922499a"></script>
+    <script src="/simulator/bridge-connection.js?v=sha256-eddf9a8bd2ab"></script>
     <script src="/simulator/change-confirmation.js?v=sha256-fcea2f7fdf7a"></script>
     <meta name="description" content="Church Machine IDE: browser-based FPGA simulator, assembler, and CLOOMC compiler with capability-based secure computing. Supports English, JavaScript, Haskell, and Lambda Calculus front-ends.">
     <meta name="robots" content="index, follow">
@@ -686,8 +686,7 @@
                     </div>
                 </div>
                 <div class="sim-controls">
-                    <button class="btn btn-view" id="ideBridgeToggle" role="switch" aria-checked="true" onclick="IDEBridge.toggle()">Bridge: On</button>
-                    <button class="btn btn-view" id="toolbarWukongBtn" onclick="switchView('builder');switchBuilderViewTab('testing')" style="opacity:0.45;" data-tooltip="Wukong board status — open the Testing page">&#x26A1; Wukong</button>
+                    <button class="btn btn-view" id="ideBridgeToggle" role="switch" aria-checked="true" onclick="IDEBridge.toggle()">Wukong: On</button>
                     <span id="toolbarIdeBadge"></span>
                     <button class="btn btn-view btn-settings-icon" onclick="openSettings()" data-tooltip="Settings — Configure student profile, subjects, and family">&#9881;</button>
                 </div>
