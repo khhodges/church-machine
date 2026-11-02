@@ -12,11 +12,15 @@ Stored NULL is valid data; NULL source is not authority; result permissions
 are unchanged.
 
 CR6.M is automatic execution-context authority, persists across ordinary
-C-list LOADs, and does not use SecurityRegulator. All other M use is limited
+C-list LOADs, and does not use SecurityRegulator. Boot is also an exception:
+preserve its defined trusted bootstrap authority and lifecycle outside SR,
+without extending bootstrap authority to ordinary code.
+Outside Boot and CR6.M, M use is limited
 to the six agreed SR methods and is consumed on use, success or failure.
 
 **Why:** The user explicitly confirmed the existing CR6 exception and
-required single-use authority for all other cases, including failures.
+required single-use authority for other cases, including failures, then
+explicitly reminded us not to omit Boot from the exceptions.
 
 **How to apply:** Do not route ordinary CR6 access through SR or consume
 CR6.M after LOAD. Do not retain other used M grants after faults or invent

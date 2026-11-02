@@ -1641,7 +1641,11 @@ instruction- and operand-specific, not a global "skip checks" mode.
 **Approved M lifetime and scope (2026-11-02):** CR6.M is the execution-context
 exception: CALL/RETURN establish it for C-list access with the unchanged E GT;
 ordinary C-list LOADs do not consume it. This mechanism does not use
-SecurityRegulator. In all other cases, M use is limited to the six agreed
+SecurityRegulator. **Boot is also an exception:** its defined trusted bootstrap
+authority does not require SecurityRegulator and retains its existing boot
+lifecycle rules. This does not grant ordinary code bootstrap authority or
+turn the reset-only activation marker into a programmer M grant.
+Outside Boot and the CR6.M execution-context exception, M use is limited to the six agreed
 SecurityRegulator methods below, and the relevant M state is consumed on use
 whether the operation succeeds or fails. Failure must not leave a reusable
 M grant. This is consumption of the used authority, not permission to clear
@@ -1870,7 +1874,7 @@ Before any implementation claims conformance, close:
 | M setup | How the mechanism establishes each required bit, and at which instruction boundary |
 | Scope | Exactly which checks each operand's M changes; explicitly list checks it does not change |
 | Register ABI | Input/result assignments above, scratch/clobber set, preservation mask, flags and return behavior |
-| Lifetime | CR6.M is the automatic persistent C-list exception, outside SR; all other M is SR-only and consumed on successful or failed use. Specify exact latch/clear points, skipped instructions and context-transfer implementation |
+| Lifetime | Boot retains its defined bootstrap authority outside SR; CR6.M is the automatic persistent C-list exception, also outside SR. Other M is SR-only and consumed on successful or failed use. Specify exact latch/clear points, skipped instructions and context-transfer implementation |
 | Control granularity | Whole-word M-control writes must not accidentally alter unrelated state; no per-bit hardware operation is assumed |
 | Evidence | Distinguish specification, simulator result, RTL result and exact installed-hardware result |
 
@@ -1882,7 +1886,9 @@ effects consistent with CR13's reservation, remain visible until resolved.
 
 ### A.6 Review and acceptance cases
 
-- Distinguish repeated CR6 C-list LOADs without SR from all other M uses:
+- Preserve Boot's defined bootstrap authority without SR; do not extend it
+  to ordinary execution or alter its established lifetime.
+- Distinguish repeated CR6 C-list LOADs without SR from other non-Boot M uses:
   SR-only authority must be consumed on both success and failure, with no
   reusable grant after a fault. Verify these as separate cases.
 - LOADM: ordinary/elevated cases, NULL data versus NULL authority, bounds,

@@ -33,7 +33,9 @@ must not be confused with the audit identity.
 
 **Approved M scope/lifetime clarification (2026-11-02):** CR6.M is automatic
 execution-context C-list authority, persists across ordinary LOADs, and does
-not use SecurityRegulator. All other M use is confined to the six agreed SR
+not use SecurityRegulator. Boot is also outside SR and retains its defined
+trusted bootstrap authority and lifecycle, without granting that authority
+to ordinary code. Outside Boot and CR6.M, M use is confined to the six agreed SR
 methods and consumes the relevant M state on use, whether successful or failed.
 This supersedes earlier open success/failure-lifetime questions below, not
 the need to verify exact implementation boundaries or resolve skipped
