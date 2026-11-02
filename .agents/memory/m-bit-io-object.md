@@ -5,6 +5,17 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+SAVEM destination-register M replaces S, retaining identity, generation,
+integrity, bounds and protected-home checks; consume it on success or failure.
+Its value operand is a GT held in CRn, not a DR integer or register-number
+argument. Source B/F transfer semantics remain a separate decision.
+
+**Why:** The user agreed to destination elevation and clarified that
+`valueGT` is a CRn.
+
+**How to apply:** Store the exact CR-held GT, never its M setting; do not infer
+source-transfer overrides or permission to read arbitrary isolated registers.
+
 M is an immovable hardware register bit setting, never a transferable GT field.
 LOADM returns the exact GT in CR1 with CR1.M clear; CR6.M is independently
 established by the normal execution-context mechanism.

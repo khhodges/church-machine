@@ -1792,6 +1792,18 @@ Proposed entry: CR1 = destinationGT; DR1 = homeIndex; CR2 = valueGT
 Proposed return: normal completion; no GT result
 ```
 
+**Approved operand clarification:** `valueGT` is supplied in a capability
+register CRn (CR2 in the proposed ABI), not as an integer in a DR or a
+register-number argument. SAVE stores that register's exact GT, not its
+hardware M setting. This does not authorize arbitrary isolated-register access.
+
+**Approved destination rule:** M on the register holding `destinationGT`
+replaces the destination S permission requirement for this Golden Token Save.
+Identity, generation, integrity, bounds and protected-home checks remain.
+The destination M is consumed on use, success or failure, under A.1.
+Neither GT's permission bits change. Source B/F transfer rules remain a
+separate review decision; destination approval does not waive them.
+
 **Proposed operation:**
 
 1. Capture all three operands.
@@ -1803,8 +1815,8 @@ Proposed return: normal completion; no GT result
 
 **Defined baseline:** ordinary SAVE requires destination S and source B with
 mSave validation; Abstract PassKey handling remains separately specified by
-the ISA. The method name alone does not settle which of these checks M
-overrides. Permission changes, GT generation changes, allocation and Thread
+the ISA. The destination S override above is approved; source-transfer M
+effects remain unresolved. Permission changes, GT generation changes, allocation and Thread
 activation are not effects of SAVEM.
 
 **First use case:**
@@ -1824,7 +1836,7 @@ Failure is not reported as successful completion. An instruction write is not
 a transaction covering FreeHandler's later bookkeeping. No implicit recovery,
 reseed or rollback is supplied.
 
-**Review closure:** specify destination M versus S, source M versus B/F,
+**Review closure:** specify source M versus B/F,
 the treatment of NULL values, protected/SELF homes and Thread-home geometry,
 remaining identity/integrity/bounds checks, and success/fault M consumption.
 An isolated-source export implementation does not by itself establish the

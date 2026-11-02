@@ -91,6 +91,14 @@ Do not create a public privileged method for every instruction by analogy.
 
 ## First worked case: SaveM
 
+**Subsequent approved decision:** destination-register M replaces destination
+S, while identity, generation, integrity, bounds and protected-home checks
+remain. Consume the used destination M on success or failure. `valueGT` is
+held in a CRn (proposed CR2), not a DR scalar; SAVE stores its GT, never its
+M setting. Source B/F transfer semantics remain open. Appendix A.3 records
+the current contract; earlier open destination-permission questions below
+are retained as review history, not unresolved approval.
+
 ### Functional proposal
 
 ```text
