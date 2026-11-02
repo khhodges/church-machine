@@ -171,6 +171,20 @@ and leave the existing boot/test abstraction and saved artifacts unchanged.
 Long-term design direction: when lazy loading supports Threads, Threads should
 be abundant and function-driven, rather than a small fixed set of resident roles.
 
+The user agreed to the compact-Block architectural direction: complete the
+initial B1 path, remove fixed-slab placement assumptions where alignment permits,
+evaluate a 16-total-entry default C-list, measure before shrinking Threads, and
+define safe reuse separately. The earlier 64-entry choice remains the existing
+baseline, not a permanent default for all applications.
+
+**Why:** The ten-Block capacity discussion exposed wasted placement space and
+the difference between required capabilities and provisioned C-list capacity.
+
+**How to apply:** Treat Blocks as logical inventories connected by named GTs.
+Keep State separate from Inventory and ThreadSetup private to its Block.
+Do not interpret architectural agreement as permission to replace saved
+artifacts, activate an image, implement recycling, or change hardware.
+
 The intended model keeps three resident boot/test/startup Threads, with
 additional transaction Threads as resources permit—for example one per order
 or telephone call. Load those Threads lazily as needed, applying the established
