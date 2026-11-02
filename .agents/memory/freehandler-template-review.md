@@ -28,7 +28,8 @@ silently preserve the old 1024-word pool geometry or implement during the pause.
 
 Use fixed initialization rather than configurable templates in this version:
 the 64-slot C-list starts entirely NULL, and the 512-word Thread is Amoeba-primed
-with CR0 holding the application-service capability.
+with CR1 holding the application-service capability (the user corrected the
+earlier CR0 proposal).
 
 **Why:** The user corrected the expanded template proposal: “KISS is the rule
 assume the clist is always empty (filled with NULL gts) and the thread is Amoeba
@@ -38,22 +39,22 @@ primed with CR0 application service.”
 alternative Thread startup modes. Preserve normal Thread initialization rules;
 this clarification is not authorization to activate a Thread or resume implementation.
 
-The new-Thread API supplies the application-service GT for the new Thread's CR0;
+The new-Thread API supplies the application-service GT for the new Thread's CR1;
 it is not a fixed application binding selected during offline inventory preparation.
 
-**Why:** The user clarified: “The API for the new thread supplies the CR0 GT.”
+**Why:** After initially specifying CR0, the user corrected it: “My mistake CR1 is good.”
 
 **How to apply:** Describe FreeThread as accepting that capability and returning
-the prepared Thread GT. Keep the new Thread's CR0 distinct from the caller's CR0;
-do not invent a register assignment for the input before reviewing the ABI.
+the prepared Thread GT. Keep the new Thread's saved CR1 distinct from the
+caller's input register. CR0 remains the offline-primed Amoeba identity.
 
 Prepare the Amoeba-primed Thread context offline in the template. Allocation
-supplies the API's application GT to the new Thread's CR0; it does not need a
+supplies the API's application GT to the new Thread's CR1; it does not need a
 runtime Amoeba priming call.
 
 **Why:** The user clarified that “The Thread template can include Amoeba primed
 offline,” correcting the proposed per-allocation priming call.
 
 **How to apply:** Separate fixed offline context initialization from the
-per-allocation CR0 binding. Review the authorized context-write mechanism before
+per-allocation CR1 binding. Review the authorized context-write mechanism before
 implementing it, without expanding the design into a runtime template engine.

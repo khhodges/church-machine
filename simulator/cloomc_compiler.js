@@ -184,7 +184,7 @@ class CLOOMCCompiler {
             if (!exact && !union) throw new Error(`Invalid ABI type: ${text}`);
             const rights = (exact || union)[2];
             // LS is explicitly allowed by the Church CREATE policy.
-            if (!['','R','W','RW','X','RX','WX','RWX','E','L','LS'].includes(rights))
+            if (!['','R','W','RW','X','RX','WX','RWX','E','L','S','LS'].includes(rights))
                 throw new Error(`Invalid ABI permissions: ${rights}`);
             if (exact) return [tags[exact[1]], rights];
             const forms = union[1].split('|').map(t => tags[t]);

@@ -1,13 +1,19 @@
 ; CLOOMC++: one resident FreeHandler, finite fresh inventory, single caller.
-; Free64/128/256 return Inform RW in CR1. Release takes its target in CR2.
+; Free64/128/256 return Inform RW; FreeCList returns Inform S;
+; FreeThread returns a permission-free Inform Thread GT. Results use CR1.
+; FreeThread(application: CR2) writes the new Thread's saved CR1, not CR0.
+; The 512-word Thread is Amoeba-primed offline; issuance never starts it.
+; Release takes any issued Inform GT in CR2.
 ; DR1: 0 OK, 1 empty, 2 foreign target, 3 not issued.
 ; The passkey parameter is present but ignored for this Phase 1 profile.
 ; Provisioning: build_free_handler_example.js --base-word X --first-slot Y.
 ; No refill, descriptor writes, scratch conversion, or hardware activation.
+; Inventory: three 64w, two 128w, one 256w, one 64-entry C-list,
+; and one 512w Thread. C-list starts entirely NULL.
 ;
 ; Private State variables (64 words):
 ;   0..2 Free64 head/tail/count; 3..5 Free128; 6..8 Free256; 9..11 Returned.
-;   12..15 Free64 indices; 16..17 Free128; 18..19 Free256; 20..27 Returned.
+;   12..14 Free64 indices; 16..17 Free128; 18 Free256; 20..27 Returned.
 ;   28..35 object state: FREE=0, ISSUED=1, RETURNED=2, RETIRED=3.
 ;   36..43 object version: zero in this explicitly fresh example.
 ;   44..63 reserved zero.
@@ -26,8 +32,9 @@ capabilities {
     ide.FreeObject3 RW,
     ide.FreeObject4 RW,
     ide.FreeObject5 RW,
-    ide.FreeObject6 RW,
-    ide.FreeObject7 RW
+    ide.FreeObject6 S,
+    ide.FreeObject7,
+    ide.FreeObject7 S
 }
 
 method Free64() -> Inform[RW] {
@@ -38,14 +45,14 @@ method Free64() -> Inform[RW] {
     DREAD DR11, CR7, #1, DR0
     MCMP DR11, #0
     BRANCHNE bad
-    MCMP DR8, #4
+    MCMP DR8, #3
     BRANCHHS bad
-    MCMP DR9, #4
+    MCMP DR9, #3
     BRANCHHI bad
     MCMP DR9, #0
     BRANCHEQ empty
     IADD DR11, DR8, DR9
-    MCMP DR11, #4
+    MCMP DR11, #3
     BRANCHNE bad
     DREAD DR10, CR7, #12, DR8
     MCMP DR10, DR8
@@ -60,9 +67,7 @@ method Free64() -> Inform[RW] {
     BRANCHEQ object0
     MCMP DR10, #1
     BRANCHEQ object1
-    MCMP DR10, #2
-    BRANCHEQ object2
-    LOAD CR1, CR6, #5
+    LOAD CR1, CR6, #4
     BRANCH issue
 object0:
     LOAD CR1, CR6, #2
@@ -70,15 +75,13 @@ object0:
 object1:
     LOAD CR1, CR6, #3
     BRANCH issue
-object2:
-    LOAD CR1, CR6, #4
 issue:
     TPERM CR1, NULL
     BRANCHEQ bad
     IADD DR11, DR0, #1
     DWRITE DR11, CR7, #28, DR10
     IADD DR8, DR8, #1
-    MCMP DR8, #4
+    MCMP DR8, #3
     BRANCHLO advance
     IADD DR8, DR0, #0
 advance:
@@ -118,7 +121,7 @@ method Free128() -> Inform[RW] {
     MCMP DR11, #2
     BRANCHNE bad
     DREAD DR10, CR7, #16, DR8
-    IADD DR11, DR8, #4
+    IADD DR11, DR8, #3
     MCMP DR10, DR11
     BRANCHNE bad
     DREAD DR11, CR7, #28, DR10
@@ -127,12 +130,12 @@ method Free128() -> Inform[RW] {
     DREAD DR11, CR7, #36, DR10
     MCMP DR11, #0
     BRANCHNE bad
-    MCMP DR10, #4
-    BRANCHEQ object4
-    LOAD CR1, CR6, #7
-    BRANCH issue
-object4:
+    MCMP DR10, #3
+    BRANCHEQ object3
     LOAD CR1, CR6, #6
+    BRANCH issue
+object3:
+    LOAD CR1, CR6, #5
 issue:
     TPERM CR1, NULL
     BRANCHEQ bad
@@ -169,17 +172,17 @@ method Free256() -> Inform[RW] {
     DREAD DR11, CR7, #7, DR0
     MCMP DR11, #0
     BRANCHNE bad
-    MCMP DR8, #2
+    MCMP DR8, #1
     BRANCHHS bad
-    MCMP DR9, #2
+    MCMP DR9, #1
     BRANCHHI bad
     MCMP DR9, #0
     BRANCHEQ empty
     IADD DR11, DR8, DR9
-    MCMP DR11, #2
+    MCMP DR11, #1
     BRANCHNE bad
     DREAD DR10, CR7, #18, DR8
-    IADD DR11, DR8, #6
+    IADD DR11, DR8, #5
     MCMP DR10, DR11
     BRANCHNE bad
     DREAD DR11, CR7, #28, DR10
@@ -188,19 +191,14 @@ method Free256() -> Inform[RW] {
     DREAD DR11, CR7, #36, DR10
     MCMP DR11, #0
     BRANCHNE bad
-    MCMP DR10, #6
-    BRANCHEQ object6
-    LOAD CR1, CR6, #9
-    BRANCH issue
-object6:
-    LOAD CR1, CR6, #8
+    LOAD CR1, CR6, #7
 issue:
     TPERM CR1, NULL
     BRANCHEQ bad
     IADD DR11, DR0, #1
     DWRITE DR11, CR7, #28, DR10
     IADD DR8, DR8, #1
-    MCMP DR8, #2
+    MCMP DR8, #1
     BRANCHLO advance
     IADD DR8, DR0, #0
 advance:
@@ -222,7 +220,74 @@ bad:
     HARDFAULT "Free256: inconsistent private state or missing prepared capability"
 }
 
-method Release(target: Inform[RW]) -> Void {
+method FreeCList() -> Inform[S] {
+    LOAD CR1, NULL
+    LOAD CR7, CR6, #1
+    DREAD DR11, CR7, #42, DR0
+    MCMP DR11, #0
+    BRANCHNE bad
+    DREAD DR10, CR7, #34, DR0
+    MCMP DR10, #3
+    BRANCHHI bad
+    MCMP DR10, #0
+    BRANCHNE empty
+    LOAD CR1, CR6, #8
+    TPERM CR1, NULL
+    BRANCHEQ bad
+    IADD DR11, DR0, #1
+    DWRITE DR11, CR7, #34, DR0
+    IADD DR1, DR0, #0
+    BRANCH done
+empty:
+    IADD DR1, DR0, #1
+done:
+    LOAD CR2, NULL
+    LOAD CR7, NULL
+    LOAD CR8, NULL
+    RETURNAL #2
+bad:
+    HARDFAULT "FreeCList: inconsistent private state or missing prepared capability"
+}
+
+method FreeThread(application: Inform[E]) -> Inform[] {
+    LOAD CR1, NULL
+    LOAD CR7, CR6, #1
+    DREAD DR11, CR7, #43, DR0
+    MCMP DR11, #0
+    BRANCHNE bad
+    DREAD DR10, CR7, #35, DR0
+    MCMP DR10, #3
+    BRANCHHI bad
+    MCMP DR10, #0
+    BRANCHNE empty
+    TPERM CR2, NULL
+    BRANCHEQ bad
+    TPERM CR2, E
+    BRANCHNE bad
+    LOAD CR1, CR6, #9
+    TPERM CR1, NULL
+    BRANCHEQ bad
+    ; Private S grant names the same Thread, never client heap storage.
+    ; SAVE enforces source transfer/B authority and destination S authority.
+    ; Row 1 is saved CR1. CR0 and Amoeba's protected frames are unchanged.
+    LOAD CR8, CR6, #10
+    SAVE CR2, CR8, #1
+    IADD DR11, DR0, #1
+    DWRITE DR11, CR7, #35, DR0
+    IADD DR1, DR0, #0
+    BRANCH done
+empty:
+    IADD DR1, DR0, #1
+done:
+    LOAD CR2, NULL
+    LOAD CR7, NULL
+    LOAD CR8, NULL
+    RETURNAL #2
+bad:
+    HARDFAULT "FreeThread: inconsistent private state, invalid application or missing prepared capability"
+}
+
+method Release(target: Inform[]) -> Void {
     LOAD CR1, NULL
     LOAD CR7, CR6, #1
     TPERM CR2, NULL
