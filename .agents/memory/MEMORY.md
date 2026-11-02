@@ -155,3 +155,4 @@
 - [UART profile authority](uart-profile-installation-authority.md) — pin software-image compatibility to the installed BIT, not mutable hardware sources; keep flash approval separate.
 - [Readable Mint calls](mint-readable-call-approval.md) — bounded compiler implementation authorized; saved artifacts, live bindings and hardware remain outside approval.
 - [Hardware progress watch](hardware-progress-watch.md) — programmable GT + offset monitoring of the stash counter across free-run and fault recovery.
+- [FreeHandler template review](freehandler-template-review.md) — review C-list and Thread templates on prepared inventory; Namespace remains an IDE function.
