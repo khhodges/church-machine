@@ -5,6 +5,18 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+Review regulator methods from the top, one decision at a time.
+LOADM's source-register M may replace source L permission, but does not
+bypass identity, generation, integrity, bounds or protected-register checks.
+Stored NULL is valid data; NULL source is not authority; result permissions
+are unchanged. Lifetime and return ABI are separate decisions.
+
+**Why:** The user explicitly approved this limited source-permission rule,
+not blanket elevation or the remaining LOADM contract.
+
+**How to apply:** Follow the approved A.2 rule without inferring success/fault
+M consumption, destination M behavior or CALL/RETURN preservation.
+
 MintM(Ctype, Permissions, Slot) -> GT adds construction to the regulator.
 The user requires fixing Phase I M-bit limitations to support it.
 

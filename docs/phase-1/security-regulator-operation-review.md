@@ -209,10 +209,14 @@ Retain failed/counterexample evidence, not only passing demonstrations.
 
 ## Next review item
 
-Resolve the SAVE destination-M rule and source-transfer scope against the ISA.
-Then freeze the primitive's ABI and M lifecycle and implement it without a
-global privilege shortcut. Expand the operation set only from similarly
-explicit machine contracts. No new caller-purpose policy is required.
+Proceed from LOADM, one decision at a time. The user approved source-register
+M replacing LOAD's L permission requirement, without bypassing identity,
+generation, integrity, bounds or protected-register checks; see appendix A.2.
+Stored NULL remains valid data, NULL source remains invalid authority, and
+loaded permissions remain unchanged. M lifetime and return ABI are not yet
+approved. Then address SAVE destination-M and source-transfer scope.
+Implement only resolved contracts, without a global privilege shortcut.
+No new caller-purpose policy is required.
 
 ## Mint and FreeHandler authority review
 

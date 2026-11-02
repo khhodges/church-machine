@@ -1715,6 +1715,14 @@ These are pending mechanism details, not permission to add policy control.
 **Function:** load one GT from the selected source capability home using the
 defined M-assisted LOAD semantics.
 
+**Approved source-permission rule (2026-11-02):** M on the register holding
+`sourceGT` permits LOAD without that GT's L permission. This overrides only
+the source L requirement, not identity, generation, integrity, bounds or
+protected-register checks. An authorized load of stored NULL returns NULL;
+a NULL source provides no authority. The loaded GT retains its exact
+permission bits. This approval does not settle M lifetime or the return ABI,
+and is not an implementation or hardware-conformance claim.
+
 ```text
 LOADM(sourceGT, homeIndex) -> valueGT
 
@@ -1740,8 +1748,8 @@ already has its own LOAD form and needs no special regulator method.
 an unauthorized access or invalid index into a successful NULL result.
 This appendix assigns no new fault numbers or multiple-fault precedence.
 
-**Review closure:** identify the exact source/destination M role, whether and
-how L is overridden, M acceptance/consumption, legal working registers, and
+**Review closure:** specify any destination M role, M acceptance/consumption,
+legal working registers, and
 how the returned GT survives CALL/RETURN and its preservation mask. The CR6
 execution-context exception must not be generalized to all operands. The
 functional return above does not authorize arbitrary isolated-register reads.
@@ -2020,7 +2028,7 @@ No seventh method is selected by this review.
 
 | M-related path | Classification for this review |
 |---|---|
-| Source-side M on LOAD | Candidate LOADM mechanism. Simulator `_execLoad` chooses its permission check from source M; this observation does not settle the normative scope for every CR |
+| Source-side M on LOAD | Approved source-L override in A.2; other validation remains required. M lifetime and legal working registers remain open; simulator behavior is not conformance evidence |
 | Isolated-source M on SAVE | Candidate SAVEM source-transfer mechanism. It does not prove SAVEM destination elevation is implemented |
 | CR15.M on SWITCH | Defined handoff admission and successful-consumption rule; covered by SWITCHM |
 | CALL/RETURN establishment of CR6 context and M transitions | Internal instruction lifecycle, not a separate public method; must compose with every returning regulator method |
