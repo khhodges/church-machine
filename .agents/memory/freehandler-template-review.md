@@ -46,3 +46,14 @@ it is not a fixed application binding selected during offline inventory preparat
 **How to apply:** Describe FreeThread as accepting that capability and returning
 the prepared Thread GT. Keep the new Thread's CR0 distinct from the caller's CR0;
 do not invent a register assignment for the input before reviewing the ABI.
+
+Prepare the Amoeba-primed Thread context offline in the template. Allocation
+supplies the API's application GT to the new Thread's CR0; it does not need a
+runtime Amoeba priming call.
+
+**Why:** The user clarified that “The Thread template can include Amoeba primed
+offline,” correcting the proposed per-allocation priming call.
+
+**How to apply:** Separate fixed offline context initialization from the
+per-allocation CR0 binding. Review the authorized context-write mechanism before
+implementing it, without expanding the design into a runtime template engine.
