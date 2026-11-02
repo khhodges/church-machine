@@ -6,6 +6,11 @@ Mint scratch conversion as the foreground allocation path.
 
 ## Latest design direction: one abstraction
 
+The subsequent four-method FreeHandler design is in
+`reports/free-handler-phase1-design.md`. It replaces the provisional four-block
+queue backing with one private 64-word state block, and proposes three
+size-specific allocation methods plus Release. The saved Mint API is unchanged.
+
 The user directs one resident abstraction with methods and private variables,
 not separate abstractions for each queue. Free64, Free128, Free256 and Returned
 are internal data structures. Their heads, tails, counts and object states are

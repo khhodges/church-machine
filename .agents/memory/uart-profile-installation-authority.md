@@ -176,6 +176,18 @@ capabilities to clients. Earlier per-queue descriptor/C-list numbering is
 provisional; reconcile actual variable storage before implementation. Grouping
 methods does not authorize deferred release/refill or hardware operations.
 
+The user approved the standardized eight-object formation and requested a
+four-method Free Handler design in one abstraction.
+
+**Why:** They said “Design approved lets design a Free Handler that includes
+the four methods.” The formation fixes relative sizes/offsets, not universal
+GT values or permission to reuse live generations.
+
+**How to apply:** Review three size-specific allocation methods and Release
+under FreeHandler; method names remain design choices, not changes to saved
+Mint.CREATE. Release quarantines returns until deferred refill: it is not
+immediate revocation. Design permission is not hardware-execution approval.
+
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
 The earlier eight-word example is not an accepted allocation contract.
 
