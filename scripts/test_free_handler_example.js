@@ -3,6 +3,9 @@
 const assert = require('node:assert/strict');
 const {prepare, wordsToBytes} = require('./build_free_handler_example');
 const Codec = require('../simulator/lump-api-codec');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const r = prepare();
 assert.deepEqual(r.compiled.errors, []);
 assert.deepEqual(r.compiled.warnings, []);
@@ -66,4 +69,22 @@ for (const bad of [
     {baseWord: 7169}, {baseWord: 0}, {baseWord: 16384},
     {firstSlot: 2}, {firstSlot: 57}, {firstSlot: 3.5},
 ]) assert.throws(() => prepare(bad));
+const compileUI = fs.readFileSync(path.join(__dirname, '../simulator/app-compile.js'), 'utf8');
+const maps = {};
+for (const name of ['_CLOOMC_FILE_EXAMPLES', '_CLOOMC_FILE_LANGUAGES']) {
+    const declaration = compileUI.match(new RegExp(`const ${name} = (\\{[\\s\\S]*?\\n\\});`));
+    assert(declaration, `missing ${name}`);
+    maps[name] = vm.runInNewContext('(' + declaration[1] + ')');
+}
+const context = vm.createContext({
+    window: {_cloomcFileExamples: maps._CLOOMC_FILE_EXAMPLES,
+        _cloomcFileLanguages: maps._CLOOMC_FILE_LANGUAGES},
+    document: {addEventListener() {}}, console,
+});
+vm.runInContext(fs.readFileSync(path.join(__dirname, '../simulator/app-source-library.js'), 'utf8'), context);
+const entries = vm.runInContext('_buildSLRegistry()', context).filter(x => x.key === 'free_handler');
+assert.equal(entries.length, 1, 'example is discoverable once in the actual Source Library');
+assert.equal(entries[0].name, 'FreeHandler');
+assert.equal(entries[0].loader, 'cloomc');
+assert.equal(maps._CLOOMC_FILE_EXAMPLES.free_handler, '/simulator/examples/free_handler.cloomc');
 console.log('PASS: real CLOOMC++ compile, four-method ABI, native instruction boundaries, embedded API, initialization, relocatable B/Y. No execution claim.');

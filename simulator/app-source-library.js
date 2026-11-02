@@ -42,6 +42,7 @@
  * generated TitleCase name is ambiguous or wrong.
  */
 const _SL_METADATA = {
+    'free_handler':             { name: 'FreeHandler', lang: 'javascript' },
     'recall_demo':              { name: 'Feedback' },
     'billing':                  { name: 'BudgetTracker' },
     'physical_pool':            { name: 'DMABuffer' },

@@ -201,6 +201,16 @@ runtime qualification or use this request as permission for board commands.
 For this bounded example, keep typed native method bodies self-contained
 rather than expanding compiler grammar to share helpers.
 
+Deliver examples through the existing IDE source-discovery path as well as
+the repository file; a filesystem path alone is not a finished handoff.
+
+**Why:** The user asked “Finish the job,, How do I find the cloomc file??”
+after receiving only a source path and build command.
+
+**How to apply:** Register the example in the existing Source Library and give
+the exact open/load steps plus a verified direct source URL. Preserve editor
+replacement consent; discoverability does not authorize overwriting a draft.
+
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
 The earlier eight-word example is not an accepted allocation contract.
 

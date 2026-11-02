@@ -4,6 +4,11 @@ The implementation is **[free_handler.cloomc](free_handler.cloomc)**, not a
 JavaScript/Python model. It uses the existing compiler's typed CLOOMC++ method
 syntax and native instruction bodies, like the saved Mint implementation.
 
+In the IDE, open the top-left menu → **Source Library**, search **FreeHandler**,
+and click **Load**. The existing source-replacement confirmation protects your
+current draft. The raw source is also served at
+`/simulator/examples/free_handler.cloomc`.
+
 | Method | Input | Output |
 | --- | --- | --- |
 | Free64 | CR1 passkey, ignored | CR1 Inform RW, 64 words |

@@ -618,6 +618,7 @@ const LANG_EXAMPLE_GROUPS = {
    Both loadCLOOMCExample() and _initCloomcStructuralGlobals() reference
    these consts to avoid duplicated data. */
 const _CLOOMC_FILE_EXAMPLES = {
+    'free_handler':            '/simulator/examples/free_handler.cloomc',
     'sliderule':               '/simulator/cloomc/sliderule.cloomc',
     'contact':                 '/simulator/cloomc/Contact.cloomc',
     'contact_stage2':          '/simulator/cloomc/ContactStage2.cloomc',
@@ -633,6 +634,7 @@ const _CLOOMC_FILE_EXAMPLES = {
     'dijkstra_flag_ada':       '/simulator/cloomc/dijkstra_flag_ada.cloomc'
 };
 const _CLOOMC_FILE_LANGUAGES = {
+    'free_handler':            'javascript',
     'sliderule':               'javascript',
     'contact':                 'javascript',
     'contact_stage2':          'javascript',
