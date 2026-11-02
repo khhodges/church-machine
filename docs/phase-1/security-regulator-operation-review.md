@@ -8,6 +8,12 @@ interfaces, not an ISA amendment, implemented API or hardware qualification.
 for LOADM, SAVEM and SWITCHM. The broader candidates below are investigation
 history, not additional selected methods.
 
+**Audit requirement:** Every SecurityRegulator action is logged in detail
+against the Passcode and sent to the Home IDE, including unsuccessful actions.
+The appendix records proposed audit fields and open delivery semantics.
+This is accountability, not an added policy engine; secret credential values
+must not be confused with the audit identity.
+
 ## Authority and purpose
 
 The [Master ISA](01-isa/instruction-set.md) is authoritative. Its approved

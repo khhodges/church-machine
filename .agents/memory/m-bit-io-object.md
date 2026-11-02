@@ -5,6 +5,17 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+Every SecurityRegulator action must be logged in detail against the Passcode
+and sent to the Home IDE.
+
+**Why:** The user explicitly requires per-Passcode accountability for all
+regulator actions, in addition to the pure digital mechanism.
+
+**How to apply:** Cover LOADM, SAVEM and SWITCHM, including unsuccessful actions
+and non-returning transfers. Use the ISA appendix's audit review requirements;
+do not invent delivery-failure behavior or expose reusable credentials as an
+audit identifier. Do not silently equate Passcode with historical Passkey ABIs.
+
 The user requested LOADM, SAVEM and SWITCHM as a review appendix to the ISA.
 These are the minimal proposed software methods, not new opcodes or approved
 M-override semantics. The appendix is in the Master ISA under

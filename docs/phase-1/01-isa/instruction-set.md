@@ -1660,6 +1660,50 @@ WriteAnyRegister, allocator or policy-check method is not part of this API.
 These three methods are the proposed minimal set; exhaustive coverage still
 requires an audit of every architecturally defined M use.
 
+#### Common audit requirement — Passcode and Home IDE
+
+**User-required behavior:** Every SecurityRegulator action is logged in detail
+against the **Passcode** and sent to the **Home IDE**. This applies to LOADM,
+SAVEM and SWITCHM, including attempted actions that fault or are rejected,
+not only successful completions. Audit is a mechanical accountability
+requirement, not a new caller-purpose policy decision.
+
+The following record contents are proposed for review:
+
+- Passcode-associated audit identity, an action identifier and ordered event
+  sequence; time source and reset/session identity must be specified.
+- Method, originating machine/Namespace/Thread context and exact selected
+  regulator implementation identity.
+- Operand GT identities, home/row index and relevant accepted M state;
+  record enough detail to reconstruct the requested operation.
+- Actual outcome: completion, rejection, fault, or handoff phase reached,
+  including the fault and any committed effect. Unknown outcomes must remain
+  explicitly unknown, not inferred successes.
+- Result GT identity for LOADM, the Golden Token Save destination/value
+  identity for SAVEM, and outgoing/incoming context identities for SWITCHM.
+- Relevant resulting M state and Home IDE delivery/acknowledgement status,
+  correlated with the same action identifier.
+
+“Against the Passcode” means attributable to its identity. It does not by
+itself authorize recording or transmitting a reusable secret Passcode or
+private proof. The Passcode representation, safe audit reference and binding
+to the invocation remain review items; do not assume Passcode and earlier
+Passkey terminology are interchangeable or invent a new register assignment.
+
+Sending records to the Home IDE is required, not optional diagnostic output.
+The audit path must cover SWITCHM even though it does not immediately return,
+and faults even when ordinary method completion cannot emit a record.
+The Home IDE must be explicitly identified; a caller-supplied arbitrary
+destination must not silently stand in for it.
+
+**Delivery contract still to review:** transport and receiver authentication,
+record integrity, ordering/duplicate handling, acknowledgement, retention,
+buffering across reset, and behavior when logging or delivery fails or the
+Home IDE is unavailable. In particular, whether execution waits, faults or
+uses a durable pending record is not selected here. Do not silently discard
+records or claim delivery merely because they were queued or transmitted.
+These are pending mechanism details, not permission to add policy control.
+
 ### A.2 LOADM — M-assisted capability load
 
 **Function:** load one GT from the selected source capability home using the
@@ -1822,6 +1866,11 @@ effects consistent with CR13's reservation, remain visible until resolved.
   no-rollback failure behavior and later resumption of the regulator wrapper.
 - Negative scope: no added M requirement for CHANGE, no raw-register write
   interface, and no watchdog refresh inferred from ordinary interval setting.
+- Audit: every action is attributed to its Passcode audit identity and
+  delivered to the Home IDE with correlated request/outcome evidence.
+  Exercise rejection, fault, SWITCHM transfer, reset, unavailable receiver
+  and duplicate delivery against the agreed delivery contract. Verify that
+  reusable secret Passcodes/proofs are not exposed in audit records.
 
 Expected outcomes must be specified before tests are treated as evidence.
 This appendix supplies no passed tests or hardware acceptance claim.
