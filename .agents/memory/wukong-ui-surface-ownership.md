@@ -9,6 +9,16 @@ Physical Wukong controls belong exclusively on the Builder > Testing page. The s
 
 **How to apply:** Add or change Step HW, HW Run/Pause, immediate Stop, Load/upload, breakpoint, reboot, and call-depth controls in the Testing page. When touching simulator controls, add guards proving they do not call Wukong command or upload endpoints.
 
+The IDE Bridge On/Off switch controls this browser's hardware connection,
+not board power, execution, or the external bridge process.
+
+**Why:** The user requested an IDE on/off switch after repeated reconnect-failure
+messages were being presented as board connection transitions.
+
+**How to apply:** Keep local disconnection separate from STOP. Off must suppress
+monitoring and new hardware requests without sending a board command; previously
+sent commands cannot be recalled by a browser-local switch.
+
 The user requires Bitstream Under Test on the Testing view itself, with the
 associated frozen Namespace/build-DNA link there rather than only in download
 or build-approval pages.

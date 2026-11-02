@@ -19817,6 +19817,7 @@ let _wukongRelayLastRx    = null;  // age in seconds since last event received f
 window._hwBreakpoints = _hwBreakpoints;
 
 function _wukongIsConnected() {
+    if (window.IDEBridge && !window.IDEBridge.isEnabled()) return false;
     return _wukongLastTraceTs > 0 &&
            (Date.now() - _wukongLastTraceTs * 1000) < _WUKONG_STALE_MS;
 }
@@ -20683,6 +20684,7 @@ function _wukongApplyStartupState(bi) {
 
 /** Fetch status and render the health strip inside #wukong-health-strip. */
 async function _wukongRefreshHealthStrip() {
+    if (window.IDEBridge && !window.IDEBridge.isEnabled()) return;
     try {
         var r = await fetch('/hardware/wukong/status');
         if (!r.ok) return;
@@ -21231,6 +21233,7 @@ function _wukongApplySnapshot(data) {
 //
 // Returns true if at least one new event arrived.
 async function _wukongDrainEvents() {
+    if (window.IDEBridge && !window.IDEBridge.isEnabled()) return false;
     const r = await fetch('/hardware/wukong/events?after=' + _wukongLastEventSeq);
     if (!r.ok) return false;
     const data = await r.json();
@@ -21621,6 +21624,7 @@ function _wukongHideStaleBanner() {
 // Poll for new trace packets every 500 ms (connection detection + CR update).
 // Also polls boot-info to show/hide the stale-bitstream banner.
 setInterval(async function _wukongPoll() {
+    if (window.IDEBridge && !window.IDEBridge.isEnabled()) return;
     try {
     const _pollWasConnected = _wukongIsConnected();
     try {
@@ -21679,6 +21683,24 @@ setInterval(async function _wukongPoll() {
         } catch (_) {}
     }
 }, 500);
+
+window.addEventListener('ide-bridge-change', function (event) {
+    if (!event.detail.enabled) {
+        // Local disconnect is not a hardware STOP and must not claim one.
+        _wukongWasConnected = false;
+        _wukongBridgeSeen = false;
+        _wukongLastTraceTs = 0;
+        _wukongClearHardwareRegisters();
+        window.TargetState.observeDevice({connected: false});
+        window._threadHardwareStatus = null;
+        document.getElementById('wukong-bridge-alert-toast')?.remove();
+        const strip = document.getElementById('wukong-health-strip');
+        if (strip) strip.textContent = 'Bridge Off in this IDE. Board state is not monitored.';
+    }
+    _wukongUpdateBtn();
+    updateThreadIdentityStrip();
+    if (event.detail.enabled) _wukongRefreshHealthStrip();
+});
 
 // Fault-code table — must stay in sync with hardware.hw_types.FaultType and
 // hardware/wukong_bridge.py _FAULT_NAMES (which is the canonical JS-side source).
