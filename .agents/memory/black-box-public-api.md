@@ -5,6 +5,18 @@ description: User-directed Church Machine encapsulation boundary for public API 
 
 The user requests: “Simplify the API to represent a black box and hide the details in the tradition of the Church Machine.”
 
+Names must follow the Church Architecture's functional, implementation-hiding
+spirit: name what an abstraction provides, not its internal mechanism.
+
+**Why:** The user explicitly stated this architectural rule after rejecting
+the unsolicited Free64/128/256 to Allocate64/128/256 rename.
+
+**How to apply:** Preserve agreed functional vocabulary across abstractions,
+methods and variables. Do not leak queue algorithms, storage placement or
+Thread scheduling into public names/contracts. Keep necessary caller-visible
+semantics explicit, but describe implementation separately; functional naming
+does not imply pure/stateless execution or authorize broad renaming.
+
 **Why:** The interface should explain what a caller can invoke, supply and receive,
 not implementation language, code offsets, allocation or dependency capabilities.
 Repeated dependency permissions and metadata must not be presented as the public

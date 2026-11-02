@@ -11,7 +11,14 @@ not create descriptors or convert data words into capabilities.
 ## Four public methods
 
 The four methods are Free64, Free128, Free256 and Release. Preserve the
-Free# naming: these methods obtain prepared objects from the matching free queue.
+Free# naming: each provides an RW object of the stated size. Release relinquishes
+an issued object to the service.
+
+Names follow the Church Architecture's functional abstraction boundary:
+describe the service, not how it is implemented. Queue representation,
+C-list placement and future refill scheduling are private design details,
+not part of the public method names. Changing those mechanisms must not
+require callers to change their vocabulary or calling contract.
 
 | Method | Method index | Inputs | Success |
 | --- | ---: | --- | --- |
