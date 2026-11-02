@@ -5,6 +5,17 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+MintM(Ctype, Permissions, Slot) -> GT extends the regulator proposal to four
+methods. The user requires fixing Phase I M-bit limitations to support it.
+
+**Why:** Golden Token construction belongs in the trusted mechanism, rather
+than being omitted because of current implementation limitations.
+
+**How to apply:** Follow appendix A.7; distinguish construction from allocation
+and generation mutation. Resolve type-specific fields and exact M changes
+before implementation. Earlier three-method minimal-set statements are
+superseded; all actions still require Passcode-associated Home IDE audit.
+
 Every SecurityRegulator action must be logged in detail against the Passcode
 and sent to the Home IDE.
 

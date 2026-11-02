@@ -1619,9 +1619,10 @@ conformance evidence, nor authorization to synthesize or program hardware.
 ## Review appendix: SecurityRegulator methods
 
 **Status: proposed method definitions for review, 2026-11-02.**
-This appendix is not an approved ISA amendment. It defines three proposed
+This appendix is not an approved ISA amendment. It defines four proposed
 SecurityRegulator methods over existing machine operations: **LOADM, SAVEM
-and SWITCHM**. These names introduce neither opcodes nor assembler mnemonics.
+and SWITCHM**, plus **MintM** for Golden Token construction. These names
+introduce neither opcodes nor assembler mnemonics.
 Where M behavior is unresolved, the review item is explicit; current simulator
 behavior does not supply a normative answer.
 
@@ -1647,6 +1648,7 @@ saved artifact or binding already exists.
 | LOADM | `LOADM(sourceGT, homeIndex) -> valueGT` | Returns the loaded GT, possibly NULL |
 | SAVEM | `SAVEM(destinationGT, homeIndex, valueGT) -> void` | Returns after the defined Golden Token Save |
 | SWITCHM | `SWITCHM(sourceCListGT, rowIndex) -> context transfer` | Enters the destination Namespace's fixed entry Thread; no ordinary immediate return |
+| MintM | `MintM(Ctype, Permissions, Slot) -> GT` | Returns a newly constructed Golden Token under the reviewed M mechanism |
 
 Only M effects explicitly adopted for the underlying instruction may differ
 from ordinary execution. All other instruction checks and defined fault
@@ -1657,14 +1659,14 @@ generation repair, or general rollback after observable writes.
 initialization is a SAVEM use, not a fourth method. Watchdog interval setting
 is ordinary RW MMIO access, not inherently an M operation. A general SetM,
 WriteAnyRegister, allocator or policy-check method is not part of this API.
-These three methods are the proposed minimal set; exhaustive coverage still
+These four methods are the proposed set; exhaustive coverage still
 requires an audit of every architecturally defined M use.
 
 #### Common audit requirement — Passcode and Home IDE
 
 **User-required behavior:** Every SecurityRegulator action is logged in detail
 against the **Passcode** and sent to the **Home IDE**. This applies to LOADM,
-SAVEM and SWITCHM, including attempted actions that fault or are rejected,
+SAVEM, SWITCHM and MintM, including attempted actions that fault or are rejected,
 not only successful completions. Audit is a mechanical accountability
 requirement, not a new caller-purpose policy decision.
 
@@ -1876,10 +1878,71 @@ Expected outcomes must be specified before tests are treated as evidence.
 This appendix supplies no passed tests or hardware acceptance claim.
 The [operation review](../security-regulator-operation-review.md) retains
 the supporting observations and earlier hypotheses; this appendix is the
-current three-method proposal for review.
+current four-method proposal for review.
 
 The supporting [Mint and FreeHandler authority review](../security-regulator-operation-review.md#mint-and-freehandler-authority-review)
 distinguishes the raw M-control GT, regulator invocation GT, register M state
 and Passcode audit identity, including current source gaps and provisioning
 questions. It is review evidence, not an implementation claim.
+
+### A.7 MintM — Golden Token construction
+
+**User-directed extension:** Phase I M-bit limitations that prevent this
+operation are to be corrected, rather than preserved as architectural
+restrictions or worked around with ordinary writable scratch storage.
+This records the required direction; the exact ISA delta and implementation
+are not established or qualified by this appendix.
+
+```text
+MintM(Ctype, Permissions, Slot) -> GT
+```
+
+**Function:** construct and return the Golden Token specified by these
+arguments using the trusted M mechanism. This is distinct from LOADM, which
+retrieves an existing GT, and SAVEM, which saves a supplied GT.
+
+| Argument | Meaning for review |
+|---|---|
+| Ctype | Requested capability type/form; enumerate its exact legal values and bit mapping before implementation |
+| Permissions | Requested permission fields; define the applicable domain, B handling and legal combinations explicitly |
+| Slot | Requested slot; specify the Namespace context and supported type-specific interpretation |
+| Result GT | Exact constructed Golden Token, returned as capability authority rather than an integer-only result |
+
+SecurityRegulator applies the defined construction rules, not application
+allocation policy. Mint remains responsible for its service's allocation,
+slot lifecycle and publication. Constructing a GT does not itself allocate
+storage, initialize an object, activate a Thread or change a generation.
+FreeHandler continues to distribute its prepared objects; adding MintM does
+not silently grant it unrestricted construction authority.
+
+**Fields not present in the signature:** resolve how generation and any
+type-dependent identity fields are obtained. Do not assume all Ctype values
+use an Inform slot/generation interpretation, silently refresh a stale GT,
+or add a version argument without review. Reading an established generation
+for an explicitly requested new construction is distinct from hardware
+changing that generation; the precise rule remains to be specified.
+
+**Phase I mechanism review:** identify how construction enters a CR under M,
+what ordinary non-M behavior remains prohibited, and which instruction/register
+paths require correction. Mint's current DATA path writes a token word into
+private State scratch and LOADs it through MintScratch L; this is implementation
+evidence, not the desired MintM contract. Do not invent a new opcode or use a
+global simulator privilege flag to make a demonstration pass.
+
+**Audit:** record MintM against the Passcode and send the detailed action to
+the Home IDE. Include Ctype, requested permissions, Slot/Namespace context,
+resolved identity fields, resulting GT identity, relevant M state and outcome.
+The common audit secret-handling and delivery requirements apply.
+
+**Review closure:** legal types/permissions, slot bounds and empty-slot behavior,
+generation/identity source, result register and clobbers, M setup/consumption,
+fault/write boundary, nested-call Passcode attribution and safe result return.
+No concrete register ABI or new numeric fault codes are selected here.
+
+**Acceptance cases:** verify exact returned bits for each supported Ctype and
+permission combination; invalid inputs; nonzero generations where applicable;
+Namespace selection; M absent/present; no unintended descriptor or memory
+mutation; return preservation; and complete audit coverage of successful and
+failed construction. Use the same resolved oracle for simulator and RTL before
+claiming physical implementation.
 
