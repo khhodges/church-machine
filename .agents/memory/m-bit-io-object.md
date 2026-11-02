@@ -3,6 +3,24 @@ name: M-bit I/O object
 description: Canonical representation and custody rule for CR M state.
 ---
 
+## Current mechanism-versus-policy clarification
+
+The user states: “SecurityRegulator as a pure digital mechanism with no policy
+control, like GTs the M bit says the owner is trusted.”
+
+**Why:** Earlier proposals incorrectly made SecurityRegulator adjudicate
+caller purpose and per-target policy rather than implement the machine
+mechanism represented by held authority.
+
+**How to apply:** Describe deterministic register/instruction semantics and
+their mechanical checks, not an added policy engine or Thread-specific
+approval service. Trust assignment belongs to the authority-granting design,
+not a new decision by the mechanism on each operation. Earlier Passkey
+discussion below is historical context, not permission to invent extra
+per-operation policy checks. This clarification does not by itself specify
+which checks M bypasses, change the GT format, or authorize code/hardware
+changes; derive those details from the approved ISA and explicit decisions.
+
 **Current review authority:** M belongs only to SecurityRegulator, trusted as
 part of the TSB. See [hardwired recovery and security](hardwired-recovery-security-authority.md).
 The historical interface and watchdog discussion below does not authorize
