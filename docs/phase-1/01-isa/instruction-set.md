@@ -1645,7 +1645,7 @@ saved artifact or binding already exists.
 | Method | Functional signature | Successful completion |
 |---|---|---|
 | LOADM | `LOADM(sourceGT, homeIndex) -> valueGT` | Returns the loaded GT, possibly NULL |
-| SAVEM | `SAVEM(destinationGT, homeIndex, valueGT) -> void` | Returns after the defined capability write |
+| SAVEM | `SAVEM(destinationGT, homeIndex, valueGT) -> void` | Returns after the defined Golden Token Save |
 | SWITCHM | `SWITCHM(sourceCListGT, rowIndex) -> context transfer` | Enters the destination Namespace's fixed entry Thread; no ordinary immediate return |
 
 Only M effects explicitly adopted for the underlying instruction may differ
@@ -1696,7 +1696,7 @@ how the returned GT survives CALL/RETURN and its preservation mask. The CR6
 execution-context exception must not be generalized to all operands. The
 functional return above does not authorize arbitrary isolated-register reads.
 
-### A.3 SAVEM — M-assisted capability save
+### A.3 SAVEM — M-assisted Golden Token Save
 
 **Function:** store one supplied GT into the selected destination capability
 home using the defined M-assisted SAVE semantics.
