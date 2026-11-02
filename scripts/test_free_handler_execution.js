@@ -40,7 +40,7 @@ function fixture() {
     const objectGTs = r.setup.objects.map(o => gt(o.slot, o.rights.join('')));
     const caps = [gt(20, 'E'), gt(24, 'L'), gt(24, 'R')];
     const destinations = {'ide.FreeHandlerBlocks': 24, 'ide.B1.Inventory': 25,
-        'ide.B1.State': 21, 'ide.AmoebaStartup': 22,
+        'ide.B1.State': 21, 'ide.FreeThreadStartup': 22,
         ...Object.fromEntries(r.setup.objects.map(o => [o.name, o.slot]))};
     const bound = bindPreparedBlock(r, (name, rights) => {
         assert.notEqual(name, 'ide.B1.ThreadSetup', 'alias resolves canonical Thread, not a ninth object');

@@ -7,11 +7,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const r = prepare();
+assert.equal(r.amoebaApi.name, 'ide.FreeThreadStartup');
+assert.equal(r.amoebaApi.symbolic_binding.owner, 'ide.FreeThreadStartup');
+assert.deepEqual(r.amoebaApi.symbolic_binding.dependencies.map(d => d.name),
+    ['SELF', 'Boot.Thread']);
+assert(r.setup.thread.relocations.every(rel => rel.name === 'ide.FreeThreadStartup'));
 const {bindPreparedBlock} = require('./free_handler_bindings');
 const Simulator = require('../simulator/simulator');
 const tokenFactory = new Simulator();
 const slots = {'ide.B1.Inventory': 25, 'ide.B1.State': 21,
-    'ide.FreeHandlerBlocks': 24, 'ide.AmoebaStartup': 22,
+    'ide.FreeHandlerBlocks': 24, 'ide.FreeThreadStartup': 22,
     ...Object.fromEntries(r.setup.objects.map(o => [o.name, o.slot]))};
 const trusted = (name, rights) => {
     assert(name in slots, `unrecognized canonical target ${name}`);

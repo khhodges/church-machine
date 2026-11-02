@@ -145,3 +145,14 @@ depend on a runtime semantic change outside this work.
 
 **How to apply:** Register entries and count together in offline preparation;
 missing entries within the registered count are corruption, not exhaustion.
+
+Use `ide.FreeThreadStartup` for the generic FreeHandler startup, shared by all
+blocks. Do not replace or extend the existing boot/test `ide.AmoebaStartup`.
+
+**Why:** The saved AmoebaStartup runs CapabilityTest and Alice/Mallory entries,
+not the application in CR1. The user approved the separate FreeThreadStartup
+name after reviewing this identity conflict.
+
+**How to apply:** Bind all new Thread startup relocations to the exact
+FreeThreadStartup artifact; preserve its Boot.Thread completion destination
+and leave the existing boot/test abstraction and saved artifacts unchanged.

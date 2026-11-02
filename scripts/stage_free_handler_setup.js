@@ -28,7 +28,7 @@ async function main() {
         {slot: 23, name: 'ide.FreeHandlerBlocks', role: 'directory', words: 128},
         {slot: 24, name: 'ide.B1.Inventory', role: 'inventory', words: 64},
         {slot: 25, name: 'ide.B1.State', role: 'state', words: 64},
-        {slot: 26, name: 'ide.AmoebaStartup', role: 'exact-template-startup-dependency'},
+        {slot: 26, name: 'ide.FreeThreadStartup', role: 'exact-template-startup-dependency'},
         ...prepared.setup.objects.map(o => ({slot: o.slot, name: o.name, role: o.kind, words: o.words})),
     ];
     for (const item of placements)
@@ -46,7 +46,7 @@ async function main() {
         blockers: [
             'Builder copy/save requires its normal review acknowledgement; no approval is bypassed.',
             'Directory, Inventory and initialized data bodies need supported design serialization and binding.',
-            'Existing ide.AmoebaStartup is already present; review exact template dependency identity before assigning another same-name row.',
+            'ide.FreeThreadStartup must be saved and bound as its own exact dependency; existing ide.AmoebaStartup remains unchanged.',
         ],
         installationAllowed: false, activationAllowed: false, hardwareProgrammingAllowed: false,
     };

@@ -53,7 +53,7 @@ The generated directory contains:
 - `inventory-UNBOUND-le.bin`: the block's private 11-entry capability list.
 - `directory-UNBOUND-le.bin`: initial single-block directory template.
 - `thread-template-UNBOUND-le.bin`: 512-word fresh Thread skeleton.
-- `AmoebaStartup-UNBOUND.lump` and API: exact compiled startup dependency.
+- `FreeThreadStartup-UNBOUND.lump` and API: exact compiled startup dependency.
 - `setup.json`: exact object locations, required bindings, hashes and scope.
 
 These are offline build outputs, not an installed Namespace image.
@@ -109,7 +109,9 @@ storage are separate and require nonoverlapping placement.
 The Thread uses the shared layout: 32 stack words, twelve tail capability
 homes, canonical poison root and initial Amoeba Start continuation. Three
 symbolic relocations in setup.json must receive the same trusted Amoeba E GT.
-The supplied Amoeba artifact also needs its Boot.Thread supervisor binding.
+The supplied `ide.FreeThreadStartup` artifact also needs its Boot.Thread
+supervisor binding. It is shared by all FreeHandler blocks and is distinct from
+the existing boot/test `ide.AmoebaStartup`, which is not replaced.
 Until these are resolved, the template is **not runnable**. Its saved CR1
 stays NULL until FreeThread supplies the caller's application GT.
 

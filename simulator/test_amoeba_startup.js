@@ -14,7 +14,9 @@ function compile(source) {
     const image = buildLump(result);
     return {image, code:image.words.slice(1, 1 + image.cw)};
 }
-const amoeba = compile(fs.readFileSync(__dirname + '/cloomc/amoeba_startup.cloomc', 'utf8'));
+const startupFile = process.argv.includes('--free-thread')
+    ? 'free_thread_startup.cloomc' : 'amoeba_startup.cloomc';
+const amoeba = compile(fs.readFileSync(__dirname + '/cloomc/' + startupFile, 'utf8'));
 const application = compile(`abstraction test.StartupApplication {
     capabilities { SELF E }
     method Run {

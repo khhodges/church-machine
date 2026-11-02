@@ -1,0 +1,16 @@
+; Shared startup for all FreeHandler blocks; not the boot/test AmoebaStartup.
+; Offline priming supplies CR0 and the protected continuation.
+; FreeThread(application) supplies the application's E-GT in saved CR1.
+; Application entry is its first public method (selector #0).
+abstraction ide.FreeThreadStartup {
+capabilities { SELF E, Boot.Thread }
+method Start {
+    IADD DR1, DR0, #0
+    CALL CR1, #0
+    ; CALL/RETURN does not preserve scratch CR2; reload supervisor authority.
+    LOAD CR2, CR6, #1
+    CHANGE CR2
+    ; Resuming a completed startup must not restart the application.
+    HALT
+}
+}

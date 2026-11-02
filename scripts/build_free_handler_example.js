@@ -67,7 +67,7 @@ function prepare({baseWord = 7168, firstSlot = 32, blockName = 'B1'} = {}) {
     ];
     // Compile the actual startup implementation, keeping its public dispatch
     // table. No copied running Thread, live catalogue choice or fabricated GT.
-    const amoebaSource = fs.readFileSync(path.join(ROOT, 'simulator/cloomc/amoeba_startup.cloomc'), 'utf8');
+    const amoebaSource = fs.readFileSync(path.join(ROOT, 'simulator/cloomc/free_thread_startup.cloomc'), 'utf8');
     const amoebaCompiled = new Compiler().compile(amoebaSource, []);
     if (amoebaCompiled.errors.length || amoebaCompiled.warnings.length)
         throw Error(JSON.stringify({errors: amoebaCompiled.errors, warnings: amoebaCompiled.warnings}));
@@ -86,7 +86,7 @@ function prepare({baseWord = 7168, firstSlot = 32, blockName = 'B1'} = {}) {
     // These three cells must receive the SAME trusted, destination-local E GT.
     // Keep them NULL in the portable output; setup records the exact source.
     const threadRelocations = [root + 1, sto + 1, layout.capsStart].map(wordOffset => ({
-        wordOffset, name: 'ide.AmoebaStartup', rights: ['E'],
+        wordOffset, name: 'ide.FreeThreadStartup', rights: ['E'],
         binarySha256: sha(wordsToBytes(amoebaWords)),
     }));
     const objectWords = Array(1536).fill(0);
@@ -127,7 +127,7 @@ function prepare({baseWord = 7168, firstSlot = 32, blockName = 'B1'} = {}) {
                 aliasOf: `${prefix}.FreeThread`, clistRow: 10, rights: ['S'],
                 slot: firstSlot + 7, private: true},
             activation: 'not performed',
-            amoeba: {source: 'simulator/cloomc/amoeba_startup.cloomc',
+            amoeba: {name: 'ide.FreeThreadStartup', source: 'simulator/cloomc/free_thread_startup.cloomc',
                 sourceSha256: sha(amoebaSource), binarySha256: sha(wordsToBytes(amoebaWords)),
                 startPC: amoebaPacked.words[1] - 1,
                 requiredBinding: 'Boot.Thread supervisor for Amoeba yield'},
@@ -160,7 +160,7 @@ function main(argv) {
     }
     const result = prepare(options);
     const directory = path.join(ROOT, 'generated-artifacts',
-        `free-handler-${result.setup.blockName}-${result.setup.baseWord}-${result.setup.firstSlot}-${sha(result.source).slice(0, 12)}`);
+        `free-handler-${result.setup.blockName}-${result.setup.baseWord}-${result.setup.firstSlot}-${sha(result.source + result.setup.thread.amoeba.sourceSha256).slice(0, 12)}`);
     fs.mkdirSync(directory, {recursive: true});
     fs.writeFileSync(path.join(directory, 'FreeHandler-UNBOUND.lump'), result.binary);
     fs.writeFileSync(path.join(directory, 'FreeHandler.api.json'), JSON.stringify(result.api, null, 2) + '\n');
@@ -170,8 +170,8 @@ function main(argv) {
     fs.writeFileSync(path.join(directory, 'inventory-UNBOUND-le.bin'), wordsToBytes(result.inventory, true));
     fs.writeFileSync(path.join(directory, 'directory-UNBOUND-le.bin'), wordsToBytes(result.directory, true));
     fs.writeFileSync(path.join(directory, 'thread-template-UNBOUND-le.bin'), wordsToBytes(result.thread, true));
-    fs.writeFileSync(path.join(directory, 'AmoebaStartup-UNBOUND.lump'), wordsToBytes(result.amoebaWords));
-    fs.writeFileSync(path.join(directory, 'AmoebaStartup.api.json'), JSON.stringify(result.amoebaApi, null, 2) + '\n');
+    fs.writeFileSync(path.join(directory, 'FreeThreadStartup-UNBOUND.lump'), wordsToBytes(result.amoebaWords));
+    fs.writeFileSync(path.join(directory, 'FreeThreadStartup.api.json'), JSON.stringify(result.amoebaApi, null, 2) + '\n');
     fs.writeFileSync(path.join(directory, 'setup.json'), JSON.stringify(result.setup, null, 2) + '\n');
     console.log(JSON.stringify({
         directory: path.relative(ROOT, directory), methods: Object.keys(result.api.methods),
