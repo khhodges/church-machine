@@ -1634,7 +1634,11 @@ Held authority expresses trust. The methods do not decide whether a caller's
 business purpose, Block ownership or allocation policy deserves an operation.
 Grant distribution is outside their mechanical function.
 
-M is register state, not a GT permission. A method must not silently rewrite
+M is an immovable hardware bit setting belonging to its register, not a GT
+permission or a field transported with a GT. Loading, saving, copying or
+returning a GT does not carry the source register's M setting with it.
+Any destination M change requires its defined hardware-state mechanism,
+not token movement. A method must not silently rewrite
 a GT's permission bits, identity or generation to emulate M. An M effect is
 instruction- and operand-specific, not a global "skip checks" mode.
 
@@ -1735,8 +1739,14 @@ defined M-assisted LOAD semantics.
 the source L requirement, not identity, generation, integrity, bounds or
 protected-register checks. An authorized load of stored NULL returns NULL;
 a NULL source provides no authority. The loaded GT retains its exact
-permission bits. This approval does not settle M lifetime or the return ABI,
-and is not an implementation or hardware-conformance claim.
+permission bits. M lifetime follows A.1; this is not an implementation or
+hardware-conformance claim.
+
+**Approved result rule:** return the exact loaded GT in CR1 with CR1.M clear.
+M is not attached to that result and cannot be transferred with it. Normal
+RETURN separately reconstructs the caller's CR6 context and rearms CR6.M.
+The instruction sequence and preservation mask still require implementation
+verification; Boot's defined behavior remains unchanged.
 
 ```text
 LOADM(sourceGT, homeIndex) -> valueGT

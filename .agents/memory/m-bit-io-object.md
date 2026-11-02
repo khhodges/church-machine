@@ -5,6 +5,16 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+M is an immovable hardware register bit setting, never a transferable GT field.
+LOADM returns the exact GT in CR1 with CR1.M clear; CR6.M is independently
+established by the normal execution-context mechanism.
+
+**Why:** The user confirmed the result rule and emphasized that M belongs
+to hardware registers, not tokens.
+
+**How to apply:** Never describe copying or returning a GT as transporting M.
+Distinguish token preservation from hardware M-state transitions.
+
 Review regulator methods from the top, one decision at a time.
 LOADM's source-register M may replace source L permission, but does not
 bypass identity, generation, integrity, bounds or protected-register checks.
