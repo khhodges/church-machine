@@ -189,6 +189,18 @@ names, not Allocate64/128/256; the user explicitly challenged that unsolicited
 rename. These are not changes to saved Mint.CREATE. Release quarantines returns until deferred refill: it is not
 immediate revocation. Design permission is not hardware-execution approval.
 
+Deliver the FreeHandler example as actual CLOOMC++ source compiled by the
+existing toolchain, not a new software simulator or IDE print/preview feature.
+
+**Why:** The user explicitly corrected the direction: “we dont need a software
+simulator for this abstraction we need a working CLOOMC++ example.”
+
+**How to apply:** Keep behavior in CLOOMC++ method bodies and limit host scripts
+to compilation/provisioning checks. Do not equate successful compilation with
+runtime qualification or use this request as permission for board commands.
+For this bounded example, keep typed native method bodies self-contained
+rather than expanding compiler grammar to share helpers.
+
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
 The earlier eight-word example is not an accepted allocation contract.
 

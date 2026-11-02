@@ -3,6 +3,11 @@
 Status: design only. No compiled LUMP, runtime change, image installation,
 Namespace binding, or hardware operation is included.
 
+Subsequent implementation: `simulator/examples/free_handler.cloomc` now contains
+the four typed native method bodies. See the adjacent `free_handler.md` for the
+offline compiler/build command and exact boundaries. This document remains the
+design reference, not evidence of runtime acceptance. No image was installed.
+
 The approved inventory is eight Inform Data RW objects in one aligned
 1024-word formation. FreeHandler is one resident abstraction with four public
 methods and private variables. It distributes prepared capabilities; it does

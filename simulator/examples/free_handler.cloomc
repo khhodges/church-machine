@@ -1,0 +1,320 @@
+; CLOOMC++: one resident FreeHandler, finite fresh inventory, single caller.
+; Free64/128/256 return Inform RW in CR1. Release takes its target in CR2.
+; DR1: 0 OK, 1 empty, 2 foreign target, 3 not issued.
+; The passkey parameter is present but ignored for this Phase 1 profile.
+; Provisioning: build_free_handler_example.js --base-word X --first-slot Y.
+; No refill, descriptor writes, scratch conversion, or hardware activation.
+;
+; Private State variables (64 words):
+;   0..2 Free64 head/tail/count; 3..5 Free128; 6..8 Free256; 9..11 Returned.
+;   12..15 Free64 indices; 16..17 Free128; 18..19 Free256; 20..27 Returned.
+;   28..35 object state: FREE=0, ISSUED=1, RETURNED=2, RETIRED=3.
+;   36..43 object version: zero in this explicitly fresh example.
+;   44..63 reserved zero.
+; GT words are in CR6's C-list, never in the writable State allocation.
+; State and object capabilities must never be given to untrusted queue writers.
+; Do not reseed State in a continuing universe: previously issued GTs may exist.
+
+abstraction ide.FreeHandler {
+passkey required;
+capabilities {
+    SELF E,
+    ide.FreeHandlerState RW,
+    ide.FreeObject0 RW,
+    ide.FreeObject1 RW,
+    ide.FreeObject2 RW,
+    ide.FreeObject3 RW,
+    ide.FreeObject4 RW,
+    ide.FreeObject5 RW,
+    ide.FreeObject6 RW,
+    ide.FreeObject7 RW
+}
+
+method Free64() -> Inform[RW] {
+    LOAD CR1, NULL
+    LOAD CR7, CR6, #1
+    DREAD DR8, CR7, #0, DR0
+    DREAD DR9, CR7, #2, DR0
+    DREAD DR11, CR7, #1, DR0
+    MCMP DR11, #0
+    BRANCHNE bad
+    MCMP DR8, #4
+    BRANCHHS bad
+    MCMP DR9, #4
+    BRANCHHI bad
+    MCMP DR9, #0
+    BRANCHEQ empty
+    IADD DR11, DR8, DR9
+    MCMP DR11, #4
+    BRANCHNE bad
+    DREAD DR10, CR7, #12, DR8
+    MCMP DR10, DR8
+    BRANCHNE bad
+    DREAD DR11, CR7, #28, DR10
+    MCMP DR11, #0
+    BRANCHNE bad
+    DREAD DR11, CR7, #36, DR10
+    MCMP DR11, #0
+    BRANCHNE bad
+    MCMP DR10, #0
+    BRANCHEQ object0
+    MCMP DR10, #1
+    BRANCHEQ object1
+    MCMP DR10, #2
+    BRANCHEQ object2
+    LOAD CR1, CR6, #5
+    BRANCH issue
+object0:
+    LOAD CR1, CR6, #2
+    BRANCH issue
+object1:
+    LOAD CR1, CR6, #3
+    BRANCH issue
+object2:
+    LOAD CR1, CR6, #4
+issue:
+    TPERM CR1, NULL
+    BRANCHEQ bad
+    IADD DR11, DR0, #1
+    DWRITE DR11, CR7, #28, DR10
+    IADD DR8, DR8, #1
+    MCMP DR8, #4
+    BRANCHLO advance
+    IADD DR8, DR0, #0
+advance:
+    DWRITE DR8, CR7, #0, DR0
+    ISUB DR9, DR9, #1
+    DWRITE DR9, CR7, #2, DR0
+    IADD DR1, DR0, #0
+    BRANCH done
+empty:
+    MCMP DR8, #0
+    BRANCHNE bad
+    IADD DR1, DR0, #1
+done:
+    LOAD CR2, NULL
+    LOAD CR7, NULL
+    LOAD CR8, NULL
+    RETURNAL #2
+bad:
+    HARDFAULT "Free64: inconsistent private state or missing prepared capability"
+}
+
+method Free128() -> Inform[RW] {
+    LOAD CR1, NULL
+    LOAD CR7, CR6, #1
+    DREAD DR8, CR7, #3, DR0
+    DREAD DR9, CR7, #5, DR0
+    DREAD DR11, CR7, #4, DR0
+    MCMP DR11, #0
+    BRANCHNE bad
+    MCMP DR8, #2
+    BRANCHHS bad
+    MCMP DR9, #2
+    BRANCHHI bad
+    MCMP DR9, #0
+    BRANCHEQ empty
+    IADD DR11, DR8, DR9
+    MCMP DR11, #2
+    BRANCHNE bad
+    DREAD DR10, CR7, #16, DR8
+    IADD DR11, DR8, #4
+    MCMP DR10, DR11
+    BRANCHNE bad
+    DREAD DR11, CR7, #28, DR10
+    MCMP DR11, #0
+    BRANCHNE bad
+    DREAD DR11, CR7, #36, DR10
+    MCMP DR11, #0
+    BRANCHNE bad
+    MCMP DR10, #4
+    BRANCHEQ object4
+    LOAD CR1, CR6, #7
+    BRANCH issue
+object4:
+    LOAD CR1, CR6, #6
+issue:
+    TPERM CR1, NULL
+    BRANCHEQ bad
+    IADD DR11, DR0, #1
+    DWRITE DR11, CR7, #28, DR10
+    IADD DR8, DR8, #1
+    MCMP DR8, #2
+    BRANCHLO advance
+    IADD DR8, DR0, #0
+advance:
+    DWRITE DR8, CR7, #3, DR0
+    ISUB DR9, DR9, #1
+    DWRITE DR9, CR7, #5, DR0
+    IADD DR1, DR0, #0
+    BRANCH done
+empty:
+    MCMP DR8, #0
+    BRANCHNE bad
+    IADD DR1, DR0, #1
+done:
+    LOAD CR2, NULL
+    LOAD CR7, NULL
+    LOAD CR8, NULL
+    RETURNAL #2
+bad:
+    HARDFAULT "Free128: inconsistent private state or missing prepared capability"
+}
+
+method Free256() -> Inform[RW] {
+    LOAD CR1, NULL
+    LOAD CR7, CR6, #1
+    DREAD DR8, CR7, #6, DR0
+    DREAD DR9, CR7, #8, DR0
+    DREAD DR11, CR7, #7, DR0
+    MCMP DR11, #0
+    BRANCHNE bad
+    MCMP DR8, #2
+    BRANCHHS bad
+    MCMP DR9, #2
+    BRANCHHI bad
+    MCMP DR9, #0
+    BRANCHEQ empty
+    IADD DR11, DR8, DR9
+    MCMP DR11, #2
+    BRANCHNE bad
+    DREAD DR10, CR7, #18, DR8
+    IADD DR11, DR8, #6
+    MCMP DR10, DR11
+    BRANCHNE bad
+    DREAD DR11, CR7, #28, DR10
+    MCMP DR11, #0
+    BRANCHNE bad
+    DREAD DR11, CR7, #36, DR10
+    MCMP DR11, #0
+    BRANCHNE bad
+    MCMP DR10, #6
+    BRANCHEQ object6
+    LOAD CR1, CR6, #9
+    BRANCH issue
+object6:
+    LOAD CR1, CR6, #8
+issue:
+    TPERM CR1, NULL
+    BRANCHEQ bad
+    IADD DR11, DR0, #1
+    DWRITE DR11, CR7, #28, DR10
+    IADD DR8, DR8, #1
+    MCMP DR8, #2
+    BRANCHLO advance
+    IADD DR8, DR0, #0
+advance:
+    DWRITE DR8, CR7, #6, DR0
+    ISUB DR9, DR9, #1
+    DWRITE DR9, CR7, #8, DR0
+    IADD DR1, DR0, #0
+    BRANCH done
+empty:
+    MCMP DR8, #0
+    BRANCHNE bad
+    IADD DR1, DR0, #1
+done:
+    LOAD CR2, NULL
+    LOAD CR7, NULL
+    LOAD CR8, NULL
+    RETURNAL #2
+bad:
+    HARDFAULT "Free256: inconsistent private state or missing prepared capability"
+}
+
+method Release(target: Inform[RW]) -> Void {
+    LOAD CR1, NULL
+    LOAD CR7, CR6, #1
+    TPERM CR2, NULL
+    BRANCHEQ fh_foreign
+    ; Match actual capabilities, not an integer supplied by the caller.
+    LOAD CR8, CR6, #2
+    IADD DR10, DR0, #0
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    LOAD CR8, CR6, #3
+    IADD DR10, DR0, #1
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    LOAD CR8, CR6, #4
+    IADD DR10, DR0, #2
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    LOAD CR8, CR6, #5
+    IADD DR10, DR0, #3
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    LOAD CR8, CR6, #6
+    IADD DR10, DR0, #4
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    LOAD CR8, CR6, #7
+    IADD DR10, DR0, #5
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    LOAD CR8, CR6, #8
+    IADD DR10, DR0, #6
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    LOAD CR8, CR6, #9
+    IADD DR10, DR0, #7
+    TPERM CR2, EXACT, CR8
+    BRANCHEQ fh_release
+    BRANCH fh_foreign
+
+fh_release:
+    DREAD DR11, CR7, #36, DR10
+    MCMP DR11, #0
+    BRANCHNE fh_corrupt
+    DREAD DR11, CR7, #28, DR10
+    MCMP DR11, #3
+    BRANCHHI fh_corrupt
+    MCMP DR11, #1
+    BRANCHNE fh_not_issued
+    DREAD DR8, CR7, #9, DR0
+    DREAD DR12, CR7, #10, DR0
+    DREAD DR9, CR7, #11, DR0
+    MCMP DR8, #8
+    BRANCHHS fh_corrupt
+    MCMP DR12, #8
+    BRANCHHS fh_corrupt
+    MCMP DR9, #8
+    BRANCHHS fh_corrupt
+    ; Check tail == (head + count) modulo 8 before any writes.
+    IADD DR11, DR8, DR9
+    MCMP DR11, #8
+    BRANCHLO fh_release_tail
+    ISUB DR11, DR11, #8
+fh_release_tail:
+    MCMP DR11, DR12
+    BRANCHNE fh_corrupt
+    ; Quarantine first. Interrupted mutation is fail-stop, not a retry.
+    IADD DR11, DR0, #2
+    DWRITE DR11, CR7, #28, DR10
+    DWRITE DR10, CR7, #20, DR12
+    IADD DR12, DR12, #1
+    MCMP DR12, #8
+    BRANCHLO fh_release_advance
+    IADD DR12, DR0, #0
+fh_release_advance:
+    DWRITE DR12, CR7, #10, DR0
+    IADD DR9, DR9, #1
+    DWRITE DR9, CR7, #11, DR0
+    IADD DR1, DR0, #0
+    BRANCH fh_return
+
+fh_foreign:
+    IADD DR1, DR0, #2
+    BRANCH fh_return
+fh_not_issued:
+    IADD DR1, DR0, #3
+fh_return:
+    ; Only CR1 is retained by RETURN. Explicitly clear private/input grants too.
+    LOAD CR2, NULL
+    LOAD CR7, NULL
+    LOAD CR8, NULL
+    RETURNAL #2
+fh_corrupt:
+    HARDFAULT "FreeHandler: inconsistent private state or missing prepared capability"
+}
+}
