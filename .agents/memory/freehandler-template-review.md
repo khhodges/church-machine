@@ -156,3 +156,13 @@ name after reviewing this identity conflict.
 **How to apply:** Bind all new Thread startup relocations to the exact
 FreeThreadStartup artifact; preserve its Boot.Thread completion destination
 and leave the existing boot/test abstraction and saved artifacts unchanged.
+
+Long-term design direction: when lazy loading supports Threads, Threads should
+be abundant and function-driven, rather than a small fixed set of resident roles.
+
+**Why:** The user explicitly raised this intended direction during architecture
+review and paused implementation to discuss its consequences.
+
+**How to apply:** Evaluate the finite B1 allocator as a Phase 1 example, not the
+permanent Thread model. Do not infer approval of scheduling, eviction, reuse,
+or a particular per-invocation ABI from this direction alone.
