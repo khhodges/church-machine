@@ -1619,9 +1619,10 @@ conformance evidence, nor authorization to synthesize or program hardware.
 ## Review appendix: SecurityRegulator methods
 
 **Status: proposed method definitions for review, 2026-11-02.**
-This appendix is not an approved ISA amendment. It defines four proposed
+This appendix is not an approved ISA amendment. It defines six proposed
 SecurityRegulator methods over existing machine operations: **LOADM, SAVEM
-and SWITCHM**, plus **MintM** for Golden Token construction. These names
+and SWITCHM**, plus **MintM** for Golden Token construction and
+**MakeOutformM / MakeInformM** for source-GT conversion. These names
 introduce neither opcodes nor assembler mnemonics.
 Where M behavior is unresolved, the review item is explicit; current simulator
 behavior does not supply a normative answer.
@@ -1649,6 +1650,8 @@ saved artifact or binding already exists.
 | SAVEM | `SAVEM(destinationGT, homeIndex, valueGT) -> void` | Returns after the defined Golden Token Save |
 | SWITCHM | `SWITCHM(sourceCListGT, rowIndex) -> context transfer` | Enters the destination Namespace's fixed entry Thread; no ordinary immediate return |
 | MintM | `MintM(Ctype, Permissions, Slot) -> GT` | Returns a newly constructed Golden Token under the reviewed M mechanism |
+| MakeOutformM | `MakeOutformM(sourceInformGT) -> outformGT` | Converts the supplied source GT to Outform |
+| MakeInformM | `MakeInformM(sourceOutformGT) -> informGT` | Converts the supplied source GT to Inform |
 
 Only M effects explicitly adopted for the underlying instruction may differ
 from ordinary execution. All other instruction checks and defined fault
@@ -1656,17 +1659,18 @@ behavior remain applicable. No method adds silent retry, substituted targets,
 generation repair, or general rollback after observable writes.
 
 **Scope exclusions:** ordinary CHANGE needs no added M requirement. Thread
-initialization is a SAVEM use, not a fourth method. Watchdog interval setting
+initialization is a SAVEM use, not an additional method. Watchdog interval setting
 is ordinary RW MMIO access, not inherently an M operation. A general SetM,
 WriteAnyRegister, allocator or policy-check method is not part of this API.
-These four methods are the proposed set; exhaustive coverage still
+These six methods are the proposed set; exhaustive coverage still
 requires an audit of every architecturally defined M use.
 
 #### Common audit requirement — Passcode and Home IDE
 
 **User-required behavior:** Every SecurityRegulator action is logged in detail
 against the **Passcode** and sent to the **Home IDE**. This applies to LOADM,
-SAVEM, SWITCHM and MintM, including attempted actions that fault or are rejected,
+SAVEM, SWITCHM, MintM, MakeOutformM and MakeInformM, including attempted actions
+that fault or are rejected,
 not only successful completions. Audit is a mechanical accountability
 requirement, not a new caller-purpose policy decision.
 
@@ -1878,7 +1882,7 @@ Expected outcomes must be specified before tests are treated as evidence.
 This appendix supplies no passed tests or hardware acceptance claim.
 The [operation review](../security-regulator-operation-review.md) retains
 the supporting observations and earlier hypotheses; this appendix is the
-current four-method proposal for review.
+current six-method proposal for review.
 
 The supporting [Mint and FreeHandler authority review](../security-regulator-operation-review.md#mint-and-freehandler-authority-review)
 distinguishes the raw M-control GT, regulator invocation GT, register M state
@@ -1945,4 +1949,42 @@ Namespace selection; M absent/present; no unintended descriptor or memory
 mutation; return preservation; and complete audit coverage of successful and
 failed construction. Use the same resolved oracle for simulator and RTL before
 claiming physical implementation.
+
+### A.8 Inform / Outform conversion — source GT required
+
+**User-required distinction:** both conversion methods must receive a source
+GT. Unlike MintM, neither constructs authority from Ctype, Permissions and
+Slot alone.
+
+```text
+MakeOutformM(sourceInformGT) -> outformGT
+MakeInformM(sourceOutformGT) -> informGT
+
+Contrast:
+MintM(Ctype, Permissions, Slot) -> GT    // no source GT argument
+```
+
+The source GT is mandatory operation input, not an optional hint, a slot
+number, or a reconstructed current token. Validate it under the reviewed
+conversion rules and retain its identity evidence through conversion.
+Do not implement conversion as MintM of the source slot after discarding
+the source's generation or other identity information.
+
+The intended result represents the same living object in the requested
+form, with no silent permission enlargement or stale-reference refresh.
+Conversion does not by itself allocate backing storage, release local
+storage, resurrect an object or prove that a destination binding is ready.
+Mint's preservation/resolution and binding responsibilities remain distinct
+from the regulator's mechanical conversion.
+
+**Review closure:** exact source-form validation, output identity/permission
+mapping, destination Namespace and binding rules where applicable, invalid
+source/fault behavior, M lifecycle and register ABI. The source-required
+contract does not assert that changing type bits alone completes conversion.
+
+Every conversion action is logged against the Passcode and sent to the Home
+IDE with source and result GT identities and the actual outcome, under the
+common audit contract. Acceptance must include missing/NULL source, wrong
+form, stale source, valid conversion and identity-preserving round trips
+where the binding remains valid. No silent fallback to MintM is permitted.
 

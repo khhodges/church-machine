@@ -5,8 +5,17 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
-MintM(Ctype, Permissions, Slot) -> GT extends the regulator proposal to four
-methods. The user requires fixing Phase I M-bit limitations to support it.
+MintM(Ctype, Permissions, Slot) -> GT adds construction to the regulator.
+The user requires fixing Phase I M-bit limitations to support it.
+
+MakeOutformM and MakeInformM must take a source GT, unlike MintM.
+
+**Why:** The user explicitly distinguishes conversion of existing authority
+from construction from explicit fields.
+
+**How to apply:** Preserve source identity evidence; never replace conversion
+with construction from a slot alone. The current proposal has six methods;
+appendix A.8 records the source-required contract.
 
 **Why:** Golden Token construction belongs in the trusted mechanism, rather
 than being omitted because of current implementation limitations.

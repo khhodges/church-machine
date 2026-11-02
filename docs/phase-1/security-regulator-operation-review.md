@@ -5,13 +5,18 @@ interfaces, not an ISA amendment, implemented API or hardware qualification.
 
 **Current method proposal:** see the Master ISA's
 [SecurityRegulator review appendix](01-isa/instruction-set.md#review-appendix-securityregulator-methods)
-for LOADM, SAVEM, SWITCHM and MintM. The broader candidates below are investigation
+for LOADM, SAVEM, SWITCHM, MintM, MakeOutformM and MakeInformM.
+The broader candidates below are investigation
 history, not additional selected methods.
 
 **Subsequent construction decision:** `MintM(Ctype, Permissions, Slot) -> GT`
-is the fourth proposed method. The user requires correction of blocking
+adds Golden Token construction. The user requires correction of blocking
 Phase I M-bit limitations. See appendix A.7 for construction versus allocation,
 unresolved identity fields, mechanism changes and audit requirements.
+
+**Conversion distinction:** MakeOutformM and MakeInformM require the original
+source GT, unlike MintM. Appendix A.8 makes that input mandatory; conversion
+must not discard source identity evidence and reconstruct from a slot alone.
 
 **Audit requirement:** Every SecurityRegulator action is logged in detail
 against the Passcode and sent to the Home IDE, including unsuccessful actions.
