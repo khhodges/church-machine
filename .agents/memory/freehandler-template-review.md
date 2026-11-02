@@ -79,6 +79,17 @@ need nine object-grant entries.
 **How to apply:** Keep the shared Thread destination explicit in any binding
 or alias representation. A naming change must not allocate another Thread.
 
+ThreadSetup is private to the **Block instance**, used when that block's
+Thread needs setup. It targets the Thread but is not the Thread's own private
+capability.
+
+**Why:** The user corrected the distinction between who holds setup authority
+and which object the capability addresses.
+
+**How to apply:** Describe B1's private inventory as holding ThreadSetup S;
+the shared FreeHandler uses that block-specific grant when supplying saved
+CR1. Do not describe it as authority held by the issued Thread or caller.
+
 Inventory names need a block-specific dot-name component so a second block
 does not collide with the first; the user proposed ide.B1.FreeData.
 
