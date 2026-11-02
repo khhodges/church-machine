@@ -105,3 +105,13 @@ rows 1–63 NULL. This supersedes the earlier all-NULL C-list initialization.
 
 **How to apply:** Bind SELF using the actual destination identity and generation;
 do not fabricate a fixed GT or allow ordinary SAVE to overwrite row 0.
+
+Keep one FreeHandler code abstraction for all inventory blocks; do not introduce
+one handler abstraction per block.
+
+**Why:** The user rejected the per-block-instance proposal: “There should be
+only one code base abstraction.”
+
+**How to apply:** Review block-specific inventory and bookkeeping as private
+data managed by the shared abstraction. Do not equate B1/B2 naming with
+duplicated handler code or newly approved public block-selection parameters.
