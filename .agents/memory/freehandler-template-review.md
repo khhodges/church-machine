@@ -94,5 +94,14 @@ has 63 writable entries. Do not enlarge it to obtain 64 writable entries.
 **Why:** The user explicitly selected “Keep 64 total entries” after reviewing
 the protected-row consequence.
 
-**How to apply:** Retain the existing capacity and all-NULL initialization;
+**How to apply:** Retain the existing capacity;
 describe total capacity separately from writable capacity.
+
+Offline preparation must bind the C-list's row 0 to its own SELF GT and leave
+rows 1–63 NULL. This supersedes the earlier all-NULL C-list initialization.
+
+**Why:** The user proposed SELF for conformity and explicitly agreed to
+“SELF plus 63 NULL entries.”
+
+**How to apply:** Bind SELF using the actual destination identity and generation;
+do not fabricate a fixed GT or allow ordinary SAVE to overwrite row 0.
