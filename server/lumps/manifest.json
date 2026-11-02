@@ -5276,5 +5276,111 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "735221c39af7412e15cda4f288f16d8f28486c5570f4ba56a86e1abb30e513b6"
     }
+  },
+  {
+    "token": "66207f51",
+    "abstraction": "ide.FreeHandler",
+    "filename": "ide.FreeHandler.1.dd255162.lump",
+    "lump_version": 2,
+    "compiled_at": 1793627880.5986688,
+    "operation_id": "581f8a34-672a-47fa-a7fc-296d40345855",
+    "output_variants": {
+      "api": {
+        "sha256": "a6161387cb87056ebe403ac2f153e9a8d96632a50d253eaa748c2524985bb65c",
+        "bytes": 4096,
+        "file_bytes": 1028,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/58672c013592bd4d5f2e487b4f244277cb72627948e1a428bc84885ed0ab5976/api?compressed=1"
+      },
+      "compact": {
+        "sha256": "d27b82b00e77ed3f294dc528a4360c54b26d5d4579214a62b1c02395c04b3c03",
+        "bytes": 16384,
+        "file_bytes": 2254,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/58672c013592bd4d5f2e487b4f244277cb72627948e1a428bc84885ed0ab5976/compact?compressed=1"
+      },
+      "full": {
+        "sha256": "7473282327ac3ad65d1d97302840e863a82c053a2f34075b36f56e9b535807a0",
+        "bytes": 16384,
+        "file_bytes": 3439,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/58672c013592bd4d5f2e487b4f244277cb72627948e1a428bc84885ed0ab5976/full?compressed=1"
+      }
+    },
+    "variant_primary_hash": "a6161387cb87056ebe403ac2f153e9a8d96632a50d253eaa748c2524985bb65c",
+    "variant_bundle_id": "58672c013592bd4d5f2e487b4f244277cb72627948e1a428bc84885ed0ab5976",
+    "variant_compiler_record": {
+      "binary_hash": "a6161387cb87056ebe403ac2f153e9a8d96632a50d253eaa748c2524985bb65c",
+      "source_hash": "3711163e441e2505c8989511415ea25e28098e5387c67c28a6ffbe924954922e",
+      "language": "javascript",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "13d16a8083cd6ea1d2dccb34423084d69159dbe86690074db66dba484a60f100",
+        "inputs": {
+          "language": "auto",
+          "_resolved_call_api_authorities": {},
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "javascript"
+      },
+      "hardfault_sites": [
+        {
+          "offset": 75,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Free64: inconsistent private state or missing prepared capability",
+          "method": "Free64",
+          "sourceLine": 116
+        },
+        {
+          "offset": 141,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Free128: inconsistent private state or missing prepared capability",
+          "method": "Free128",
+          "sourceLine": 192
+        },
+        {
+          "offset": 203,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Free256: inconsistent private state or missing prepared capability",
+          "method": "Free256",
+          "sourceLine": 263
+        },
+        {
+          "offset": 239,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "FreeCList: inconsistent private state or missing prepared capability",
+          "method": "FreeCList",
+          "sourceLine": 305
+        },
+        {
+          "offset": 281,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "FreeThread: inconsistent private state, invalid application or missing prepared capability",
+          "method": "FreeThread",
+          "sourceLine": 356
+        },
+        {
+          "offset": 374,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "FreeHandler: inconsistent private state or missing prepared capability",
+          "method": "Release",
+          "sourceLine": 465
+        }
+      ],
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "513add3c036f79ae2ca6d12edad68c3d5d5d673c2f59a805cffc1b39b7af5f56"
+    }
   }
 ]
