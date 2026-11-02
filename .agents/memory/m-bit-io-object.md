@@ -5,6 +5,17 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+The user clarified that the watchdog is an MMIO capability with RW access to
+set the next time interval.
+
+**Why:** Watchdog control is capability-mediated device access, not inherently
+an M privilege or a policy service.
+
+**How to apply:** Treat W as authority for the defined interval-setting write
+and R as defined register readback. Do not infer active-deadline refresh,
+remaining-time readback, new units, or a combined M/watchdog word from this
+clarification; reconcile exact timing with the Master ISA.
+
 The first operation review is recorded in
 `docs/phase-1/security-regulator-operation-review.md`. It separates proposed
 APIs from Master ISA authority: ordinary CHANGE has no added M requirement,

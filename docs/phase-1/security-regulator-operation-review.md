@@ -135,6 +135,16 @@ not used to settle it.
 
 ## Corrections to earlier hypotheses
 
+**Watchdog interface clarification:** The user describes the watchdog timer
+as an MMIO capability with **RW access to set the next time interval**.
+Possession of its W authority permits the defined interval-setting write;
+R permits reading the defined register value, not an assumed remaining-time
+counter. This is ordinary capability-mediated device access, not inherently
+an M-elevated instruction or a separate policy decision by SecurityRegulator.
+A wrapper, if useful, exposes that mechanism rather than adding approval.
+“Next interval” does not by itself authorize refreshing the active deadline,
+selecting arbitrary time units/ranges, or changing the approved MMIO encoding.
+
 1. **CHANGE is not generally M-gated.** Do not introduce a new requirement.
 2. **SWITCH is not WriteAnyRegister.** It has fixed destinations and requires
    explicit source L even when source M is set.
