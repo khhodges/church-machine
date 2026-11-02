@@ -6,6 +6,16 @@ description: Independent Thread drafts must not become global boot geometry.
 Keep per-Thread design intent separate from the legacy shared boot layout.
 Do not migrate the old unassigned tuple list into every Namespace Thread.
 
+The Namespace Builder must accept the shared Thread contract's supported sizes
+per object; 256 words is a default, not a universal size restriction. Preserve
+existing sizes unless explicitly edited, including the agreed 512-word B1 Thread.
+
+**Why:** The user explicitly approved removing Builder's fixed-size restriction
+through validation, placement and initialization, not merely weakening validation.
+
+**How to apply:** Derive Thread geometry from each selected allocation. Changing
+one draft never authorizes resizing running memory or other Thread objects.
+
 **Why:** The legacy global geometry action changes multiple Threads. Individual
 design approval is a separate contract; it must not silently repurpose that action.
 

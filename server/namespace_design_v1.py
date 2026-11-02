@@ -10,6 +10,7 @@ import re
 import struct
 import tempfile
 from server.binding_cleanup import serialized
+from server.boot_image import THREAD_SUPPORTED_BODY_WORDS
 
 FORMAT = "ascending-nst-metadata-slot0-v1"
 PHASE1_FORMAT = "phase1-nst-metadata-slot0-v1"
@@ -166,8 +167,10 @@ def validate(document):
             raise ValueError("Invalid load policy")
         if kind != "lump" and row["policy"] != ("Hardware" if kind == "mmio" else "Resident"):
             raise ValueError("Architectural objects retain their residency")
-        if kind == "thread" and row.get("words") != 256:
-            raise ValueError("Thread design allocation must remain 256 words")
+        if kind == "thread" and (type(row.get("words")) is not int or
+                                 row["words"] not in THREAD_SUPPORTED_BODY_WORDS):
+            raise ValueError("Thread allocation must be one of " +
+                             ", ".join(map(str, THREAD_SUPPORTED_BODY_WORDS)) + " words")
         if "preparedThread" in row:
             binding = row["preparedThread"]
             if (kind != "thread" or slot == 2 or not isinstance(binding, dict)

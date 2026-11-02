@@ -45,7 +45,6 @@ async function main() {
         partialDesign: document, inventoryPreparation: prepared.setup,
         blockers: [
             'Builder copy/save requires its normal review acknowledgement; no approval is bypassed.',
-            'Namespace editor currently restricts authored Threads to 256 words; B1 requires 512.',
             'Directory, Inventory and initialized data bodies need supported design serialization and binding.',
             'Existing ide.AmoebaStartup is already present; review exact template dependency identity before assigning another same-name row.',
         ],

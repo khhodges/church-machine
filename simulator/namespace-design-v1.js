@@ -430,6 +430,18 @@
                 binary_hash:s.binaryHash, abstraction:row.name, namespaceSlot:slot});
     }
     let sourceRequest = 0;
+    function threadSize(slot, value) {
+        const row=state.document.rows.find(r=>r.slot===slot);
+        const words=Number(value);
+        if(!row || row.kind!=='thread' || state.saving) return;
+        if(!root.ThreadDesign.supportedBodyWords.includes(words)) {
+            root.alert('Choose a supported Thread allocation.');
+            return;
+        }
+        if(row.words===words) return;
+        row.words=words;
+        changed();
+    }
     function thread(slot) {
         const row=state.document.rows.find(r=>r.slot===slot);
         if(!row || row.kind!=='thread' || slot===2 || state.saving) return;
@@ -482,6 +494,9 @@
         } else if(row.kind==='thread') {
             content+=`<h4>Thread target</h4><p>Allocation: ${esc(row.words)} words.
                 Sequence: ${esc(row.sequence)}. Policy: ${esc(row.policy)}.</p>
+                <label>Allocation (words) <select ${state.saving?'disabled':''} onchange="NamespaceDesignV1.threadSize(${row.slot},this.value)">
+                ${root.ThreadDesign.supportedBodyWords.map(words=>`<option value="${words}" ${row.words===words?'selected':''}>${words}</option>`).join('')}</select></label>
+                <p>Changes the draft only. Save and prepare a fresh image to apply the new size; running Thread memory is not resized.</p>
                 <p>This is a configured Thread object, not an executable abstraction's source.</p>
                 ${row.preparedThread?`<p>Entry: NS[${row.preparedThread.entrySlot}] · Actor E in CR1: NS[${row.preparedThread.actorSlot}] · ${Number.isInteger(row.preparedThread.entryNia)?`Fresh on boot · NIA ${row.preparedThread.entryNia}`:'Empty on IDE boot'}</p>`:''}
                 ${row.slot!==2?`<button class="btn" onclick="NamespaceDesignV1.thread(${row.slot})">Prepare driver and actor</button>`:''}`;
@@ -720,7 +735,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery};
+    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');
