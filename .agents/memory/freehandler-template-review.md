@@ -58,3 +58,13 @@ offline,” correcting the proposed per-allocation priming call.
 **How to apply:** Separate fixed offline context initialization from the
 per-allocation CR1 binding. Review the authorized context-write mechanism before
 implementing it, without expanding the design into a runtime template engine.
+
+FreeHandler's C-list grant and FreeCList result must be LS, never S-only.
+The separate private Thread initialization grant remains S.
+
+**Why:** The user explicitly corrected the S-only implementation: “The C-List
+permissions must be LS not just S!”
+
+**How to apply:** Preserve LS in source, API and prepared bindings. Treat a
+runtime rejection of LS as a compatibility issue, not permission to narrow the
+user's contract or bypass machine checks. S-only test results do not qualify LS.

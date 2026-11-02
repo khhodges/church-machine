@@ -44,7 +44,7 @@ function prepare({baseWord = 7168, firstSlot = 32} = {}) {
         name: `ide.FreeObject${i}`, clistRow: i + 2,
         kind: i < 6 ? 'data' : i === 6 ? 'clist' : 'thread',
         slot: firstSlot + i, sequence: 0,
-        rights: i < 6 ? ['R', 'W'] : i === 6 ? ['S'] : [],
+        rights: i < 6 ? ['R', 'W'] : i === 6 ? ['L', 'S'] : [],
         baseWord: baseWord + offset, words: sizes[i], limit: sizes[i] - 1,
     }));
     // A 64-entry C-list needs a header in addition to the 64 NULL GTs.

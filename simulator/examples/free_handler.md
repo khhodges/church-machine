@@ -14,7 +14,7 @@ current draft. The raw source is also served at
 | Free64 | CR1 passkey, ignored | CR1 Inform RW, 64 words |
 | Free128 | CR1 passkey, ignored | CR1 Inform RW, 128 words |
 | Free256 | CR1 passkey, ignored | CR1 Inform RW, 256 words |
-| FreeCList | CR1 passkey, ignored | CR1 Inform S, 64-entry C-list |
+| FreeCList | CR1 passkey, ignored | CR1 Inform LS, 64-entry C-list |
 | FreeThread | CR1 passkey ignored; CR2 application Inform E | CR1 permission-free Inform Thread GT |
 | Release | CR1 passkey ignored; CR2 issued Inform target | NULL CR1 |
 
@@ -57,14 +57,19 @@ These are offline build outputs, not an installed Namespace image.
 
 Use the normal trusted binding process, not arbitrary caller-supplied tokens.
 C-list row 0 is SELF E; row 1 is private State RW; rows 2–7 are the six
-Inform Data RW GTs; row 8 is the C-list S GT; row 9 is the permission-free
+Inform Data RW GTs; row 8 is the C-list LS GT; row 9 is the permission-free
 Thread GT. Row 10 is a **private S grant to that same Thread**, used only to
 SAVE the application input into home 1. It is not returned to the caller.
 No scratch, Namespace-write or whole-pool grant is needed.
 
-The C-list uses S-only authority (not a mixed LS token). All 64 entries start
+The C-list requires both L and S authority. All 64 entries start
 NULL, including the immutable row 0. Existing ISA rules permit ordinary SAVE
 to rows 1–63; this example does not change that rule.
+
+Runtime compatibility remains blocked by the simulator's single-Church-permission
+guard, which currently rejects LS. The source/API contract must retain LS, not
+substitute S to pass that guard. The prior S-only execution result does not
+qualify this corrected contract.
 
 Pool offsets are `0,64,128,256,384,512,768,1024`; allocation sizes are
 `64,64,64,128,128,256,128,512`. Allocations total 1344 words and the pool spans

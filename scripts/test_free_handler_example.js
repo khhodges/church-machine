@@ -15,7 +15,7 @@ assert.deepEqual(Object.keys(r.api.methods).sort(),
     ['Free64', 'Free128', 'Free256', 'FreeCList', 'FreeThread', 'Release'].sort());
 for (const [index, name] of ['Free64', 'Free128', 'Free256'].entries())
     assert.deepEqual(r.api.methods[name], [index, [], [2, 'RW']]);
-assert.deepEqual(r.api.methods.FreeCList, [3, [], [2, 'S']]);
+assert.deepEqual(r.api.methods.FreeCList, [3, [], [2, 'LS']]);
 assert.deepEqual(r.api.methods.FreeThread, [4, [['application', 2, 'E']], [2, '']]);
 assert.deepEqual(r.api.methods.Release, [5, [['target', 2, '']], 0]);
 assert.equal(r.packed.cc, 11);
@@ -24,7 +24,7 @@ assert.equal(r.api.symbolic_binding.calls.length, 0);
 assert.deepEqual(r.api.symbolic_binding.dependencies.map(d => d.relocation_row),
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 assert.deepEqual(r.api.symbolic_binding.dependencies.map(d => d.rights.join('')),
-    ['E', 'RW', 'RW', 'RW', 'RW', 'RW', 'RW', 'RW', 'S', '', 'S']);
+    ['E', 'RW', 'RW', 'RW', 'RW', 'RW', 'RW', 'RW', 'LS', '', 'S']);
 assert.equal(r.api.symbolic_binding.dependencies[9].name, r.api.symbolic_binding.dependencies[10].name);
 assert.deepEqual(r.state.slice(0, 12), [0, 0, 3, 0, 0, 2, 0, 0, 1, 0, 0, 0]);
 assert.deepEqual(r.state.slice(12, 20), [0, 1, 2, 0, 3, 4, 5, 0]);

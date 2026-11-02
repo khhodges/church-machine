@@ -1,5 +1,5 @@
 ; CLOOMC++: one resident FreeHandler, finite fresh inventory, single caller.
-; Free64/128/256 return Inform RW; FreeCList returns Inform S;
+; Free64/128/256 return Inform RW; FreeCList returns Inform LS;
 ; FreeThread returns a permission-free Inform Thread GT. Results use CR1.
 ; FreeThread(application: CR2) writes the new Thread's saved CR1, not CR0.
 ; The 512-word Thread is Amoeba-primed offline; issuance never starts it.
@@ -32,7 +32,7 @@ capabilities {
     ide.FreeObject3 RW,
     ide.FreeObject4 RW,
     ide.FreeObject5 RW,
-    ide.FreeObject6 S,
+    ide.FreeObject6 LS,
     ide.FreeObject7,
     ide.FreeObject7 S
 }
@@ -220,7 +220,7 @@ bad:
     HARDFAULT "Free256: inconsistent private state or missing prepared capability"
 }
 
-method FreeCList() -> Inform[S] {
+method FreeCList() -> Inform[LS] {
     LOAD CR1, NULL
     LOAD CR7, CR6, #1
     DREAD DR11, CR7, #42, DR0
