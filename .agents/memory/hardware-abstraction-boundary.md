@@ -25,3 +25,13 @@ an external RAM socket.
 **How to apply:** Treat it as user-reported storage hardware when discussing
 backing-store architecture. Do not count SD capacity as resident RAM or infer
 that an SD controller or Thread backing-store service exists in the bitstream.
+
+The user specified a named abstraction for each SD card, using `ide.SD#`
+notation, and requested review of its methods.
+
+**Why:** SD backing storage should appear through the machine's abstraction
+model rather than as implicit globally accessible storage.
+
+**How to apply:** Preserve the per-card naming direction. The method contract,
+card-to-name binding and meaning of the suffix still require their normal
+design review; do not infer an implemented storage service.
