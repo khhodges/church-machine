@@ -5,6 +5,18 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+The command interpreter is used as a compiler to populate the E C-list of
+a newly composed abstraction: it creates GTs and saves them in ESaveLists.
+B must survive at least one RETURN in this workflow.
+
+**Why:** The user supplied this concrete composition use case to distinguish
+durable B authority from register-local, consumed M authority.
+
+**How to apply:** Preserve B on explicitly returned GT results; do not replace
+the post-RETURN SAVE with an assumption that the recipient can invoke SR.
+Review any intervening CALL separately from RETURN. This requirement alone
+does not settle B consumption on SAVE or authorize an SR interface change.
+
 B and M do not coincide in every situation; not all callers have SR access.
 Ordinary B-authorized SAVE must remain independent of SR invocation rights.
 
