@@ -1621,8 +1621,11 @@ conformance evidence, nor authorization to synthesize or program hardware.
 **Subsequent scope requirement:** The user requires SecurityRegulator methods
 for B and F as well. Their operations, names and signatures remain to be
 reviewed one at a time. The six-method inventory below is therefore no longer
-a closed scope. This requirement alone does not authorize changing B/F state
-or bypassing B/F transfer checks in SAVEM.
+a closed scope. B has subsequently been resolved as an override during SAVE,
+not a B-state change; see A.3. For F, the required operation explicitly sets
+Near or Far, rather than toggling state or overriding the SAVE check.
+Its target, encoding, method signature and exact mechanism remain to be
+specified; no implementation or existing-artifact mutation is implied.
 
 **Status: proposed method definitions for review, 2026-11-02.**
 This appendix is not an approved ISA amendment. It defines six proposed
@@ -1807,8 +1810,15 @@ hardware M setting. This does not authorize arbitrary isolated-register access.
 replaces the destination S permission requirement for this Golden Token Save.
 Identity, generation, integrity, bounds and protected-home checks remain.
 The destination M is consumed on use, success or failure, under A.1.
-Neither GT's permission bits change. Source B/F transfer rules remain a
-separate review decision; destination approval does not waive them.
+Neither GT's permission bits change. Source transfer authority is separate
+from this destination approval.
+
+**Approved B operation:** SecurityRegulator may override the source B
+transfer check during SAVE, without changing the supplied GT's B bit.
+The saved GT remains exact. This is not approval for a SetB/ClearB operation
+or an F override. Exact source-M setup, register restrictions and whether
+this is exposed through SAVEM or a distinct method remain to be specified;
+used M authority follows A.1's success-or-failure consumption rule.
 
 **Proposed operation:**
 
@@ -1821,8 +1831,9 @@ separate review decision; destination approval does not waive them.
 
 **Defined baseline:** ordinary SAVE requires destination S and source B with
 mSave validation; Abstract PassKey handling remains separately specified by
-the ISA. The destination S override above is approved; source-transfer M
-effects remain unresolved. Permission changes, GT generation changes, allocation and Thread
+the ISA. Destination S and source B overrides above are approved. F is an
+explicit Near/Far setting operation, not an approved SAVE-time F bypass.
+Exact source-M mechanics remain unresolved. Permission changes, GT generation changes, allocation and Thread
 activation are not effects of SAVEM.
 
 **First use case:**
@@ -1842,7 +1853,8 @@ Failure is not reported as successful completion. An instruction write is not
 a transaction covering FreeHandler's later bookkeeping. No implicit recovery,
 reseed or rollback is supplied.
 
-**Review closure:** specify source M versus B/F,
+**Review closure:** specify source-M mechanics for the approved B override,
+the separate explicit Near/Far setting operation and its interaction with SAVE,
 the treatment of NULL values, protected/SELF homes and Thread-home geometry,
 remaining identity/integrity/bounds checks, and success/fault M consumption.
 An isolated-source export implementation does not by itself establish the

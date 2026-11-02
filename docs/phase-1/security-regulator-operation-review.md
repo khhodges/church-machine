@@ -2,7 +2,11 @@
 
 **Subsequent B/F requirement:** The user requires SecurityRegulator methods
 for B and F. Resolve their intended operations before choosing signatures or
-changing SAVEM checks. The earlier six-method completeness discussion is
+changing SAVEM checks. B is now approved as a SAVE-time transfer-check override,
+not a change to the GT's B bit. F must explicitly set Near or Far, not toggle
+state or override its SAVE check. Its target, encoding and exact interface
+details remain open.
+The earlier six-method completeness discussion is
 historical, not a restriction against these requested additions.
 
 **Status:** First-pass architectural review, 2026-11-02. Proposed software

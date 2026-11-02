@@ -10,14 +10,18 @@ The user requires SecurityRegulator methods for B and F as well.
 **Why:** The user explicitly extended the review beyond the six-method set
 when source B/F transfer semantics were raised.
 
-**How to apply:** Review B then F, one decision at a time. Do not treat the
-six-method inventory as closed, or infer whether the requested operations
-change B/F state or override transfer checks before clarification.
+**How to apply:** B is approved as an override during SAVE, preserving the
+GT's B bit and exact saved value, not as a B-state-changing operation.
+For F, explicitly set Near or Far; do not toggle state or substitute a SAVE
+check override. The user corrected the wording to “Set not change near or far.”
+Do not infer the target, encoding, source-M setup or method signature from
+these functional decisions.
 
 SAVEM destination-register M replaces S, retaining identity, generation,
 integrity, bounds and protected-home checks; consume it on success or failure.
 Its value operand is a GT held in CRn, not a DR integer or register-number
-argument. Source B/F transfer semantics remain a separate decision.
+argument. The source B override is separately approved above; the F setting
+mechanism remains open, not a SAVE-time F bypass.
 
 **Why:** The user agreed to destination elevation and clarified that
 `valueGT` is a CRn.
