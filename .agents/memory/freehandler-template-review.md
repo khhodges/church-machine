@@ -37,3 +37,12 @@ primed with CR0 application service.”
 **How to apply:** Do not add prepopulated C-list grants, template selectors or
 alternative Thread startup modes. Preserve normal Thread initialization rules;
 this clarification is not authorization to activate a Thread or resume implementation.
+
+The new-Thread API supplies the application-service GT for the new Thread's CR0;
+it is not a fixed application binding selected during offline inventory preparation.
+
+**Why:** The user clarified: “The API for the new thread supplies the CR0 GT.”
+
+**How to apply:** Describe FreeThread as accepting that capability and returning
+the prepared Thread GT. Keep the new Thread's CR0 distinct from the caller's CR0;
+do not invent a register assignment for the input before reviewing the ABI.
