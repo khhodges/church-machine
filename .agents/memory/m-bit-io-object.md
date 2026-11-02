@@ -9,13 +9,25 @@ Review regulator methods from the top, one decision at a time.
 LOADM's source-register M may replace source L permission, but does not
 bypass identity, generation, integrity, bounds or protected-register checks.
 Stored NULL is valid data; NULL source is not authority; result permissions
-are unchanged. Lifetime and return ABI are separate decisions.
+are unchanged.
+
+CR6.M is automatic execution-context authority, persists across ordinary
+C-list LOADs, and does not use SecurityRegulator. All other M use is limited
+to the six agreed SR methods and is consumed on use, success or failure.
+
+**Why:** The user explicitly confirmed the existing CR6 exception and
+required single-use authority for all other cases, including failures.
+
+**How to apply:** Do not route ordinary CR6 access through SR or consume
+CR6.M after LOAD. Do not retain other used M grants after faults or invent
+extra M services. Resolve exact clear points and skipped instructions
+separately; this decision is not installed-FPGA qualification.
 
 **Why:** The user explicitly approved this limited source-permission rule,
 not blanket elevation or the remaining LOADM contract.
 
-**How to apply:** Follow the approved A.2 rule without inferring success/fault
-M consumption, destination M behavior or CALL/RETURN preservation.
+**How to apply:** Follow A.2 and the approved lifetime rule above without
+inferring destination M behavior or result preservation across CALL/RETURN.
 
 MintM(Ctype, Permissions, Slot) -> GT adds construction to the regulator.
 The user requires fixing Phase I M-bit limitations to support it.

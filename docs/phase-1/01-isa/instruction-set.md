@@ -1638,6 +1638,17 @@ M is register state, not a GT permission. A method must not silently rewrite
 a GT's permission bits, identity or generation to emulate M. An M effect is
 instruction- and operand-specific, not a global "skip checks" mode.
 
+**Approved M lifetime and scope (2026-11-02):** CR6.M is the execution-context
+exception: CALL/RETURN establish it for C-list access with the unchanged E GT;
+ordinary C-list LOADs do not consume it. This mechanism does not use
+SecurityRegulator. In all other cases, M use is limited to the six agreed
+SecurityRegulator methods below, and the relevant M state is consumed on use
+whether the operation succeeds or fails. Failure must not leave a reusable
+M grant. This is consumption of the used authority, not permission to clear
+unrelated M state or roll back writes. Exact implementation latch/clear points
+and predication-skipped behavior still require specification; a skipped
+instruction must not silently be classified as a failed use.
+
 The signatures below use GT values and zero-based capability-home/C-list
 indices, not unrestricted memory addresses. Register assignments are proposed
 software ABI choices, not new instruction encodings. The provisioned invocation
@@ -1748,7 +1759,8 @@ already has its own LOAD form and needs no special regulator method.
 an unauthorized access or invalid index into a successful NULL result.
 This appendix assigns no new fault numbers or multiple-fault precedence.
 
-**Review closure:** specify any destination M role, M acceptance/consumption,
+**Review closure:** specify any destination M role, exact acceptance/clear
+points implementing the approved success-or-failure consumption rule,
 legal working registers, and
 how the returned GT survives CALL/RETURN and its preservation mask. The CR6
 execution-context exception must not be generalized to all operands. The
@@ -1858,17 +1870,21 @@ Before any implementation claims conformance, close:
 | M setup | How the mechanism establishes each required bit, and at which instruction boundary |
 | Scope | Exactly which checks each operand's M changes; explicitly list checks it does not change |
 | Register ABI | Input/result assignments above, scratch/clobber set, preservation mask, flags and return behavior |
-| Lifetime | M before acceptance, after success, on a skipped instruction, on each fault boundary, across CALL/RETURN and on context transfer |
+| Lifetime | CR6.M is the automatic persistent C-list exception, outside SR; all other M is SR-only and consumed on successful or failed use. Specify exact latch/clear points, skipped instructions and context-transfer implementation |
 | Control granularity | Whole-word M-control writes must not accidentally alter unrelated state; no per-bit hardware operation is assumed |
 | Evidence | Distinguish specification, simulator result, RTL result and exact installed-hardware result |
 
-No new blanket M-clearing rule is introduced. "No unintended authority
+The approved consumption rule clears used M authority, not all register M
+state indiscriminately. "No unintended authority
 export" is an interface proof obligation, not permission to clear unrelated
 architectural state. Existing Master oracle gaps, including CALL/RETURN M
 effects consistent with CR13's reservation, remain visible until resolved.
 
 ### A.6 Review and acceptance cases
 
+- Distinguish repeated CR6 C-list LOADs without SR from all other M uses:
+  SR-only authority must be consumed on both success and failure, with no
+  reusable grant after a fault. Verify these as separate cases.
 - LOADM: ordinary/elevated cases, NULL data versus NULL authority, bounds,
   stale identities, result-register aliasing and result survival on return.
 - SAVEM: source M and destination M independently varied; S/B/F cases;

@@ -31,6 +31,15 @@ must not be confused with the audit identity.
 
 ## Authority and purpose
 
+**Approved M scope/lifetime clarification (2026-11-02):** CR6.M is automatic
+execution-context C-list authority, persists across ordinary LOADs, and does
+not use SecurityRegulator. All other M use is confined to the six agreed SR
+methods and consumes the relevant M state on use, whether successful or failed.
+This supersedes earlier open success/failure-lifetime questions below, not
+the need to verify exact implementation boundaries or resolve skipped
+instructions. Historical M-window/Abstract-dispatch paths are not additional
+exceptions authorized by this review; reconcile them against this rule.
+
 The [Master ISA](01-isa/instruction-set.md) is authoritative. Its approved
 corrections override older reference tables and implementation behavior.
 The user's current direction defines SecurityRegulator as a pure digital
@@ -213,8 +222,10 @@ Proceed from LOADM, one decision at a time. The user approved source-register
 M replacing LOAD's L permission requirement, without bypassing identity,
 generation, integrity, bounds or protected-register checks; see appendix A.2.
 Stored NULL remains valid data, NULL source remains invalid authority, and
-loaded permissions remain unchanged. M lifetime and return ABI are not yet
-approved. Then address SAVE destination-M and source-transfer scope.
+loaded permissions remain unchanged. Success/failure consumption and the
+independent persistent CR6.M exception are now approved; exact implementation
+boundaries and result-return ABI remain to be resolved. Then address SAVE
+destination-M and source-transfer scope.
 Implement only resolved contracts, without a global privilege shortcut.
 No new caller-purpose policy is required.
 
