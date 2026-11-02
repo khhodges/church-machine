@@ -1,5 +1,10 @@
 # SecurityRegulator — machine-operation review
 
+**Subsequent B/F requirement:** The user requires SecurityRegulator methods
+for B and F. Resolve their intended operations before choosing signatures or
+changing SAVEM checks. The earlier six-method completeness discussion is
+historical, not a restriction against these requested additions.
+
 **Status:** First-pass architectural review, 2026-11-02. Proposed software
 interfaces, not an ISA amendment, implemented API or hardware qualification.
 

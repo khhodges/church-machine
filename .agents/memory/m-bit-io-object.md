@@ -5,6 +5,15 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+The user requires SecurityRegulator methods for B and F as well.
+
+**Why:** The user explicitly extended the review beyond the six-method set
+when source B/F transfer semantics were raised.
+
+**How to apply:** Review B then F, one decision at a time. Do not treat the
+six-method inventory as closed, or infer whether the requested operations
+change B/F state or override transfer checks before clarification.
+
 SAVEM destination-register M replaces S, retaining identity, generation,
 integrity, bounds and protected-home checks; consume it on success or failure.
 Its value operand is a GT held in CRn, not a DR integer or register-number

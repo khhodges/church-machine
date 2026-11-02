@@ -1618,6 +1618,12 @@ conformance evidence, nor authorization to synthesize or program hardware.
 
 ## Review appendix: SecurityRegulator methods
 
+**Subsequent scope requirement:** The user requires SecurityRegulator methods
+for B and F as well. Their operations, names and signatures remain to be
+reviewed one at a time. The six-method inventory below is therefore no longer
+a closed scope. This requirement alone does not authorize changing B/F state
+or bypassing B/F transfer checks in SAVEM.
+
 **Status: proposed method definitions for review, 2026-11-02.**
 This appendix is not an approved ISA amendment. It defines six proposed
 SecurityRegulator methods over existing machine operations: **LOADM, SAVEM
