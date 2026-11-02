@@ -177,6 +177,10 @@ evaluate a 16-total-entry default C-list, measure before shrinking Threads, and
 define safe reuse separately. The earlier 64-entry choice remains the existing
 baseline, not a permanent default for all applications.
 
+The user explicitly placed the compact two-Block demonstration in Phase 2.
+See `docs/phase-2/compact-block-inventory.md` for the agreed direction and
+open capability-handoff decision; it is not an added Phase 1 completion gate.
+
 **Why:** The ten-Block capacity discussion exposed wasted placement space and
 the difference between required capabilities and provisioned C-list capacity.
 
