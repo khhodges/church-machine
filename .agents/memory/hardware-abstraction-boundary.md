@@ -16,3 +16,12 @@ being misrepresented as active resources.
 verification and authorized Namespace access. Describe unverified expansion
 categories explicitly as unknown, not supported. Resource descriptions grant
 no capability and authorize no hardware change.
+
+The user identified the board's memory-extension slot as an **SD slot**, not
+an external RAM socket.
+
+**Why:** This was clarified during the transaction-Thread memory review.
+
+**How to apply:** Treat it as user-reported storage hardware when discussing
+backing-store architecture. Do not count SD capacity as resident RAM or infer
+that an SD controller or Thread backing-store service exists in the bitstream.
