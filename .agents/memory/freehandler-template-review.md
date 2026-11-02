@@ -83,6 +83,21 @@ ThreadSetup is private to the **Block instance**, used when that block's
 Thread needs setup. It targets the Thread but is not the Thread's own private
 capability.
 
+Subsequent architectural correction: do not perpetuate ThreadSetup S merely
+to avoid implementing SecurityRegulator. The user challenged that workaround
+and wants the common regulated M functionality addressed, rather than isolated
+special-case grants. Existing saved artifacts remain unchanged pending an
+explicit replacement interface and validation.
+
+**Why:** A self-contained B1 demonstration must not substitute for the intended
+shared privileged-operation architecture.
+
+**How to apply:** Specify SecurityRegulator's general machine/register-level
+operations, Passkey authorization and exact M semantics before migrating
+FreeHandler. Do not invent a Thread-specific constructor in the regulator or
+claim that M bypasses all checks. This correction is not permission to flash
+hardware or silently remove grants from existing artifacts.
+
 **Why:** The user corrected the distinction between who holds setup authority
 and which object the capability addresses.
 
