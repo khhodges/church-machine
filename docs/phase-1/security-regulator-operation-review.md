@@ -9,6 +9,11 @@ for LOADM, SAVEM, SWITCHM, MintM, MakeOutformM and MakeInformM.
 The broader candidates below are investigation
 history, not additional selected methods.
 
+**Coverage result:** [Appendix A.9](01-isa/instruction-set.md#a9-six-method-coverage-review)
+maps the identified Mint/FreeHandler functions to these six methods or ordinary
+operations. It retains a concrete open descriptor-M-window case; no seventh
+method or universal completeness claim is justified by this static review.
+
 **Subsequent construction decision:** `MintM(Ctype, Permissions, Slot) -> GT`
 adds Golden Token construction. The user requires correction of blocking
 Phase I M-bit limitations. See appendix A.7 for construction versus allocation,

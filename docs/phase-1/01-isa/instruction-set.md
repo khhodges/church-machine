@@ -1988,3 +1988,96 @@ common audit contract. Acceptance must include missing/NULL source, wrong
 form, stale source, valid conversion and identity-preserving round trips
 where the binding remains valid. No silent fallback to MintM is permitted.
 
+### A.9 Six-method coverage review
+
+**Status:** Static functional coverage review, 2026-11-02. The identified
+Mint/FreeHandler functions map to the six proposed methods or ordinary
+operations. This is not a proof that the signatures are sufficient for every
+M use, that the methods are implemented, or that Phase I hardware conforms.
+No seventh method is selected by this review.
+
+#### A.9.1 Service-operation coverage
+
+| Required operation | Responsible mechanism | Remaining qualification |
+|---|---|---|
+| Load an already held Inventory/C-list GT through valid L authority | Ordinary LOAD | FreeHandler's directory scan needs no regulator call merely because it loads a GT |
+| Load a GT where an approved M-assisted access is required | LOADM | Exact M override, legal registers and return ABI remain open |
+| Save a GT through existing S authority with valid transfer authority | Ordinary SAVE | Do not require M for operations already authorized without it |
+| Initialize an issued Thread's saved CR1 through its permission-free GT | SAVEM | Resolve destination M and source transfer separately; preserve FreeHandler's selected Thread and State across the call |
+| Construct Mint's issued GT from explicit fields | MintM | Legal Ctype/permission mapping, slot context and generation/identity source remain open |
+| Convert Inform to Outform | MakeOutformM, with source GT | Mint must separately establish any required preserved backing/binding |
+| Convert Outform to Inform | MakeInformM, with source GT | Mint must separately resolve the living object and establish/reuse local binding |
+| Allocate/zero storage; maintain queues and counts | Mint/Cleaner/FreeHandler using ordinary granted access | Not regulator policy or a new M primitive |
+| Publish, release or retire an eligible Namespace entry | Existing explicit Namespace-write mechanism and lifecycle contract | Generation changes remain software responsibilities; M does not silently change versions |
+| Validate Mint's provisioned approval token | Existing PkVerify/EXACT path | Do not replace it with a new regulator policy; distinguish Passkey from audit Passcode |
+| Release a FreeHandler object | Owning Block's ordinary State update to quarantine | Does not revoke other copies or provide reuse |
+| Activate/resume a Thread | Ordinary CHANGE | No general operand-M requirement; permission-free target and all defined context checks remain |
+| Handoff to another Namespace and its entry Thread | SWITCHM over the fixed SWITCH contract | Source L remains required; wrapper continuation needs definition |
+| Set next watchdog interval | Ordinary RW MMIO capability | Not an M operation or an assumed active-deadline refresh |
+| Attribute and send regulator actions Home | Common audit mechanism for all six methods | Passcode transport, delivery failure and interrupted-operation evidence remain open |
+
+#### A.9.2 Architectural and implementation M-use classification
+
+| M-related path | Classification for this review |
+|---|---|
+| Source-side M on LOAD | Candidate LOADM mechanism. Simulator `_execLoad` chooses its permission check from source M; this observation does not settle the normative scope for every CR |
+| Isolated-source M on SAVE | Candidate SAVEM source-transfer mechanism. It does not prove SAVEM destination elevation is implemented |
+| CR15.M on SWITCH | Defined handoff admission and successful-consumption rule; covered by SWITCHM |
+| CALL/RETURN establishment of CR6 context and M transitions | Internal instruction lifecycle, not a separate public method; must compose with every returning regulator method |
+| LAMBDA/continuation processing | Existing execution semantics, not evidence for a new privileged LambdaM method; reconcile its preservation behavior with the Master oracle |
+| Fetch and ordinary data-access permission checks | Ordinary architectural checks; do not infer X/R/W overrides from simulator-wide `mElevation` |
+| Reset, bootstrap and fault-entry privilege | Trusted internal machine transitions, not caller-invocable regulator services; the Master explicitly excludes programmer M as fault-entry authority |
+| Whole-word M-control device writes | Internal regulator mechanism whose custody and unrelated-bit effects require definition, not an automatically public SetM API |
+| Abstract dispatch and descriptor M-window | **Unclosed coverage case**, described below |
+| Retired fused opcodes or legacy isolated-register reload paths | Not reasons to add methods; reconcile against the Master rather than promote legacy behavior |
+
+#### A.9.3 Concrete unclosed case: descriptor inspection/writeback
+
+The implementation contains more than just the six method-shaped operations:
+
+- `simulator/simulator.js` has `_setMWindow` exposing descriptor words in
+  DR11–DR15 and `_mwinWriteback` at CALL/CALL-frame RETURN boundaries.
+- Its Abstract DREAD/DWRITE/CALL dispatch paths manipulate M state for
+  dispatch. This is separate from the ordinary RW watchdog capability.
+- `hardware/core.py` contains a CR15-oriented M-window writeback FSM with
+  accepted DR snapshots and integrity/generation checks.
+- `hardware/registers.py` supplies whole-word M-state control and CALL/RETURN
+  M updates. Its comments and behavior are implementation evidence, not
+  authority to close the Master's remaining CALL/RETURN oracle questions.
+
+None of the six signatures currently promises **arbitrary descriptor
+inspection or modification**. Therefore that operation cannot be marked
+covered by LOADM merely because LOADM returns a GT, or by MintM merely
+because MintM constructs one.
+
+Determine whether the M-window is (a) a necessary internal implementation
+of one or more selected methods, (b) required internal Abstract dispatch,
+(c) obsolete implementation to reconcile, or (d) a separately required
+public function. Only case (d), supported by an explicit use case, would
+justify considering another method. Current code alone does not select it.
+
+#### A.9.4 Evidence and completeness verdict
+
+Evidence examined: the Master ISA's capability, CHANGE, SWITCH, watchdog and
+fault-entry contracts; Mint CREATE/DESTROY and conversion stubs; FreeHandler
+allocation/release source; simulator M-state references and key consumers;
+M-control device helper; and selected RTL M-window/register-state paths.
+This is not an exhaustive RTL, wrapper-ABI or hardware-path proof.
+
+Mint currently materializes its DATA result through a private scratch write
+and LOAD. Its conversion methods are explicit unimplemented stubs.
+FreeHandler still uses ThreadSetup S for ordinary SAVE. Neither is evidence
+of a working regulator method or Home IDE audit path.
+
+**Verdict:** retain the six-method proposal. No missing public function has
+been established for the reviewed Mint/FreeHandler workloads. Do not claim
+universal completeness until the descriptor-window classification and method
+semantics are resolved. In particular, close MintM identity fields, conversion
+binding context, SAVE source/destination M, result/continuation preservation,
+and audit fault/delivery behavior before implementation acceptance.
+
+The next semantic review should keep a concrete operand example for each
+case and expected results for both valid and invalid inputs. An implementation
+that passes only the happy path is not evidence that the authority boundary
+is correct.
+
