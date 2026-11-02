@@ -5,6 +5,19 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+The first operation review is recorded in
+`docs/phase-1/security-regulator-operation-review.md`. It separates proposed
+APIs from Master ISA authority: ordinary CHANGE has no added M requirement,
+SWITCH has fixed destinations, and watchdog MMIO must not be conflated with
+the earlier combined M-control-word proposal.
+
+**Why:** Current Master rules constrain the broader hypothetical API family;
+mechanism-only design does not authorize inventing new instruction semantics.
+
+**How to apply:** Resolve SaveM destination elevation separately from source
+transfer and CALL/RETURN lifetime before implementing a replacement for the
+private ThreadSetup grant.
+
 Historical naming correction: the user distinguishes Babbage's “regulator”
 from this project's “SecurityRegulator”; do not attribute the latter term
 or the project's M-bit API to Babbage.

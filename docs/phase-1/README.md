@@ -8,6 +8,10 @@
 
 ## Software review scope
 
+- **[SecurityRegulator operation review](security-regulator-operation-review.md)** —
+  pure machine mechanism, proposed M-operation matrix, SaveM worked case,
+  ISA constraints and open conformance decisions; not an implementation claim.
+
 - **[Transaction-oriented Thread model](transaction-thread-model.md)** —
   agreed three resident boot/test/startup Threads plus as many transaction
   Threads as resources permit; future lazy loading under existing
