@@ -5,6 +5,10 @@ The shared collection is in **`docs/phase-1/`**.
 Start with the [Master ISA](instruction-set.md), then the
 [Phase 1 petname execution model](cloomc-petname-execution-model-phase-1.md).
 
+The agreed [transaction-oriented Thread model](phase-1/transaction-thread-model.md)
+records the resident boot/test/startup Threads and the intended population of
+lazily loaded transaction Threads.
+
 The [complete reading index](phase-1/README.md) groups the related documents:
 
 1. ISA and instruction semantics.

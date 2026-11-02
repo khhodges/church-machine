@@ -8,6 +8,11 @@
 
 ## Software review scope
 
+- **[Transaction-oriented Thread model](transaction-thread-model.md)** —
+  agreed three resident boot/test/startup Threads plus as many transaction
+  Threads as resources permit; future lazy loading under existing
+  run-to-suspension and retirement rules, not an implementation claim.
+
 - **[Next Factory Build — approval specification](factory-build-verified-install-approval.md)** —
   current scope, approval gates and work sequence: start with IDE UART and
   finish Phase 1 with Ethernet and standalone FPGA singletons. Includes both

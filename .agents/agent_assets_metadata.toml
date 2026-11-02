@@ -1648,3 +1648,17 @@ mtime_ms = 1793561487566
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f629125b-1a20-4c13-ab25-f0f1d9e15952/d07181f3-6466-43e7-bf79-b20d59802d16"
 storage_version_token = "1793561492877551"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "CZkd2zEmmzQBt5VjhLTlQ"
+uri = "file://docs/phase-1/transaction-thread-model.md"
+type = "text"
+title = "Phase 1 — Transaction-oriented Thread model"
+description = "Agreed resident and transaction Thread model, with lazy-loading direction and current implementation boundaries."
+logical_id = "348384d7-dada-4367-ae28-bc0f148b410f"
+content_hash = "sha256:94777a9908e5e8edec19b004de7fc480aedc7d6af839fe2017e4fa62e026b72e"
+size = 3739
+mtime_ms = 1793632134007
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/348384d7-dada-4367-ae28-bc0f148b410f/a078341d-398d-4cd9-a0e4-60d1750fb869"
+storage_version_token = "1793632160088820"
+content_type = "text/markdown"
