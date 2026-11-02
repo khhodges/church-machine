@@ -10,14 +10,14 @@ not create descriptors or convert data words into capabilities.
 
 ## Four public methods
 
-The working method names below interpret the requested four methods as three
-size-specific allocation methods and one release method.
+The four methods are Free64, Free128, Free256 and Release. Preserve the
+Free# naming: these methods obtain prepared objects from the matching free queue.
 
 | Method | Method index | Inputs | Success |
 | --- | ---: | --- | --- |
-| Allocate64 | 0 | Passkey in CR1, ignored for this profile | 64-word RW GT in CR1; DR1=0 |
-| Allocate128 | 1 | Passkey in CR1, ignored for this profile | 128-word RW GT in CR1; DR1=0 |
-| Allocate256 | 2 | Passkey in CR1, ignored for this profile | 256-word RW GT in CR1; DR1=0 |
+| Free64 | 0 | Passkey in CR1, ignored for this profile | 64-word RW GT in CR1; DR1=0 |
+| Free128 | 1 | Passkey in CR1, ignored for this profile | 128-word RW GT in CR1; DR1=0 |
+| Free256 | 2 | Passkey in CR1, ignored for this profile | 256-word RW GT in CR1; DR1=0 |
 | Release | 3 | Passkey in CR1, ignored; object GT in CR2 | NULL CR1; DR1=0 |
 
 No allocation-size or permissions input is needed: the selected method fixes
@@ -114,7 +114,7 @@ Versions must come from verified bindings, never guessed from vacant slots.
 For the approved fresh disposable origin, generation zero may be provisioned.
 Capacities and class membership are constants in code.
 
-## Allocate64 / Allocate128 / Allocate256
+## Free64 / Free128 / Free256
 
 Each method invokes the same internal operation with fixed class parameters:
 

@@ -184,8 +184,9 @@ the four methods.” The formation fixes relative sizes/offsets, not universal
 GT values or permission to reuse live generations.
 
 **How to apply:** Review three size-specific allocation methods and Release
-under FreeHandler; method names remain design choices, not changes to saved
-Mint.CREATE. Release quarantines returns until deferred refill: it is not
+under FreeHandler. Preserve the user's Free64, Free128 and Free256 method
+names, not Allocate64/128/256; the user explicitly challenged that unsolicited
+rename. These are not changes to saved Mint.CREATE. Release quarantines returns until deferred refill: it is not
 immediate revocation. Design permission is not hardware-execution approval.
 
 The Mint CREATE demonstration must respect a minimum allocation of 64 words.
