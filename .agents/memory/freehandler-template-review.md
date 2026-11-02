@@ -68,3 +68,13 @@ permissions must be LS not just S!”
 **How to apply:** Preserve LS in source, API and prepared bindings. Treat a
 runtime rejection of LS as a compatibility issue, not permission to narrow the
 user's contract or bypass machine checks. S-only test results do not qualify LS.
+
+Use descriptive grant names: FreeData0 through FreeData5, FreeClist,
+FreeThread and ThreadSetup. ThreadSetup denotes private S authority to the
+same Thread as FreeThread, never a separate object allocation.
+
+**Why:** The user proposed these names to clarify why eight inventory objects
+need nine object-grant entries.
+
+**How to apply:** Keep the shared Thread destination explicit in any binding
+or alias representation. A naming change must not allocate another Thread.
