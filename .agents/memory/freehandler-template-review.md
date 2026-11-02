@@ -160,8 +160,13 @@ and leave the existing boot/test abstraction and saved artifacts unchanged.
 Long-term design direction: when lazy loading supports Threads, Threads should
 be abundant and function-driven, rather than a small fixed set of resident roles.
 
-**Why:** The user explicitly raised this intended direction during architecture
-review and paused implementation to discuss its consequences.
+The intended model keeps three resident boot/test/startup Threads, with
+additional transaction Threads as resources permit—for example one per order
+or telephone call. Load those Threads lazily as needed, applying the established
+run-to-suspension rules and lazy-load retirement rules.
+
+**Why:** The user explicitly confirmed this model during paused architecture
+review, citing the PP250 telephone-call example.
 
 **How to apply:** Evaluate the finite B1 allocator as a Phase 1 example, not the
 permanent Thread model. Do not infer approval of scheduling, eviction, reuse,
