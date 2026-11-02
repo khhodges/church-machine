@@ -9,6 +9,12 @@ details remain open.
 The earlier six-method completeness discussion is
 historical, not a restriction against these requested additions.
 
+**B versus M access:** The user clarified that B and M do not coincide in
+every situation and not all callers have SR access rights. Preserve ordinary
+B-authorized SAVE without requiring SR. Do not infer M or SR invocation
+authority from B, or declare a SaveB interface redundant solely because
+SAVEM can override a transfer check. Its interface disposition remains open.
+
 **Status:** First-pass architectural review, 2026-11-02. Proposed software
 interfaces, not an ISA amendment, implemented API or hardware qualification.
 

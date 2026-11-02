@@ -5,6 +5,16 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+B and M do not coincide in every situation; not all callers have SR access.
+Ordinary B-authorized SAVE must remain independent of SR invocation rights.
+
+**Why:** The user corrected the inference that SAVE effects alone made SaveB
+redundant; ordinary authority and privileged service access are distinct.
+
+**How to apply:** Never infer M or SR rights from B. Preserve ordinary SAVE
+checks and access. Resolve any SaveB interface by its actual authority path,
+not by equating it with SAVEM.
+
 The user requires SecurityRegulator methods for B and F as well.
 
 **Why:** The user explicitly extended the review beyond the six-method set

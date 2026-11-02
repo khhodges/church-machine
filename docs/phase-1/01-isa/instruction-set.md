@@ -1820,6 +1820,15 @@ or an F override. Exact source-M setup, register restrictions and whether
 this is exposed through SAVEM or a distinct method remain to be specified;
 used M authority follows A.1's success-or-failure consumption rule.
 
+**Authority distinction:** B and M need not coincide. Ordinary SAVE through
+the required destination S and source B authority remains available without
+SecurityRegulator access, subject to its other checks. Holding B does not
+grant M or authority to invoke SR; not every caller has SR access rights.
+The SR override is a separately authorized path, not a replacement for
+ordinary B-authorized SAVE. A claim that SaveB is redundant cannot follow
+merely from overlapping SAVE effects; its intended interface and access
+rights must first be distinguished. No separate SaveB API is settled here.
+
 **Proposed operation:**
 
 1. Capture all three operands.
