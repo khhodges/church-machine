@@ -6,7 +6,7 @@ const Simulator = require('../simulator/simulator');
 const {prepare} = require('./build_free_handler_example');
 const r = prepare();
 assert(Simulator.isSinglePerm({L: 1, S: 1}).ok,
-    'BLOCKED: FreeCList requires LS, but the current simulator rejects LS. Do not substitute S or bypass the guard.');
+    'FreeCList requires genuine LS support; do not substitute S or bypass the guard.');
 const CODE = 2048, STATE = 4096, AMOEBA = 5120, APP = 6144;
 function fixture() {
     const s = new Simulator();

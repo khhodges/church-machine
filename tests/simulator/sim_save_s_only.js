@@ -90,6 +90,38 @@ test('assembled non-CR6 S-only SAVE retires and L-only LOAD reads back the exact
     assert.equal(s.faultLog.length, 0);
 });
 
+test('LS GT round-trips and authorizes both SAVE and LOAD through the same register', () => {
+    const s = fixture('SAVE CR1, CR8, #1\nLOAD CR2, CR8, #1');
+    install(s, 8, SLOT.list, 'LS');
+    const token = s.cr[8].word0, source = s.cr[1].word0;
+    const parsed = s.parseGT(token);
+    assert.equal(parsed.malformed, false);
+    assert.equal(parsed.permissions.L, 1);
+    assert.equal(parsed.permissions.S, 1);
+    assert.equal(parsed.permissions.E, 0);
+    const before = s.memory.slice(BASE, CELL);
+    assert.ok(s.step());
+    assert.equal(s.memory[CELL], source);
+    assert.ok(s.step());
+    assert.equal(s.cr[2].word0, source);
+    assert.equal(s.cr[8].word0, token);
+    assert.deepEqual(s.memory.slice(BASE, CELL), before);
+    assert.equal(s.faultLog.length, 0);
+});
+
+test('LS permission correction does not permit LE, SE, LSE or mixed domains', () => {
+    const s = fixture();
+    for (const rights of ['LE', 'SE', 'LSE']) {
+        const perms = Object.fromEntries([...rights].map(p => [p, 1]));
+        assert.equal(Simulator.isSinglePerm(perms).ok, false);
+        assert.throws(() => gt(s, SLOT.list, rights), /invalid Church permission/);
+        const perm3 = (perms.L || 0) | ((perms.S || 0) << 1) | 4;
+        const raw = ((perm3 << 28) | (1 << 27) | (1 << 25) | SLOT.list) >>> 0;
+        assert.equal(s.parseGT(raw).malformed, true);
+    }
+    assert.throws(() => gt(s, SLOT.list, 'RLS'), /domain-impure/);
+});
+
 for (const rights of ['R', 'E', 'L']) {
     test(`${rights}-only ordinary c-list view cannot SAVE`, () => {
         const s = fixture();

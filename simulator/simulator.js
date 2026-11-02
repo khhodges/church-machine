@@ -3994,14 +3994,14 @@ class ChurchSimulator {
             : { B: b_flag, R: 0, W: 0, X: 0,
                            L: (perm3>>>0)&1, S: (perm3>>>1)&1, E: (perm3>>>2)&1 };
         // Domain purity is now structurally guaranteed by the dom bit (0=Turing, 1=Church).
-        // Only check single-Church-perm rule (CLOOMC security model).
+        // Church permissions permit L, S, LS or E; E cannot mix with L/S.
         let malformed = false;
         let malformedReason = null;
         if (type !== 3) {
             const single = ChurchSimulator.isSinglePerm(permissions);
             if (!single.ok) {
                 malformed = true;
-                malformedReason = `multi-Church permissions (${single.bits})`;
+                malformedReason = `invalid Church permission combination (${single.bits})`;
             }
         }
         return {
@@ -4025,14 +4025,14 @@ class ChurchSimulator {
         return { ok: true };
     }
 
-    // Single-Church-perm guard: a Church GT must carry exactly one permission bit
-    // (enforcing "C-Lists only have E permission" from the security model).
+    // Retain the helper name for callers. ISA permits LS as well as L, S, E;
+    // Enter authority must not be combined with Load/Save authority.
     // Pure Turing GTs ({R,W,X} only) may carry multiple bits and are not checked here.
     static isSinglePerm(perms) {
         const hasChurch = perms.L || perms.S || perms.E;
         if (!hasChurch) return { ok: true };
         const churchCount = (perms.L ? 1 : 0) + (perms.S ? 1 : 0) + (perms.E ? 1 : 0);
-        if (churchCount > 1) {
+        if (churchCount > 1 && perms.E) {
             const bits = (perms.L?'L':'')+(perms.S?'S':'')+(perms.E?'E':'');
             return { ok: false, bits };
         }
@@ -4053,7 +4053,7 @@ class ChurchSimulator {
         }
         const single = ChurchSimulator.isSinglePerm(perms);
         if (!single.ok) {
-            throw new Error(`createGT: single-Church-perm violation (${single.bits}) — slot ${slotId} must carry exactly one Church permission`);
+            throw new Error(`createGT: invalid Church permission combination (${single.bits}) — slot ${slotId} permits L, S, LS or E`);
         }
         // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom
         //               ★[26:25]=gt_type  ★[24:16]=gt_seq(9b)  [15:0]=slot_id

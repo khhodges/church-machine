@@ -66,10 +66,9 @@ The C-list requires both L and S authority. All 64 entries start
 NULL, including the immutable row 0. Existing ISA rules permit ordinary SAVE
 to rows 1–63; this example does not change that rule.
 
-Runtime compatibility remains blocked by the simulator's single-Church-permission
-guard, which currently rejects LS. The source/API contract must retain LS, not
-substitute S to pass that guard. The prior S-only execution result does not
-qualify this corrected contract.
+The simulator permits LS, while rejecting combinations of E with L/S and mixed
+Church/Turing permissions. The source/API contract retains LS, not S-only.
+This simulator correction is not a claim of physical hardware qualification.
 
 Pool offsets are `0,64,128,256,384,512,768,1024`; allocation sizes are
 `64,64,64,128,128,256,128,512`. Allocations total 1344 words and the pool spans
