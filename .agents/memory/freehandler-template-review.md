@@ -126,3 +126,12 @@ Agreed, next.”
 
 **How to apply:** Adding B2 registers new prepared inventory without resetting
 B1 or duplicating handler code. Keep block selection private to FreeHandler.
+
+Keep Boot.Thread as Amoeba's supervisor destination after the application
+returns. Yield does not automatically release or recycle the completed Thread.
+
+**Why:** The user explicitly selected “Keep Boot.Thread” when reviewing the
+completion destination.
+
+**How to apply:** Preserve that offline supervisor binding; keep activation,
+completion, quarantine and future reuse as distinct operations.
