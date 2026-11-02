@@ -9,7 +9,13 @@
 ; Provisioning: build_free_handler_example.js --base-word X --first-slot Y.
 ; No refill, descriptor writes, scratch conversion, or hardware activation.
 ; Inventory: three 64w, two 128w, one 256w, one 64-entry C-list,
-; and one 512w Thread. C-list starts entirely NULL.
+; and one 512w Thread. C-list starts SELF plus 63 NULL entries.
+; One code body scans ide.FreeHandlerBlocks: 64 rows, SELF then up to
+; 63 densely registered block Inventory L grants; word 1 stores block count.
+; Each private Inventory has SELF, State RW, FreeData0..5 RW, FreeClist LS,
+; FreeThread (no permissions), ThreadSetup S. ThreadSetup aliases FreeThread.
+; Example names: ide.B1.FreeData0 through ide.B1.FreeData5,
+; ide.B1.FreeClist, ide.B1.FreeThread and ide.B1.ThreadSetup.
 ;
 ; Private State variables (64 words):
 ;   0..2 Free64 head/tail/count; 3..5 Free128; 6..8 Free256; 9..11 Returned.
@@ -17,7 +23,7 @@
 ;   28..35 object state: FREE=0, ISSUED=1, RETURNED=2, RETIRED=3.
 ;   36..43 object version: zero in this explicitly fresh example.
 ;   44..63 reserved zero.
-; GT words are in CR6's C-list, never in the writable State allocation.
+; GT words are in private Inventory C-lists, never in writable State storage.
 ; State and object capabilities must never be given to untrusted queue writers.
 ; Do not reseed State in a continuing universe: previously issued GTs may exist.
 
@@ -25,21 +31,26 @@ abstraction ide.FreeHandler {
 passkey required;
 capabilities {
     SELF E,
-    ide.FreeHandlerState RW,
-    ide.FreeObject0 RW,
-    ide.FreeObject1 RW,
-    ide.FreeObject2 RW,
-    ide.FreeObject3 RW,
-    ide.FreeObject4 RW,
-    ide.FreeObject5 RW,
-    ide.FreeObject6 LS,
-    ide.FreeObject7,
-    ide.FreeObject7 S
+    ide.FreeHandlerBlocks L,
+    ide.FreeHandlerBlocks R
 }
 
 method Free64() -> Inform[RW] {
     LOAD CR1, NULL
-    LOAD CR7, CR6, #1
+    LOAD CR10, CR6, #1
+    LOAD CR11, CR6, #2
+    DREAD DR14, CR11, #1, DR0
+    MCMP DR14, #63
+    BRANCHHI bad
+    IADD DR13, DR0, #0
+nextblock:
+    IADD DR13, DR13, #1
+    MCMP DR13, DR14
+    BRANCHHI exhausted
+    LOAD CR9, CR10, DR13
+    TPERM CR9, NULL
+    BRANCHEQ bad
+    LOAD CR7, CR9, #1
     DREAD DR8, CR7, #0, DR0
     DREAD DR9, CR7, #2, DR0
     DREAD DR11, CR7, #1, DR0
@@ -67,13 +78,13 @@ method Free64() -> Inform[RW] {
     BRANCHEQ object0
     MCMP DR10, #1
     BRANCHEQ object1
-    LOAD CR1, CR6, #4
+    LOAD CR1, CR9, #4
     BRANCH issue
 object0:
-    LOAD CR1, CR6, #2
+    LOAD CR1, CR9, #2
     BRANCH issue
 object1:
-    LOAD CR1, CR6, #3
+    LOAD CR1, CR9, #3
     BRANCH issue
 issue:
     TPERM CR1, NULL
@@ -93,6 +104,8 @@ advance:
 empty:
     MCMP DR8, #0
     BRANCHNE bad
+    BRANCH nextblock
+exhausted:
     IADD DR1, DR0, #1
 done:
     LOAD CR2, NULL
@@ -105,7 +118,20 @@ bad:
 
 method Free128() -> Inform[RW] {
     LOAD CR1, NULL
-    LOAD CR7, CR6, #1
+    LOAD CR10, CR6, #1
+    LOAD CR11, CR6, #2
+    DREAD DR14, CR11, #1, DR0
+    MCMP DR14, #63
+    BRANCHHI bad
+    IADD DR13, DR0, #0
+nextblock:
+    IADD DR13, DR13, #1
+    MCMP DR13, DR14
+    BRANCHHI exhausted
+    LOAD CR9, CR10, DR13
+    TPERM CR9, NULL
+    BRANCHEQ bad
+    LOAD CR7, CR9, #1
     DREAD DR8, CR7, #3, DR0
     DREAD DR9, CR7, #5, DR0
     DREAD DR11, CR7, #4, DR0
@@ -132,10 +158,10 @@ method Free128() -> Inform[RW] {
     BRANCHNE bad
     MCMP DR10, #3
     BRANCHEQ object3
-    LOAD CR1, CR6, #6
+    LOAD CR1, CR9, #6
     BRANCH issue
 object3:
-    LOAD CR1, CR6, #5
+    LOAD CR1, CR9, #5
 issue:
     TPERM CR1, NULL
     BRANCHEQ bad
@@ -154,6 +180,8 @@ advance:
 empty:
     MCMP DR8, #0
     BRANCHNE bad
+    BRANCH nextblock
+exhausted:
     IADD DR1, DR0, #1
 done:
     LOAD CR2, NULL
@@ -166,7 +194,20 @@ bad:
 
 method Free256() -> Inform[RW] {
     LOAD CR1, NULL
-    LOAD CR7, CR6, #1
+    LOAD CR10, CR6, #1
+    LOAD CR11, CR6, #2
+    DREAD DR14, CR11, #1, DR0
+    MCMP DR14, #63
+    BRANCHHI bad
+    IADD DR13, DR0, #0
+nextblock:
+    IADD DR13, DR13, #1
+    MCMP DR13, DR14
+    BRANCHHI exhausted
+    LOAD CR9, CR10, DR13
+    TPERM CR9, NULL
+    BRANCHEQ bad
+    LOAD CR7, CR9, #1
     DREAD DR8, CR7, #6, DR0
     DREAD DR9, CR7, #8, DR0
     DREAD DR11, CR7, #7, DR0
@@ -191,7 +232,7 @@ method Free256() -> Inform[RW] {
     DREAD DR11, CR7, #36, DR10
     MCMP DR11, #0
     BRANCHNE bad
-    LOAD CR1, CR6, #7
+    LOAD CR1, CR9, #7
 issue:
     TPERM CR1, NULL
     BRANCHEQ bad
@@ -210,6 +251,8 @@ advance:
 empty:
     MCMP DR8, #0
     BRANCHNE bad
+    BRANCH nextblock
+exhausted:
     IADD DR1, DR0, #1
 done:
     LOAD CR2, NULL
@@ -222,7 +265,20 @@ bad:
 
 method FreeCList() -> Inform[LS] {
     LOAD CR1, NULL
-    LOAD CR7, CR6, #1
+    LOAD CR10, CR6, #1
+    LOAD CR11, CR6, #2
+    DREAD DR14, CR11, #1, DR0
+    MCMP DR14, #63
+    BRANCHHI bad
+    IADD DR13, DR0, #0
+nextblock:
+    IADD DR13, DR13, #1
+    MCMP DR13, DR14
+    BRANCHHI empty
+    LOAD CR9, CR10, DR13
+    TPERM CR9, NULL
+    BRANCHEQ bad
+    LOAD CR7, CR9, #1
     DREAD DR11, CR7, #42, DR0
     MCMP DR11, #0
     BRANCHNE bad
@@ -230,8 +286,8 @@ method FreeCList() -> Inform[LS] {
     MCMP DR10, #3
     BRANCHHI bad
     MCMP DR10, #0
-    BRANCHNE empty
-    LOAD CR1, CR6, #8
+    BRANCHNE nextblock
+    LOAD CR1, CR9, #8
     TPERM CR1, NULL
     BRANCHEQ bad
     IADD DR11, DR0, #1
@@ -251,7 +307,20 @@ bad:
 
 method FreeThread(application: Inform[E]) -> Inform[] {
     LOAD CR1, NULL
-    LOAD CR7, CR6, #1
+    LOAD CR10, CR6, #1
+    LOAD CR11, CR6, #2
+    DREAD DR14, CR11, #1, DR0
+    MCMP DR14, #63
+    BRANCHHI bad
+    IADD DR13, DR0, #0
+nextblock:
+    IADD DR13, DR13, #1
+    MCMP DR13, DR14
+    BRANCHHI empty
+    LOAD CR9, CR10, DR13
+    TPERM CR9, NULL
+    BRANCHEQ bad
+    LOAD CR7, CR9, #1
     DREAD DR11, CR7, #43, DR0
     MCMP DR11, #0
     BRANCHNE bad
@@ -259,18 +328,18 @@ method FreeThread(application: Inform[E]) -> Inform[] {
     MCMP DR10, #3
     BRANCHHI bad
     MCMP DR10, #0
-    BRANCHNE empty
+    BRANCHNE nextblock
     TPERM CR2, NULL
     BRANCHEQ bad
     TPERM CR2, E
     BRANCHNE bad
-    LOAD CR1, CR6, #9
+    LOAD CR1, CR9, #9
     TPERM CR1, NULL
     BRANCHEQ bad
     ; Private S grant names the same Thread, never client heap storage.
     ; SAVE enforces source transfer/B authority and destination S authority.
     ; Row 1 is saved CR1. CR0 and Amoeba's protected frames are unchanged.
-    LOAD CR8, CR6, #10
+    LOAD CR8, CR9, #10
     SAVE CR2, CR8, #1
     IADD DR11, DR0, #1
     DWRITE DR11, CR7, #35, DR0
@@ -289,43 +358,56 @@ bad:
 
 method Release(target: Inform[]) -> Void {
     LOAD CR1, NULL
-    LOAD CR7, CR6, #1
     TPERM CR2, NULL
     BRANCHEQ fh_foreign
+    LOAD CR10, CR6, #1
+    LOAD CR11, CR6, #2
+    DREAD DR14, CR11, #1, DR0
+    MCMP DR14, #63
+    BRANCHHI fh_corrupt
+    IADD DR13, DR0, #0
+nextblock:
+    IADD DR13, DR13, #1
+    MCMP DR13, DR14
+    BRANCHHI fh_foreign
+    LOAD CR9, CR10, DR13
+    TPERM CR9, NULL
+    BRANCHEQ fh_corrupt
+    LOAD CR7, CR9, #1
     ; Match actual capabilities, not an integer supplied by the caller.
-    LOAD CR8, CR6, #2
+    LOAD CR8, CR9, #2
     IADD DR10, DR0, #0
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    LOAD CR8, CR6, #3
+    LOAD CR8, CR9, #3
     IADD DR10, DR0, #1
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    LOAD CR8, CR6, #4
+    LOAD CR8, CR9, #4
     IADD DR10, DR0, #2
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    LOAD CR8, CR6, #5
+    LOAD CR8, CR9, #5
     IADD DR10, DR0, #3
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    LOAD CR8, CR6, #6
+    LOAD CR8, CR9, #6
     IADD DR10, DR0, #4
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    LOAD CR8, CR6, #7
+    LOAD CR8, CR9, #7
     IADD DR10, DR0, #5
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    LOAD CR8, CR6, #8
+    LOAD CR8, CR9, #8
     IADD DR10, DR0, #6
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    LOAD CR8, CR6, #9
+    LOAD CR8, CR9, #9
     IADD DR10, DR0, #7
     TPERM CR2, EXACT, CR8
     BRANCHEQ fh_release
-    BRANCH fh_foreign
+    BRANCH nextblock
 
 fh_release:
     DREAD DR11, CR7, #36, DR10

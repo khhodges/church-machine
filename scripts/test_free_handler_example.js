@@ -7,6 +7,33 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const r = prepare();
+const {bindPreparedBlock} = require('./free_handler_bindings');
+const Simulator = require('../simulator/simulator');
+const tokenFactory = new Simulator();
+const slots = {'ide.B1.Inventory': 25, 'ide.B1.State': 21,
+    'ide.FreeHandlerBlocks': 24, 'ide.AmoebaStartup': 22,
+    ...Object.fromEntries(r.setup.objects.map(o => [o.name, o.slot]))};
+const trusted = (name, rights) => {
+    assert(name in slots, `unrecognized canonical target ${name}`);
+    return tokenFactory.createGT(0, slots[name], Object.fromEntries(rights.map(p => [p, 1])), 1) >>> 0;
+};
+const portableBefore = JSON.stringify([r.clist, r.inventory, r.directory, r.thread]);
+const bound = bindPreparedBlock(r, trusted);
+assert.equal(bound.clist[64], trusted('ide.B1.FreeClist', ['E']));
+assert(bound.clist.slice(65).every(x => x === 0));
+assert.equal(bound.inventory[62] & 0x07FFFFFF, bound.inventory[63] & 0x07FFFFFF);
+assert.equal(bound.thread[501], 0);
+assert.equal(JSON.stringify([r.clist, r.inventory, r.directory, r.thread]), portableBefore,
+    'offline binding does not mutate portable templates');
+assert.throws(() => bindPreparedBlock(r, () => 0), /Missing trusted grant/);
+assert.throws(() => bindPreparedBlock(r, (name, rights) => {
+    if (name === 'ide.B1.FreeThread' && rights.join('') === 'S')
+        return trusted('ide.B1.FreeClist', rights);
+    return trusted(name, rights);
+}), /Wrong destination slot/, 'ThreadSetup cannot bind a different object');
+assert.throws(() => bindPreparedBlock(r, (name, rights) =>
+    name === 'ide.B1.FreeClist' && rights.join('') === 'LS'
+        ? trusted(name, ['S']) : trusted(name, rights)), /Wrong form or permissions/);
 assert.deepEqual(r.compiled.errors, []);
 assert.deepEqual(r.compiled.warnings, []);
 assert.equal(r.api.name, 'ide.FreeHandler');
@@ -18,14 +45,20 @@ for (const [index, name] of ['Free64', 'Free128', 'Free256'].entries())
 assert.deepEqual(r.api.methods.FreeCList, [3, [], [2, 'LS']]);
 assert.deepEqual(r.api.methods.FreeThread, [4, [['application', 2, 'E']], [2, '']]);
 assert.deepEqual(r.api.methods.Release, [5, [['target', 2, '']], 0]);
-assert.equal(r.packed.cc, 11);
-assert(r.words.slice(-11).every(word => word === 0), 'unbound means NULL, not fabricated grants');
+assert.equal(r.packed.cc, 3);
+assert(r.words.slice(-3).every(word => word === 0), 'unbound means NULL, not fabricated grants');
 assert.equal(r.api.symbolic_binding.calls.length, 0);
 assert.deepEqual(r.api.symbolic_binding.dependencies.map(d => d.relocation_row),
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    [0, 1, 2]);
 assert.deepEqual(r.api.symbolic_binding.dependencies.map(d => d.rights.join('')),
-    ['E', 'RW', 'RW', 'RW', 'RW', 'RW', 'RW', 'RW', 'LS', '', 'S']);
-assert.equal(r.api.symbolic_binding.dependencies[9].name, r.api.symbolic_binding.dependencies[10].name);
+    ['E', 'L', 'R']);
+assert.equal(r.setup.inventory.bindings[10].aliasOf, r.setup.objects[7].name);
+assert.equal(r.setup.inventory.bindings[10].slot, r.setup.objects[7].slot);
+assert.equal(r.setup.inventory.bindings[10].name, 'ide.B1.ThreadSetup');
+assert.deepEqual(r.setup.objects.map(o => o.name),
+    ['FreeData0','FreeData1','FreeData2','FreeData3','FreeData4','FreeData5','FreeClist','FreeThread'].map(n => 'ide.B1.' + n));
+assert.deepEqual(r.setup.clist.relocations,
+    [{wordOffset: 64, name: 'ide.B1.FreeClist', rights: ['E'], slot: 38}]);
 assert.deepEqual(r.state.slice(0, 12), [0, 0, 3, 0, 0, 2, 0, 0, 1, 0, 0, 0]);
 assert.deepEqual(r.state.slice(12, 20), [0, 1, 2, 0, 3, 4, 5, 0]);
 assert(r.state.slice(20).every(word => word === 0));
@@ -51,11 +84,11 @@ for (const word of executable) {
     if (op === 17) assert.equal(src, 7, 'all DWRITE authority is private State in CR7');
     if (op === 0 && (word & 0x7FFF) !== 0x4000) {
         // NULL-clear encoding is handled separately by the existing assembler.
-        assert.equal(src, 6, 'non-NULL LOAD source must be CR6');
+        assert([6, 9, 10].includes(src), 'LOAD only uses SELF directory, directory or selected inventory');
     }
 }
 assert.equal(executable.filter(word => word >>> 27 === 1).length, 1);
-assert(r.clist.slice(64).every(word => word === 0), 'all 64 C-list entries start NULL');
+assert(r.clist.slice(64).every(word => word === 0), 'portable SELF is unresolved; remaining 63 entries are NULL');
 assert.equal(r.clist[0] & 255, 64);
 const layout = r.setup.thread.layout;
 assert.equal(layout.capsStart, 500);
@@ -86,10 +119,12 @@ const embedded = JSON.parse(r.binary.subarray((frame + 1) * 4,
 assert.deepEqual(embedded, r.api);
 const expanded = Codec.expand(r.api, r.words);
 assert(expanded, 'existing API reader accepts compiled contract');
-const shifted = prepare({baseWord: 8192, firstSlot: 44});
+const shifted = prepare({baseWord: 8192, firstSlot: 44, blockName: 'B2'});
 assert.deepEqual(shifted.binary, r.binary, 'B/Y are destination binding inputs, not source patches');
 assert.equal(shifted.setup.objects[7].baseWord, 9216);
 assert.equal(shifted.setup.objects[7].slot, 51);
+assert.equal(shifted.setup.objects[0].name, 'ide.B2.FreeData0');
+assert.equal(shifted.setup.thread.initializationGrant.aliasOf, 'ide.B2.FreeThread');
 for (const bad of [
     {baseWord: 7169}, {baseWord: 0}, {baseWord: 15360}, {baseWord: 16384},
     {firstSlot: 2}, {firstSlot: 57}, {firstSlot: 3.5},
@@ -112,4 +147,4 @@ assert.equal(entries.length, 1, 'example is discoverable once in the actual Sour
 assert.equal(entries[0].name, 'FreeHandler');
 assert.equal(entries[0].loader, 'cloomc');
 assert.equal(maps._CLOOMC_FILE_EXAMPLES.free_handler, '/simulator/examples/free_handler.cloomc');
-console.log('PASS: six-method ABI, private SAVE CR1 boundary, empty C-list, offline Thread skeleton, embedded API, initialization and relocatable B/Y.');
+console.log('PASS: shared six-method ABI, private SAVE CR1 boundary, SELF relocation, block names, Thread alias and byte-identical B1/B2 code.');

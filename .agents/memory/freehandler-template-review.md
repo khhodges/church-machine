@@ -135,3 +135,13 @@ completion destination.
 
 **How to apply:** Preserve that offline supervisor binding; keep activation,
 completion, quarantine and future reuse as distinct operations.
+
+Use an explicit bounded block count in the private directory, not a NULL-GT
+sentinel read through ordinary LOAD.
+
+**Why:** Testing the shared-directory design showed that ordinary LOAD of an
+empty C-list row faults; scanning until such a load succeeds would silently
+depend on a runtime semantic change outside this work.
+
+**How to apply:** Register entries and count together in offline preparation;
+missing entries within the registered count are corruption, not exhaustion.

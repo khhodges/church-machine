@@ -20,7 +20,9 @@ function wordsToBytes(words, littleEndian = false) {
     return bytes;
 }
 
-function prepare({baseWord = 7168, firstSlot = 32} = {}) {
+function prepare({baseWord = 7168, firstSlot = 32, blockName = 'B1'} = {}) {
+    if (!/^B[1-9][0-9]*$/.test(blockName)) throw Error('Block name must be B1, B2, ...');
+    const prefix = `ide.${blockName}`;
     if (!Number.isSafeInteger(baseWord) || baseWord < 1024 ||
         baseWord % 1024 || baseWord + 1536 > 16384)
         throw Error('B must be a 1024-word-aligned resident base outside the table, within 16384 words.');
@@ -41,16 +43,28 @@ function prepare({baseWord = 7168, firstSlot = 32} = {}) {
     const offsets = [0, 64, 128, 256, 384, 512, 768, 1024];
     const sizes = [64, 64, 64, 128, 128, 256, 128, 512];
     const objects = offsets.map((offset, i) => ({
-        name: `ide.FreeObject${i}`, clistRow: i + 2,
+        name: `${prefix}.${i < 6 ? 'FreeData' + i : i === 6 ? 'FreeClist' : 'FreeThread'}`, clistRow: i + 2,
         kind: i < 6 ? 'data' : i === 6 ? 'clist' : 'thread',
         slot: firstSlot + i, sequence: 0,
         rights: i < 6 ? ['R', 'W'] : i === 6 ? ['L', 'S'] : [],
         baseWord: baseWord + offset, words: sizes[i], limit: sizes[i] - 1,
     }));
-    // A 64-entry C-list needs a header in addition to the 64 NULL GTs.
+    // A 64-entry C-list needs a header in addition to SELF plus 63 NULL GTs.
     // The 128-word body has cc=64 and no executable code.
     const clist = Array(128).fill(0);
     clist[0] = (0xF8000000 | (1 << 23) | 64) >>> 0;
+    const inventory = Array(64).fill(0);
+    inventory[0] = (0xF8000000 | 11) >>> 0;
+    const directory = Array(128).fill(0);
+    directory[0] = clist[0];
+    directory[1] = 1;
+    const inventoryBindings = [
+        {name: `${prefix}.Inventory`, rights: ['E'], row: 0},
+        {name: `${prefix}.State`, rights: ['R', 'W'], row: 1},
+        ...objects.map(o => ({name: o.name, rights: o.rights, row: o.clistRow, slot: o.slot})),
+        {name: `${prefix}.ThreadSetup`, target: `${prefix}.FreeThread`,
+            aliasOf: `${prefix}.FreeThread`, rights: ['S'], row: 10, slot: firstSlot + 7},
+    ];
     // Compile the actual startup implementation, keeping its public dispatch
     // table. No copied running Thread, live catalogue choice or fabricated GT.
     const amoebaSource = fs.readFileSync(path.join(ROOT, 'simulator/cloomc/amoeba_startup.cloomc'), 'utf8');
@@ -82,9 +96,15 @@ function prepare({baseWord = 7168, firstSlot = 32} = {}) {
         status: 'compiled-unbound-example-not-installable',
         source: 'simulator/examples/free_handler.cloomc',
         sourceSha256: sha(source), binarySha256: sha(binary),
-        baseWord, firstSlot, objects,
+        baseWord, firstSlot, blockName, objects,
+        directory: {name: 'ide.FreeHandlerBlocks', words: 128, entries: 64,
+            bindings: [{name: 'ide.FreeHandlerBlocks', rights: ['E'], row: 0},
+                {name: `${prefix}.Inventory`, rights: ['L'], row: 1}],
+            countWordOffset: 1, initialBlockCount: 1,
+            policy: 'Dense entries 1..count, count <= 63; add new blocks without resetting existing state.'},
+        inventory: {name: `${prefix}.Inventory`, words: 64, entries: 11, bindings: inventoryBindings},
         state: {
-            name: 'ide.FreeHandlerState', clistRow: 1, rights: ['R', 'W'],
+            name: `${prefix}.State`, clistRow: 1, rights: ['R', 'W'],
             words: 64, initializedWords: state,
             placement: 'Choose a private nonoverlapping allocation and vacant slot; not inferred from B/Y.',
         },
@@ -96,12 +116,15 @@ function prepare({baseWord = 7168, firstSlot = 32} = {}) {
         poolWords: objectWords.length,
         allocatedObjectWords: sizes.reduce((a, b) => a + b, 0),
         clist: {entries: 64, bodyWords: 128, entriesStart: 64,
-            initialValue: 'NULL', rowZero: 'immutable NULL; ordinary SAVE targets rows 1 through 63'},
+            initialValue: 'SELF plus 63 NULL entries',
+            relocations: [{wordOffset: 64, name: `${prefix}.FreeClist`, rights: ['E'], slot: firstSlot + 6}],
+            rowZero: 'immutable SELF; ordinary SAVE targets rows 1 through 63'},
         thread: {
             bodyWords: 512, stackWords: 32, layout, relocations: threadRelocations,
             applicationHome: layout.capsStart + 1,
             applicationInput: 'FreeThread CR2; saved into new Thread CR1 by SAVE',
-            initializationGrant: {name: 'ide.FreeObject7', clistRow: 10, rights: ['S'],
+            initializationGrant: {name: `${prefix}.ThreadSetup`, target: `${prefix}.FreeThread`,
+                aliasOf: `${prefix}.FreeThread`, clistRow: 10, rights: ['S'],
                 slot: firstSlot + 7, private: true},
             activation: 'not performed',
             amoeba: {source: 'simulator/cloomc/amoeba_startup.cloomc',
@@ -124,26 +147,28 @@ function prepare({baseWord = 7168, firstSlot = 32} = {}) {
         ],
     };
     return {source, compiled, packed, api, words, binary, state, setup,
-        objectWords, clist, thread, amoebaWords, amoebaApi};
+        objectWords, clist, thread, amoebaWords, amoebaApi, inventory, directory};
 }
 
 function main(argv) {
     const options = {};
     for (let i = 0; i < argv.length; i += 2) {
-        const key = {'--base-word': 'baseWord', '--first-slot': 'firstSlot'}[argv[i]];
+        const key = {'--base-word': 'baseWord', '--first-slot': 'firstSlot', '--block': 'blockName'}[argv[i]];
         if (!key || argv[i + 1] === undefined)
-            throw Error('Usage: node scripts/build_free_handler_example.js [--base-word X] [--first-slot Y]');
-        options[key] = Number(argv[i + 1]);
+            throw Error('Usage: node scripts/build_free_handler_example.js [--base-word X] [--first-slot Y] [--block B1]');
+        options[key] = key === 'blockName' ? argv[i + 1] : Number(argv[i + 1]);
     }
     const result = prepare(options);
     const directory = path.join(ROOT, 'generated-artifacts',
-        `free-handler-${result.setup.baseWord}-${result.setup.firstSlot}-${sha(result.source).slice(0, 12)}`);
+        `free-handler-${result.setup.blockName}-${result.setup.baseWord}-${result.setup.firstSlot}-${sha(result.source).slice(0, 12)}`);
     fs.mkdirSync(directory, {recursive: true});
     fs.writeFileSync(path.join(directory, 'FreeHandler-UNBOUND.lump'), result.binary);
     fs.writeFileSync(path.join(directory, 'FreeHandler.api.json'), JSON.stringify(result.api, null, 2) + '\n');
     fs.writeFileSync(path.join(directory, 'initial-state-le.bin'), wordsToBytes(result.state, true));
     fs.writeFileSync(path.join(directory, 'initial-objects-le.bin'), wordsToBytes(result.objectWords, true));
-    fs.writeFileSync(path.join(directory, 'empty-clist-le.bin'), wordsToBytes(result.clist, true));
+    fs.writeFileSync(path.join(directory, 'clist-template-UNBOUND-le.bin'), wordsToBytes(result.clist, true));
+    fs.writeFileSync(path.join(directory, 'inventory-UNBOUND-le.bin'), wordsToBytes(result.inventory, true));
+    fs.writeFileSync(path.join(directory, 'directory-UNBOUND-le.bin'), wordsToBytes(result.directory, true));
     fs.writeFileSync(path.join(directory, 'thread-template-UNBOUND-le.bin'), wordsToBytes(result.thread, true));
     fs.writeFileSync(path.join(directory, 'AmoebaStartup-UNBOUND.lump'), wordsToBytes(result.amoebaWords));
     fs.writeFileSync(path.join(directory, 'AmoebaStartup.api.json'), JSON.stringify(result.amoebaApi, null, 2) + '\n');
