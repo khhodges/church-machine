@@ -108,8 +108,8 @@ for (const state of [
     {pending:false, message:'LUMP saved; realignment incomplete. This saved LUMP has no Namespace assignment. Select a destination before simulation.', retryInput},
 ]) {
     const unassigned = mount(state);
-    assert.match(unassigned.host.children[0].textContent, /LUMP saved successfully/);
-    assert.match(unassigned.host.children[0].textContent, /no destination Namespace slot selected/);
+    assert.match(unassigned.host.children[0].textContent, /LUMP saved to the library/);
+    assert.match(unassigned.host.children[0].textContent, /No further action is required to keep this saved version/);
     assert.deepEqual(unassigned.host.children.filter(n => n.tag === 'button').map(n => n.textContent), ['Close']);
     assert.equal(unassigned.context._savedLumpRealignment.reason, 'namespace-unassigned');
     dismissAndCheck(unassigned);

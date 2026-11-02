@@ -172,7 +172,7 @@ function harness(fail, records=[artifact]) {
     }
     const legacy=harness();
     const unassigned=harness();
-    await assert.rejects(unassigned.api.realign(response,{save_as_copy:true}), /no destination Namespace slot selected/);
+    await assert.rejects(unassigned.api.realign(response,{save_as_copy:true}), /LUMP saved to the library/);
     assert.equal(unassigned.context._savedLumpRealignment.reason,'namespace-unassigned');
     assert(!unassigned.calls.includes('prepare'));
     assert(!unassigned.calls.includes('/api/namespace/save-table'));

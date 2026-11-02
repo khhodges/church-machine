@@ -4,7 +4,7 @@
     const storageKey = 'savedLumpRealignment';
     const dismissalKey = 'savedLumpRealignmentDismissedNotice';
     const readyMessage = 'LUMP saved and exact bytes admitted for private simulation. Admission does not certify complete C-list binding. Use Bind Namespace Design explicitly when binding is needed, then prepare fresh simulation. Run and Step do not bind references.';
-    const unassignedMessage = 'LUMP saved successfully. Not prepared for simulation: no destination Namespace slot selected. Select a destination in Namespace before preparing for simulation.';
+    const unassignedMessage = 'LUMP saved to the library. It is not assigned to a Namespace entry. No further action is required to keep this saved version. To use it in simulation, add it and its required objects to a Namespace design in Builder, then bind and prepare that design.';
     let retryInput = null;
     let dismissedNotice = null;
     let restoredNotice = false;
@@ -35,8 +35,9 @@
         const ready = state && !state.pending && state.privateReady === true;
         host.hidden = !state || ready || dismissedNotice === noticeKey(state);
         if (!state || ready) return;
-        host.setAttribute('data-state', restoredNotice ? 'previous' : state.pending ? 'pending' : 'error');
-        host.style.borderColor = state.pending ? '#93c5fd' : '#e0a055';
+        const libraryOnly = state.reason === 'namespace-unassigned';
+        host.setAttribute('data-state', restoredNotice ? 'previous' : state.pending ? 'pending' : libraryOnly ? 'saved-library' : 'error');
+        host.style.borderColor = state.pending || libraryOnly ? '#93c5fd' : '#e0a055';
         host.style.background = '#29344c';
         let message = state.message;
         if (restoredNotice) {
