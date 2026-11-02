@@ -78,3 +78,12 @@ need nine object-grant entries.
 
 **How to apply:** Keep the shared Thread destination explicit in any binding
 or alias representation. A naming change must not allocate another Thread.
+
+Inventory names need a block-specific dot-name component so a second block
+does not collide with the first; the user proposed ide.B1.FreeData.
+
+**Why:** The user explicitly raised naming for allocating a second block.
+
+**How to apply:** Keep block identity separate from per-object numbering and
+the established #issue suffix. B1/B2 is the proposed block component, not a
+Namespace slot, physical address or GT version.
