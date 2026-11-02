@@ -5,6 +5,15 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+Historical naming correction: the user distinguishes Babbage's “regulator”
+from this project's “SecurityRegulator”; do not attribute the latter term
+or the project's M-bit API to Babbage.
+
+**Why:** The user explicitly corrected that attribution.
+
+**How to apply:** Cite Babbage's actual mechanical regulation examples and
+label any digital-authority comparison as a modern analogy.
+
 The user states: “SecurityRegulator as a pure digital mechanism with no policy
 control, like GTs the M bit says the owner is trusted.”
 
