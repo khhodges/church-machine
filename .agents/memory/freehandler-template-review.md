@@ -25,3 +25,15 @@ without adding many large objects or a broader allocator.
 design review. The distribution of the six data objects, C-list physical
 allocation, template bindings and method ABI still need to be settled; do not
 silently preserve the old 1024-word pool geometry or implement during the pause.
+
+Use fixed initialization rather than configurable templates in this version:
+the 64-slot C-list starts entirely NULL, and the 512-word Thread is Amoeba-primed
+with CR0 holding the application-service capability.
+
+**Why:** The user corrected the expanded template proposal: “KISS is the rule
+assume the clist is always empty (filled with NULL gts) and the thread is Amoeba
+primed with CR0 application service.”
+
+**How to apply:** Do not add prepopulated C-list grants, template selectors or
+alternative Thread startup modes. Preserve normal Thread initialization rules;
+this clarification is not authorization to activate a Thread or resume implementation.
