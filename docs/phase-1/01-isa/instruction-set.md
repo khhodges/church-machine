@@ -11,6 +11,7 @@
 - [LOAD NULL and capability discard](#load-null-and-capability-discard)
 - [SWITCH: combined Namespace/Thread handoff](#switch-isolated-register-load)
 - [Retired opcodes and reference forms](#retired-opcodes-and-directindirect-reference-forms)
+- [Review appendix: SecurityRegulator methods](#review-appendix-securityregulator-methods)
 
 ## Document authority
 
@@ -1614,4 +1615,217 @@ Boot inputs, finite memory-failure detection and safe cross-root loading of
 CR1/CR2 must be resolved before implementation; no numeric timeout is approved
 by this change. These are architectural rules, not simulator, RTL or physical
 conformance evidence, nor authorization to synthesize or program hardware.
+
+## Review appendix: SecurityRegulator methods
+
+**Status: proposed method definitions for review, 2026-11-02.**
+This appendix is not an approved ISA amendment. It defines three proposed
+SecurityRegulator methods over existing machine operations: **LOADM, SAVEM
+and SWITCHM**. These names introduce neither opcodes nor assembler mnemonics.
+Where M behavior is unresolved, the review item is explicit; current simulator
+behavior does not supply a normative answer.
+
+### A.1 Common contract and notation
+
+SecurityRegulator is a **digital mechanism, not a policy decision service**.
+Held authority expresses trust. The methods do not decide whether a caller's
+business purpose, Block ownership or allocation policy deserves an operation.
+Grant distribution is outside their mechanical function.
+
+M is register state, not a GT permission. A method must not silently rewrite
+a GT's permission bits, identity or generation to emulate M. An M effect is
+instruction- and operand-specific, not a global "skip checks" mode.
+
+The signatures below use GT values and zero-based capability-home/C-list
+indices, not unrestricted memory addresses. Register assignments are proposed
+software ABI choices, not new instruction encodings. The provisioned invocation
+GT is denoted `ide.SecurityRegulator E`; this notation does not assert that a
+saved artifact or binding already exists.
+
+| Method | Functional signature | Successful completion |
+|---|---|---|
+| LOADM | `LOADM(sourceGT, homeIndex) -> valueGT` | Returns the loaded GT, possibly NULL |
+| SAVEM | `SAVEM(destinationGT, homeIndex, valueGT) -> void` | Returns after the defined capability write |
+| SWITCHM | `SWITCHM(sourceCListGT, rowIndex) -> context transfer` | Enters the destination Namespace's fixed entry Thread; no ordinary immediate return |
+
+Only M effects explicitly adopted for the underlying instruction may differ
+from ordinary execution. All other instruction checks and defined fault
+behavior remain applicable. No method adds silent retry, substituted targets,
+generation repair, or general rollback after observable writes.
+
+**Scope exclusions:** ordinary CHANGE needs no added M requirement. Thread
+initialization is a SAVEM use, not a fourth method. Watchdog interval setting
+is ordinary RW MMIO access, not inherently an M operation. A general SetM,
+WriteAnyRegister, allocator or policy-check method is not part of this API.
+These three methods are the proposed minimal set; exhaustive coverage still
+requires an audit of every architecturally defined M use.
+
+### A.2 LOADM — M-assisted capability load
+
+**Function:** load one GT from the selected source capability home using the
+defined M-assisted LOAD semantics.
+
+```text
+LOADM(sourceGT, homeIndex) -> valueGT
+
+Proposed entry: CR1 = sourceGT; DR1 = homeIndex
+Proposed return: CR1 = exact loaded valueGT
+```
+
+**Proposed operation:**
+
+1. Capture the source GT and home index before overwriting the result register.
+2. Resolve the source and indexed capability home through the normal LOAD
+   path, applying only the specifically defined M effect.
+3. Deliver the exact loaded GT as the result, with no permission enlargement.
+4. Complete the specified M-state transition and normal method return.
+
+**Defined constraints:** an authorized read whose stored value is NULL succeeds
+and discards the destination's previous authority. A NULL source GT does not
+authorize that read. Ordinary bounds, identity/integrity and register
+restrictions are not removed by calling the method LOADM. Direct NULL discard
+already has its own LOAD form and needs no special regulator method.
+
+**Faults:** use the underlying LOAD's applicable machine faults; do not turn
+an unauthorized access or invalid index into a successful NULL result.
+This appendix assigns no new fault numbers or multiple-fault precedence.
+
+**Review closure:** identify the exact source/destination M role, whether and
+how L is overridden, M acceptance/consumption, legal working registers, and
+how the returned GT survives CALL/RETURN and its preservation mask. The CR6
+execution-context exception must not be generalized to all operands. The
+functional return above does not authorize arbitrary isolated-register reads.
+
+### A.3 SAVEM — M-assisted capability save
+
+**Function:** store one supplied GT into the selected destination capability
+home using the defined M-assisted SAVE semantics.
+
+```text
+SAVEM(destinationGT, homeIndex, valueGT) -> void
+
+Proposed entry: CR1 = destinationGT; DR1 = homeIndex; CR2 = valueGT
+Proposed return: normal completion; no GT result
+```
+
+**Proposed operation:**
+
+1. Capture all three operands.
+2. Resolve the destination home through the SAVE path.
+3. Apply the defined M effects separately to destination write authority
+   and source transfer, rather than assuming one global privilege override.
+4. Store the exact supplied GT.
+5. Complete the specified M-state transition and normal method return.
+
+**Defined baseline:** ordinary SAVE requires destination S and source B with
+mSave validation; Abstract PassKey handling remains separately specified by
+the ISA. The method name alone does not settle which of these checks M
+overrides. Permission changes, GT generation changes, allocation and Thread
+activation are not effects of SAVEM.
+
+**First use case:**
+
+```text
+SAVEM(ide.B1.FreeThread, 1, applicationE_GT)
+    intended effect: B1 Thread's saved CR1 <- applicationE_GT
+```
+
+`ide.B1.FreeThread` remains permission-free. If the reviewed M semantics
+support this operation, `ide.B1.ThreadSetup S` is redundant and may be removed
+through an explicit artifact revision. Existing artifacts are not changed
+by this appendix. FreeHandler still owns allocation bookkeeping and issuance.
+
+**Faults:** preserve applicable SAVE faults and the defined write boundary.
+Failure is not reported as successful completion. An instruction write is not
+a transaction covering FreeHandler's later bookkeeping. No implicit recovery,
+reseed or rollback is supplied.
+
+**Review closure:** specify destination M versus S, source M versus B/F,
+the treatment of NULL values, protected/SELF homes and Thread-home geometry,
+remaining identity/integrity/bounds checks, and success/fault M consumption.
+An isolated-source export implementation does not by itself establish the
+destination-M permission needed for this example.
+
+### A.4 SWITCHM — M-authorized Namespace/Thread handoff
+
+**Function:** select a Namespace GT from a supplied C-list and perform the
+existing combined SWITCH handoff with CR15.M authorization.
+
+```text
+SWITCHM(sourceCListGT, rowIndex) -> context transfer
+
+Proposed entry: CR1 = sourceCListGT; DR1 = rowIndex
+Operand selected by SWITCH: sourceCListGT[rowIndex]
+```
+
+This accepts a **C-list GT plus row**, not a direct Namespace GT and not an
+arbitrary destination-register number.
+
+**Defined underlying operation:**
+
+1. Latch CR15.M at SWITCH acceptance. Its absence faults PERM_L.
+2. Use a source register in CR0–CR11 with explicit L permission. Source M
+   cannot replace L, including for CR6.
+3. Validate the selected Namespace capability, bounds, identity/integrity
+   and Namespace type before outgoing save or incoming installation.
+4. Save the outgoing Thread, install the Namespace into fixed CR15, then
+   activate that Namespace's fixed slot-2 entry Thread into CR12 according
+   to the approved SWITCH contract.
+5. Consume CR15.M on successful handoff. CR13 remains untouched.
+
+No additional CR12.M grant is required. Instruction bits 22:19 remain
+required zero; the software method does not restore the retired selectable
+destination encoding. Fixed entry selection must not synthesize a GT using
+the destination descriptor's current generation.
+
+**Faults:** all underlying SWITCH admission and handoff faults apply.
+After outgoing-save writes begin, no rollback or substitute Namespace is
+promised. The wrapper must not mask faults or redefine the hardware's trusted
+fault-recovery sequence.
+
+**Review closure — software continuation:** a CALL into SecurityRegulator
+followed by SWITCH saves a continuation inside the regulator, not automatically
+the caller's post-CALL continuation. Specify that saved frame and how a later
+reactivation completes the method. Define which outgoing Thread performs the
+handoff and the wrapper's M setup. Do not add an ordinary RETURN after SWITCH
+and claim that it ran immediately in the original context.
+
+### A.5 Shared ABI and M-lifecycle review items
+
+Before any implementation claims conformance, close:
+
+| Item | Required definition |
+|---|---|
+| Invocation | Exact selected regulator artifact, method selectors and held invocation authority; no invented policy database |
+| M setup | How the mechanism establishes each required bit, and at which instruction boundary |
+| Scope | Exactly which checks each operand's M changes; explicitly list checks it does not change |
+| Register ABI | Input/result assignments above, scratch/clobber set, preservation mask, flags and return behavior |
+| Lifetime | M before acceptance, after success, on a skipped instruction, on each fault boundary, across CALL/RETURN and on context transfer |
+| Control granularity | Whole-word M-control writes must not accidentally alter unrelated state; no per-bit hardware operation is assumed |
+| Evidence | Distinguish specification, simulator result, RTL result and exact installed-hardware result |
+
+No new blanket M-clearing rule is introduced. "No unintended authority
+export" is an interface proof obligation, not permission to clear unrelated
+architectural state. Existing Master oracle gaps, including CALL/RETURN M
+effects consistent with CR13's reservation, remain visible until resolved.
+
+### A.6 Review and acceptance cases
+
+- LOADM: ordinary/elevated cases, NULL data versus NULL authority, bounds,
+  stale identities, result-register aliasing and result survival on return.
+- SAVEM: source M and destination M independently varied; S/B/F cases;
+  exact value at home 1, protected-home cases, no unrelated object writes.
+- Both: defined remaining checks, accepted operands held through multicycle
+  execution, predication, fault/write boundaries and exact M state afterward.
+- SWITCHM: CR15.M absent/present, explicit source L absent/present regardless
+  of source M, wrong target type, fixed destinations, entry validation,
+  no-rollback failure behavior and later resumption of the regulator wrapper.
+- Negative scope: no added M requirement for CHANGE, no raw-register write
+  interface, and no watchdog refresh inferred from ordinary interval setting.
+
+Expected outcomes must be specified before tests are treated as evidence.
+This appendix supplies no passed tests or hardware acceptance claim.
+The [operation review](../security-regulator-operation-review.md) retains
+the supporting observations and earlier hypotheses; this appendix is the
+current three-method proposal for review.
 

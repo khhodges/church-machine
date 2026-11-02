@@ -5,6 +5,18 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+The user requested LOADM, SAVEM and SWITCHM as a review appendix to the ISA.
+These are the minimal proposed software methods, not new opcodes or approved
+M-override semantics. The appendix is in the Master ISA under
+“Review appendix: SecurityRegulator methods.”
+
+**Why:** The regulator API must be reviewed as one explicit machine contract,
+not accumulated from purpose-specific wrappers.
+
+**How to apply:** Use that appendix for the current proposal; preserve its
+open LOAD/SAVE M rules, ABI and SWITCHM continuation questions. Watchdog RW
+access and ordinary CHANGE do not require additional M methods.
+
 The user clarified that the watchdog is an MMIO capability with RW access to
 set the next time interval.
 

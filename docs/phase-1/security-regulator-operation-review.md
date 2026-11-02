@@ -3,6 +3,11 @@
 **Status:** First-pass architectural review, 2026-11-02. Proposed software
 interfaces, not an ISA amendment, implemented API or hardware qualification.
 
+**Current method proposal:** see the Master ISA's
+[SecurityRegulator review appendix](01-isa/instruction-set.md#review-appendix-securityregulator-methods)
+for LOADM, SAVEM and SWITCHM. The broader candidates below are investigation
+history, not additional selected methods.
+
 ## Authority and purpose
 
 The [Master ISA](01-isa/instruction-set.md) is authoritative. Its approved
