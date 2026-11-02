@@ -26,12 +26,13 @@ an external RAM socket.
 backing-store architecture. Do not count SD capacity as resident RAM or infer
 that an SD controller or Thread backing-store service exists in the bitstream.
 
-The user specified a named abstraction for each SD card, using `ide.SD#`
-notation, and requested review of its methods.
+The user approved a named abstraction for each SD card, using `ide.SD#`
+notation, with Info, ReadBlocks, WriteBlocks and Sync as a **Phase 2 objective**.
+See `docs/phase-2/sd-storage-abstraction.md` for the agreed responsibilities.
 
-**Why:** SD backing storage should appear through the machine's abstraction
-model rather than as implicit globally accessible storage.
+**Why:** The user approved the minimal storage interface and explicitly placed
+it in Phase 2, separate from Thread/object lifecycle policy above the driver.
 
-**How to apply:** Preserve the per-card naming direction. The method contract,
-card-to-name binding and meaning of the suffix still require their normal
-design review; do not infer an implemented storage service.
+**How to apply:** Keep this out of Phase 1 completion gates. Detailed ABI,
+card-to-name binding and suffix interpretation still require review; approval
+of the objective does not establish an implemented or qualified storage service.

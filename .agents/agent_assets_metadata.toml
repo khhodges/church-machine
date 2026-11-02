@@ -1662,3 +1662,17 @@ mtime_ms = 1793632134007
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/348384d7-dada-4367-ae28-bc0f148b410f/a078341d-398d-4cd9-a0e4-60d1750fb869"
 storage_version_token = "1793632160088820"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "4_cg7uCe4lisOG6kam3BP"
+uri = "file://docs/phase-2/sd-storage-abstraction.md"
+type = "text"
+title = "Phase 2 — Named SD-card storage abstraction"
+description = "Agreed Info, ReadBlocks, WriteBlocks and Sync methods, capability boundaries, and separation from Thread lifecycle policy."
+logical_id = "2366e3db-cd9f-4714-9f6f-844236dd5c40"
+content_hash = "sha256:9de519a62fa3c7b789d614abad6a8b99021bb0240fa58047bdd5f4a16e246768"
+size = 4517
+mtime_ms = 1793634071504
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2366e3db-cd9f-4714-9f6f-844236dd5c40/48231c88-0733-4284-9d66-eb71a0f7a6c0"
+storage_version_token = "1793634107995480"
+content_type = "text/markdown"

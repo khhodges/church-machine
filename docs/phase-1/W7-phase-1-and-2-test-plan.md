@@ -239,6 +239,11 @@ contract, exposure and statistical interpretation, not “ran once without fault
 
 ## 7. Phase 2 adversarial campaign
 
+Related Phase 2 objective:
+[named SD-card storage abstraction](../phase-2/sd-storage-abstraction.md).
+Its capability-controlled block interface and backing-store boundary are
+documented separately; no implementation or hardware qualification is implied.
+
 Start with two Namespaces on one FPGA as scoped. Keep same-FPGA shared resources
 visible in the threat model; this is not proof of isolation between physical
 machines. A later multi-device campaign requires separate topology approval.

@@ -78,3 +78,7 @@ small, finite initial inventory—not the long-term limit on Threads:
 
 No saved Namespace, executable image, running Thread or hardware configuration
 is changed by this document.
+
+The agreed [named SD-card storage abstraction](../phase-2/sd-storage-abstraction.md)
+is a **Phase 2 objective** that can support this model. It is not an additional
+Phase 1 completion requirement.
