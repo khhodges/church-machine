@@ -1,5 +1,12 @@
 # SecurityRegulator — machine-operation review
 
+**Latest conceptual correction:** B is a GT setting defining movement,
+not a source/destination property or a hardware-register M setting. Do not
+infer a CALL clearing rule from the user's correction. The preceding
+multiple-RETURN/private-sharing explanation has been corrected and must
+not serve as a settled movement oracle; exact CALL/RETURN semantics await
+clarification.
+
 **Latest correction — source bits do not authorize SAVE:** The source GT's
 bits, including B, have zero effect on SAVE admission. Source B=0 does not
 require SR access. Destination authority governs the write; source GT remains
@@ -22,10 +29,9 @@ B-authorized SAVE without requiring SR. Do not infer M or SR invocation
 authority from B, or declare a SaveB interface redundant solely because
 SAVEM can override a transfer check. Its interface disposition remains open.
 
-**Subsequent B lifetime decision:** B remains unchanged across multiple
-RETURNs that keep the CR holding the GT, supporting the compiler's ESaveLists
-workflow and sharing private GTs with personal objects. There is no
-one-RETURN limit; cleared CRs and intervening CALL behavior are separate.
+**B lifetime review:** The compiler's ESaveLists workflow requires returned
+GTs. The later multiple-RETURN/private-sharing claim was corrected; exact
+CALL/RETURN movement semantics remain to be clarified.
 Successful SAVE clears B in the stored GT only. The source CR retains B
 and can supply further SAVEs subject to destination authority and checks. Other
 stored GT fields remain unchanged. Failed-SAVE behavior remains unresolved.

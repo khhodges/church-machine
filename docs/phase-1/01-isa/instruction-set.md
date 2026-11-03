@@ -1618,6 +1618,13 @@ conformance evidence, nor authorization to synthesize or program hardware.
 
 ## Review appendix: SecurityRegulator methods
 
+**Latest B clarification:** B is a GT setting that defines movement, not a
+source/destination property and not register-local M state. Review its
+movement semantics as such; do not substitute a source/destination permission
+model or infer a CALL bit transition. The recent multiple-RETURN/private-sharing
+explanation was corrected by the user and is not a settled movement oracle.
+The exact CALL/RETURN movement rule remains to be clarified.
+
 **Subsequent scope requirement:** The user requires SecurityRegulator methods
 for B and F as well. Their operations, names and signatures remain to be
 reviewed one at a time. The six-method inventory below is therefore no longer
@@ -1821,12 +1828,11 @@ merely because source B=0. This supersedes the earlier source-B-check and
 SR B-override proposals. Destination authority and destination validation
 remain separate requirements. Register-operand restrictions are not GT bits.
 
-**Approved B lifetime direction:** For the command-interpreter/compiler
-composition workflow and sharing private GTs with personal objects, B remains
-unchanged across multiple RETURNs whenever each RETURN keeps the CR holding
-the GT. There is no one-RETURN limit or RETURN-based B consumption. This
-does not preserve a CR that the keep mask clears, or decide intervening CALL
-behavior. The recipient can populate the newly composed
+**B lifetime review:** The command-interpreter/compiler needs returned GTs
+to populate a newly composed abstraction. The later multiple-RETURN and
+private-sharing explanation was corrected; do not treat it as an approved
+general movement rule. Resolve CALL/RETURN in terms of B as the GT's movement
+setting, separately from M. The intended recipient populates the newly composed
 abstraction's E C-list/ESaveLists without SR access. A successful SAVE consumes
 B in the **stored GT only**: the source CR retains its B bit, while the stored
 copy has B=0. All other GT fields are preserved. The retained source can
