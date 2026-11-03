@@ -1764,9 +1764,17 @@ The remaining record contents are proposed for review:
 
 “Against the Passcode” means attributable to its identity. It does not by
 itself authorize recording or transmitting a reusable secret Passcode or
-private proof. The Passcode representation, safe audit reference and binding
-to the invocation remain review items; do not assume Passcode and earlier
-Passkey terminology are interchangeable or invent a new register assignment.
+private proof.
+
+**Approved audit representation:** Assign a non-secret audit ID when the
+Passcode is provisioned. The Home IDE maintains the association between this
+ID and the Passcode's identity. Audit records contain that ID, never the
+secret Passcode. The ID grants no authority by itself and is distinct from
+`TransactionID`, which identifies the transaction rather than the credential.
+Binding this ID to the actual invocation remains a separate decision;
+an arbitrary caller-supplied ID is not evidence of that binding. Do not assume
+Passcode and earlier Passkey terminology are interchangeable or invent a new
+register assignment.
 
 Sending records to the Home IDE is required, not optional diagnostic output.
 The audit path must cover SWITCHM even though it does not immediately return,

@@ -443,6 +443,13 @@ originator or invent a separate transaction-ID mechanism.
 CR5 tuple store across transaction types. This names the existing transaction
 identity; it does not create another ID or add a SAVEM operand.
 
+**Approved Passcode audit representation:** Provision a non-secret audit ID
+with the Passcode. The Home IDE maintains its association with the Passcode's
+identity. Record the audit ID, not the secret; the ID confers no authority.
+It identifies the credential and remains distinct from `TransactionID`.
+Secure binding to the actual invocation remains open; this approval does not
+make arbitrary caller-supplied labels trustworthy or select an ABI.
+
 The physical tuple layout and how these identities are carried and bound
 without spoofing or leaking a secret remain to be specified. The transaction
 ID is the stored ID, not an assumption that the raw CR5 GT is the ID.

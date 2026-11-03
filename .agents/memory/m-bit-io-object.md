@@ -232,6 +232,18 @@ secure propagation and detailed audit-delivery mechanisms remain separate design
 The user approved trusted IDE/Builder provisioning of SecurityRegulator's
 Home IDE destination during Namespace preparation.
 
+Passcode audit attribution uses a non-secret audit ID assigned at Passcode
+provisioning, with the association to the credential identity maintained by
+the Home IDE.
+
+**Why:** The user approved identifying the originating credential without
+recording or transmitting its reusable secret.
+
+**How to apply:** The ID itself grants no authority and is distinct from
+`TransactionID`. Secure invocation binding is still a separate decision;
+do not trust arbitrary caller labels or invent a register ABI from this
+representation approval.
+
 **Why:** Audit destination ownership must not pass to individual callers.
 
 **How to apply:** Mint, FreeHandler and applications cannot redirect individual
