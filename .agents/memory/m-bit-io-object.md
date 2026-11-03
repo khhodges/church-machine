@@ -30,6 +30,16 @@ not a purpose-policy filter.
 **How to apply:** Keep this at design approval until implementation is requested.
 Do not infer that the Passcode/audit contract or concrete binding ABI is settled.
 
+The user approved SAVEM's three operand inputs: CR1 destination GT, CR2 value
+GT, and DR1 capability-home index, not a byte address.
+
+**Why:** Freeze the bounded first-use interface for writing the application
+E-GT into the allocated Thread's saved CR1 without conflating CR and DR values.
+
+**How to apply:** This is interface design approval only. Method selector,
+audit inputs, clobbers, preservation and return behavior remain separate
+decisions; do not infer implementation or hardware approval.
+
 SR must support explicitly setting a GT's B to either 1 or 0, not just
 toggling it or bypassing a check.
 

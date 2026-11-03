@@ -1827,15 +1827,19 @@ home using the defined M-assisted SAVE semantics.
 ```text
 SAVEM(destinationGT, homeIndex, valueGT) -> void
 
-Proposed entry: CR1 = destinationGT; DR1 = homeIndex; CR2 = valueGT
+Approved operand inputs: CR1 = destinationGT; DR1 = homeIndex; CR2 = valueGT
 Proposed return: normal completion; no GT result
 ```
 
 **Approved operand clarification:** `valueGT` is supplied in a capability
-register CRn (CR2 in the proposed ABI), not as an integer in a DR or a
+register CR2 under the approved input assignment, not as an integer in a DR or a
 register-number argument. SAVE stores that register's GT with B cleared in
 the stored copy, not its hardware M setting. This does not authorize arbitrary
 isolated-register access.
+
+Approval of these three input assignments does not freeze the method selector,
+audit identity inputs, scratch/clobber set, register preservation or return
+contract, and does not authorize implementation or artifact/hardware changes.
 
 **Approved destination rule:** M on the register holding `destinationGT`
 replaces the destination S permission requirement for this Golden Token Save.

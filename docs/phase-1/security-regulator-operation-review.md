@@ -151,8 +151,9 @@ Do not create a public privileged method for every instruction by analogy.
 **Subsequent approved decision:** destination-register M replaces destination
 S, while identity, generation, integrity, bounds and protected-home checks
 remain. Consume the used destination M on success or failure. `valueGT` is
-held in a CRn (proposed CR2), not a DR scalar; SAVE stores its GT, never its
-M setting. Source B/F transfer semantics remain open. Appendix A.3 records
+held in CR2 under the approved input assignment, not a DR scalar; SAVE stores
+its GT, never its M setting. The latest source and stored-B rules are recorded
+in Appendix A.3; older source B/F questions below are historical. Appendix A.3 records
 the current contract; earlier open destination-permission questions below
 are retained as review history, not unresolved approval.
 
@@ -163,10 +164,12 @@ SaveM(destinationGT, homeIndex, valueGT) -> normal completion or machine fault
 ```
 
 The index is a capability-home index, not an arbitrary word address.
-The intended write stores the exact GT, not a permission-upgraded copy.
+The write stores the supplied GT with B cleared in the stored copy, preserving
+all other fields; it does not upgrade permissions.
 No allocation, activation, generation change or policy decision is included.
 
-Illustrative ABI, **not yet frozen**:
+**Approved operand inputs:** this freezes only the three assignments below,
+not the method selector, audit inputs, preservation or return contract.
 
 | Register | Input |
 |---|---|
@@ -174,8 +177,9 @@ Illustrative ABI, **not yet frozen**:
 | CR2 | Value GT |
 | DR1 | Home index |
 
-An eventual `ide.SecurityRegulator E` invocation grant is a proposed binding,
-not an assertion that this saved artifact exists. Define method selector,
+An `ide.SecurityRegulator E` invocation grant is approved for explicit
+provisioning to Mint and FreeHandler, not an assertion that this saved artifact
+exists. Define method selector,
 clobbers, result registers and CALL/RETURN effects before implementing it.
 
 ### B1 call
