@@ -1822,8 +1822,11 @@ SR B-override proposals. Destination authority and destination validation
 remain separate requirements. Register-operand restrictions are not GT bits.
 
 **Approved B lifetime direction:** For the command-interpreter/compiler
-composition workflow, an intentionally bindable GT retains B across at least
-one RETURN, allowing the recipient to populate the newly composed
+composition workflow and sharing private GTs with personal objects, B remains
+unchanged across multiple RETURNs whenever each RETURN keeps the CR holding
+the GT. There is no one-RETURN limit or RETURN-based B consumption. This
+does not preserve a CR that the keep mask clears, or decide intervening CALL
+behavior. The recipient can populate the newly composed
 abstraction's E C-list/ESaveLists without SR access. A successful SAVE consumes
 B in the **stored GT only**: the source CR retains its B bit, while the stored
 copy has B=0. All other GT fields are preserved. The retained source can

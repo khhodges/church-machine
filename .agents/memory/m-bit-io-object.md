@@ -19,8 +19,9 @@ and reconcile existing implementation checks against this current rule.
 
 The command interpreter is used as a compiler to populate the E C-list of
 a newly composed abstraction: it creates GTs and saves them in ESaveLists.
-B must survive at least one RETURN in this workflow; the user subsequently
-confirmed that successful SAVE consumes B in the stored GT only. Source CR
+B remains unchanged across multiple RETURNs that keep its CR, not merely
+one RETURN. The user also identifies sharing private GTs with personal objects
+as a reason for this lifetime. Successful SAVE consumes B in the stored GT only. Source CR
 B remains unchanged, allowing further authorized bindings; other stored GT
 fields are preserved.
 
@@ -28,8 +29,8 @@ The user clarified that source B may start at 1 or 0: authorized SAVE leaves
 that value unchanged and writes stored B=0 in either case.
 Destination authority, not source B, decides SAVE admission.
 
-**Why:** The user supplied this concrete composition use case to distinguish
-durable B authority from register-local, consumed M authority.
+**Why:** The user supplied these composition and sharing use cases and
+explicitly confirmed multiple-RETURN preservation, distinct from consumed M.
 
 **How to apply:** Preserve B on explicitly returned GT results; do not replace
 the post-RETURN SAVE with an assumption that the recipient can invoke SR.

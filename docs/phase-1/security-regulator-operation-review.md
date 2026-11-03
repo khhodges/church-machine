@@ -22,14 +22,15 @@ B-authorized SAVE without requiring SR. Do not infer M or SR invocation
 authority from B, or declare a SaveB interface redundant solely because
 SAVEM can override a transfer check. Its interface disposition remains open.
 
-**Subsequent B lifetime decision:** B survives the GT-producing service's
-RETURN for the compiler's ESaveLists workflow, then successful SAVE clears B
-in the stored GT only. The source CR retains B and can authorize further
-ordinary SAVEs subject to destination authority and other checks. Other
+**Subsequent B lifetime decision:** B remains unchanged across multiple
+RETURNs that keep the CR holding the GT, supporting the compiler's ESaveLists
+workflow and sharing private GTs with personal objects. There is no
+one-RETURN limit; cleared CRs and intervening CALL behavior are separate.
+Successful SAVE clears B in the stored GT only. The source CR retains B
+and can supply further SAVEs subject to destination authority and checks. Other
 stored GT fields remain unchanged. Failed-SAVE behavior remains unresolved.
 Source B may start at 1 or 0 and remains unchanged; stored B is zero for
-either authorized case. Ordinary B admission and the SR override remain
-distinct from this storage postcondition.
+either authorized case. Source bits, including B, do not authorize SAVE.
 This supersedes earlier exact-copy wording; do not reuse M's
 fault-consumption semantics for B.
 
