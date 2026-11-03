@@ -15,6 +15,12 @@ B-authorized SAVE without requiring SR. Do not infer M or SR invocation
 authority from B, or declare a SaveB interface redundant solely because
 SAVEM can override a transfer check. Its interface disposition remains open.
 
+**Subsequent B lifetime decision:** B survives the GT-producing service's
+RETURN for the compiler's ESaveLists workflow, then SAVE consumes B.
+Source-CR versus stored-GT clearing and failed-SAVE consumption are not yet
+resolved. This qualifies earlier exact-copy wording, not permission to invent
+a B mutation rule or reuse M's fault-consumption semantics.
+
 **Status:** First-pass architectural review, 2026-11-02. Proposed software
 interfaces, not an ISA amendment, implemented API or hardware qualification.
 
