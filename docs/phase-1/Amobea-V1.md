@@ -74,24 +74,18 @@ of machine state.
 
 ## 4. Continuation capture without CHANGE
 
-**Required application services:** Amoeba must support checkpoint,
-continuation and rollback methods as options applications explicitly choose
-to use. Their inclusion is required; applications are not required to invoke
-them. This is separate from Thread-local hard-fault handling and does not
-authorize automatic rollback, retry or recovery of unaffected Threads.
-The detailed capture/restore contract below remains to be defined; this
-requirement is not a claim that the methods are already implemented.
+**User-defined save operation:** It creates a saved copy of a Thread—no more,
+no less. Applications may use that copy for their checkpoint, continuation
+and rollback options. Creating the copy does not itself restore, activate,
+retry or recover anything. This clarifies the required operation, not its
+implementation status.
 
 The Thread's existing continuation structure is the starting point.
 Saving continuation state need not transfer execution to another Thread.
 
-The intended conceptual sequence is:
-
-1. Capture a defined continuation into the Thread's continuation structure.
-2. Retain that captured version if later rollback is required.
-3. Continue on the current Thread without invoking `CHANGE` merely to save.
-4. If explicitly requested, restore a retained continuation through the
-   agreed rollback contract.
+The save operation creates the saved Thread copy. The earlier multi-step
+capture/restore sequence is not part of that operation. Questions below
+about subsequently using the copy must not expand the save operation itself.
 
 The detailed capture and restore sequence must respect the existing ISA and
 Thread protection rules. This outline does not prescribe register layouts,
