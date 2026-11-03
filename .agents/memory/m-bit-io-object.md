@@ -219,13 +219,14 @@ Every SecurityRegulator action must be logged in detail against the Passcode
 and sent to the Home IDE.
 
 Audit attribution includes the originating Passcode identity, immediate caller,
-and the transaction ID held in the tuple's CR5 store.
+and the transaction ID held in the tuple's CR5 store. The user approved
+`TransactionID` as the reserved tuple entry name across transaction types.
 
 **Why:** The user explicitly added the transaction, such as an order or
 telephone call, to the proposed originator-and-caller audit attribution.
 
 **How to apply:** Reuse that stored transaction ID; do not invent a second
-transaction identity or treat the raw CR5 GT as the ID. Exact tuple field,
+transaction identity or treat the raw CR5 GT as the ID. Physical tuple layout,
 secure propagation and audit-delivery behavior remain separate design work.
 
 **Why:** The user explicitly requires per-Passcode accountability for all

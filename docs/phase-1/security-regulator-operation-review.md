@@ -439,7 +439,11 @@ tuple's CR5 store. The user explicitly added transaction attribution, such as
 an order or a telephone call. Do not substitute the service identity for the
 originator or invent a separate transaction-ID mechanism.
 
-The exact tuple field/layout and how these identities are carried and bound
+**Approved tuple entry name:** `TransactionID` is the reserved name in the
+CR5 tuple store across transaction types. This names the existing transaction
+identity; it does not create another ID or add a SAVEM operand.
+
+The physical tuple layout and how these identities are carried and bound
 without spoofing or leaking a secret remain to be specified. The transaction
 ID is the stored ID, not an assumption that the raw CR5 GT is the ID.
 This is evidence binding, not purpose policy or implementation approval.

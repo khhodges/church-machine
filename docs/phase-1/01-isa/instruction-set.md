@@ -1739,6 +1739,11 @@ introducing a separate ID mechanism. Exact tuple layout and secure propagation
 remain interface work; this does not identify the raw CR5 GT as the transaction
 ID or authorize implementation.
 
+**Approved tuple entry name:** `TransactionID` is reserved for this ID in the
+CR5 tuple store across transaction types. No additional SAVEM operand or
+separate transaction identity is introduced. Physical layout, access and
+modification protection remain separate from this naming decision.
+
 The remaining record contents are proposed for review:
 
 - Passcode-associated audit identity, an action identifier and ordered event
