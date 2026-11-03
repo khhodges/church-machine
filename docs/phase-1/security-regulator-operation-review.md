@@ -1,5 +1,12 @@
 # SecurityRegulator — machine-operation review
 
+**Latest correction — source bits do not authorize SAVE:** The source GT's
+bits, including B, have zero effect on SAVE admission. Source B=0 does not
+require SR access. Destination authority governs the write; source GT remains
+unchanged and stored GT has B=0 with other fields preserved. This supersedes
+the historical source-B requirement and SR B-override discussion below.
+Existing implementation checks must be reconciled, not treated as this rule.
+
 **Subsequent B/F requirement:** The user requires SecurityRegulator methods
 for B and F. Resolve their intended operations before choosing signatures or
 changing SAVEM checks. B is now approved as a SAVE-time transfer-check override,

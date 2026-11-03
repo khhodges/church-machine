@@ -1812,17 +1812,14 @@ replaces the destination S permission requirement for this Golden Token Save.
 Identity, generation, integrity, bounds and protected-home checks remain.
 The destination M is consumed on use, success or failure, under A.1.
 Destination elevation itself changes neither GT's permission bits; the
-stored-copy B clearing below is a separate SAVE effect. Source transfer
-authority is separate from this destination approval.
+stored-copy B clearing below is a separate SAVE effect.
 
-**Approved B operation:** SecurityRegulator may override the source B
-transfer check during SAVE, without changing the supplied GT's B bit.
-This override does not itself rewrite B. The subsequent SAVE-consumption
-decision below qualifies earlier promises of an exact stored GT.
-This is not approval for a SetB/ClearB operation
-or an F override. Exact source-M setup, register restrictions and whether
-this is exposed through SAVEM or a distinct method remain to be specified;
-used M authority follows A.1's success-or-failure consumption rule.
+**Latest approved source rule:** The source GT bits, including B, have no
+effect on SAVE authorization. They supply the value, not authority for the
+write. Do not require source B, introduce a source-B fault, or require SR
+merely because source B=0. This supersedes the earlier source-B-check and
+SR B-override proposals. Destination authority and destination validation
+remain separate requirements. Register-operand restrictions are not GT bits.
 
 **Approved B lifetime direction:** For the command-interpreter/compiler
 composition workflow, an intentionally bindable GT retains B across at least
@@ -1830,22 +1827,20 @@ one RETURN, allowing the recipient to populate the newly composed
 abstraction's E C-list/ESaveLists without SR access. A successful SAVE consumes
 B in the **stored GT only**: the source CR retains its B bit, while the stored
 copy has B=0. All other GT fields are preserved. The retained source can
-authorize further ordinary SAVEs when destination S and all other checks
-permit; a later LOAD of the stored copy does not recover B.
+supply further SAVEs when destination authority and checks permit; its B
+does not authorize or prohibit them.
 The source may initially have B=1 or B=0: after an authorized SAVE, source
 B remains its original value and stored B is zero in either case.
-This postcondition does not waive admission: ordinary SAVE requires B,
-while the approved SR override can authorize the B=0 case subject to the
-other checks.
+Both source values follow the same destination-authorized SAVE path.
 Failed-SAVE behavior remains a separate review item. Do not import M's
 success-or-failure rule into B without a separate decision.
 
 **Authority distinction:** B and M need not coincide. Ordinary SAVE through
-the required destination S and source B authority remains available without
+the required destination S authority remains available without
 SecurityRegulator access, subject to its other checks. Holding B does not
 grant M or authority to invoke SR; not every caller has SR access rights.
 The SR override is a separately authorized path, not a replacement for
-ordinary B-authorized SAVE. A claim that SaveB is redundant cannot follow
+ordinary destination-authorized SAVE. A claim that SaveB is redundant cannot follow
 merely from overlapping SAVE effects; its intended interface and access
 rights must first be distinguished. No separate SaveB API is settled here.
 
@@ -1853,17 +1848,18 @@ rights must first be distinguished. No separate SaveB API is settled here.
 
 1. Capture all three operands.
 2. Resolve the destination home through the SAVE path.
-3. Apply the defined M effects separately to destination write authority
-   and source transfer, rather than assuming one global privilege override.
+3. Apply the defined destination M override when used; do not gate SAVE on
+   source GT bits, including B.
 4. Store the supplied GT with B=0, preserving all other fields and leaving
    the source CR's GT, including B, unchanged.
 5. Complete the specified M-state transition and normal method return.
 
-**Defined baseline:** ordinary SAVE requires destination S and source B with
-mSave validation; Abstract PassKey handling remains separately specified by
-the ISA. Destination S and source B overrides above are approved. F is an
+**Current review contract:** ordinary SAVE requires destination S, not source
+B. The approved destination M override applies to SAVEM. Older source-based
+mSave checks are implementation evidence to reconcile, not authority to
+reintroduce source admission. F is an
 explicit Near/Far setting operation, not an approved SAVE-time F bypass.
-Exact source-M mechanics remain unresolved. Permission changes, GT generation changes, allocation and Thread
+Apart from stored B clearing, permission changes, GT generation changes, allocation and Thread
 activation are not effects of SAVEM.
 
 **First use case:**
@@ -1883,7 +1879,7 @@ Failure is not reported as successful completion. An instruction write is not
 a transaction covering FreeHandler's later bookkeeping. No implicit recovery,
 reseed or rollback is supplied.
 
-**Review closure:** specify source-M mechanics for the approved B override,
+**Review closure:** reconcile implementation source checks with the approved source-independent SAVE rule,
 the separate explicit Near/Far setting operation and its interaction with SAVE,
 the treatment of NULL values, protected/SELF homes and Thread-home geometry,
 remaining identity/integrity/bounds checks, and success/fault M consumption.

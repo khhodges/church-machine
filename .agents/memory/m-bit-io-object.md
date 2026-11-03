@@ -5,6 +5,18 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+**Current SAVE rule, superseding earlier B-admission notes below:** Source
+GT bits, including B, have no effect on SAVE authorization. Destination
+authority governs the write. Source GT stays unchanged; stored GT has B=0,
+with other fields preserved. Source B=0 does not require SR.
+
+**Why:** The user explicitly corrected repeated attempts to reintroduce a
+source-B requirement: “The source bits including B have zero impace on the SAVE”.
+
+**How to apply:** Do not add source-B checks or describe B as authorizing
+SAVE. Treat earlier source-B/SR-override discussions as superseded history,
+and reconcile existing implementation checks against this current rule.
+
 The command interpreter is used as a compiler to populate the E C-list of
 a newly composed abstraction: it creates GTs and saves them in ESaveLists.
 B must survive at least one RETURN in this workflow; the user subsequently
@@ -14,8 +26,7 @@ fields are preserved.
 
 The user clarified that source B may start at 1 or 0: authorized SAVE leaves
 that value unchanged and writes stored B=0 in either case.
-Do not confuse this postcondition with admission: B=0 does not gain ordinary
-SAVE authority merely because the stored copy will have B=0.
+Destination authority, not source B, decides SAVE admission.
 
 **Why:** The user supplied this concrete composition use case to distinguish
 durable B authority from register-local, consumed M authority.
@@ -23,11 +34,11 @@ durable B authority from register-local, consumed M authority.
 **How to apply:** Preserve B on explicitly returned GT results; do not replace
 the post-RETURN SAVE with an assumption that the recipient can invoke SR.
 Review any intervening CALL separately from RETURN. A stored copy has B=0;
-loading it does not restore binding authority. Failed-SAVE behavior remains
+loading it does not restore B. Failed-SAVE behavior remains
 a separate decision, not an inference from M consumption.
 
 B and M do not coincide in every situation; not all callers have SR access.
-Ordinary B-authorized SAVE must remain independent of SR invocation rights.
+Ordinary destination-authorized SAVE remains independent of SR invocation rights.
 
 **Why:** The user corrected the inference that SAVE effects alone made SaveB
 redundant; ordinary authority and privileged service access are distinct.
@@ -41,8 +52,8 @@ The user requires SecurityRegulator methods for B and F as well.
 **Why:** The user explicitly extended the review beyond the six-method set
 when source B/F transfer semantics were raised.
 
-**How to apply:** B is approved as an override during SAVE, preserving the
-GT's B bit and exact saved value, not as a B-state-changing operation.
+**How to apply:** The earlier B-override proposal is superseded: no source
+B check applies to SAVE; stored B is cleared and source B remains unchanged.
 For F, explicitly set Near or Far; do not toggle state or substitute a SAVE
 check override. The user corrected the wording to “Set not change near or far.”
 Do not infer the target, encoding, source-M setup or method signature from
@@ -51,13 +62,13 @@ these functional decisions.
 SAVEM destination-register M replaces S, retaining identity, generation,
 integrity, bounds and protected-home checks; consume it on success or failure.
 Its value operand is a GT held in CRn, not a DR integer or register-number
-argument. The source B override is separately approved above; the F setting
+argument. No source B override is needed under the current rule; the F setting
 mechanism remains open, not a SAVE-time F bypass.
 
 **Why:** The user agreed to destination elevation and clarified that
 `valueGT` is a CRn.
 
-**How to apply:** Store the exact CR-held GT, never its M setting; do not infer
+**How to apply:** Store the CR-held GT with stored B cleared, never its M setting; do not infer
 source-transfer overrides or permission to read arbitrary isolated registers.
 
 M is an immovable hardware register bit setting, never a transferable GT field.
