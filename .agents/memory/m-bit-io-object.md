@@ -8,16 +8,16 @@ description: Canonical representation and custody rule for CR M state.
 **B movement model:** B is a GT setting defining movement, not a property
 of source/destination operands and not register-local M.
 
-An argument GT with B=0 may cross CALL; the user explicitly approved this.
-Do not reject or discard an argument merely for B=0. Explicit argument
-clearing and other CALL checks remain separate; the post-CALL B setting
-is not decided by this approval.
+An argument GT with B=0 may cross CALL; an argument with B=1 crosses with
+B cleared to 0. Both decisions are explicitly approved. Passed arguments
+arrive with B=0. Explicit argument clearing, the invocation E GT, other CALL
+checks and M behavior remain separate; RETURN semantics still need review.
 
 **Why:** The user emphatically corrected the repeated source/destination
 framing and clarified that the discussion concerns B, not M.
 
 **How to apply:** Review GT movement semantics directly. Do not infer a
-CALL-clears-B rule from the correction or retain the corrected
+broader CALL-clears-B rule beyond passed arguments or retain the corrected
 multiple-RETURN/private-sharing explanation as an approved oracle.
 
 **Current SAVE rule, superseding earlier B-admission notes below:** Source

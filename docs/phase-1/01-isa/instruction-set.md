@@ -1627,9 +1627,11 @@ The exact CALL/RETURN movement rule remains to be clarified.
 
 **CALL movement decision:** An argument GT with B=0 may cross a CALL
 boundary. B=0 is not a reason to reject or discard that argument. This does
-not override explicit argument clearing or other CALL checks. The B setting
-after crossing remains a separate decision; this statement concerns argument
-GTs, not the E GT used to invoke the abstraction.
+not override explicit argument clearing or other CALL checks. An argument
+GT with B=1 crosses with B cleared to 0; an argument with B=0 crosses with
+B=0. Thus passed argument GTs arrive with B=0. This statement concerns
+argument GTs, not the E GT used to invoke the abstraction, and does not change
+M behavior. RETURN movement semantics remain a separate review decision.
 
 **Subsequent scope requirement:** The user requires SecurityRegulator methods
 for B and F as well. Their operations, names and signatures remain to be

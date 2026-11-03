@@ -9,7 +9,9 @@ clarification.
 
 **CALL argument decision:** B=0 does not prohibit an argument GT from
 crossing CALL. This does not override explicit argument clearing or other
-CALL checks. The post-CALL B setting remains to be decided separately.
+CALL checks. A passed argument with B=1 has B cleared to 0; B=0 remains 0.
+Passed argument GTs therefore arrive with B=0. This does not settle RETURN
+movement semantics or change M behavior.
 
 **Latest correction — source bits do not authorize SAVE:** The source GT's
 bits, including B, have zero effect on SAVE admission. Source B=0 does not
