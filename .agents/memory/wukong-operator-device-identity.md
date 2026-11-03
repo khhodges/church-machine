@@ -22,14 +22,18 @@ reported successful BootBuild.mcs programming after a USB/JTAG retry.
 Subsequent Vivado status after the reported power cycle showed DONE and EOS
 set, no CRC/ID/security errors, and no fallback. Its reported DNA_PORT is
 `058AD4112E1085C`. This establishes configuration evidence, not exact image
-provenance or Church Machine runtime qualification. A new operator bridge UID
-has not yet been commissioned.
+provenance or Church Machine runtime qualification. The operator subsequently
+started the second board's bridge with distinct UID `058ad4112e1085c`, derived
+from that DNA value. The published IDE reported this UID in both bridge and
+boot evidence, BUILD v20 / TU_VERSION 2, with session-matched halt confirmation.
+Keep this operator-assigned identity distinct from the original handoff board;
+it is not cryptographic hardware attestation or exact BIT-hash verification.
 
 **Why:** The new board's Vivado log showed the same JTAG target identifier
 used during the earlier board's session. That identifier must not be treated
 as proof that the physical board is unchanged.
 
 **How to apply:** Retain the earlier operator UID for the original handoff
-board. Commission a distinct UID for the second board before bridging it;
+board. Use the distinct commissioned UID above for the second board;
 do not reuse the handoff launcher's hardcoded identity on the new board.
 Programming success alone does not prove exact artifact identity or startup.
