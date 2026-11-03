@@ -6,8 +6,11 @@ description: Pin UART software compatibility to the installed BIT, not today's m
 The user wants a second Artix-7 board for a team member's independent IDE
 development site.
 
+Set up the second IDE first, before flashing the second board.
+
 **Why:** The immediate goal is a second development environment, not an
 implicit requirement to finish all SR or Factory Build features first.
+The user explicitly selected IDE setup before flashing.
 
 **How to apply:** Assess exact board/bitstream compatibility, matching software
 baseline, separate site state and bridge targeting. This request to identify
