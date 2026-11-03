@@ -1828,7 +1828,7 @@ home using the defined M-assisted SAVE semantics.
 SAVEM(destinationGT, homeIndex, valueGT) -> void
 
 Approved operand inputs: CR1 = destinationGT; DR1 = homeIndex; CR2 = valueGT
-Proposed return: normal completion; no GT result
+Return: normal completion; no result value
 ```
 
 **Approved operand clarification:** `valueGT` is supplied in a capability

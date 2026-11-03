@@ -50,6 +50,16 @@ for ordinary working registers.
 The exact clobber set and supported save/restore sequence still need definition;
 this approval neither exports temporary M nor changes saved artifacts.
 
+Retain SAVEM's void return contract: normal return after a successful write,
+no result value or success flag; failed SAVE takes the defined machine-fault
+path. Audit-delivery failure remains separate.
+
+**Why:** The user confirmed the existing contract and rejected reopening it
+as an unnecessary choice.
+
+**How to apply:** Resolve genuinely open contract items rather than presenting
+established SAVEM behavior as a new approval decision.
+
 SR must support explicitly setting a GT's B to either 1 or 0, not just
 toggling it or bypassing a check.
 
