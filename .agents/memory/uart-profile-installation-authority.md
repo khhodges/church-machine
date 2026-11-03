@@ -23,6 +23,19 @@ Namespace and boot changes to themselves.
 role-based permissions or completed backups. Do not publish or connect a
 second simultaneous bridge as part of ordinary development work.
 
+For proposed multi-bridge support, the user agrees that software-image
+upgrades will never occur simultaneously, using a shared IDE switch.
+
+**Why:** Serial image loading reduces complexity while allowing boards to
+run different compatible images. This is not a request to change the
+Phase 1 bitstream.
+
+**How to apply:** Design one shared selected upload target and one
+server-enforced upload operation at a time, pinned to exact image bytes,
+board UID and session. Do not retarget an in-flight operation. Still isolate
+board commands and telemetry. Until implemented and verified, the existing
+one-connected-bridge rule remains in force.
+
 **Why:** The user explicitly rejected the independent-site interpretation
 and clarified the split between Phase 1 integration and foundation work.
 
