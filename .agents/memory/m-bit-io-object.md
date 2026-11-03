@@ -227,7 +227,20 @@ telephone call, to the proposed originator-and-caller audit attribution.
 
 **How to apply:** Reuse that stored transaction ID; do not invent a second
 transaction identity or treat the raw CR5 GT as the ID. Physical tuple layout,
-secure propagation and audit-delivery behavior remain separate design work.
+secure propagation and detailed audit-delivery mechanisms remain separate design work.
+
+The user approved local audit recording with asynchronous Home IDE delivery.
+Required local evidence precedes the privileged effect; record the actual
+outcome and retain unacknowledged records as pending. If required local
+recording cannot be guaranteed, hard-fault instead of executing unaudited.
+
+**Why:** Standalone operation should not depend on a network round trip for
+each regulator action, while the required audit must not be silently lost.
+
+**How to apply:** Treat this as design approval only, not evidence of
+reset-safe storage. Specify retention, capacity, acknowledgement and
+outcome-recording failure boundaries separately; transmission is not receipt
+and a logging fault does not imply rollback of a committed effect.
 
 **Why:** The user explicitly requires per-Passcode accountability for all
 regulator actions, in addition to the pure digital mechanism.

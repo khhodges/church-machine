@@ -448,6 +448,15 @@ without spoofing or leaking a secret remain to be specified. The transaction
 ID is the stored ID, not an assumption that the raw CR5 GT is the ID.
 This is evidence binding, not purpose policy or implementation approval.
 
+**Approved audit delivery model:** Retain required audit evidence locally
+before the privileged effect, record the actual outcome, and deliver
+asynchronously to the Home IDE. Network acknowledgement does not block each
+operation. Unacknowledged records remain pending; transmission alone is not
+delivery proof. If required local recording cannot be guaranteed, hard-fault
+rather than execute without evidence. This is design approval only, not proof
+of implemented reset-safe storage. Capacity, reset retention, acknowledgement
+protocol and outcome-recording failure boundaries remain to be defined.
+
 Review in order:
 
 1. Exact M-control custody/provisioning, including Mint's Namespace-write reach.

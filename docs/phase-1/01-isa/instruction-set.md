@@ -1774,13 +1774,19 @@ and faults even when ordinary method completion cannot emit a record.
 The Home IDE must be explicitly identified; a caller-supplied arbitrary
 destination must not silently stand in for it.
 
-**Delivery contract still to review:** transport and receiver authentication,
-record integrity, ordering/duplicate handling, acknowledgement, retention,
-buffering across reset, and behavior when logging or delivery fails or the
-Home IDE is unavailable. In particular, whether execution waits, faults or
-uses a durable pending record is not selected here. Do not silently discard
-records or claim delivery merely because they were queued or transmitted.
-These are pending mechanism details, not permission to add policy control.
+**Approved delivery rule:** Record locally and deliver asynchronously. Retain
+the required audit evidence locally before allowing the privileged effect,
+then record the actual outcome. Execution does not wait for a Home IDE
+network round trip. Keep unacknowledged records pending; queued or transmitted
+does not mean received. If required local recording cannot be guaranteed,
+hard-fault rather than perform an unaudited privileged operation.
+
+This approves the delivery model, not an implemented reset-safe storage
+mechanism. Transport and receiver authentication, record integrity,
+ordering/duplicate handling, acknowledgement protocol, capacity, retention,
+buffering across reset and outcome-recording failure boundaries still require
+definition. Do not silently discard records, infer successful outcomes, or
+add implicit rollback. These are mechanism details, not caller-purpose policy.
 
 ### A.2 LOADM — M-assisted capability load
 
