@@ -1718,3 +1718,17 @@ mtime_ms = 1793715191656
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5a63d2d9-5d53-4675-a2b4-4ac091d95288/73bc85d3-7d69-4f38-9276-650ab8146be9"
 storage_version_token = "1793715235250261"
 content_type = "image/png"
+
+[[outputs]]
+id = "8C5bYioJdFm2MLjxu8AcB"
+uri = "file://generated-artifacts/live-backup/comparison-20261103T141940Z/READ-ME.txt"
+type = "text"
+title = "Live-versus-workspace comparison"
+description = "Current LUMPs match exactly. Lists recoverable CapabilityTest history gaps, Namespace/configuration differences, and the remaining unverified state. Read-only comparison; nothing restored or published."
+logical_id = "82c6f955-0dd9-4968-a153-af39c8c3cd14"
+content_hash = "sha256:6b9a1cc4a0f977bb39a37a113cc4c09cf4b0ab18a2dbcd4682f594b719bc129e"
+size = 4166
+mtime_ms = 1793715696756
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/82c6f955-0dd9-4968-a153-af39c8c3cd14/2e718587-b758-4c9c-9924-4c2b2ab40f20"
+storage_version_token = "1793715705312993"
+content_type = "text/plain"
