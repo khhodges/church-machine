@@ -306,7 +306,7 @@ qualification and no saved-artifact migration.
 | Item | Meaning | Custody / use |
 |---|---|---|
 | M-control GT | Capability addressing the hardware control object; not an M bit embedded in a GT | Intended private regulator authority; concrete canonical name/binding remains to be established |
-| `ide.SecurityRegulator E` | Proposed capability to invoke the regulator's methods | Explicitly provisioned to trusted consumers such as Mint and FreeHandler if adopted |
+| `ide.SecurityRegulator E` | Capability to invoke the regulator's methods; concrete binding/ABI still pending | Explicit IDE/Builder provisioning to Mint and FreeHandler approved as a design |
 | CRn.M | Actual architectural register state | Established/consumed by the specified operation; not an issued GT permission |
 | Passcode audit identity | Identity against which regulator actions are recorded and sent Home | Must remain attributable across nested service calls; exact representation/ABI not yet selected |
 
@@ -343,8 +343,17 @@ Mint or FreeHandler
 
 The approved provisioning route is the trusted IDE/Builder, not ordinary
 Mint CREATE or FreeHandler inventory allocation. Neither service's ordinary
-result should include raw M-control authority. Provisioning regulator
-invocation grants to consumers remains a separate review decision.
+result should include raw M-control authority.
+
+**Approved consumer-grant design (2026-11-03):** The trusted IDE/Builder
+explicitly provisions SecurityRegulator E to Mint and FreeHandler. They
+receive invocation authority, not raw M-control authority. Their ordinary
+allocation results include neither raw M-control nor regulator invocation
+authority. Other applications gain no automatic regulator access; additional
+grants require an explicit programmer decision. These are substantial grants
+to a mechanism without caller-purpose policy. The separate Passcode/audit
+contract remains open. This approval does not authorize implementation,
+saved-artifact changes or hardware operations.
 
 ### Mint: what the source establishes
 

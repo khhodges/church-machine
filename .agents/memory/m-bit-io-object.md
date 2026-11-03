@@ -15,8 +15,20 @@ CR6.M retain their defined exceptions.
 ordinary allocation services an implicit M-control issuance role.
 
 **How to apply:** Treat this as design approval only, not permission to change
-code, saved artifacts or hardware. Consumer invocation grants remain separate;
-verify Mint's Namespace-write reach before asserting exclusive access.
+code, saved artifacts or hardware. Verify Mint's Namespace-write reach before
+asserting exclusive access.
+
+The user separately approved explicit trusted IDE/Builder provisioning of SR
+E invocation grants to Mint and FreeHandler. Their ordinary allocation results
+include neither SR access nor raw M-control; additional application grants
+require an explicit programmer decision.
+
+**Why:** Trusted consumers need the regulator's general operations without
+receiving its raw control capability. Invocation remains substantial authority,
+not a purpose-policy filter.
+
+**How to apply:** Keep this at design approval until implementation is requested.
+Do not infer that the Passcode/audit contract or concrete binding ABI is settled.
 
 SR must support explicitly setting a GT's B to either 1 or 0, not just
 toggling it or bypassing a check.
