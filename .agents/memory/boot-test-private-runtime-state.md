@@ -175,3 +175,16 @@ creation, while allowing writes into the frozen source weakens retention proof.
 as routing all data inputs there. Block networking and writes outside that root;
 compare frozen source and staged state hashes after the run. Carry dependency
 search paths explicitly without inheriting production secrets.
+
+Real signed artifact fixtures require their existing verification keys even in
+an isolated preparation trial; a credential-free smoke test cannot qualify them.
+
+**Why:** Stripping all credentials makes a present, valid signed admission record
+look unauthenticated. That is a harness limitation, not evidence of missing
+artifact provenance.
+
+**How to apply:** For explicitly authorized real-artifact qualification, allow
+only the required existing verification keys through process inheritance, with
+no value inspection, argument serialization or logging. Keep network/write
+isolation and the genuine review/confirmation flow; never sign replacement
+evidence or weaken admission checks merely to make the trial pass.

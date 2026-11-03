@@ -1746,3 +1746,17 @@ mtime_ms = 1793716237749
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9f08e146-1603-4a25-9735-13809e13920c/28298694-0e85-443c-a100-c8e2977bf9c9"
 storage_version_token = "1793716293213097"
 content_type = "text/plain"
+
+[[outputs]]
+id = "JCaELHLrM4Lsv9GqtBUho"
+uri = "file://generated-artifacts/live-backup/candidate-20261103T142436Z/image-trial-20261103T143742Z/RESULT.txt"
+type = "text"
+title = "Boot image comparison — identical bytes"
+description = "Isolated preparation succeeded. Zero binary changes; only provenance input hashes changed. Boot entry, layout, resident artifacts and saved settings are unchanged. Nothing published or installed."
+logical_id = "174f286e-cbe5-45bb-b7a7-e8b61e6e3c51"
+content_hash = "sha256:bad5bc6c7903858c01236cdb525ffce706d145dc97ab72fe40963d76aac4e131"
+size = 2246
+mtime_ms = 1793716968668
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/174f286e-cbe5-45bb-b7a7-e8b61e6e3c51/c2ff1c72-3507-47c9-b939-a321151518ef"
+storage_version_token = "1793716987988169"
+content_type = "text/plain"
