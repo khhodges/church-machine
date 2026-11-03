@@ -2061,5 +2061,83 @@
         "age_timestamp": 1790506439.9806974
       }
     }
+  ],
+  "a207ecd1": [
+    {
+      "version": 40,
+      "filename": "CapabilityTest.1.ff2e3f35.lump",
+      "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "deleted_at": 1793712783.6473868,
+      "compiled_at": 1791072510.9183779,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1791072510.9183779
+      }
+    },
+    {
+      "version": 39,
+      "filename": "CapabilityTest_v39.lump",
+      "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "deleted_at": 1793712784.2772412,
+      "compiled_at": 1791072510.9183779,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1791072510.9183779
+      }
+    },
+    {
+      "version": 38,
+      "filename": "CapabilityTest_v38.lump",
+      "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "deleted_at": 1793712784.7949958,
+      "compiled_at": 1791072510.9183779,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1791072510.9183779
+      }
+    },
+    {
+      "version": 37,
+      "filename": "CapabilityTest_v37.lump",
+      "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "deleted_at": 1793712785.3339517,
+      "compiled_at": 1791072510.9183779,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1791072510.9183779
+      }
+    }
   ]
 }
