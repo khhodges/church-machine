@@ -240,9 +240,20 @@ the Home IDE.
 recording or transmitting its reusable secret.
 
 **How to apply:** The ID itself grants no authority and is distinct from
-`TransactionID`. Secure invocation binding is still a separate decision;
-do not trust arbitrary caller labels or invent a register ABI from this
-representation approval.
+`TransactionID`. Do not trust arbitrary caller labels or invent a register ABI
+from this representation approval.
+
+The user approved SecurityRegulator verifying the supplied originating
+Passcode and obtaining the audit ID from the provisioned association.
+
+**Why:** Attribution must bind to the verified credential rather than an
+independent caller-supplied identity claim.
+
+**How to apply:** Mint/FreeHandler nested calls retain the originator, not a
+substituted service credential. The invocation capability remains necessary;
+this is not purpose policy and the secret is never logged. Protected
+representation, nested-call transport and register ABI remain separate design
+work; this is not implementation or hardware authorization.
 
 **Why:** Audit destination ownership must not pass to individual callers.
 

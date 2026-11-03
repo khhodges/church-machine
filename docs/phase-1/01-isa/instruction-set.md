@@ -1771,10 +1771,15 @@ Passcode is provisioned. The Home IDE maintains the association between this
 ID and the Passcode's identity. Audit records contain that ID, never the
 secret Passcode. The ID grants no authority by itself and is distinct from
 `TransactionID`, which identifies the transaction rather than the credential.
-Binding this ID to the actual invocation remains a separate decision;
-an arbitrary caller-supplied ID is not evidence of that binding. Do not assume
-Passcode and earlier Passkey terminology are interchangeable or invent a new
-register assignment.
+**Approved verification point:** SecurityRegulator verifies the supplied
+originating Passcode and obtains its audit ID from the provisioned association,
+not from an independently supplied caller label. Nested calls through Mint or
+FreeHandler retain the originating Passcode rather than substituting the
+service's own identity. This is credential-to-identity verification, not
+caller-purpose policy; the invocation capability remains necessary and the
+secret never enters the audit record. Protected credential representation,
+transport through nested calls and register assignments remain to be defined.
+Do not assume Passcode and earlier Passkey terminology are interchangeable.
 
 Sending records to the Home IDE is required, not optional diagnostic output.
 The audit path must cover SWITCHM even though it does not immediately return,

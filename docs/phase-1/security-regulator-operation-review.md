@@ -447,8 +447,15 @@ identity; it does not create another ID or add a SAVEM operand.
 with the Passcode. The Home IDE maintains its association with the Passcode's
 identity. Record the audit ID, not the secret; the ID confers no authority.
 It identifies the credential and remains distinct from `TransactionID`.
-Secure binding to the actual invocation remains open; this approval does not
-make arbitrary caller-supplied labels trustworthy or select an ABI.
+**Approved verification point:** SecurityRegulator verifies the supplied
+originating Passcode and obtains the audit ID from its provisioned association.
+Mint and FreeHandler must not substitute their own identity for the originator
+on nested calls. Independently supplied audit labels are not trusted.
+The invocation capability remains necessary; verification is not a
+caller-purpose policy check and the secret is never logged. Protected
+credential representation, nested-call transport and the register ABI remain
+to be defined. This design approval authorizes no implementation or hardware
+changes.
 
 The physical tuple layout and how these identities are carried and bound
 without spoofing or leaking a secret remain to be specified. The transaction
