@@ -16,3 +16,16 @@ or proof of a silicon serial number.
 Never infer a UID from a port or session, and reconfirm identity if the physical
 board changes. Configuration confirmation does not authorize board commands,
 reprogramming, persistent flash changes, or a new image installation.
+
+The operator switched to a separate new XC7A100T board on 2026-11-03 and
+reported successful BootBuild.mcs programming after a USB/JTAG retry.
+Power-on boot and a new bridge identity were not established by that report.
+
+**Why:** The new board's Vivado log showed the same JTAG target identifier
+used during the earlier board's session. That identifier must not be treated
+as proof that the physical board is unchanged.
+
+**How to apply:** Retain the earlier operator UID for the original handoff
+board. Commission a distinct UID for the second board before bridging it;
+do not reuse the handoff launcher's hardcoded identity on the new board.
+Programming success alone does not prove exact artifact identity or startup.
