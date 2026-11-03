@@ -242,6 +242,17 @@ reset-safe storage. Specify retention, capacity, acknowledgement and
 outcome-recording failure boundaries separately; transmission is not receipt
 and a logging fault does not imply rollback of a committed effect.
 
+The user approved allowing pending local audit records to be lost on board
+power-off in Phase 1.
+
+**Why:** The user chose the bounded retention guarantee rather than requiring
+power-loss-safe local storage.
+
+**How to apply:** Do not add nonvolatile audit storage as a Phase 1 requirement
+on this account. Preserve pending records during normal powered operation;
+Thread-local faults are not power-off. Do not extend this decision to FPGA
+reconfiguration or discard acknowledged Home IDE records.
+
 **Why:** The user explicitly requires per-Passcode accountability for all
 regulator actions, in addition to the pure digital mechanism.
 

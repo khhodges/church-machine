@@ -1788,6 +1788,13 @@ Threads or their pending audit records are reset or discarded. This
 clarification does not select a retention guarantee for power loss or FPGA
 reconfiguration.
 
+**Approved Phase 1 power-off boundary:** Pending local audit records may be
+lost when board power is switched off. Phase 1 does not require power-loss-safe
+local audit storage. This exception does not permit discarding unacknowledged
+records during normal powered operation or treating a Thread-local hard fault
+as a board power-off. FPGA reconfiguration retention is not decided by this
+power-off decision.
+
 This approves the delivery model, not an implemented reset-safe storage
 mechanism. Transport and receiver authentication, record integrity,
 ordering/duplicate handling, acknowledgement protocol, capacity, retention,

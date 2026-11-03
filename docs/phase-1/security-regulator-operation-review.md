@@ -461,8 +461,13 @@ protocol and outcome-recording failure boundaries remain to be defined.
 only one Thread at a time, only the fault data is retained, and other Threads
 are unaffected. The earlier “Church reset” framing is withdrawn: do not turn
 this into a machine-wide reset or a requirement to recover unaffected
-Threads. Power-loss/reconfiguration retention is separate and remains
-undecided.
+Threads.
+
+**Approved Phase 1 power-off boundary:** Loss of pending local audit records
+on board power-off is allowed; power-loss-safe local audit storage is not a
+Phase 1 requirement. Normal powered operation must still retain unacknowledged
+records under the approved delivery rule. This does not authorize clearing
+records on a Thread-local fault or settle FPGA reconfiguration retention.
 
 Review in order:
 
