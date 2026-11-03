@@ -4,6 +4,17 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const source = fs.readFileSync('simulator/app-run.js', 'utf8');
 const context = vm.createContext({});
+context._WUKONG_FAULT_NAMES = {8: 'BOUNDS'};
+context._WUKONG_EV_INSTR_NAME = {};
+vm.runInContext(source.slice(source.indexOf('function _wukongBuildHwFaultObj('),
+    source.indexOf('const _FAULT_GOLDEN_REFERENCE =')), context);
+for (const nia of [null, undefined, -1]) {
+    const missing = context._wukongBuildHwFaultObj({fault_code:8, nia});
+    assert.equal(missing.physicalPC, null, 'absent NIA must not become address zero');
+    assert.match(missing.message, /unavailable NIA/);
+}
+assert.equal(context._wukongBuildHwFaultObj({fault_code:8, nia:0}).physicalPC, 0);
+assert.equal(context._wukongBuildHwFaultObj({fault_code:8, nia:0x3a08}).physicalPC, 0x3a08);
 vm.runInContext(source.slice(source.indexOf('const _FAULT_GOLDEN_REFERENCE ='), source.indexOf('function _wukongFlagsStr(')), context);
 const reference = vm.runInContext('_FAULT_GOLDEN_REFERENCE', context);
 const trace = {incident_id:'fixture-incident', bridge_session:'fixture-session', nia:0x3a08, fault_code:8, bridge_trace_counter:1907};

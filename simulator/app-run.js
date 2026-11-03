@@ -4764,7 +4764,8 @@ function showFaultModal(f) {
     const pcCandidate = (f.physicalPC !== undefined && f.physicalPC !== null)
         ? f.physicalPC : f.pc;
     const pcNumber = Number(pcCandidate);
-    const pc = Number.isFinite(pcNumber) && pcNumber >= 0 ? (pcNumber >>> 0) : null;
+    const pc = pcCandidate !== null && pcCandidate !== undefined && pcCandidate !== '' &&
+        Number.isFinite(pcNumber) && pcNumber >= 0 ? (pcNumber >>> 0) : null;
     const pcHex = pc === null
         ? 'unavailable'
         : '0x' + pc.toString(16).toUpperCase().padStart(4, '0');
@@ -5312,13 +5313,20 @@ function showFaultModal(f) {
                     </div>
                     <div class="fault-detail-row">
                         <span class="fault-detail-label">Step</span>
-                        <span class="fault-detail-value"><button class="gate-loc-step-link fault-step-link" onclick="faultModalDismiss();jumpToTraceStep(${f.step},'${(f.type||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}');" title="Jump to this step in the Trace view">#${f.step}</button></span>
+                        <span class="fault-detail-value">${Number.isInteger(f.step) && f.step >= 0
+                            ? `<button class="gate-loc-step-link fault-step-link" onclick="faultModalDismiss();jumpToTraceStep(${f.step},'${(f.type||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}');" title="Jump to this step in the Trace view">#${f.step}</button>`
+                            : 'Unavailable — no simulator step was captured'}</span>
                     </div>
                     ${bootEvidenceHtml}
                 </div>`;
     const _isHw = f._origin === 'hardware';
     const _fe = v => _escHtml(v === undefined || v === null || v === '' ? 'unknown' : String(v));
-    const _pd = f.programmerDiagnosis && typeof f.programmerDiagnosis === 'object' ? f.programmerDiagnosis : null;
+    // Render the evidence-first hardware diagnosis immediately, even when the
+    // later correlated-snapshot lookup is slow or unavailable. Never fall back
+    // to the live simulator's operands or infer a selected image from the NIA.
+    const _pd = f.programmerDiagnosis && typeof f.programmerDiagnosis === 'object'
+        ? f.programmerDiagnosis
+        : (_isHw && typeof _wukongFaultDiagnosis === 'function' ? _wukongFaultDiagnosis(f) : null);
     const _pairs = a => Array.isArray(a) ? a.filter(p => Array.isArray(p) && p.length >= 1) : [];
     const _pairRows = a => _pairs(a).map(p => `<div class="fault-detail-row"><span class="fault-detail-label">${_fe(p[0])}</span><span class="fault-detail-value">${_fe(p[1])}</span></div>`).join('');
     const _diagTitle = _pd && _pd.title ? _pd.title : (f.type ? f.type + ' fault' : 'Machine fault');
@@ -5357,7 +5365,7 @@ function showFaultModal(f) {
                 ${_hwPackets ? `<div class="fault-detail-row"><span class="fault-detail-label">Trace packets</span><span class="fault-detail-value">${_fe(_hwPackets)}</span></div>` : ''}
                 <div class="fault-detail-row"><span class="fault-detail-label">Provenance</span><span class="fault-detail-value">${_fe(_pd ? _pd.provenance : null)}</span></div>
             </div>`
-        : (Number.isInteger(f.step) ? _traceFaultDetailsHtml : _traceFaultDetailsHtml.replace(/<button class="gate-loc-step-link[\s\S]*?<\/button>/, 'unknown'));
+        : _traceFaultDetailsHtml;
     const instrTraceSection = `
         <div class="fault-trace-section fault-trace-open">
             <div class="fault-trace-body">
@@ -21725,7 +21733,7 @@ const _WUKONG_FAULT_NAMES = {
 function _wukongBuildHwFaultObj(data) {
     const faultCode = data.fault_code || 0;
     const faultName = _WUKONG_FAULT_NAMES[faultCode] || ('FAULT_' + faultCode);
-    const niaInt    = (data.nia || 0) >>> 0;
+    const niaInt    = Number.isInteger(data.nia) && data.nia >= 0 ? data.nia >>> 0 : null;
     const flags     = data.flags || 0;
     const evType    = data.ev_type || 0;
     // Trace packets do not capture a full CR bank. A later snapshot or the
@@ -21733,8 +21741,8 @@ function _wukongBuildHwFaultObj(data) {
     const crSnap = [];
     return {
         type:             faultName,
-        message:          faultName + ' at NIA 0x' +
-                          niaInt.toString(16).toUpperCase().padStart(8, '0') +
+        message:          faultName + (niaInt === null ? ' at unavailable NIA' : ' at NIA 0x' +
+                          niaInt.toString(16).toUpperCase().padStart(8, '0')) +
                           (data.nia_label ? ' (' + data.nia_label + ')' : ''),
         physicalPC:       niaInt,
         pc:               niaInt,

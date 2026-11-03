@@ -1704,3 +1704,17 @@ mtime_ms = 1793704591690
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/12bfcb2c-7987-4493-b12f-5414afc00d76/15252971-2cd9-469f-9251-b5344aa68506"
 storage_version_token = "1793704610556180"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "_zVArDLVDL3Mg660TQmhx"
+uri = "file://generated-artifacts/fault-modal-check/desktop.png"
+type = "image"
+title = "Updated hardware fault dialog — workspace preview"
+description = "Verified using a display-only BOUNDS fixture, not a new board run. Evidence-first diagnosis with Details, Trace, Registers, Evidence and Note tabs."
+logical_id = "5a63d2d9-5d53-4675-a2b4-4ac091d95288"
+content_hash = "sha256:24ae165cb22f60ef245a98e564eee3214920594b374eaa510f6b902a7462fd42"
+size = 154227
+mtime_ms = 1793715191656
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5a63d2d9-5d53-4675-a2b4-4ac091d95288/73bc85d3-7d69-4f38-9276-650ab8146be9"
+storage_version_token = "1793715235250261"
+content_type = "image/png"

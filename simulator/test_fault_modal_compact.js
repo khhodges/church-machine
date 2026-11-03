@@ -15,7 +15,12 @@ assert.match(m, /_wukongUseGoldenFaultReference\(\)/);
 assert.match(m, /_isHw && !f\._diagnosticLoaded && typeof _wukongEnrichFaultReport === 'function'/);
 assert.ok(!/#\$\{f\.step\}/.test(m.split('_traceFaultDetailsHtml =')[0] + '') || m.includes("Number.isInteger(f.step)"), 'missing step guarded');
 const hwActions = m.slice(m.indexOf('const _actions = _isHw ?'), m.indexOf('` : `', m.indexOf('const _actions = _isHw ?')));
-assert.ok(!/faultModalReboot|faultModalInvestigate|faultModalOpen/.test(hwActions), 'hardware actions never reset or navigate the simulator');
+assert.ok(!/faultModalReboot|faultModalInvestigate|faultModalOpenEditor|faultModalOpenBinaryLump/.test(hwActions), 'hardware actions never reset or navigate the simulator');
+assert.match(hwActions, /faultModalOpenLumpSummary/, 'hardware retains exact-build investigation');
+assert.match(m, /_isHw && typeof _wukongFaultDiagnosis === 'function' \? _wukongFaultDiagnosis\(f\)/,
+    'hardware gets the improved diagnosis immediately, before network enrichment');
+assert.match(m, /Number\.isInteger\(f\.step\) && f\.step >= 0/);
+assert.match(m, /Unavailable — no simulator step was captured/);
 assert.ok(!/&#x1F/.test(m), 'no emoji entities');
 assert.match(run, /function _faultPaginateActive\(dialog\)/);
 assert.match(css, /\.fault-pane-body\s*\{[^}]*overflow:\s*hidden/);
