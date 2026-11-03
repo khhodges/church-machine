@@ -11,7 +11,9 @@ of source/destination operands and not register-local M.
 An argument GT with B=0 may cross CALL; an argument with B=1 crosses with
 B cleared to 0. Both decisions are explicitly approved. Passed arguments
 arrive with B=0. Explicit argument clearing, the invocation E GT, other CALL
-checks and M behavior remain separate; RETURN semantics still need review.
+checks and M behavior remain separate. RETURN explicitly preserves B on
+deliberately returned GTs in kept CRs: 0 stays 0, 1 stays 1. Repeated RETURNs
+preserve B while the GT is kept; intervening CALLs apply their own rule.
 
 **Why:** The user emphatically corrected the repeated source/destination
 framing and clarified that the discussion concerns B, not M.
@@ -34,8 +36,8 @@ and reconcile existing implementation checks against this current rule.
 
 The command interpreter is used as a compiler to populate the E C-list of
 a newly composed abstraction: it creates GTs and saves them in ESaveLists.
-The later multiple-RETURN/private-sharing explanation was corrected by the
-user; exact CALL/RETURN movement semantics need clarification.
+Use the explicit CALL/RETURN decisions above rather than the earlier
+corrected multiple-RETURN/private-sharing explanation.
 Successful SAVE consumes B in the stored GT only. Source CR
 B remains unchanged, allowing further authorized bindings; other stored GT
 fields are preserved.

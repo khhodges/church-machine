@@ -1621,9 +1621,8 @@ conformance evidence, nor authorization to synthesize or program hardware.
 **Latest B clarification:** B is a GT setting that defines movement, not a
 source/destination property and not register-local M state. Review its
 movement semantics as such; do not substitute a source/destination permission
-model or infer a CALL bit transition. The recent multiple-RETURN/private-sharing
-explanation was corrected by the user and is not a settled movement oracle.
-The exact CALL/RETURN movement rule remains to be clarified.
+model. The explicit CALL and RETURN decisions below supersede the earlier
+corrected multiple-RETURN/private-sharing explanation.
 
 **CALL movement decision:** An argument GT with B=0 may cross a CALL
 boundary. B=0 is not a reason to reject or discard that argument. This does
@@ -1631,7 +1630,13 @@ not override explicit argument clearing or other CALL checks. An argument
 GT with B=1 crosses with B cleared to 0; an argument with B=0 crosses with
 B=0. Thus passed argument GTs arrive with B=0. This statement concerns
 argument GTs, not the E GT used to invoke the abstraction, and does not change
-M behavior. RETURN movement semantics remain a separate review decision.
+M behavior.
+
+**RETURN movement decision:** RETURN preserves B on deliberately returned
+GTs in kept CRs: B=0 remains 0 and B=1 remains 1. It does not restore a CR
+cleared by the keep mask. Repeated RETURNs that keep the GT preserve its B;
+an intervening CALL applies the separate argument rule above. This is
+independent of hardware-register M state.
 
 **Subsequent scope requirement:** The user requires SecurityRegulator methods
 for B and F as well. Their operations, names and signatures remain to be
@@ -1837,10 +1842,9 @@ SR B-override proposals. Destination authority and destination validation
 remain separate requirements. Register-operand restrictions are not GT bits.
 
 **B lifetime review:** The command-interpreter/compiler needs returned GTs
-to populate a newly composed abstraction. The later multiple-RETURN and
-private-sharing explanation was corrected; do not treat it as an approved
-general movement rule. Resolve CALL/RETURN in terms of B as the GT's movement
-setting, separately from M. The intended recipient populates the newly composed
+to populate a newly composed abstraction. The explicit movement rules above
+preserve B on kept RETURN results and clear B on passed CALL arguments,
+separately from M. The intended recipient populates the newly composed
 abstraction's E C-list/ESaveLists without SR access. A successful SAVE consumes
 B in the **stored GT only**: the source CR retains its B bit, while the stored
 copy has B=0. All other GT fields are preserved. The retained source can

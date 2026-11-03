@@ -3,15 +3,17 @@
 **Latest conceptual correction:** B is a GT setting defining movement,
 not a source/destination property or a hardware-register M setting. Do not
 infer a CALL clearing rule from the user's correction. The preceding
-multiple-RETURN/private-sharing explanation has been corrected and must
-not serve as a settled movement oracle; exact CALL/RETURN semantics await
-clarification.
+multiple-RETURN/private-sharing explanation has been corrected; use the
+explicit CALL and RETURN decisions below instead.
 
 **CALL argument decision:** B=0 does not prohibit an argument GT from
 crossing CALL. This does not override explicit argument clearing or other
 CALL checks. A passed argument with B=1 has B cleared to 0; B=0 remains 0.
-Passed argument GTs therefore arrive with B=0. This does not settle RETURN
-movement semantics or change M behavior.
+Passed argument GTs therefore arrive with B=0. This does not change M behavior.
+
+**RETURN decision:** Deliberately returned GTs in kept CRs retain B unchanged:
+0 remains 0 and 1 remains 1. Repeated RETURNs preserve it while the GT is kept;
+an intervening CALL applies its own rule. Cleared CRs are not restored.
 
 **Latest correction — source bits do not authorize SAVE:** The source GT's
 bits, including B, have zero effect on SAVE admission. Source B=0 does not
@@ -36,8 +38,8 @@ authority from B, or declare a SaveB interface redundant solely because
 SAVEM can override a transfer check. Its interface disposition remains open.
 
 **B lifetime review:** The compiler's ESaveLists workflow requires returned
-GTs. The later multiple-RETURN/private-sharing claim was corrected; exact
-CALL/RETURN movement semantics remain to be clarified.
+GTs. Apply the explicit CALL/RETURN decisions above, rather than the
+earlier corrected private-sharing explanation.
 Successful SAVE clears B in the stored GT only. The source CR retains B
 and can supply further SAVEs subject to destination authority and checks. Other
 stored GT fields remain unchanged. Failed-SAVE behavior remains unresolved.
