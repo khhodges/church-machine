@@ -4,6 +4,16 @@ description: User-directed extension of Thread design and its Alice acceptance e
 ---
 
 Build-retained tuple definitions are annotations, never initialization authority.
+
+In the transaction/tuple discussion, the user clarified: “the self-GT is the
+Amoeba that can save GTs against pet names.”
+
+**Why:** This identifies Amoeba's role in named GT storage in the user's model.
+
+**How to apply:** Preserve this contextual meaning when discussing tuple access
+and transaction identity. Do not generalize it to every abstraction's SELF GT,
+invent a new storage service, or infer an ABI or implementation authorization.
+
 Only explicit approval may freeze a design for a future build; inspection must
 not retrofit browser definitions onto historical bytes or infer allocation from
 nonzero heap contents.
