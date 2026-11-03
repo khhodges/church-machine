@@ -3,18 +3,19 @@ name: UART profile installation authority
 description: Pin UART software compatibility to the installed BIT, not today's mutable hardware checkout.
 ---
 
-The user wants a second Artix-7 board for a team member's independent IDE
-development site.
+The second Artix-7 is for a team member using the same published lab IDE
+for code development and Phase 1 integration. Foundation improvements
+continue in the Replit development workspace. Do not create a second site.
+Prepare the shared-IDE usage before flashing the second board.
 
-Set up the second IDE first, before flashing the second board.
+**Why:** The user explicitly rejected the independent-site interpretation
+and clarified the split between Phase 1 integration and foundation work.
 
-**Why:** The immediate goal is a second development environment, not an
-implicit requirement to finish all SR or Factory Build features first.
-The user explicitly selected IDE setup before flashing.
-
-**How to apply:** Assess exact board/bitstream compatibility, matching software
-baseline, separate site state and bridge targeting. This request to identify
-problems does not authorize flashing or sharing existing credentials.
+**How to apply:** Check shared artifact/editing behavior and board-target
+isolation on the existing site. Keep foundation changes out of the shared
+baseline until deliberately released. Verify the actual published domain
+before configuring endpoints. This clarification does not authorize
+publishing, flashing, or sharing existing credentials.
 
 The user accepts the existing BIT as a fixed bootstrap toward the CLOOMC++
 ABI LUMP compiler and future software, rather than requiring a new BIT for
