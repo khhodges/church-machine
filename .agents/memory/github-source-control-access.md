@@ -13,3 +13,13 @@ documented secure Git provider proxy while the connector lookup was unusable.
 Test release asset upload separately from metadata creation: binary upload
 requests returned HTTP 400 even though release creation worked. Keep incomplete
 releases in draft and report asset-upload failures rather than claiming completion.
+
+Always explicitly select the intended GitHub repository for backup checks.
+
+**Why:** The default `gh` repository selection can differ from Git `origin`
+when multiple historical GitHub remotes are configured. An empty release list
+from the default repository is not evidence that the origin has no releases.
+
+**How to apply:** Check the sanitized origin identity and pass `--repo` or an
+explicit repository API path. Check repository visibility before exporting
+live user data; an existing code repository is not necessarily private.
