@@ -23377,6 +23377,31 @@ function _renderLastAcceptedFaultState(state, detail, candidate) {
         _escHtml(detail || 'No durable accepted record.') + '</div>' + localDetails;
 }
 
+function _openRetainedHardwareFault(snap) {
+    snap = snap || _lastFaultSnapshotData;
+    if (!snap || !_wukongFaultSnapshotMatches(snap, snap)) return false;
+    const f = _wukongBuildHwFaultObj(snap);
+    f._acceptedSnapshot = snap;
+    f.crSnapshot = snap.cr.map(row => ({word0: row[0], word1: row[1], word2: row[2]}));
+    f.drSnapshot = snap.dr.slice();
+    // Inspect this exact retained record, never enrich it with a later machine
+    // state or turn opening a report into a hardware operation.
+    f._diagnosticLoaded = true;
+    f.message += ' — retained snapshot (inspection only)';
+    f.programmerDiagnosis = _wukongFaultDiagnosis(f);
+    showFaultModal(f);
+    return true;
+}
+
+let _retainedFaultAutoOpened = false;
+
+// Retained hardware evidence must remain inspectable even when the independent
+// simulator boot cannot complete. This only reads the already stored snapshot.
+if (typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('retainedFault') === '1') {
+    window.addEventListener('DOMContentLoaded', _fetchAndShowLastFaultPanel, {once: true});
+}
+
 function _renderAcceptedLastFault(snap) {
     var host = document.getElementById('lastFaultHost');
     if (!host) return;
@@ -23414,7 +23439,9 @@ function _renderAcceptedLastFault(snap) {
         crHtml += '<div class="lf-reg-cell"><b>DR' + j + '</b><code>' + _lastFaultHex(dr[j]) + '</code></div>';
     }
     host.className = 'last-fault-host lf-state-accepted';
-    host.innerHTML = '<div class="last-fault-panel-header"><span>Last Accepted Fault</span><strong>ACCEPTED — durable record</strong></div>' +
+    host.innerHTML = '<div class="last-fault-panel-header"><span>Last Accepted Fault</span><strong>ACCEPTED — durable record</strong>' +
+        (_wukongFaultSnapshotMatches(snap, snap)
+            ? '<button type="button" class="btn btn-muted" onclick="_openRetainedHardwareFault()">Open fault report</button>' : '') + '</div>' +
         '<div class="lf-accepted-meta">' + rows + '</div>' + crHtml + '</div></div>';
 }
 
@@ -23619,6 +23646,10 @@ function _fetchAndShowLastFaultPanel() {
             if (state === 'accepted' && body.incident_id) {
                 _lastFaultSnapshotData = body;
                 _renderAcceptedLastFault(body);
+                if (!_retainedFaultAutoOpened &&
+                    new URLSearchParams(window.location.search).get('retainedFault') === '1') {
+                    _retainedFaultAutoOpened = _openRetainedHardwareFault(body);
+                }
             } else {
                 _renderLastAcceptedFaultState(state,
                     body.reason || body.decision || 'No durable accepted record.',

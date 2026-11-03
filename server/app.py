@@ -23453,7 +23453,8 @@ def fault_snapshot_post():
         'nia':               int(data.get('nia', 0)),
         'pc':                int(data.get('pc', 0)),
         'flags':             int(data.get('flags', 0)),
-        'call_depth':        int(data.get('call_depth', 0)),
+        'call_depth':        (int(data.get('call_depth', 0))
+                              if data.get('call_depth', 0) is not None else None),
         'led_bits':          int(data.get('led_bits', 0)),
         'abstraction_label': str(data.get('abstraction_label', '') or ''),
         'abstraction_slot':  (int(data['abstraction_slot'])

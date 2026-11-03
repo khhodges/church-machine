@@ -14,3 +14,4 @@ description: Delivery, correlation and incident constraints for hardware fault e
 - [One-shot Skip Fault](wukong-skip-fault-protocol.md): authenticated FPGA-sequence proof is required; lost correlation requires reboot.
 - [Command locking](single-slot-delivery-watch-lock.md): hold busy through terminal delivery state.
 - [Command correlation](single-slot-cmd-ack-correlation.md): correlate by monotonic command ID, never letter or time-window heuristics.
+- [Retained inspection](retained-fault-inspection.md): inspecting a retained hardware incident must not depend on simulator boot or change the board.
