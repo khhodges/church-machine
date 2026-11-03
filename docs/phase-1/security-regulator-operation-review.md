@@ -318,6 +318,18 @@ request a powerful action.
 
 ### Intended relationship
 
+**Approved provisioning design (2026-11-03):** The trusted IDE/Builder
+explicitly binds the raw M-control capability into SecurityRegulator's private
+C-list when preparing the Namespace. Ordinary Mint allocation and FreeHandler
+allocation neither create nor distribute this capability; SecurityRegulator
+does not acquire it automatically at runtime. Boot and automatic CR6.M retain
+their separately defined exceptions.
+
+This approves the design only, not implementation, saved-artifact migration,
+activation or hardware changes. The canonical binding and verification of
+Mint's Namespace-write reach remain open; intended private custody is not
+proof that the implementation prevents another access path.
+
 ```text
 Trusted provisioning
     -> raw M-control GT held by SecurityRegulator
@@ -329,11 +341,10 @@ Mint or FreeHandler
     -> detailed action/outcome record sent to Home IDE
 ```
 
-This diagram does not authorize ordinary Mint CREATE to manufacture or
-distribute M-control authority. Mint's role in provisioning this special
-device grant, if any, needs an explicit bootstrap contract. It is not a
-normal allocation from FreeHandler's inventory, and neither service's ordinary
-result should silently include it.
+The approved provisioning route is the trusted IDE/Builder, not ordinary
+Mint CREATE or FreeHandler inventory allocation. Neither service's ordinary
+result should include raw M-control authority. Provisioning regulator
+invocation grants to consumers remains a separate review decision.
 
 ### Mint: what the source establishes
 

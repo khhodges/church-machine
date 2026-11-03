@@ -5,6 +5,19 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+The user approved trusted IDE/Builder provisioning of the raw M-control
+capability into SecurityRegulator's private C-list during Namespace preparation
+on 2026-11-03. Ordinary Mint/FreeHandler allocation must not create or distribute
+it, and SR does not acquire it automatically at runtime. Boot and automatic
+CR6.M retain their defined exceptions.
+
+**Why:** Explicit preparation establishes intended custody without giving
+ordinary allocation services an implicit M-control issuance role.
+
+**How to apply:** Treat this as design approval only, not permission to change
+code, saved artifacts or hardware. Consumer invocation grants remain separate;
+verify Mint's Namespace-write reach before asserting exclusive access.
+
 SR must support explicitly setting a GT's B to either 1 or 0, not just
 toggling it or bypassing a check.
 
