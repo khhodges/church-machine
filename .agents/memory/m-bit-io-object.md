@@ -8,16 +8,18 @@ description: Canonical representation and custody rule for CR M state.
 The command interpreter is used as a compiler to populate the E C-list of
 a newly composed abstraction: it creates GTs and saves them in ESaveLists.
 B must survive at least one RETURN in this workflow; the user subsequently
-confirmed that SAVE consumes B.
+confirmed that successful SAVE consumes B in the stored GT only. Source CR
+B remains unchanged, allowing further authorized bindings; other stored GT
+fields are preserved.
 
 **Why:** The user supplied this concrete composition use case to distinguish
 durable B authority from register-local, consumed M authority.
 
 **How to apply:** Preserve B on explicitly returned GT results; do not replace
 the post-RETURN SAVE with an assumption that the recipient can invoke SR.
-Review any intervening CALL separately from RETURN. Resolve source versus
-stored-copy clearing and failed-SAVE consumption separately; neither is
-implied by the approved principle that SAVE consumes B.
+Review any intervening CALL separately from RETURN. A stored copy has B=0;
+loading it does not restore binding authority. Failed-SAVE behavior remains
+a separate decision, not an inference from M consumption.
 
 B and M do not coincide in every situation; not all callers have SR access.
 Ordinary B-authorized SAVE must remain independent of SR invocation rights.

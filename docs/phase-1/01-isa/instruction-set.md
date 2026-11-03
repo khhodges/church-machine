@@ -1803,15 +1803,17 @@ Proposed return: normal completion; no GT result
 
 **Approved operand clarification:** `valueGT` is supplied in a capability
 register CRn (CR2 in the proposed ABI), not as an integer in a DR or a
-register-number argument. SAVE stores that register's exact GT, not its
-hardware M setting. This does not authorize arbitrary isolated-register access.
+register-number argument. SAVE stores that register's GT with B cleared in
+the stored copy, not its hardware M setting. This does not authorize arbitrary
+isolated-register access.
 
 **Approved destination rule:** M on the register holding `destinationGT`
 replaces the destination S permission requirement for this Golden Token Save.
 Identity, generation, integrity, bounds and protected-home checks remain.
 The destination M is consumed on use, success or failure, under A.1.
-Neither GT's permission bits change. Source transfer authority is separate
-from this destination approval.
+Destination elevation itself changes neither GT's permission bits; the
+stored-copy B clearing below is a separate SAVE effect. Source transfer
+authority is separate from this destination approval.
 
 **Approved B operation:** SecurityRegulator may override the source B
 transfer check during SAVE, without changing the supplied GT's B bit.
@@ -1825,9 +1827,12 @@ used M authority follows A.1's success-or-failure consumption rule.
 **Approved B lifetime direction:** For the command-interpreter/compiler
 composition workflow, an intentionally bindable GT retains B across at least
 one RETURN, allowing the recipient to populate the newly composed
-abstraction's E C-list/ESaveLists without SR access. SAVE consumes B.
-Still to resolve: whether consumption clears B in the source CR, the stored
-GT, or both; and the consumption boundary on failed SAVE. Do not import M's
+abstraction's E C-list/ESaveLists without SR access. A successful SAVE consumes
+B in the **stored GT only**: the source CR retains its B bit, while the stored
+copy has B=0. All other GT fields are preserved. The retained source can
+authorize further ordinary SAVEs when destination S and all other checks
+permit; a later LOAD of the stored copy does not recover B.
+Failed-SAVE behavior remains a separate review item. Do not import M's
 success-or-failure rule into B without a separate decision.
 
 **Authority distinction:** B and M need not coincide. Ordinary SAVE through
@@ -1845,8 +1850,8 @@ rights must first be distinguished. No separate SaveB API is settled here.
 2. Resolve the destination home through the SAVE path.
 3. Apply the defined M effects separately to destination write authority
    and source transfer, rather than assuming one global privilege override.
-4. Store the supplied GT subject to the B-consumption representation still
-   to be resolved; do not change other identity or permission fields.
+4. Store the supplied GT with B=0, preserving all other fields and leaving
+   the source CR's GT, including B, unchanged.
 5. Complete the specified M-state transition and normal method return.
 
 **Defined baseline:** ordinary SAVE requires destination S and source B with

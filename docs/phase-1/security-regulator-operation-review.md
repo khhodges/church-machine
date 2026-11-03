@@ -16,10 +16,12 @@ authority from B, or declare a SaveB interface redundant solely because
 SAVEM can override a transfer check. Its interface disposition remains open.
 
 **Subsequent B lifetime decision:** B survives the GT-producing service's
-RETURN for the compiler's ESaveLists workflow, then SAVE consumes B.
-Source-CR versus stored-GT clearing and failed-SAVE consumption are not yet
-resolved. This qualifies earlier exact-copy wording, not permission to invent
-a B mutation rule or reuse M's fault-consumption semantics.
+RETURN for the compiler's ESaveLists workflow, then successful SAVE clears B
+in the stored GT only. The source CR retains B and can authorize further
+ordinary SAVEs subject to destination authority and other checks. Other
+stored GT fields remain unchanged. Failed-SAVE behavior remains unresolved.
+This supersedes earlier exact-copy wording; do not reuse M's
+fault-consumption semantics for B.
 
 **Status:** First-pass architectural review, 2026-11-02. Proposed software
 interfaces, not an ISA amendment, implemented API or hardware qualification.
