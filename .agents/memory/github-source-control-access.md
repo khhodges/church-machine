@@ -33,3 +33,14 @@ binaries while still omitting approval stores, raw manifests and hidden drafts.
 **How to apply:** Never regenerate or Prepare production merely to make backup
 downloads succeed. Preserve the existing state; report missing filesystem
 inputs and require complete recovery evidence before a release.
+
+Do not confuse workspace SSH access with access to published runtime files.
+
+**Why:** A generic documentation lookup initially suggested SSH as a recovery
+path; the deployment-specific lookup distinguished development SSH from the
+separate production filesystem. Using workspace files would not capture live
+saved state.
+
+**How to apply:** Establish a production-specific export route before calling
+a backup complete. Publishing a new export endpoint first does not preserve
+the old runtime's state and must not be presented as a safe recovery shortcut.

@@ -88,3 +88,28 @@ boot bytes and exact production source are still not captured.
 
 The partial export is useful evidence and artifact preservation, but **Step 1
 remains incomplete**. Do not proceed to publishing or label it restore-ready.
+
+## Remaining export-path investigation
+
+Inspected the existing download, bundle and snapshot routes without changing
+production. The hardware ZIP packages build inputs, not the live application
+data store. Boot downloads use admission/freshness checks, and the available
+artifact APIs do not constitute an export of the raw approval store, sidecars,
+drafts and committed stale image.
+
+Official documentation lookup distinguished workspace SSH/Shell from the
+published deployment: access to the development workspace is not access to
+the running production filesystem. No supported production filesystem access
+method was established in this investigation. Do not tell an operator that
+workspace SSH will capture the published application's files.
+
+Adding an export endpoint to workspace code would require a release before it
+can read production files. That would cross the very persistence boundary
+the backup is intended to protect; it is not a safe substitute for capturing
+the existing process's state first.
+
+Step 1 is blocked on a complete existing production backup or a supported
+way to capture that running deployment's files. Platform assistance may be
+needed to establish whether such a capture is available; recovery is not
+guaranteed. No ticket has been submitted and no release is authorized by this
+finding. The existing verified partial export remains intact.
