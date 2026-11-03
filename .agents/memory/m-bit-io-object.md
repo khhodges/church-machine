@@ -37,8 +37,18 @@ GT, and DR1 capability-home index, not a byte address.
 E-GT into the allocated Thread's saved CR1 without conflating CR and DR values.
 
 **How to apply:** This is interface design approval only. Method selector,
-audit inputs, clobbers, preservation and return behavior remain separate
-decisions; do not infer implementation or hardware approval.
+audit inputs, exact clobbers and return behavior remain separate decisions;
+do not infer implementation or hardware approval.
+
+The user approved caller-managed preservation across SAVEM: callers preserve
+the working values they need afterward; SR offers no preservation guarantee
+for ordinary working registers.
+
+**Why:** Keep the method interface small and FreeHandler's dependencies explicit.
+
+**How to apply:** Preserve protected CALL/RETURN behavior and M-authority rules.
+The exact clobber set and supported save/restore sequence still need definition;
+this approval neither exports temporary M nor changes saved artifacts.
 
 SR must support explicitly setting a GT's B to either 1 or 0, not just
 toggling it or bypassing a check.

@@ -177,6 +177,13 @@ not the method selector, audit inputs, preservation or return contract.
 | CR2 | Value GT |
 | DR1 | Home index |
 
+**Approved preservation responsibility:** The caller preserves working values
+needed after SAVEM, including FreeHandler's selected Thread GT, Block State GT
+and application GT. SAVEM does not promise preservation of ordinary working
+registers. This does not change protected CALL/RETURN behavior or authorize
+temporary M authority to escape. The exact clobber set and supported
+save/restore sequence remain to be specified.
+
 An `ide.SecurityRegulator E` invocation grant is approved for explicit
 provisioning to Mint and FreeHandler, not an assertion that this saved artifact
 exists. Define method selector,

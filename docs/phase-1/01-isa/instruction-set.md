@@ -1841,6 +1841,12 @@ Approval of these three input assignments does not freeze the method selector,
 audit identity inputs, scratch/clobber set, register preservation or return
 contract, and does not authorize implementation or artifact/hardware changes.
 
+**Approved preservation responsibility:** The caller preserves the working
+values it needs after SAVEM. SAVEM gives no preservation guarantee for ordinary
+working registers. Protected CALL/RETURN behavior and M-authority rules are
+unchanged; this is not permission to export temporary M. The exact clobber set
+and supported save/restore sequence remain to be specified.
+
 **Approved destination rule:** M on the register holding `destinationGT`
 replaces the destination S permission requirement for this Golden Token Save.
 Identity, generation, integrity, bounds and protected-home checks remain.
