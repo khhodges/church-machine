@@ -48,6 +48,7 @@
 - [boot_resident manifest-only](boot-resident-manifest-only.md) — generator reads boot_resident from manifest.json only; sidecar-only flag = NS descriptor with zero-filled body
 - [Namespace reissue generation](boot-entry-generation-minting.md) — every GT minted for a reused slot must inherit the live/retained Word-1 sequence
 - [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config
+- [Release candidate completeness](release-candidate-completeness.md) — test the configured build and served assets; a Git archive or passing API smoke test can still omit runtime files.
 - [Latched multi-cycle hardware inputs](latched-multicycle-hardware-inputs.md) — capture operands, control-flow state, and security decisions at acceptance; never consume live inputs later
 - [SelfTest caller-return flow](selftest-next-lightningbolt.md) — no Next capability; CapabilityTest calls SelfTest and WukongCallHome, with CHANGE to Thread.2 each iteration.
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure

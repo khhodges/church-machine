@@ -1760,3 +1760,17 @@ mtime_ms = 1793716968668
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/174f286e-cbe5-45bb-b7a7-e8b61e6e3c51/c2ff1c72-3507-47c9-b939-a321151518ef"
 storage_version_token = "1793716987988169"
 content_type = "text/plain"
+
+[[outputs]]
+id = "16TXT2tEMgiFbWscPdHyg"
+uri = "file://generated-artifacts/live-backup/release-package-20261103T162223Z/RESULT.txt"
+type = "text"
+title = "Isolated release package — build and test results"
+description = "Production build passed; 181 URL checks passed; introduction page visually verified; boot bytes unchanged. Lists dependency warnings and remaining recovery limits. Nothing published."
+logical_id = "40e31671-8661-4d3a-b097-4ced7ae96b77"
+content_hash = "sha256:9f341b80208f9e81bba2ef657e0cf95db79f3c5fa85c0c69a351e0590c3d0be3"
+size = 3449
+mtime_ms = 1793723238391
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/40e31671-8661-4d3a-b097-4ced7ae96b77/0e22a0c7-adbb-4996-b025-b53d9e3c5b8d"
+storage_version_token = "1793723264253963"
+content_type = "text/plain"
