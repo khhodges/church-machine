@@ -163,3 +163,15 @@ rejects that supposedly private copy as escaping its output directory.
 
 **How to apply:** Use `verbatimSymlinks: true` for faithful private catalog copies;
 retain the production guard rather than bypassing it for tests.
+
+Keep a frozen source inventory separate from the disposable executable copy
+when qualifying a staged release.
+
+**Why:** Server imports create runtime directories relative to the source tree.
+A test root containing only mutable data rejects even harmless startup directory
+creation, while allowing writes into the frozen source weakens retention proof.
+
+**How to apply:** Clone frozen source into the disposable execution root as well
+as routing all data inputs there. Block networking and writes outside that root;
+compare frozen source and staged state hashes after the run. Carry dependency
+search paths explicitly without inheriting production secrets.

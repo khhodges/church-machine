@@ -1732,3 +1732,17 @@ mtime_ms = 1793715696756
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/82c6f955-0dd9-4968-a153-af39c8c3cd14/2e718587-b758-4c9c-9924-4c2b2ab40f20"
 storage_version_token = "1793715705312993"
 content_type = "text/plain"
+
+[[outputs]]
+id = "-r1Att5g0ufm1uBwVRCkq"
+uri = "file://generated-artifacts/live-backup/candidate-20261103T142436Z/READ-ME.txt"
+type = "text"
+title = "Isolated candidate — preparation and test results"
+description = "Live settings preserved; five historical files recovered; current catalog and focused diagnostics checks pass. Lists remaining stale-boot and metadata limitations. Nothing published."
+logical_id = "9f08e146-1603-4a25-9735-13809e13920c"
+content_hash = "sha256:923309e19b8aca50a6e083f1658731ea6653312d0118467b3936777670edc4f4"
+size = 3622
+mtime_ms = 1793716237749
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9f08e146-1603-4a25-9735-13809e13920c/28298694-0e85-443c-a100-c8e2977bf9c9"
+storage_version_token = "1793716293213097"
+content_type = "text/plain"
