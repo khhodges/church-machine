@@ -19,7 +19,11 @@ reprogramming, persistent flash changes, or a new image installation.
 
 The operator switched to a separate new XC7A100T board on 2026-11-03 and
 reported successful BootBuild.mcs programming after a USB/JTAG retry.
-Power-on boot and a new bridge identity were not established by that report.
+Subsequent Vivado status after the reported power cycle showed DONE and EOS
+set, no CRC/ID/security errors, and no fallback. Its reported DNA_PORT is
+`058AD4112E1085C`. This establishes configuration evidence, not exact image
+provenance or Church Machine runtime qualification. A new operator bridge UID
+has not yet been commissioned.
 
 **Why:** The new board's Vivado log showed the same JTAG target identifier
 used during the earlier board's session. That identifier must not be treated
