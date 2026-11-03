@@ -37,6 +37,18 @@ not inherit them merely because its geometry matches.
 
 The Thread designer must cover the Tuple Store and rollback/checkpoint concepts, not only the Thread's register and stack layout. Use the Alice Save LUMP rejection as a concrete diagnostic and tuple-storage acceptance example.
 
+Amoeba must support checkpoint, continuation and rollback methods as
+application-selected options.
+
+**Why:** The user explicitly states these application options are needed;
+they are not optional scope to defer merely because hard faults retain fault
+data rather than automatically recovering execution.
+
+**How to apply:** Keep availability of the methods required and their use
+application-controlled. Do not infer automatic hard-fault rollback, recovery
+of other Threads, reversal of external effects, power-loss persistence, or a
+settled capture/restore ABI. Review the contract before implementation.
+
 Treat Threads as individually designed objects: the user states that all three
 Threads in a build can differ, including tuple stores and design sizes.
 

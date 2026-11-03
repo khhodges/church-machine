@@ -5,7 +5,8 @@ Phase 1 local review copy of repository-root `Amobea-V1.md`, refreshed
 
 **Status:** Outline for review, not an implementation specification.  
 **Scope:** Phase 1 Thread-local tuple storage and IDE support, within a common
-Thread service abstraction that also considers continuation-state services.
+Thread service abstraction that must also provide application-selectable
+checkpoint, continuation and rollback methods.
 CR0 bootstrap binding and rollback contracts remain TBD.
 
 ## 1. Purpose
@@ -72,6 +73,14 @@ Method names also must not be confused with ISA mnemonics: a method called
 of machine state.
 
 ## 4. Continuation capture without CHANGE
+
+**Required application services:** Amoeba must support checkpoint,
+continuation and rollback methods as options applications explicitly choose
+to use. Their inclusion is required; applications are not required to invoke
+them. This is separate from Thread-local hard-fault handling and does not
+authorize automatic rollback, retry or recovery of unaffected Threads.
+The detailed capture/restore contract below remains to be defined; this
+requirement is not a claim that the methods are already implemented.
 
 The Thread's existing continuation structure is the starting point.
 Saving continuation state need not transfer execution to another Thread.
