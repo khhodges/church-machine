@@ -8,6 +8,21 @@ for code development and Phase 1 integration. Foundation improvements
 continue in the Replit development workspace. Do not create a second site.
 Prepare the shared-IDE usage before flashing the second board.
 
+Agreed shared-site operating rules:
+- Keep the published baseline unchanged while team development begins.
+- Export and verify live LUMPs, history and Namespace configuration before
+  any republish; do not assume production saves sync back to the workspace.
+- Connect only one hardware bridge at a time.
+- Only the project owner changes shared Namespace configuration and boot
+  selections; the team member develops code and performs Phase 1 integration.
+
+**Why:** The user approved the first three safeguards and explicitly reserved
+Namespace and boot changes to themselves.
+
+**How to apply:** Treat these as operating constraints, not proof of enforced
+role-based permissions or completed backups. Do not publish or connect a
+second simultaneous bridge as part of ordinary development work.
+
 **Why:** The user explicitly rejected the independent-site interpretation
 and clarified the split between Phase 1 integration and foundation work.
 
