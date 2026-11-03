@@ -86,6 +86,18 @@ validation as supporting evidence, not the demonstration objective. Do not
 silently promote historical private Mint fixtures or expand this direction into
 authorization for live provisioning, runtime fixes, or flash programming.
 
+For the immediate board handoff, the user explicitly approved temporary
+sharing of the existing bridge credential with full existing access.
+
+**Why:** The user chose “Yes, temporary full access” to avoid delaying the
+handoff for a separate restricted credential and production release.
+
+**How to apply:** Transfer the credential privately outside chat and source
+control. Keep one bridge connected at a time and the published site unchanged.
+Do not claim a separate token exists, restricted permissions are enforced, or
+the receiving workstation has been tested until there is fresh evidence.
+This temporary exception does not authorize publishing or FPGA changes.
+
 Proceed toward the Mint demonstration step by step with joint review and
 explicit approval before each next step. Do not batch later stages under a
 general agreement to pursue the demonstration.
