@@ -7,6 +7,10 @@ multiple-RETURN/private-sharing explanation has been corrected and must
 not serve as a settled movement oracle; exact CALL/RETURN semantics await
 clarification.
 
+**CALL argument decision:** B=0 does not prohibit an argument GT from
+crossing CALL. This does not override explicit argument clearing or other
+CALL checks. The post-CALL B setting remains to be decided separately.
+
 **Latest correction — source bits do not authorize SAVE:** The source GT's
 bits, including B, have zero effect on SAVE admission. Source B=0 does not
 require SR access. Destination authority governs the write; source GT remains

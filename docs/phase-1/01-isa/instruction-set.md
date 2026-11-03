@@ -1625,6 +1625,12 @@ model or infer a CALL bit transition. The recent multiple-RETURN/private-sharing
 explanation was corrected by the user and is not a settled movement oracle.
 The exact CALL/RETURN movement rule remains to be clarified.
 
+**CALL movement decision:** An argument GT with B=0 may cross a CALL
+boundary. B=0 is not a reason to reject or discard that argument. This does
+not override explicit argument clearing or other CALL checks. The B setting
+after crossing remains a separate decision; this statement concerns argument
+GTs, not the E GT used to invoke the abstraction.
+
 **Subsequent scope requirement:** The user requires SecurityRegulator methods
 for B and F as well. Their operations, names and signatures remain to be
 reviewed one at a time. The six-method inventory below is therefore no longer

@@ -8,6 +8,11 @@ description: Canonical representation and custody rule for CR M state.
 **B movement model:** B is a GT setting defining movement, not a property
 of source/destination operands and not register-local M.
 
+An argument GT with B=0 may cross CALL; the user explicitly approved this.
+Do not reject or discard an argument merely for B=0. Explicit argument
+clearing and other CALL checks remain separate; the post-CALL B setting
+is not decided by this approval.
+
 **Why:** The user emphatically corrected the repeated source/destination
 framing and clarified that the discussion concerns B, not M.
 
