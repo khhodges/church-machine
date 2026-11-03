@@ -23,3 +23,13 @@ from the default repository is not evidence that the origin has no releases.
 **How to apply:** Check the sanitized origin identity and pass `--repo` or an
 explicit repository API path. Check repository visibility before exporting
 live user data; an existing code repository is not necessarily private.
+
+An API artifact export is not automatically a restorable production backup.
+
+**Why:** Bulk LUMP export can reject IDX1 artifacts, and boot downloads can
+reject a stale committed image. Exact word/hash capture can preserve individual
+binaries while still omitting approval stores, raw manifests and hidden drafts.
+
+**How to apply:** Never regenerate or Prepare production merely to make backup
+downloads succeed. Preserve the existing state; report missing filesystem
+inputs and require complete recovery evidence before a release.

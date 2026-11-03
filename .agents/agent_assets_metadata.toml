@@ -1676,3 +1676,17 @@ mtime_ms = 1793634071504
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2366e3db-cd9f-4714-9f6f-844236dd5c40/48231c88-0733-4284-9d66-eb71a0f7a6c0"
 storage_version_token = "1793634107995480"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Yajo50X83FwsIG2HiFtC6"
+uri = "file://generated-artifacts/live-backup/lab-ide-partial-export-20261103.zip"
+type = "unspecified"
+title = "Live IDE partial backup — 3 November"
+description = "Verified artifact capture with checksums and a README listing missing state. Not a complete or restore-qualified backup; keep private."
+logical_id = "2048ce1d-6401-438a-ba56-598a041dd5e0"
+content_hash = "sha256:144ddb1f7c9d3dbcf11d8871b5208ec5dab24b4404a7ca83eac36d33a99295ab"
+size = 2501261
+mtime_ms = 1793702643415
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2048ce1d-6401-438a-ba56-598a041dd5e0/73b96916-e665-4d18-9ed2-74918a68644c"
+storage_version_token = "1793702650980160"
+content_type = "application/octet-stream"

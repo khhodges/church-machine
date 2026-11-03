@@ -61,3 +61,30 @@ No complete production filesystem export or restore test has been performed.
 
 Never export credentials, session cookies, or environment-secret values.
 Do not proceed to publication on the strength of this inventory alone.
+
+## Read-only partial capture completed
+
+Capture directory:
+`generated-artifacts/live-backup/20261103T103737Z/`
+(excluded from Git and deployment packaging).
+
+- Catalog with archived records: 123 rows, versus the earlier default active
+  catalog's 80 entries; this is not an increase inferred from different queries.
+- 86 unique catalog tokens queried for history; 79 successful responses,
+  seven 404 responses, 463 reported history records.
+- 424 exact artifact locators requested; 423 verified, covering 116 unique
+  binary hashes. Every saved binary matches the server SHA-256 and passed a
+  local reread/hash check. No filename/hash conflicts were found.
+- The one unavailable artifact locator is archived
+  `SelfTest.1.fcf2c79d.lump`, token `bb1e4bed` (404).
+- Start/end comparisons matched the complete catalog response, Namespace
+  abstraction rows and boot config object. This is not an atomic snapshot.
+
+The bulk ZIP endpoint returned 409 because IDX1 export is unsupported.
+The boot-image endpoint returned 409 because the committed image is stale.
+No preparation, regeneration, state repair or hardware command was attempted.
+Raw manifest/approval stores, full sidecars, drafts, unlisted files, committed
+boot bytes and exact production source are still not captured.
+
+The partial export is useful evidence and artifact preservation, but **Step 1
+remains incomplete**. Do not proceed to publishing or label it restore-ready.
