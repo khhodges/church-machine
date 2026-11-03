@@ -1638,6 +1638,10 @@ cleared by the keep mask. Repeated RETURNs that keep the GT preserve its B;
 an intervening CALL applies the separate argument rule above. This is
 independent of hardware-register M state.
 
+**LOAD movement decision:** LOAD ignores B as a condition and preserves the
+loaded GT's B unchanged: 0 remains 0 and 1 remains 1. M-assisted loading
+does not set B. Other LOAD validation remains applicable.
+
 **Subsequent scope requirement:** The user requires SecurityRegulator methods
 for B and F as well. Their operations, names and signatures remain to be
 reviewed one at a time. The six-method inventory below is therefore no longer

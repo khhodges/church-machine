@@ -18,6 +18,9 @@ a concrete method ABI, new opcode, or changes to other copies or GT fields.
 **B movement model:** B is a GT setting defining movement, not a property
 of source/destination operands and not register-local M.
 
+LOAD ignores B as a condition and preserves the loaded GT's B unchanged;
+the user explicitly approved this. M-assisted LOAD does not grant B.
+
 An argument GT with B=0 may cross CALL; an argument with B=1 crosses with
 B cleared to 0. Both decisions are explicitly approved. Passed arguments
 arrive with B=0. Explicit argument clearing, the invocation E GT, other CALL

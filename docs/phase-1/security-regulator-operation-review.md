@@ -1,5 +1,9 @@
 # SecurityRegulator — machine-operation review
 
+**LOAD B decision:** LOAD ignores B as a condition and copies the loaded
+GT's B unchanged. Neither ordinary nor M-assisted LOAD grants or consumes B;
+other LOAD validation remains applicable.
+
 **Latest conceptual correction:** B is a GT setting defining movement,
 not a source/destination property or a hardware-register M setting. Do not
 infer a CALL clearing rule from the user's correction. The preceding
