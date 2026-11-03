@@ -229,6 +229,16 @@ telephone call, to the proposed originator-and-caller audit attribution.
 transaction identity or treat the raw CR5 GT as the ID. Physical tuple layout,
 secure propagation and detailed audit-delivery mechanisms remain separate design work.
 
+The user approved trusted IDE/Builder provisioning of SecurityRegulator's
+Home IDE destination during Namespace preparation.
+
+**Why:** Audit destination ownership must not pass to individual callers.
+
+**How to apply:** Mint, FreeHandler and applications cannot redirect individual
+records. Passcode identity and `TransactionID` identify activity, not its
+destination. Changes require explicit configuration; transport and credentials
+remain separate, and design approval does not authorize live changes.
+
 The user approved local audit recording with asynchronous Home IDE delivery.
 Required local evidence precedes the privileged effect; record the actual
 outcome and retain unacknowledged records as pending. If required local

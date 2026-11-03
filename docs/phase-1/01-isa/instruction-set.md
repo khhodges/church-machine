@@ -1774,6 +1774,14 @@ and faults even when ordinary method completion cannot emit a record.
 The Home IDE must be explicitly identified; a caller-supplied arbitrary
 destination must not silently stand in for it.
 
+**Approved destination provisioning:** The trusted IDE/Builder provisions
+SecurityRegulator's Home IDE destination when preparing the Namespace.
+Mint, FreeHandler and applications cannot redirect individual audit records.
+Passcode identity and `TransactionID` identify activity, not its destination.
+Changing the destination requires an explicit configuration change. This
+decides destination ownership only, not transport, credentials or an
+implementation/activation authorization.
+
 **Approved delivery rule:** Record locally and deliver asynchronously. Retain
 the required audit evidence locally before allowing the privileged effect,
 then record the actual outcome. Execution does not wait for a Home IDE

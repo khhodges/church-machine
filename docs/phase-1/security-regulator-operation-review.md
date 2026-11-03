@@ -457,6 +457,13 @@ rather than execute without evidence. This is design approval only, not proof
 of implemented reset-safe storage. Capacity, reset retention, acknowledgement
 protocol and outcome-recording failure boundaries remain to be defined.
 
+**Approved Home IDE provisioning:** The trusted IDE/Builder sets the Home IDE
+destination alongside SecurityRegulator during Namespace preparation.
+Individual calls cannot redirect records; Passcode identity and
+`TransactionID` are attribution, not destination selectors. A destination
+change requires explicit configuration. Transport and credentials remain
+separate design work; this approval changes no live configuration.
+
 **Fault-scope clarification:** The user specifies that a hard fault impacts
 only one Thread at a time, only the fault data is retained, and other Threads
 are unaffected. The earlier “Church reset” framing is withdrawn: do not turn
