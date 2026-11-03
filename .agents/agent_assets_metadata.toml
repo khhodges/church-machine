@@ -1690,3 +1690,17 @@ mtime_ms = 1793702643415
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2048ce1d-6401-438a-ba56-598a041dd5e0/73b96916-e665-4d18-9ed2-74918a68644c"
 storage_version_token = "1793702650980160"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "xTnFelsHIKLZuWK2v2v8Z"
+uri = "file://generated-artifacts/Reiser-Handoff-Builder.zip"
+type = "unspecified"
+title = "Reiser handoff ZIP builder"
+description = "Creates the AES-256 password-protected handoff ZIP on your Windows PC, using your local token and your chosen password. This download contains no credentials."
+logical_id = "12bfcb2c-7987-4493-b12f-5414afc00d76"
+content_hash = "sha256:f472d7fe178169c3664f249802bbc55eb4c083506c0e39166e464cfcafdb231b"
+size = 40490
+mtime_ms = 1793704591690
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/12bfcb2c-7987-4493-b12f-5414afc00d76/15252971-2cd9-469f-9251-b5344aa68506"
+storage_version_token = "1793704610556180"
+content_type = "application/octet-stream"

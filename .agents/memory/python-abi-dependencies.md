@@ -12,3 +12,13 @@ could not load in the server's 3.12 interpreter.
 **How to apply:** Verify imports using the workflow's interpreter as well as
 the installer environment. Keep runtime-compatible system dependencies available;
 do not silently change the entire application interpreter to fix one download.
+
+Also check inherited Python search paths when explicitly selecting Python 3.11.
+
+**Why:** A 3.11 test imported Nix's 3.12 CFFI Python module alongside a local
+3.11 compiled backend, producing a CFFI version mismatch even with the right
+interpreter selected.
+
+**How to apply:** For isolated package checks, align PYTHONPATH with that
+interpreter's installed site-packages. Do not change the serving workflow to
+accommodate a test-only packaging tool.
