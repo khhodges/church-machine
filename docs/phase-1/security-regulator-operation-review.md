@@ -457,6 +457,13 @@ rather than execute without evidence. This is design approval only, not proof
 of implemented reset-safe storage. Capacity, reset retention, acknowledgement
 protocol and outcome-recording failure boundaries remain to be defined.
 
+**Fault-scope clarification:** The user specifies that a hard fault impacts
+only one Thread at a time, only the fault data is retained, and other Threads
+are unaffected. The earlier “Church reset” framing is withdrawn: do not turn
+this into a machine-wide reset or a requirement to recover unaffected
+Threads. Power-loss/reconfiguration retention is separate and remains
+undecided.
+
 Review in order:
 
 1. Exact M-control custody/provisioning, including Mint's Namespace-write reach.

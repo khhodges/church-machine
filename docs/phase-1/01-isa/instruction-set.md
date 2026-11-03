@@ -1781,6 +1781,13 @@ network round trip. Keep unacknowledged records pending; queued or transmitted
 does not mean received. If required local recording cannot be guaranteed,
 hard-fault rather than perform an unaudited privileged operation.
 
+**Thread-local fault scope:** A hard fault impacts only the faulting Thread
+at a time; only its fault data is retained, and other Threads are unaffected.
+Do not describe this as a machine-wide “Church reset” or infer that unrelated
+Threads or their pending audit records are reset or discarded. This
+clarification does not select a retention guarantee for power loss or FPGA
+reconfiguration.
+
 This approves the delivery model, not an implemented reset-safe storage
 mechanism. Transport and receiver authentication, record integrity,
 ordering/duplicate handling, acknowledgement protocol, capacity, retention,

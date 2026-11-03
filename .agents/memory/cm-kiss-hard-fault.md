@@ -5,6 +5,17 @@ description: Prefer first-fault detection and correction over recovery strategie
 
 ## Current software integration approval
 
+The user clarified: “The hard fault impacts only one thread at a time only
+the fault data is retained other threads are unaffected.”
+
+**Why:** The agent incorrectly framed a Thread-local hard fault as a “Church
+reset” when discussing audit retention.
+
+**How to apply:** Keep hard-fault scope Thread-local and fault-data retention
+distinct from machine-wide reset, FPGA reconfiguration or power loss. Do not
+infer interruption, reset or recovery of unaffected Threads, or interpret
+this clarification as a power-loss retention decision.
+
 The user authorized the shared HARDFAULT compiler/save/load/IDE integration
 after the Mint fault cases were written. This supersedes the historical
 software-emission gate below, not physical FPGA acceptance.
