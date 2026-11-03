@@ -1641,8 +1641,14 @@ independent of hardware-register M state.
 **Subsequent scope requirement:** The user requires SecurityRegulator methods
 for B and F as well. Their operations, names and signatures remain to be
 reviewed one at a time. The six-method inventory below is therefore no longer
-a closed scope. B has subsequently been resolved as an override during SAVE,
-not a B-state change; see A.3. For F, the required operation explicitly sets
+a closed scope. SR must support explicitly setting a GT's B to 1 or 0,
+not merely toggling B. This is distinct from CALL/SAVE/RETURN movement
+rules and supersedes the earlier B-override-only proposal. Only B is selected
+for change; this requirement does not authorize other GT-field changes,
+an opcode, or updates to other copies. The concrete method name, register ABI
+and instruction mechanism remain to be specified. The common SR invocation,
+M-consumption and Passcode/Home IDE audit requirements apply.
+For F, the required operation explicitly sets
 Near or Far, rather than toggling state or overriding the SAVE check.
 Its target, encoding, method signature and exact mechanism remain to be
 specified; no implementation or existing-artifact mutation is implied.

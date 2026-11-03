@@ -5,6 +5,16 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Current mechanism-versus-policy clarification
 
+SR must support explicitly setting a GT's B to either 1 or 0, not just
+toggling it or bypassing a check.
+
+**Why:** The user explicitly requested both B settings after settling the
+CALL/SAVE/RETURN movement rules.
+
+**How to apply:** Keep B-setting separate from automatic movement behavior.
+Follow common SR access, consumed-M and audit requirements; do not infer
+a concrete method ABI, new opcode, or changes to other copies or GT fields.
+
 **B movement model:** B is a GT setting defining movement, not a property
 of source/destination operands and not register-local M.
 
