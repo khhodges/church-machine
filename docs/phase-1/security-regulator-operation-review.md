@@ -433,12 +433,16 @@ API merely by copying it into a document.
 
 ### Cross-service audit and review priorities
 
-For a nested call, distinguish the **immediate executor** (Mint or FreeHandler)
-from the Passcode identity to which the action is attributable. Define whether
-the association identifies the service itself or an originating requester,
-and how that association is carried without spoofing or leaking a secret.
-Record both where applicable; do not silently substitute the service identity
-for the required attribution. This is evidence binding, not purpose policy.
+For a nested call, record the originating Passcode identity and the immediate
+caller (Mint or FreeHandler), together with the transaction ID held in the
+tuple's CR5 store. The user explicitly added transaction attribution, such as
+an order or a telephone call. Do not substitute the service identity for the
+originator or invent a separate transaction-ID mechanism.
+
+The exact tuple field/layout and how these identities are carried and bound
+without spoofing or leaking a secret remain to be specified. The transaction
+ID is the stored ID, not an assumption that the raw CR5 GT is the ID.
+This is evidence binding, not purpose policy or implementation approval.
 
 Review in order:
 

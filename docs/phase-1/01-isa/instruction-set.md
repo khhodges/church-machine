@@ -1732,10 +1732,19 @@ that fault or are rejected,
 not only successful completions. Audit is a mechanical accountability
 requirement, not a new caller-purpose policy decision.
 
-The following record contents are proposed for review:
+**Attribution decision:** Record the originating Passcode identity, immediate
+caller and transaction ID held in the tuple's CR5 store (for example, an order
+or telephone call). Use that existing transaction identity rather than
+introducing a separate ID mechanism. Exact tuple layout and secure propagation
+remain interface work; this does not identify the raw CR5 GT as the transaction
+ID or authorize implementation.
+
+The remaining record contents are proposed for review:
 
 - Passcode-associated audit identity, an action identifier and ordered event
   sequence; time source and reset/session identity must be specified.
+- Immediate caller and the transaction ID from the tuple's CR5 store, linked
+  to the originating Passcode identity.
 - Method, originating machine/Namespace/Thread context and exact selected
   regulator implementation identity.
 - Operand GT identities, home/row index and relevant accepted M state;
