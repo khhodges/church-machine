@@ -20,6 +20,9 @@ RETURN for the compiler's ESaveLists workflow, then successful SAVE clears B
 in the stored GT only. The source CR retains B and can authorize further
 ordinary SAVEs subject to destination authority and other checks. Other
 stored GT fields remain unchanged. Failed-SAVE behavior remains unresolved.
+Source B may start at 1 or 0 and remains unchanged; stored B is zero for
+either authorized case. Ordinary B admission and the SR override remain
+distinct from this storage postcondition.
 This supersedes earlier exact-copy wording; do not reuse M's
 fault-consumption semantics for B.
 

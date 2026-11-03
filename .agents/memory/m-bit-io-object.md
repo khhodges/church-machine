@@ -12,6 +12,11 @@ confirmed that successful SAVE consumes B in the stored GT only. Source CR
 B remains unchanged, allowing further authorized bindings; other stored GT
 fields are preserved.
 
+The user clarified that source B may start at 1 or 0: authorized SAVE leaves
+that value unchanged and writes stored B=0 in either case.
+Do not confuse this postcondition with admission: B=0 does not gain ordinary
+SAVE authority merely because the stored copy will have B=0.
+
 **Why:** The user supplied this concrete composition use case to distinguish
 durable B authority from register-local, consumed M authority.
 

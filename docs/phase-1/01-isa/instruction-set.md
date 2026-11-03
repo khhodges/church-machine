@@ -1832,6 +1832,11 @@ B in the **stored GT only**: the source CR retains its B bit, while the stored
 copy has B=0. All other GT fields are preserved. The retained source can
 authorize further ordinary SAVEs when destination S and all other checks
 permit; a later LOAD of the stored copy does not recover B.
+The source may initially have B=1 or B=0: after an authorized SAVE, source
+B remains its original value and stored B is zero in either case.
+This postcondition does not waive admission: ordinary SAVE requires B,
+while the approved SR override can authorize the B=0 case subject to the
+other checks.
 Failed-SAVE behavior remains a separate review item. Do not import M's
 success-or-failure rule into B without a separate decision.
 
