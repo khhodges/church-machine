@@ -3,6 +3,16 @@ name: UART profile installation authority
 description: Pin UART software compatibility to the installed BIT, not today's mutable hardware checkout.
 ---
 
+The user wants a second Artix-7 board for a team member's independent IDE
+development site.
+
+**Why:** The immediate goal is a second development environment, not an
+implicit requirement to finish all SR or Factory Build features first.
+
+**How to apply:** Assess exact board/bitstream compatibility, matching software
+baseline, separate site state and bridge targeting. This request to identify
+problems does not authorize flashing or sharing existing credentials.
+
 The user accepts the existing BIT as a fixed bootstrap toward the CLOOMC++
 ABI LUMP compiler and future software, rather than requiring a new BIT for
 each compiler/ABI iteration.
