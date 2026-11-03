@@ -37,3 +37,14 @@ as proof that the physical board is unchanged.
 board. Use the distinct commissioned UID above for the second board;
 do not reuse the handoff launcher's hardcoded identity on the new board.
 Programming success alone does not prove exact artifact identity or startup.
+
+Use unfiltered bridge telemetry for physical Step qualification.
+
+**Why:** On the second board, a verified snapshot advanced while church-only
+filtering caused the IDE to report no fresh retirement and keep Run locked.
+The operator repeated Step without the filter and obtained both a fresh
+RESULT and explicit Step confirmation.
+
+**How to apply:** Omit `--church-only` during control-path qualification.
+Distinguish missing filtered telemetry from lack of board execution; a passed
+Step does not establish a complete SelfTest pass.
