@@ -7,9 +7,9 @@ import savedInputs from "./_saved-inputs.json";
 type NamespaceName = keyof typeof savedInputs;
 type Slot = {
   slot: number; name: string; kind?: string; type?: string;
-  policy?: string; load_policy?: string; resident?: boolean;
+  policy?: string; load_policy?: string; resident?: boolean; token?: string;
   sequence?: number; seq?: number; boot?: boolean; filename?: string;
-  location?: string; selection?: { filename?: string; revision?: number };
+  location?: string; selection?: { filename?: string; revision?: number; token?: string };
   lump_version?: number;
 };
 
@@ -41,22 +41,16 @@ export default function KISS() {
   const lumps = slots
     .filter(row => row.kind === "lump" || Boolean(row.filename))
     .sort((a, b) => a.slot - b.slot);
-  const visualSlotCount = slotCount ?? Math.max(slots.length, Math.max(...slots.map(row => row.slot)) + 1);
   const colors = ["#73d7c0", "#9fcb72", "#e9c46a", "#ee9b70", "#e887a5", "#b8a1ee", "#72b8df", "#d4dc7b", "#f1a86c", "#70c8d5", "#d89bcc", "#a8d497", "#e9a5a0", "#9daee8", "#dfc078", "#86d5b4"];
   const colorForSlot = (slot: number) => {
-    const index = lumps.findIndex(row => row.slot === slot && Boolean(row.selection || row.filename));
+    const index = lumps.findIndex(row => row.slot === slot);
     return index < 0 ? undefined : colors[index % colors.length];
   };
-  const glassWidth = 940;
-  const glassTop = 24;
-  const glassBottom = glassTop + Math.max(300, lumps.length * 27);
-  const bandHeight = lumps.length ? (glassBottom - glassTop) / lumps.length : 0;
-  const namespaceTop = glassBottom + 68;
-  const cellWidth = 52;
-  const cellHeight = 27;
-  const gridGap = 4;
-  const namespaceHeight = Math.ceil(visualSlotCount / 16) * (cellHeight + gridGap);
-  const waterSvgHeight = namespaceTop + namespaceHeight + 30;
+  const glassCapacity = capacity ?? 16384;
+  const glassHeight = 420;
+  const glassTop = 42;
+  const glassBottom = glassTop + glassHeight;
+  const selectedLump = lumps.find(row => row.slot === selectedSlot);
 
   function changeNamespace(value: NamespaceName) {
     setNamespace(value);
@@ -174,62 +168,68 @@ export default function KISS() {
                 <p className="kiss-map-legend"><span><i className="kiss-legend-assigned" /> Saved row</span><span><i className="kiss-legend-empty" /> Empty</span><span><i className="kiss-legend-unfinished" /> Unfinished</span></p>
               </article>
             </div>
-             <section className="kiss-water-map" aria-labelledby="kiss-water-title">
-               <div className="kiss-water-heading">
-                 <div><span className="kiss-step">LUMP BY LUMP</span><h4 id="kiss-water-title">Glass-fill view of LUMP assignments</h4></div>
-                 <span className="kiss-water-caveat">Schematic · no image generated</span>
-               </div>
-               <p className="kiss-water-intro">Saved LUMP rows fill the glass one by one. Matching colors and slot numbers link each layer to its Namespace position below.</p>
-               <svg className="kiss-water-svg" viewBox={`0 0 ${glassWidth} ${waterSvgHeight}`} role="group" aria-label={`Illustrative saved LUMP rows crosslinked by slot to the ${visualSlotCount}-slot Namespace table. This is not a generated binary or physical memory map.`}>
-                 <defs>
-                   <clipPath id="kiss-glass-clip"><path d={`M18 ${glassTop + 16} Q18 ${glassTop} 34 ${glassTop} H906 Q922 ${glassTop} 922 ${glassTop + 16} V${glassBottom - 24} Q922 ${glassBottom} 898 ${glassBottom} H42 Q18 ${glassBottom} 18 ${glassBottom - 24} Z`} /></clipPath>
-                   <linearGradient id="kiss-glass-sheen" x1="0" x2="1">
-                     <stop offset="0" stopColor="#d7fff7" stopOpacity=".08" />
-                     <stop offset=".1" stopColor="#d7fff7" stopOpacity="0" />
-                     <stop offset=".88" stopColor="#d7fff7" stopOpacity="0" />
-                     <stop offset="1" stopColor="#d7fff7" stopOpacity=".12" />
-                   </linearGradient>
-                 </defs>
-                 {lumps.map((row, index) => {
-                   const color = colors[index % colors.length];
-                   const centerY = glassBottom - (index + .5) * bandHeight;
-                   const targetX = 24 + (row.slot % 16) * (cellWidth + gridGap) + cellWidth / 2;
-                   const targetY = namespaceTop + Math.floor(row.slot / 16) * (cellHeight + gridGap) + cellHeight / 2;
-                   if (!row.selection && !row.filename) return null;
-                   return <path key={`link-${row.slot}`} d={`M924 ${centerY} C${glassWidth - 3} ${centerY}, ${glassWidth - 3} ${targetY}, ${targetX} ${targetY}`} fill="none" stroke={color} strokeWidth={selectedSlot === row.slot ? 2.4 : 1.1} strokeOpacity={selectedSlot === row.slot ? .9 : .34} />;
-                 })}
-                 <g clipPath="url(#kiss-glass-clip)">
-                   <rect x="18" y={glassTop} width="904" height={glassBottom - glassTop} fill="#bdebe2" fillOpacity=".04" />
-                   {lumps.map((row, index) => {
-                     const color = colors[index % colors.length];
-                     const y = glassBottom - (index + 1) * bandHeight;
-                     const active = selectedSlot === row.slot;
-                     const hasBinary = Boolean(row.selection || row.filename);
-                     return <g key={`lump-${row.slot}`} className={`kiss-water-layer${active ? " is-selected" : ""}`} role="button" tabIndex={0} aria-pressed={active} aria-label={`Select LUMP ${row.name}, Namespace slot ${row.slot}${hasBinary ? "" : ", no selected binary"}`} onClick={() => setSelectedSlot(row.slot)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedSlot(row.slot); } }}>
-                       <rect x="18" y={y} width="904" height={bandHeight} fill={hasBinary ? color : "#d8b36a"} fillOpacity={hasBinary ? .58 : .3} stroke={color} strokeOpacity=".78" strokeWidth=".8" />
-                       {index % 2 === 0 && <path d={`M25 ${y + bandHeight * .35} Q210 ${y + bandHeight * .08} 400 ${y + bandHeight * .35} T900 ${y + bandHeight * .35}`} fill="none" stroke="#ffffff" strokeOpacity=".13" />}
-                       <text x="42" y={y + bandHeight / 2 + 4} className="kiss-water-name">{row.name}</text>
-                       <text x="892" y={y + bandHeight / 2 + 4} textAnchor="end" className="kiss-water-slot">SLOT {String(row.slot).padStart(2, "0")}{hasBinary ? "" : " · UNBOUND"}</text>
-                     </g>;
-                   })}
-                   <rect x="18" y={glassTop} width="904" height={glassBottom - glassTop} fill="url(#kiss-glass-sheen)" pointerEvents="none" />
-                 </g>
-                 <path d={`M18 ${glassTop + 16} Q18 ${glassTop} 34 ${glassTop} H906 Q922 ${glassTop} 922 ${glassTop + 16} V${glassBottom - 24} Q922 ${glassBottom} 898 ${glassBottom} H42 Q18 ${glassBottom} 18 ${glassBottom - 24} Z`} fill="none" stroke="#c9eee7" strokeOpacity=".72" strokeWidth="2" />
-                 <path d={`M26 ${glassTop + 12} V${glassBottom - 27} Q26 ${glassBottom - 8} 46 ${glassBottom - 8}`} fill="none" stroke="#e5fff9" strokeOpacity=".36" strokeWidth="3" />
-                 <text x="26" y={glassBottom + 39} className="kiss-namespace-label">NAMESPACE · LOGICAL SLOTS</text>
-                 {Array.from({ length: visualSlotCount }, (_, slot) => {
-                   const x = 24 + (slot % 16) * (cellWidth + gridGap);
-                   const y = namespaceTop + Math.floor(slot / 16) * (cellHeight + gridGap);
-                   const row = slots.find(item => item.slot === slot);
-                   const color = colorForSlot(slot);
-                   return <g key={`slot-${slot}`} className={`kiss-water-ns-slot${selectedSlot === slot ? " is-selected" : ""}`} role="button" tabIndex={0} aria-label={`Select Namespace slot ${slot}${row ? `, ${row.name}` : ", empty"}`} aria-pressed={selectedSlot === slot} onClick={() => row && setSelectedSlot(slot)} onKeyDown={event => { if (row && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setSelectedSlot(slot); } }}>
-                     <rect x={x} y={y} width={cellWidth} height={cellHeight} rx="3" fill={color ?? "#172433"} fillOpacity={color ? .55 : 1} stroke={color ?? "#405064"} strokeOpacity={row ? .9 : .65} />
-                     <text x={x + cellWidth / 2} y={y + 18} textAnchor="middle" className="kiss-water-slot-number">{String(slot).padStart(2, "0")}</text>
-                   </g>;
-                 })}
-               </svg>
-               <div className="kiss-water-legend"><span><i className="kiss-water-swatch" /> Matching slot and color connect each LUMP to the Namespace</span><span>Stack order and band heights are illustrative—not runtime order, sizes, or addresses.</span></div>
-             </section>
+              <section className="kiss-water-map" aria-labelledby="kiss-water-title">
+                <div className="kiss-water-heading">
+                  <div><span className="kiss-step">IMAGE CAPACITY</span><h4 id="kiss-water-title">Full-scale memory glass</h4></div>
+                  <span className="kiss-water-caveat">Empty · no bound image attached</span>
+                </div>
+                <p className="kiss-water-intro">The vessel represents the full {glassCapacity.toLocaleString()}-word address space. Saved LUMPs are listed beside it; their physical sizes and positions are unknown until a bound image supplies an allocation map.</p>
+                <div className="kiss-glass-layout">
+                  <div className="kiss-glass-figure">
+                    <div className="kiss-glass-capacity">{glassCapacity.toLocaleString()} words total</div>
+                    <svg className="kiss-water-svg" viewBox="0 0 240 500" role="img" aria-label={`Empty full-scale ${glassCapacity.toLocaleString()} word memory vessel. No physical LUMP allocations are available.`}>
+                      <defs>
+                        <linearGradient id="kiss-empty-glass" x1="0" x2="1">
+                          <stop offset="0" stopColor="#b9eee2" stopOpacity=".13" />
+                          <stop offset=".16" stopColor="#b9eee2" stopOpacity=".035" />
+                          <stop offset=".84" stopColor="#b9eee2" stopOpacity=".035" />
+                          <stop offset="1" stopColor="#b9eee2" stopOpacity=".13" />
+                        </linearGradient>
+                      </defs>
+                      <path d={`M49 ${glassTop} H191 L181 ${glassBottom - 10} Q120 ${glassBottom + 17} 59 ${glassBottom - 10} Z`} fill="url(#kiss-empty-glass)" stroke="#b9eee2" strokeOpacity=".84" strokeWidth="2" />
+                      <path d={`M55 ${glassTop + 7} V${glassBottom - 19}`} stroke="#e7fff8" strokeOpacity=".25" strokeWidth="3" />
+                      {[0, .25, .5, .75, 1].map((fraction, index) => {
+                        const y = glassTop + fraction * glassHeight;
+                        const words = Math.round(glassCapacity * (1 - fraction));
+                        return <g key={index}>
+                          <line x1="38" x2={index === 0 || index === 4 ? 61 : 70} y1={y} y2={y} stroke="#b9eee2" strokeOpacity=".7" />
+                          <text x="32" y={y + 4} textAnchor="end" className="kiss-glass-tick">{words.toLocaleString()}</text>
+                        </g>;
+                      })}
+                      <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">EMPTY</text>
+                      <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">No placement data</text>
+                    </svg>
+                    <div className="kiss-glass-zero">0 words allocated</div>
+                  </div>
+                  <div className="kiss-lump-review">
+                    <h5>Namespace LUMPs <span>{lumps.length}</span></h5>
+                    <p className="kiss-lump-list-note">Select a LUMP to highlight its Namespace slot and inspect its saved binding details.</p>
+                    <div className="kiss-lump-list" role="list" aria-label="Namespace LUMPs">
+                      {lumps.map((row, index) => {
+                        const selected = selectedSlot === row.slot;
+                        const hasBinary = Boolean(row.selection || row.filename);
+                        return <button type="button" role="listitem" key={row.slot} className={`kiss-lump-item${selected ? " is-selected" : ""}`} style={{ "--kiss-lump-color": colors[index % colors.length] } as CSSProperties} aria-pressed={selected} onClick={() => setSelectedSlot(row.slot)}>
+                          <span className="kiss-lump-dot" aria-hidden="true" />
+                          <span className="kiss-lump-item-name">{row.name}<small>Slot {String(row.slot).padStart(2, "0")}{row.name === "ide.Mint" ? " · unfinished" : ""}</small></span>
+                          <span className="kiss-lump-size">{hasBinary ? "size unknown" : "unbound"}</span>
+                        </button>;
+                      })}
+                    </div>
+                    {selectedLump ? <section className="kiss-lump-details" aria-live="polite" aria-labelledby="kiss-lump-detail-title">
+                      <div className="kiss-lump-detail-head"><span className="kiss-lump-detail-dot" style={{ "--kiss-lump-color": colors[Math.max(0, lumps.findIndex(row => row.slot === selectedLump.slot)) % colors.length] } as CSSProperties} /><div><span>SELECTED LUMP · SLOT {String(selectedLump.slot).padStart(2, "0")}</span><h5 id="kiss-lump-detail-title">{selectedLump.name}</h5></div></div>
+                      <dl>
+                        <dt>Bound artifact</dt><dd>{selectedLump.selection?.filename ?? selectedLump.filename ?? "None selected"}</dd>
+                        <dt>Revision</dt><dd>{selectedLump.selection?.revision ?? selectedLump.lump_version ?? "—"}</dd>
+                        <dt>Token</dt><dd>{selectedLump.selection?.token ?? selectedLump.token ?? "—"}</dd>
+                        <dt>Policy</dt><dd>{selectedLump.policy ?? selectedLump.load_policy ?? "Not recorded"}</dd>
+                        <dt>Physical size</dt><dd>Unknown · no bound-image allocation data</dd>
+                        <dt>Word address</dt><dd>Unknown · no generated memory map</dd>
+                      </dl>
+                    </section> : <div className="kiss-lump-details kiss-no-lump">Select a LUMP to inspect its details.</div>}
+                  </div>
+                </div>
+                <div className="kiss-water-legend"><span>Glass scale = full Namespace capacity</span><span>LUMP sizes and positions intentionally not inferred from slots.</span></div>
+              </section>
             <section className="kiss-physical-map" aria-labelledby="kiss-physical-title">
               <div className="kiss-physical-head"><h4 id="kiss-physical-title">Physical word layout</h4><span>Not generated</span></div>
               <p>Word addresses and binary region sizes are not in this saved Namespace table. The converter must produce them; slot numbers are not memory addresses.</p>
