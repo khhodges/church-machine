@@ -21,6 +21,7 @@ export default function KISS() {
   const [loaded, setLoaded] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [report, setReport] = useState(false);
+  const [handoff, setHandoff] = useState<"none" | "inspect" | "accept">("none");
   const dialog = useRef<HTMLDialogElement>(null);
   const input = savedInputs[namespace];
   const slots: Slot[] = ("rows" in input ? input.rows : input.abstractions);
@@ -56,32 +57,34 @@ export default function KISS() {
       </header>
 
       <div className="kiss-heading">
-        <div><h1>Development image</h1><p className="kiss-subtitle">Opening a saved Namespace should bind its exact artifacts into an image automatically.</p></div>
+        <div><h1>Development image</h1><p className="kiss-subtitle">Inspect or accept the exact image produced by Bind Namespace Design.</p></div>
         <span className="kiss-local">LOCAL UI SIMULATION</span>
       </div>
 
       <section className="kiss-binding" aria-labelledby="kiss-binding-title">
         <div className="kiss-binding-head">
-          <div><span className="kiss-step">ON OPEN</span><h2 id="kiss-binding-title">Automatic image binding</h2></div>
-          <span className="kiss-binding-badge">{isNew ? "BLOCKED · PRIOR PROBE" : "NOT VERIFIED IN PREVIEW"}</span>
+          <div><span className="kiss-step">FROM NAMESPACE</span><h2 id="kiss-binding-title">Bound image handoff</h2></div>
+          <span className="kiss-binding-badge">BINDING IS NOT REPEATED HERE</span>
         </div>
-        <p className="kiss-binding-intro">The intended page behavior is to resolve this Namespace’s pinned LUMPs and bind them before offering FPGA load.</p>
-        <div className="kiss-binding-flow" aria-label="Image binding stages">
-          <div><span>01</span><strong>Saved Namespace</strong><small>{slots.length} logical rows</small></div>
-          <i aria-hidden="true">→</i>
-          <div><span>02</span><strong>Resolve artifacts</strong><small>{codeSelections.length - unselectedCode.length} selected · {unselectedCode.length} missing</small></div>
-          <i aria-hidden="true">→</i>
-          <div><span>03</span><strong>Bind binary image</strong><small>Validate loader format</small></div>
-          <i aria-hidden="true">→</i>
-          <div><span>04</span><strong>FPGA transfer</strong><small>Only after validation</small></div>
+        <p className="kiss-binding-intro">The Namespace page’s <strong>Bind Namespace Design</strong> action creates the bound result. Open it here to inspect the map, or accept that exact result for the development-image workflow.</p>
+        <div className="kiss-handoff-actions">
+          <button type="button" aria-pressed={handoff === "inspect"} onClick={() => setHandoff("inspect")}>Inspect bound image</button>
+          <button type="button" className="kiss-primary" aria-pressed={handoff === "accept"} onClick={() => setHandoff("accept")}>Accept bound image</button>
+          <span>Neither action binds again. FPGA loading remains separate.</span>
         </div>
+        {handoff !== "none" && <div className="kiss-handoff-state" role="status">
+          <strong>{handoff === "inspect" ? "Inspect · read-only review" : "Accept · exact bound result selected"}</strong>
+          <span>{handoff === "inspect"
+            ? "This opens the bound image’s slots, findings, and physical map without changing it."
+            : "This selects the bound image for this workflow. It does not transfer or activate anything on the FPGA."}</span>
+        </div>}
         <div className={`kiss-binding-result${isNew ? " kiss-binding-failed" : ""}`} role="status">
-          <strong>{isNew ? "Latest known result: projection rejected" : "No conversion result recorded for this Namespace"}</strong>
+          <strong>{isNew ? "This preview has no accepted bound image" : "Bound-image evidence not attached"}</strong>
           <span>{isNew
-            ? "A prior probe produced a 65,536-byte simulator image, but Wukong projection rejected it: missing Namespace Header V2 marker. It was not sent to the FPGA."
-            : "This design preview cannot run the binder. No binary is claimed to be bound or ready for transfer."}</span>
+            ? "The latest known probe produced a 65,536-byte simulator image, but Wukong projection rejected it: missing Namespace Header V2 marker."
+            : "The saved design is shown for discussion only. No binary is claimed to be bound or ready for transfer."}</span>
         </div>
-        <p className="kiss-binding-foot">Design preview only · this panel does not run conversion, change saved inputs, or contact hardware.</p>
+        <p className="kiss-binding-foot">Demo controls only · a real successful bind result would carry its exact image and generated memory map here. This preview does not bind, accept a real artifact, or contact hardware.</p>
       </section>
 
       <div className="kiss-layout">

@@ -49,6 +49,11 @@
 .kiss-workbench .kiss-binding-result span { color:#c2cedc; }
 .kiss-workbench .kiss-binding-result.kiss-binding-failed { border-left:2px solid #d6ad4e; background:#29283a; }
 .kiss-workbench .kiss-binding-foot { color:var(--kiss-muted); font-size:10px; margin-top:8px; }
+.kiss-workbench .kiss-handoff-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.kiss-workbench .kiss-handoff-actions > span { color:var(--kiss-muted); font-size:11px; margin-left:4px; }
+.kiss-workbench .kiss-handoff-state { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; padding:8px 10px; border:1px solid #40516a; background:#111a27; border-radius:4px; font-size:11px; }
+.kiss-workbench .kiss-handoff-state strong { color:var(--kiss-yellow); }
+.kiss-workbench .kiss-handoff-state span { color:#c2cedc; }
 .kiss-workbench h1 { font-size: 25px; font-weight: 600; letter-spacing: -.025em; color: var(--kiss-text); }
 .kiss-workbench .kiss-subtitle { color: var(--kiss-muted); margin-top: 4px; }
 .kiss-workbench .kiss-local { font-family: "SFMono-Regular", Consolas, monospace; color: var(--kiss-muted); font-size: 11px; white-space: nowrap; }
