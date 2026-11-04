@@ -1,6 +1,6 @@
 import "./_group.css";
 import "./_kiss.css";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import savedInputs from "./_saved-inputs.json";
 
@@ -14,9 +14,11 @@ type Slot = {
 };
 
 export default function KISS() {
-  const [namespace, setNamespace] = useState<NamespaceName>("New Layout");
-  const [selectedSlot, setSelectedSlot] = useState<number>(9);
+  const [namespace, setNamespace] = useState<NamespaceName>("Original");
+  const [selectedSlot, setSelectedSlot] = useState<number>(6);
   const [sendAttempted, setSendAttempted] = useState(false);
+  const detailsDialog = useRef<HTMLDialogElement>(null);
+  const detailsOpener = useRef<HTMLElement | SVGElement | null>(null);
   const input = savedInputs[namespace];
   const slots: Slot[] = ("rows" in input ? input.rows : input.abstractions);
   const sorted = [...slots].sort((a, b) => a.slot - b.slot);
@@ -28,11 +30,14 @@ export default function KISS() {
     .filter(row => row.kind === "lump" || Boolean(row.filename))
     .sort((a, b) => a.slot - b.slot);
   const colors = ["#73d7c0", "#9fcb72", "#e9c46a", "#ee9b70", "#e887a5", "#b8a1ee", "#72b8df", "#d4dc7b", "#f1a86c", "#70c8d5", "#d89bcc", "#a8d497", "#e9a5a0", "#9daee8", "#dfc078", "#86d5b4"];
+  const colorForSlot = (slot: number) => {
+    const index = lumps.findIndex(row => row.slot === slot);
+    return index < 0 ? undefined : colors[index % colors.length];
+  };
   const glassCapacity = capacity ?? 16384;
   const glassHeight = 420;
   const glassTop = 42;
   const glassBottom = glassTop + glassHeight;
-  const selectedLump = lumps.find(row => row.slot === selectedSlot);
   const wordValue = (value: unknown) => {
     if (typeof value === "number" && Number.isFinite(value)) return value;
     if (typeof value !== "string" || !value.trim()) return undefined;
@@ -49,8 +54,21 @@ export default function KISS() {
 
   function changeNamespace(value: NamespaceName) {
     setNamespace(value);
-    setSelectedSlot(value === "Original" ? 0 : 9);
+    const nextInput = savedInputs[value];
+    const nextSlots: Slot[] = ("rows" in nextInput ? nextInput.rows : nextInput.abstractions);
+    setSelectedSlot(nextSlots.find(row => row.kind === "lump" || Boolean(row.filename))?.slot ?? nextSlots[0]?.slot ?? 0);
     setSendAttempted(false);
+  }
+
+  function inspectSlot(row: Slot, control: HTMLElement | SVGElement) {
+    setSelectedSlot(row.slot);
+    detailsOpener.current = control;
+    if (!detailsDialog.current?.open) detailsDialog.current?.showModal();
+  }
+
+  function restoreDetailsFocus() {
+    const opener = detailsOpener.current;
+    requestAnimationFrame(() => opener?.focus());
   }
 
   return (
@@ -75,6 +93,7 @@ export default function KISS() {
             </select>
           </div>
           <p className="kiss-meta">{slots.length} saved rows{"slotCount" in input ? ` · ${input.slotCount} slots` : " · original slot assignments"} · Select a name to inspect its saved data.</p>
+          <div className="kiss-slot-visual-row">
           <div className="kiss-table-scroll" tabIndex={0} role="region" aria-label={`${namespace} saved slot table`}>
             <table>
               <thead><tr><th scope="col">Slot</th><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Policy</th><th scope="col">Rev.</th></tr></thead>
@@ -83,20 +102,13 @@ export default function KISS() {
                 const policy = row.policy ?? row.load_policy ?? (kind === "mmio" ? "Hardware" : "—");
                 return <tr key={row.slot} className={selectedSlot === row.slot ? "kiss-active" : undefined}>
                   <td>{String(row.slot).padStart(2, "0")}</td>
-                  <td><button className="kiss-slot-button" onClick={() => setSelectedSlot(row.slot)} aria-pressed={selectedSlot === row.slot} aria-label={`Inspect slot ${row.slot}, ${row.name}`}>{row.name}</button>{row.boot && <span className="kiss-tag">boot</span>}{row.name === "ide.Mint" && <span className="kiss-tag">unfinished</span>}</td>
+                  <td>{kind === "lump" && colorForSlot(row.slot) && <span className="kiss-slot-color" style={{ "--kiss-lump-color": colorForSlot(row.slot) } as CSSProperties} aria-hidden="true" />}<button className="kiss-slot-button" style={kind === "lump" && colorForSlot(row.slot) ? { "--kiss-lump-color": colorForSlot(row.slot) } as CSSProperties : undefined} onClick={event => inspectSlot(row, event.currentTarget)} aria-pressed={selectedSlot === row.slot} aria-label={`Inspect slot ${row.slot}, ${row.name}`}>{row.name}</button>{row.boot && <span className="kiss-tag">boot</span>}{row.name === "ide.Mint" && <span className="kiss-tag">unfinished</span>}</td>
                   <td className="kiss-kind">{kind}</td><td className="kiss-kind">{policy}</td>
                   <td className="kiss-kind">{row.selection?.revision ?? row.lump_version ?? "—"}</td>
                 </tr>;
               })}</tbody>
             </table>
           </div>
-          <details className="kiss-technical">
-            <summary>Technical details · {selected?.name ?? "Namespace"}</summary>
-            <p className="kiss-muted">Exact saved row. Kind labels for Original are inferred for display; saved data is unchanged.</p>
-            <pre>{JSON.stringify(selected, null, 2)}</pre>
-            <p className="kiss-muted">Namespace metadata</p>
-            <pre>{JSON.stringify(Object.fromEntries(Object.entries(input).filter(([key]) => key !== "rows" && key !== "abstractions")), null, 2)}</pre>
-          </details>
           <section className="kiss-water-map" aria-labelledby="kiss-water-title">
                 <div className="kiss-water-heading">
                   <div><span className="kiss-step">SAVED LOCATIONS</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
@@ -124,7 +136,8 @@ export default function KISS() {
                           const y = glassTop + (glassCapacity - start - (hasExtent ? words : 0)) / glassCapacity * glassHeight;
                           const markerY = glassTop + (glassCapacity - start) / glassCapacity * glassHeight;
                           const active = selectedSlot === row.slot;
-                          return <g key={row.slot} role="button" tabIndex={0} aria-label={`Select ${row.name}, slot ${row.slot}, location ${row.location}${words === undefined ? ", extent unknown" : `, extent ${words} words`}`} aria-pressed={active} onClick={() => setSelectedSlot(row.slot)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedSlot(row.slot); } }} className={`kiss-region${active ? " is-selected" : ""}`} style={{ "--kiss-lump-color": colors[index % colors.length] } as CSSProperties}>
+                          const color = colorForSlot(row.slot) ?? colors[index % colors.length];
+                          return <g key={row.slot} role="button" tabIndex={0} aria-label={`Inspect ${row.name}, slot ${row.slot}, location ${row.location}${words === undefined ? ", extent unknown" : `, extent ${words} words`}`} aria-pressed={active} onClick={event => inspectSlot(row, event.currentTarget)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); inspectSlot(row, event.currentTarget); } }} className={`kiss-region${active ? " is-selected" : ""}`} style={{ "--kiss-lump-color": color } as CSSProperties}>
                             {hasExtent ? <>
                               <rect x="60" y={y} width="120" height={extentHeight} rx="2" />
                               {extentHeight >= 14 && <text x="120" y={y + Math.min(extentHeight - 3, 12)} textAnchor="middle">{row.name}</text>}
@@ -148,22 +161,17 @@ export default function KISS() {
                     </svg>
                     <div className="kiss-glass-zero">{locatedLumps.length} table locations shown</div>
                   </div>
-                  <div className="kiss-lump-review">
-                    {selectedLump ? <section className="kiss-lump-details" aria-live="polite" aria-labelledby="kiss-lump-detail-title">
-                      <div className="kiss-lump-detail-head"><span className="kiss-lump-detail-dot" style={{ "--kiss-lump-color": colors[Math.max(0, lumps.findIndex(row => row.slot === selectedLump.slot)) % colors.length] } as CSSProperties} /><div><span>SELECTED LUMP · SLOT {String(selectedLump.slot).padStart(2, "0")}</span><h5 id="kiss-lump-detail-title">{selectedLump.name}</h5></div></div>
-                      <dl>
-                        <dt>Bound artifact</dt><dd>{selectedLump.selection?.filename ?? selectedLump.filename ?? "None selected"}</dd>
-                        <dt>Revision</dt><dd>{selectedLump.selection?.revision ?? selectedLump.lump_version ?? "—"}</dd>
-                        <dt>Token</dt><dd>{selectedLump.selection?.token ?? selectedLump.token ?? "—"}</dd>
-                        <dt>Policy</dt><dd>{selectedLump.policy ?? selectedLump.load_policy ?? "Not recorded"}</dd>
-                        <dt>Table location</dt><dd>{selectedLump.location ?? "Not recorded"}</dd>
-                        <dt>Table extent</dt><dd>{selectedLump.limit ?? "Not recorded"}</dd>
-                      </dl>
-                    </section> : <div className="kiss-lump-details kiss-no-lump">Select a LUMP slot in the Namespace Table to highlight its location and inspect the saved row.</div>}
-                  </div>
                 </div>
                 <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Select a table row or region to inspect.</span></div>
           </section>
+          </div>
+          <details className="kiss-technical">
+            <summary>Technical details · {selected?.name ?? "Namespace"}</summary>
+            <p className="kiss-muted">Exact saved row. Kind labels for Original are inferred for display; saved data is unchanged.</p>
+            <pre>{JSON.stringify(selected, null, 2)}</pre>
+            <p className="kiss-muted">Namespace metadata</p>
+            <pre>{JSON.stringify(Object.fromEntries(Object.entries(input).filter(([key]) => key !== "rows" && key !== "abstractions")), null, 2)}</pre>
+          </details>
         </section>
 
       </div>
@@ -172,6 +180,42 @@ export default function KISS() {
         <button type="button" className="kiss-primary kiss-send-button" onClick={() => setSendAttempted(true)}>Send build to FPGA</button>
         {sendAttempted && <p className="kiss-send-status" role="status">Not sent — this preview has no accepted bound image or hardware connection. No FPGA action occurred.</p>}
       </footer>
+      <dialog
+        ref={detailsDialog}
+        className="kiss-slot-dialog"
+        aria-labelledby="kiss-slot-dialog-title"
+        onClose={restoreDetailsFocus}
+        onClick={event => {
+          if (event.target === event.currentTarget) detailsDialog.current?.close();
+        }}
+      >
+        {selected && (() => {
+          const kind = selected.kind ?? (selected.filename ? "lump" : selected.name.includes("DEV") ? "mmio" : selected.name.includes("Thread") ? "thread" : "namespace");
+          const value = (field: string | number | undefined) => field === undefined || field === "" ? "Not recorded" : String(field);
+          return <>
+            <div className="kiss-slot-dialog-head">
+              <span className="kiss-slot-dialog-kicker">SAVED SLOT · {String(selected.slot).padStart(2, "0")} · {kind.toUpperCase()}</span>
+              <h2 id="kiss-slot-dialog-title">{selected.name}</h2>
+            </div>
+            <dl className="kiss-slot-dialog-fields">
+              <dt>Slot</dt><dd>{selected.slot}</dd>
+              <dt>Artifact</dt><dd>{value(selected.selection?.filename ?? selected.filename)}</dd>
+              <dt>Revision</dt><dd>{value(selected.selection?.revision ?? selected.lump_version)}</dd>
+              <dt>Token</dt><dd>{value(selected.selection?.token ?? selected.token)}</dd>
+              <dt>Policy</dt><dd>{value(selected.policy ?? selected.load_policy)}</dd>
+              <dt>Location</dt><dd>{value(selected.location)}</dd>
+              <dt>Extent</dt><dd>{value(selected.limit)}</dd>
+            </dl>
+            <details className="kiss-slot-raw">
+              <summary>Exact saved row fields</summary>
+              <pre>{JSON.stringify(selected, null, 2)}</pre>
+            </details>
+            <div className="kiss-slot-dialog-actions">
+              <button type="button" className="kiss-primary" onClick={() => detailsDialog.current?.close()}>Close</button>
+            </div>
+          </>;
+        })()}
+      </dialog>
       <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This preview leaves every saved input untouched.</span><span>No network · no storage writes · no hardware</span></p>
     </main>
   );
