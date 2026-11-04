@@ -1,0 +1,63 @@
+<div id="buildApprovalPanel"  class="ti60-connect-panel ba-panel">
+            <form class="ba-token-row" aria-label="Build authorization">
+                <label for="baBuildTokenInput">&#x1F511; IDE access token</label>
+                <input id="baBuildTokenInput" type="password" class="ba-token-input"
+                       placeholder="Paste REPORT_TOKEN to unlock build actions&hellip;"
+                       autocomplete="off"
+                      >
+                <span id="baTokenStatus" class="ba-token-status"></span>
+                <button type="button" class="ba-refresh-btn">Connect bridge</button>
+            </form>
+            
+            <div class="ba-header">
+                <h2>&#x1F528; Build Approval</h2>
+                <button id="baRefreshBtn" class="ba-refresh-btn">&#x21BB; Refresh</button>
+                <span id="baLastChecked" class="ba-last-checked"></span>
+            </div>
+            <div class="ba-toolbar">
+                <span class="ba-snapshot-status">Current Namespace: editable draft · freezing approves exact saved inputs</span>
+                <button id="baFreezeBtn" class="ba-freeze-btn" disabled>&#x2744;&#xFE0F; Freeze Snapshot</button>
+                <label for="baRevisionSelect">Namespaces and bitstream builds (blue)</label>
+                <select id="baRevisionSelect" style="max-width:100%" aria-label="Choose a saved Namespace or bitstream build"><option value="">Select a Namespace or bitstream build…</option></select>
+                <button id="baSelectSnapshotBtn" class="ba-freeze-btn" disabled>Use approved revision</button>
+                <button id="baInstallImageBtn" class="ba-approve-btn" disabled>Install Image</button>
+                <button class="ba-approve-btn">Check UART Image</button>
+                <button class="ba-approve-btn">Install UART Image</button>
+                <span id="baInstallImageStatus" role="status"></span>
+                <button id="baApproveBtn" class="ba-approve-btn" disabled>&#x1F528; Build Bitstream</button>
+                <span id="baSnapshotStatus" class="ba-snapshot-status"></span>
+            </div>
+            <div id="baReleaseContext" class="ba-release-context">
+                <div class="ba-loading">Loading pending release comments&hellip;</div>
+            </div>
+            <div id="baIssueComments" class="ba-issue-comments">
+                <div class="ba-loading">Loading approval issues&hellip;</div>
+            </div>
+            <div class="ba-toolbar">
+                <label for="baBitstreamRevisionSelect">Saved bitstreams (read-only)</label>
+                <select id="baBitstreamRevisionSelect" aria-label="Select saved immutable bitstream"><option value="">Select a saved bitstream…</option></select>
+                <button type="button" class="ba-refresh-btn">Refresh outputs</button>
+                <button type="button" id="baDownloadRevisionBtn" class="ba-freeze-btn" disabled>Download selected .bit</button>
+                <span id="baBitstreamRevisionStatus" class="ba-snapshot-status">Downloading an older output does not activate or flash it.</span>
+            </div>
+            <div id="baMapBody" class="ba-map-body">
+                <div class="ba-loading">Select the &#x1F528; Build tab to load NS map&hellip;</div>
+            </div>
+            <div id="baConsole" class="ba-console">
+                <div class="ba-console-header">
+                    <span class="ba-console-title">&#x1F4DF; Build console</span>
+                    <span id="baConsoleState" class="ba-console-state">Idle</span>
+                </div>
+                <div class="ba-console-progress"><div id="baConsoleProgress" class="ba-console-progress-fill"></div></div>
+                <div id="baConsolePhases" class="ba-console-phases"></div>
+                <div id="baConsoleMessage" class="ba-console-message">Start a build to see live phases and messages.</div>
+            </div>
+            <div id="baBuildLogWrap" class="ba-build-log-wrap" style="display:none;">
+                <div class="ba-build-log-header">
+                    <span>&#x1F6E0;&#xFE0F; Vivado build log</span>
+                    <span id="baBuildStatus" class="ba-build-status"></span>
+                </div>
+                <pre id="baBuildLog" class="ba-build-log"></pre>
+            </div>
+        </div>
+        
