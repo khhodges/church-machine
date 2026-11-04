@@ -34,6 +34,8 @@ export default function KISS() {
   const codeSelections = slots.filter(row => row.kind === "lump");
   const unselectedCode = codeSelections.filter(row => !row.selection);
   const unfinished = slots.filter(row => row.name === "ide.Mint");
+  const slotCount = capacity ? slotCapacity ?? slots.length : undefined;
+  const addressRows = slots.filter(row => row.location);
 
   function changeNamespace(value: NamespaceName) {
     setNamespace(value);
@@ -106,15 +108,30 @@ export default function KISS() {
                 </dl>
               </article>
               <article>
-                <h4>Memory layout</h4>
+                <h4>Namespace slot map</h4>
                 <dl>
-                  <dt>Namespace capacity</dt><dd>{capacity ? `${capacity.toLocaleString()} words` : "Not recorded in this saved design"}</dd>
-                  <dt>Slot-table capacity</dt><dd>{slotCapacity ? `${slotCapacity} slots` : "Original layout fields"}</dd>
-                  <dt>Saved rows</dt><dd>{slots.length} logical slot assignments, numbered {Math.min(...slots.map(row => row.slot))}–{Math.max(...slots.map(row => row.slot))}</dd>
-                  <dt>Physical word placement</dt><dd>Not present in this design file; must be reported by conversion, not inferred from slot numbers.</dd>
+                  <dt>Address space</dt><dd>{capacity ? `${capacity.toLocaleString()} words` : "Not recorded for this saved layout"}</dd>
+                  <dt>Logical slots</dt><dd>{slotCount ? `${slotCount} slots · ${slots.length} saved rows` : `${slots.length} saved rows · capacity not recorded`}</dd>
                 </dl>
+                {slotCount && <div className="kiss-slot-map" role="img" aria-label={`${slots.length} saved logical slot rows in a ${slotCount}-slot Namespace table; this is not physical word placement`}>
+                  {Array.from({length: slotCount}, (_, slot) => {
+                    const row = slots.find(item => item.slot === slot);
+                    const status = row
+                      ? row.name === "ide.Mint" ? "unfinished" : "assigned"
+                      : "empty";
+                    const label = row ? row.name : "Unassigned";
+                    return <span key={slot} className={`kiss-slot-cell kiss-slot-${status}${selectedSlot === slot ? " kiss-slot-selected" : ""}`} title={`Slot ${slot}: ${label}`} aria-hidden="true">{slot}</span>;
+                  })}
+                </div>}
+                <p className="kiss-map-legend"><span><i className="kiss-legend-assigned" /> Saved row</span><span><i className="kiss-legend-empty" /> Empty</span><span><i className="kiss-legend-unfinished" /> Unfinished</span></p>
               </article>
             </div>
+            <section className="kiss-physical-map" aria-labelledby="kiss-physical-title">
+              <div className="kiss-physical-head"><h4 id="kiss-physical-title">Physical word layout</h4><span>Not generated</span></div>
+              <p>Word addresses and binary region sizes are not in this saved Namespace table. The converter must produce them; slot numbers are not memory addresses.</p>
+              {addressRows.length > 0 && <details><summary>Saved location fields (not a verified image map)</summary><ul>{addressRows.map(row => <li key={row.slot}>Slot {row.slot} · {row.name}: saved location {row.location}</li>)}</ul></details>}
+              <p className="kiss-physical-caption">No physical blocks are drawn because no converted image exists.</p>
+            </section>
             <p className="kiss-review-foot">This review does not edit the Namespace or suppress unfinished entries. Preparation findings remain visible and do not prevent further inspection.</p>
           </section>
         </section>
