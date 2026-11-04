@@ -14,6 +14,8 @@ const BuildApprovalView = {
     _selectedSnapshot: null,
     _availableSnapshot: null,
     _approvedRevisions: [],
+    _savedNamespaceEntries: [],
+    _selectedSavedEntry: null,
     _bitstreamRevisions: [],
     _selectedBitstream: null,
     _buildRunning: false,
@@ -239,6 +241,10 @@ const BuildApprovalView = {
         this._selectedSnapshot = null;
         this._availableSnapshot = null;
         this._approvedRevisions = [];
+        this._savedNamespaceEntries = [];
+        this._selectedSavedEntry = null;
+        const namespaceSelect = document.getElementById('baRevisionSelect');
+        if (namespaceSelect) namespaceSelect.innerHTML = '<option value="">Select a saved Namespace…</option>';
         this._bitstreamRevisions = [];
         this._selectedBitstream = null;
         const download = document.getElementById('baDownloadRevisionBtn');
@@ -364,6 +370,7 @@ const BuildApprovalView = {
 
     async refresh(manual) {
         if (this._inFlight) return;
+        if (manual) this._loadRevisions();
         this._inFlight = true;
         const btn = document.getElementById('baRefreshBtn');
         if (btn && manual) btn.disabled = true;
@@ -888,6 +895,8 @@ const BuildApprovalView = {
 
     _selectSnapshot(snapshot) {
         if (!snapshot) throw new Error('Approved Namespace revision identity is unavailable.');
+        this._selectedSavedEntry = this._savedNamespaceEntries.find(
+            row => row.id === snapshot.namespace_revision_id) || null;
         this._selectedSnapshot = snapshot;
         this._snapFrozen = true;
         const status = document.getElementById('baSnapshotStatus');
@@ -1022,7 +1031,7 @@ const BuildApprovalView = {
             const res = await fetch('/api/artifact-revisions/namespace', {
                 headers: this._authHeaders(), cache: 'no-store',
             });
-            const data = await _actionableJsonResponse(res, 'Load approved Namespace revisions', {
+            const data = await _actionableJsonResponse(res, 'Load saved Namespace versions', {
                 dataChanged: false,
                 nextAction: 'Check the build token and refresh Build Approval.',
             });
@@ -1034,35 +1043,52 @@ const BuildApprovalView = {
             this._approvedRevisions = data.revisions.map(record =>
                 this._revisionChoice(record)).filter(Boolean).sort((a, b) =>
                 String(b.frozen_at || '').localeCompare(String(a.frozen_at || '')));
-            if (!this._approvedRevisions.length && data.revisions.some(record =>
-                record && record.metadata && record.metadata.approval_state === 'approved')) {
-                throw new Error('Approved revisions have no exact build intent and approval snapshot identities.');
-            }
+            this._savedNamespaceEntries = Array.isArray(data.saved_entries) ? data.saved_entries :
+                data.revisions.map(record => ({
+                    id: record.revision_id, revision_id: record.revision_id,
+                    name: record.metadata?.name || 'Namespace build',
+                    saved_at: record.metadata?.snapshot?.provenance?.approval_frozen_at || '',
+                    approval: record.metadata?.approval_state || 'Not approved',
+                    testing: record.metadata?.test_status || 'Not tested',
+                    preparation: record.files?.['boot-image.bin'] ? 'Image retained' : 'Needs preparation',
+                }));
             const select = document.getElementById('baRevisionSelect');
             if (select) {
-                select.innerHTML = '<option value="">Select an approved Namespace revision…</option>' +
-                    this._approvedRevisions.map(revision =>
-                        `<option value="${this._esc(revision.namespace_revision_id)}">${
-                            this._esc(revision.frozen_at || 'Approved')} · ${
-                            this._esc(revision.namespace_revision_id.slice(0, 12))} · ${
-                            this._esc(revision.provenance_identity.slice(0, 24))}</option>`).join('');
-                select.value = this._selectedSnapshot
+                const pinned = this._selectedSavedEntry;
+                const entries = this._savedNamespaceEntries.slice();
+                if (pinned && !entries.some(row => row.id === pinned.id))
+                    entries.unshift({...pinned, preparation: 'Saved version changed — select a current entry'});
+                select.innerHTML = '<option value="">Select a saved Namespace…</option>' +
+                    entries.map(row =>
+                        `<option value="${this._esc(row.id)}">${this._esc(
+                            [row.name, row.saved_at || 'Date unavailable', row.revision_id.slice(0, 12),
+                                row.approval, row.testing, row.preparation].join(' · '))}</option>`).join('');
+                select.value = pinned ? pinned.id : this._selectedSnapshot
                     ? this._selectedSnapshot.namespace_revision_id : '';
             }
         } catch (error) {
             const status = document.getElementById('baSnapshotStatus');
             if (status && !this._selectedSnapshot) status.textContent =
-                'Could not load approved revisions: ' + error.message;
+                'Could not load saved versions: ' + error.message;
         }
     },
 
     selectRevisionId(revisionId) {
+        this._selectedSavedEntry = this._savedNamespaceEntries.find(row => row.id === revisionId) || null;
         const revision = this._approvedRevisions.find(row =>
             row.namespace_revision_id === revisionId);
         if (!revision) {
-            const select = document.getElementById('baRevisionSelect');
-            if (select) select.value = this._selectedSnapshot
-                ? this._selectedSnapshot.namespace_revision_id : '';
+            this._selectedSnapshot = null;
+            this._snapFrozen = false;
+            this._updateApproveBtn();
+            const row = this._selectedSavedEntry;
+            const status = document.getElementById('baSnapshotStatus');
+            if (status) status.textContent = row ?
+                `${row.name} · exact revision ${row.revision_id} · ${row.approval} · ${row.testing} · ${row.preparation}. ` +
+                'Selected for inspection, not approved or installed. This version has no certified hardware build input; preparation is required before the existing install controls can use it.' :
+                'Select a saved Namespace version.';
+            const installStatus = document.getElementById('baInstallImageStatus');
+            if (installStatus) installStatus.textContent = 'Nothing was sent to hardware.';
             return;
         }
         this._selectSnapshot(revision);

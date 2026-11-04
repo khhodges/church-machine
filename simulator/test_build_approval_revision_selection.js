@@ -89,6 +89,22 @@ const historical = {
         historical.metadata.build_intent_id, 'history selection uses frozen provenance verbatim');
     assert.strictEqual(view._selectedSnapshot.namespace_fingerprint,
         historical.metadata.snapshot.fingerprint);
+    const draft = {id: 'design:' + 'c'.repeat(64), revision_id: 'c'.repeat(64),
+        name: 'New Layout', saved_at: '2026-11-04', approval: 'Not approved',
+        testing: 'Not tested', preparation: 'Needs preparation'};
+    context.fetch = async () => ({ok: true, status: 200,
+        json: async () => ({revisions: [historical], saved_entries: [draft]})});
+    await view._loadRevisions();
+    assert(elements.baRevisionSelect.innerHTML.includes('New Layout'));
+    view.selectRevisionId(draft.id);
+    assert.strictEqual(view._selectedSnapshot, null, 'draft selection clears old hardware authority');
+    assert.strictEqual(elements.baApproveBtn.disabled, true);
+    assert(elements.baSnapshotStatus.textContent.includes('Needs preparation'));
+    context.fetch = async () => ({ok: true, status: 200,
+        json: async () => ({revisions: [historical], saved_entries: []})});
+    await view._loadRevisions();
+    assert.strictEqual(view._selectedSavedEntry.id, draft.id, 'refresh never substitutes a newer draft');
+    assert(elements.baRevisionSelect.innerHTML.includes('Saved version changed'));
     view._selectedSnapshot = null;
     view._updateApproveBtn();
     let available = first;

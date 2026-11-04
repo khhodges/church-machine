@@ -2,6 +2,15 @@
 name: Workflow role boundaries
 description: Independent LUMP, simulation Namespace, and bitstream deliverables and approval boundaries.
 ---
+List every saved Namespace build/version newest first, regardless of approval
+or test outcome. Include saved designs without images as Needs preparation.
+
+**Why:** The user explicitly confirmed that approval and test results should be
+labels, not visibility filters, during the FPGA reload walkthrough.
+
+**How to apply:** Keep exact selection separate from preparation, approval and
+installation. Never substitute an old approved build or silently adopt new LUMPs.
+
 Keep development-image replacement testing separate from completion of the
 SecurityRegulator audit/proof design.
 

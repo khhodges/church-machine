@@ -2591,6 +2591,10 @@ def artifact_revision_history(kind, revision_id=None):
         records = [store.read(kind, revision_id)] if revision_id else store.history(kind)
         if kind == "namespace":
             records = _decorate_namespace_revision_history(records)
+            if not revision_id:
+                from server.saved_namespace_catalog import catalog
+                return jsonify(ok=True, revisions=records,
+                               saved_entries=catalog(records, _BUILD_SNAPSHOTS_DIR, NS_STATE_PATH))
         return jsonify(ok=True, **(
             {"revision": records[0]} if revision_id else {"revisions": records}))
     except (ValueError, OSError) as exc:
