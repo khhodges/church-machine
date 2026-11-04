@@ -40,6 +40,17 @@ const assert = require("node:assert/strict");
       options.find(option => option.textContent.startsWith("New Layout")).value);
     await page.selectOption("#kiss-namespace", next);
     await page.waitForFunction(() => document.querySelectorAll("tbody tr").length === 21);
+    assert(await page.locator(".kiss-region").count() > 1, "Changing to New Layout must fill the memory glass.");
+    await page.getByRole("button", {name: "Show details for slot 2, Boot.Thread", exact: true}).click();
+    assert.equal(await page.locator(".kiss-region.is-selected").count(), 1);
+    assert.match(await page.locator(".kiss-device-card").innerText(), /0x00000100/);
+    const phase = await page.locator("#kiss-namespace option").evaluateAll(options =>
+      options.find(option => option.textContent === "Phase 1").value);
+    await page.selectOption("#kiss-namespace", phase);
+    await page.waitForFunction(() => document.querySelectorAll("tbody tr").length === 17);
+    assert(await page.locator(".kiss-region").count() > 1, "Changing to Phase 1 must fill known allocations.");
+    await page.selectOption("#kiss-namespace", next);
+    await page.waitForFunction(() => document.querySelectorAll("tbody tr").length === 21);
     assert.equal(await page.locator(".kiss-region.is-selected").count(), 0);
     await page.setViewportSize({width: 1024, height: 783});
     assert(await page.evaluate(() => {

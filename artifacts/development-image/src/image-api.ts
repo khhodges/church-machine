@@ -12,6 +12,7 @@ export type PreparedImage = {
 };
 export type Inspection = {
   id: string; name: string; rows: Slot[]; fingerprint: string;
+  layoutRows?: Slot[]; layoutSource?: string;
   capacityWords: number; capacitySource: string; image: PreparedImage | null;
   imageSha256: string | null; imageBytes: number | null;
   hardwareError: string | null; warnings: string[]; metadata: Record<string, unknown>;

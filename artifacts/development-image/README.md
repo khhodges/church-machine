@@ -10,6 +10,10 @@ and canvas mockup remain unchanged.
 - Viewing this artifact does not bind, save, regenerate, activate, or install.
 - `location` is the saved word address; descriptor `limit` is inclusive, so an
   allocation occupies `limit + 1` words. MMIO is not counted as ordinary memory.
+- Named designs store allocation policy rather than literal addresses. Their
+  glass uses Namespace Table's shared read-only layout calculation over exact
+  hash-pinned selections, not a new binding operation. Original saved rows stay
+  available separately; design allocations are not claimed as installed memory.
 - The Original format does not record total capacity. Its 16,384-word reference
   scale is labelled as a reference rather than asserted as image evidence.
 - An unfinished or location-free design stays inspectable without invented

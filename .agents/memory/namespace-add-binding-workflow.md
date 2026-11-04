@@ -38,6 +38,18 @@ Namespace, not bind again on page open or selection.
 **Why:** The user corrected the proposed automatic-bind-on-open flow: binding
 belongs to the Namespace page's explicit button, not a downstream image view.
 
+Read-only layout calculation is not rebinding. The development-image glass must
+also display named designs whose saved rows encode exact artifact selections and
+allocation policy rather than explicit addresses.
+
+**Why:** Reading only literal location fields made the glass empty when switching
+from Original to New Layout or Phase 1.
+
+**How to apply:** Reuse Namespace Table's read-only layout from the exact saved
+design and hash-checked selected artifacts. Distinguish design allocations from
+installed memory, retain unresolved members, and never invoke Bind or manufacture
+hardware readiness to draw the glass.
+
 **How to apply:** Distinguish assembling or inspecting an image from creating
 bindings. Reuse exact saved binding results; report missing or stale bindings
 and direct the user to Bind Namespace rather than silently recreating them.

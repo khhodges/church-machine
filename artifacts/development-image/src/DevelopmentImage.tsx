@@ -21,7 +21,7 @@ export default function DevelopmentImage() {
   const [confirmation, setConfirmation] = useState<{image: PreparedImage; target: Target} | null>(null);
   const confirmationDialog = useRef<HTMLDialogElement>(null);
   const busy = useRef(false);
-  const slots = input?.rows ?? [];
+  const slots = input?.layoutRows ?? input?.rows ?? [];
   const sorted = [...slots].sort((a, b) => a.slot - b.slot);
   const selected = slots.find(row => row.slot === selectedSlot);
   const selectedKind = selected?.kind ?? (selected?.filename ? "lump" : selected?.name.includes("DEV") ? "mmio" : selected?.name.includes("Thread") ? "thread" : "namespace");
@@ -45,7 +45,8 @@ export default function DevelopmentImage() {
     return Number.isFinite(parsed) ? parsed : undefined;
   };
   // The saved table can place LUMPs, Threads, and boot entries in the same
-  // address space. Keep only in-range saved locations; never infer placement.
+  // address space. Use the backend's shared Namespace layout, never invent
+  // placements or calculate allocation order in the browser.
   const locatedEntries = slots.map(row => ({
     row,
     start: wordValue(row.location),
@@ -190,7 +191,9 @@ export default function DevelopmentImage() {
                   <div><span className="kiss-step">SAVED LOCATIONS</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
                   <span className="kiss-water-caveat">{locatedEntries.length} mapped entries</span>
                 </div>
-                <p className="kiss-water-intro">Colored regions use each saved entry’s location and extent, including LUMPs, Threads, and Boot.NS / Boot.Thread. This is the Namespace layout, not a generated binary map.</p>
+                <p className="kiss-water-intro">{input?.layoutSource === "saved-design-layout"
+                  ? "Colored regions show the saved design’s memory layout, using its exact selected LUMPs and Thread allocations. Lazy entries stay outside resident memory. This is not an installed binary map."
+                  : "Colored regions use each saved entry’s location and extent, including LUMPs, Threads, and Boot.NS / Boot.Thread. This is the Namespace layout, not a generated binary map."}</p>
                 <div className="kiss-glass-layout">
                   <div className="kiss-glass-figure">
                     <div className="kiss-glass-capacity">{glassCapacity.toLocaleString()}-word {input?.capacitySource === "reference" ? "reference scale" : "address space"}</div>
@@ -306,13 +309,17 @@ export default function DevelopmentImage() {
                     <span className="kiss-device-type">Saved regions are shown dimmed until you choose a row.</span>
                   </aside>}
                 </div>
-                <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
+                <div className="kiss-water-legend"><span>{input?.layoutSource === "saved-design-layout" ? "Uses the same read-only layout as Namespace Table. No rebinding." : "Position and extent come directly from Namespace Table fields."}</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
           </section>
           </div>
           <details className="kiss-technical">
             <summary>Technical details · {selected?.name ?? "Namespace"}</summary>
             <p className="kiss-muted">Exact saved row. Kind labels for Original are inferred for display; saved data is unchanged.</p>
-            <pre>{JSON.stringify(selected, null, 2)}</pre>
+            <pre>{JSON.stringify(input?.rows.find(row => row.slot === selectedSlot), null, 2)}</pre>
+            {input?.layoutSource === "saved-design-layout" && <>
+              <p className="kiss-muted">Displayed design allocation (not installed memory)</p>
+              <pre>{JSON.stringify(selected, null, 2)}</pre>
+            </>}
             <p className="kiss-muted">Namespace metadata</p>
             <pre>{JSON.stringify(input?.metadata ?? {}, null, 2)}</pre>
             <p>Saved identity: {input?.fingerprint ?? "Unavailable"}</p>

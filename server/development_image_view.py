@@ -96,6 +96,16 @@ def inspect(backend, identifier):
     if rows is None:
         raise ValueError("Selected Namespace has no saved slot table.")
     rows = normalize_rows(rows)
+    layout_rows = rows
+    layout_source = "saved-locations"
+    from server.namespace_design_v1 import FORMAT, PHASE1_FORMAT, project
+    if not record and document.get("format") in (FORMAT, PHASE1_FORMAT):
+        # Same read-only allocation calculation as Namespace Table. This reads
+        # exact hash-pinned selections; it does not link or create binding bytes.
+        layout = project(document, Path(backend.NS_STATE_PATH).parent)
+        layout_rows = normalize_rows(layout["rows"])
+        layout_source = "saved-design-layout"
+        warnings.extend(layout["warnings"])
     capacity = integer(document.get("capacityWords"))
     image = None
     if record and "boot-image.bin" in record.get("files", {}):
@@ -119,12 +129,13 @@ def inspect(backend, identifier):
             hardware_error = None
         except (OSError, ValueError, KeyError) as error:
             hardware_error = str(error)
-    for row in rows:
+    for row in layout_rows:
         start, words = row["location"], row["allocationWords"]
         if row["kind"] != "mmio" and start is not None and words is not None:
             if start < 0 or start + words > (capacity or 16384):
                 warnings.append(f"Slot {row['slot']} ({row.get('name')}): saved allocation is outside the displayed address space.")
     return dict(ok=True, id=identifier, name=entry["name"], rows=rows,
+                layoutRows=layout_rows, layoutSource=layout_source,
                 fingerprint=entry["revision_id"], capacityWords=capacity or 16384,
                 capacitySource=capacity_source, image=prepared,
                 imageSha256=hashlib.sha256(image).hexdigest() if image is not None else None,

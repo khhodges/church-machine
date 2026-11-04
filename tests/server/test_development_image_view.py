@@ -77,6 +77,27 @@ def test_named_design_locations_are_not_projected(backend):
     assert result["image"] is None
 
 
+def test_supported_saved_design_uses_shared_read_only_layout(backend):
+    from server.namespace_design_v1 import seed, project
+    folder = Path(backend.NS_STATE_PATH).parent / "design-drafts"
+    folder.mkdir()
+    document = seed({"abstractions": []})
+    raw = json.dumps(document).encode()
+    path = folder / "ascending-v1.json"
+    path.write_bytes(raw)
+    before = {p: p.read_bytes() for p in folder.parent.rglob("*") if p.is_file()}
+    result = inspect(backend, "design:" + hashlib.sha256(raw).hexdigest())
+    expected = normalize_rows(project(document, folder.parent)["rows"])
+    assert result["layoutRows"] == expected
+    assert result["layoutSource"] == "saved-design-layout"
+    assert next(r for r in result["layoutRows"] if r["kind"] == "namespace")["allocationWords"] == 256
+    thread = next(r for r in result["layoutRows"] if r["name"] == "Boot.Thread")
+    assert thread["location"] == 256 and thread["allocationWords"] == 256
+    assert all(r["location"] is None for r in result["rows"] if r["kind"] != "mmio")
+    assert result["image"] is None and result["bindingsChanged"] is False
+    assert before == {p: p.read_bytes() for p in folder.parent.rglob("*") if p.is_file()}
+
+
 def test_routes_read_only_and_no_arbitrary_file_selection(backend):
     app = Flask(__name__)
     register(app, backend)
