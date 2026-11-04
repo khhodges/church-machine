@@ -69,7 +69,7 @@
 .kiss-workbench select { min-width: 180px; flex: 1; }
 .kiss-workbench .kiss-meta { padding: 0 16px 13px; color: var(--kiss-muted); font-size: 12px; }
 .kiss-workbench .kiss-table-scroll { overflow-x: auto; }
-.kiss-workbench .kiss-slot-visual-row { display:grid; grid-template-columns:minmax(430px,1.15fr) minmax(360px,.85fr); align-items:start; border-top:1px solid var(--kiss-line); }
+.kiss-workbench .kiss-slot-visual-row { display:grid; grid-template-columns:minmax(350px,.8fr) minmax(480px,1.2fr); align-items:start; border-top:1px solid var(--kiss-line); }
 .kiss-workbench .kiss-slot-color { display:inline-block; width:8px; height:8px; margin:0 7px 1px 0; border-radius:50%; background:var(--kiss-lump-color); vertical-align:middle; }
 .kiss-workbench table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
 .kiss-workbench th { text-align: left; color: var(--kiss-muted); font-weight: 500; background: #121b28; font-size: 11px; }
@@ -134,7 +134,7 @@
 .kiss-workbench .kiss-water-caveat { color:#e5c773; font:10px Consolas,monospace; text-transform:uppercase; white-space:nowrap; }
 .kiss-workbench .kiss-water-intro { color:var(--kiss-muted); font-size:11px; margin-top:5px; }
 .kiss-workbench .kiss-water-svg { display:block; width:100%; height:auto; margin-top:8px; overflow:visible; }
-.kiss-workbench .kiss-glass-layout { display:grid; grid-template-columns:minmax(0,1fr) 138px; align-items:stretch; gap:10px; margin-top:12px; }
+.kiss-workbench .kiss-glass-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(190px,.82fr); align-items:stretch; gap:10px; margin-top:12px; }
 .kiss-workbench .kiss-glass-figure { display:flex; flex-direction:column; align-items:center; min-width:0; padding:14px 10px 10px; background:#0d1621; border:1px solid #304153; border-radius:5px; }
 .kiss-workbench .kiss-device-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-width:0; padding:12px 8px; border:1px solid #3a4b5e; border-radius:5px; background:#121e2c; text-align:center; animation:kiss-device-in .18s ease-out both; }
 .kiss-workbench .kiss-device-kicker { color:#e3c86f; font:9px Consolas,monospace; letter-spacing:.08em; }
@@ -142,6 +142,9 @@
 .kiss-workbench .kiss-device-card strong { color:#edf1f4; font:600 12px Consolas,monospace; overflow-wrap:anywhere; }
 .kiss-workbench .kiss-device-type,.kiss-workbench .kiss-device-location { color:#aabaca; font-size:10px; line-height:1.45; overflow-wrap:anywhere; }
 .kiss-workbench .kiss-device-location { font-family:Consolas,monospace; }
+.kiss-workbench .kiss-inline-details { align-self:stretch; width:100%; min-width:0; margin:2px 0 0; display:grid; grid-template-columns:minmax(52px,.48fr) minmax(0,1fr); gap:7px 8px; text-align:left; font-size:10px; line-height:1.4; }
+.kiss-workbench .kiss-inline-details dt { color:var(--kiss-muted); }
+.kiss-workbench .kiss-inline-details dd { margin:0; color:#e1e7ee; font-family:Consolas,monospace; overflow-wrap:anywhere; }
 @keyframes kiss-device-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 .kiss-workbench .kiss-glass-capacity,.kiss-workbench .kiss-glass-zero { color:#b4c4d1; font:10px Consolas,monospace; letter-spacing:.04em; }
 .kiss-workbench .kiss-glass-zero { color:#dfc577; }
@@ -153,17 +156,6 @@
 .kiss-workbench .kiss-region rect { fill:color-mix(in srgb,var(--kiss-lump-color) 78%,#11202a); stroke:color-mix(in srgb,var(--kiss-lump-color) 90%,#e8f4ef); stroke-width:1; opacity:.9; }
 .kiss-workbench .kiss-region text { fill:#10202a; font:700 8px Consolas,monospace; pointer-events:none; }
 .kiss-workbench .kiss-region:hover rect,.kiss-workbench .kiss-region:focus rect,.kiss-workbench .kiss-region.is-selected rect { stroke:#fff0b1; stroke-width:2; opacity:1; }
-.kiss-workbench .kiss-slot-dialog { max-height:min(82dvh,700px); overflow:auto; }
-.kiss-workbench .kiss-slot-dialog::backdrop { background:rgb(5 10 18 / 72%); backdrop-filter:blur(2px); }
-.kiss-workbench .kiss-slot-dialog-head { padding-bottom:13px; border-bottom:1px solid #35465b; }
-.kiss-workbench .kiss-slot-dialog-kicker { color:#dfc577; font:10px Consolas,monospace; letter-spacing:.06em; }
-.kiss-workbench .kiss-slot-dialog-head h2 { margin:5px 0 0; font:600 20px/1.3 Consolas,monospace; overflow-wrap:anywhere; }
-.kiss-workbench .kiss-slot-dialog-fields { display:grid; grid-template-columns:minmax(94px,.55fr) minmax(0,1.45fr); gap:8px 12px; margin:15px 0; font-size:12px; }
-.kiss-workbench .kiss-slot-dialog-fields dt { color:var(--kiss-muted); }
-.kiss-workbench .kiss-slot-dialog-fields dd { margin:0; color:#e1e7ee; overflow-wrap:anywhere; }
-.kiss-workbench .kiss-slot-raw { padding-top:11px; border-top:1px solid #35465b; }
-.kiss-workbench .kiss-slot-raw pre { max-height:210px; margin-top:8px; }
-.kiss-workbench .kiss-slot-dialog-actions { display:flex; justify-content:flex-end; margin-top:16px; }
 .kiss-workbench .kiss-water-legend { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 18px; margin-top:4px; color:var(--kiss-muted); font-size:10px; }
 .kiss-workbench summary { cursor: pointer; color: var(--kiss-muted); font-size: 12px; }
 .kiss-workbench pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 Consolas, monospace; color: #b3c4d8; margin: 12px 0 0; max-height: 300px; overflow: auto; }
