@@ -28,6 +28,12 @@ export default function KISS() {
   const selected = slots.find(row => row.slot === selectedSlot);
   const missing = slots.filter(row => row.kind === "lump" && !row.selection);
   const isNew = namespace === "New Layout";
+  const format = "format" in input ? input.format : "Original saved Namespace format";
+  const capacity = "capacityWords" in input ? input.capacityWords : undefined;
+  const slotCapacity = "slotCount" in input ? input.slotCount : undefined;
+  const codeSelections = slots.filter(row => row.kind === "lump");
+  const unselectedCode = codeSelections.filter(row => !row.selection);
+  const unfinished = slots.filter(row => row.name === "ide.Mint");
 
   function changeNamespace(value: NamespaceName) {
     setNamespace(value);
@@ -84,6 +90,33 @@ export default function KISS() {
             <p className="kiss-muted">Namespace metadata</p>
             <pre>{JSON.stringify(Object.fromEntries(Object.entries(input).filter(([key]) => key !== "rows" && key !== "abstractions")), null, 2)}</pre>
           </details>
+          <section className="kiss-design-review" aria-labelledby="kiss-design-review-title">
+            <div className="kiss-review-head">
+              <div><span className="kiss-step">REVIEW</span><h3 id="kiss-design-review-title">Binary design &amp; memory layout</h3></div>
+              <span className="kiss-review-note">Observations · not a build gate</span>
+            </div>
+            <div className="kiss-review-grid">
+              <article>
+                <h4>Binary design</h4>
+                <dl>
+                  <dt>Saved format</dt><dd>{format}</dd>
+                  <dt>Code slots</dt><dd>{codeSelections.length} selected rows · {unselectedCode.length} without a selected artifact</dd>
+                  {unfinished.length > 0 && <><dt>Unfinished code</dt><dd>Mint remains in this saved design{unfinished[0].selection ? " with its selected revision retained" : " without a selected artifact"}.</dd></>}
+                  <dt>Conversion</dt><dd>{isNew ? "Prior probe produced a 65,536-byte simulator image; Wukong projection rejected it: missing Namespace Header V2 marker." : "Not converted in this design preview. Image format and loader compatibility need a real conversion result."}</dd>
+                </dl>
+              </article>
+              <article>
+                <h4>Memory layout</h4>
+                <dl>
+                  <dt>Namespace capacity</dt><dd>{capacity ? `${capacity.toLocaleString()} words` : "Not recorded in this saved design"}</dd>
+                  <dt>Slot-table capacity</dt><dd>{slotCapacity ? `${slotCapacity} slots` : "Original layout fields"}</dd>
+                  <dt>Saved rows</dt><dd>{slots.length} logical slot assignments, numbered {Math.min(...slots.map(row => row.slot))}–{Math.max(...slots.map(row => row.slot))}</dd>
+                  <dt>Physical word placement</dt><dd>Not present in this design file; must be reported by conversion, not inferred from slot numbers.</dd>
+                </dl>
+              </article>
+            </div>
+            <p className="kiss-review-foot">This review does not edit the Namespace or suppress unfinished entries. Preparation findings remain visible and do not prevent further inspection.</p>
+          </section>
         </section>
 
         <aside className="kiss-rail" aria-label="Prepare and load workflow">
