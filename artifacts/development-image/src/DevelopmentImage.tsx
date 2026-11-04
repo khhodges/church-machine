@@ -30,6 +30,8 @@ export default function DevelopmentImage() {
   const selectedIsThread = selectedKind === "thread" || selected?.name.includes("Thread") === true;
   const selectedIsNamespace = selectedKind === "namespace" || selected?.name === "Boot.NS";
   const selectedIsBoot = selected?.name.startsWith("Boot.") === true || selected?.boot === true;
+  const displayLocation = (value: number | null | undefined) =>
+    value == null ? "Not recorded" : `0x${value.toString(16).toUpperCase().padStart(8, "0")}`;
   const capacity = input?.capacityWords;
   const colors = ["#73d7c0", "#9fcb72", "#e9c46a", "#ee9b70", "#e887a5", "#b8a1ee", "#72b8df", "#d4dc7b", "#f1a86c", "#70c8d5", "#d89bcc", "#a8d497", "#e9a5a0", "#9daee8", "#dfc078", "#86d5b4"];
   const glassCapacity = capacity ?? 16384;
@@ -146,12 +148,12 @@ export default function DevelopmentImage() {
     <main className="kiss-workbench">
       <header className="kiss-top">
         <div className="kiss-brand"><span className="kiss-mark" aria-hidden="true">λ</span> CHURCH MACHINE <span className="kiss-muted">/ IDE</span></div>
-        <p className="kiss-preview">Saved Namespace inspection · explicit FPGA transfer</p>
+        <p className="kiss-preview">{input?.image ? "Bound Namespace — FPGA transfer available" : "Saved Namespace — FPGA transfer unavailable"}</p>
       </header>
 
       <div className="kiss-heading">
-        <div><h1>Development image</h1><p className="kiss-subtitle">Inspect saved bindings and memory locations. No rebinding is performed here.</p></div>
-        <a className="kiss-local" href="/simulator/#namespace">Namespace editor</a>
+        <div><h1>Development image</h1><p className="kiss-subtitle">Review the bound Namespace layout, then send it to the FPGA.</p></div>
+        <span className="kiss-local">SAVED NAMESPACE</span>
       </div>
       {error && <p className="kiss-api-error" role="alert">{error} No saved data was changed. <a href={location.pathname}>Reload saved Namespaces</a></p>}
       {loading && <p className="kiss-api-message" role="status">Reading the exact saved Namespace…</p>}
@@ -163,10 +165,10 @@ export default function DevelopmentImage() {
             <label htmlFor="kiss-namespace">Namespace</label>
             <select id="kiss-namespace" value={namespace} disabled={sending || !!confirmation} onChange={event => changeNamespace(event.target.value)}>
               {!namespace && <option value="">Select a saved Namespace</option>}
-              {entries.map(entry => <option key={entry.id} value={entry.id}>{entry.name}{entry.saved_at ? ` · ${entry.saved_at.slice(0, 10)}` : ""}{entries.filter(other => other.name === entry.name).length > 1 ? ` · ${entry.id.slice(-12)}` : ""}</option>)}
+              {entries.map(entry => <option key={entry.id} value={entry.id}>{entry.name}{entries.filter(other => other.name === entry.name).length > 1 ? ` · ${entry.id.slice(-12)}` : ""}</option>)}
             </select>
           </div>
-          <p className="kiss-meta">{slots.length} saved rows · {input?.name ?? "No selection"} · Select a name to inspect its saved data.</p>
+          <p className="kiss-meta">{slots.length} saved rows{typeof input?.metadata.slotCount === "number" ? ` · ${input.metadata.slotCount} slots` : input?.name === "Original" ? " · original slot assignments" : ""} · Select a name to inspect its saved data.</p>
           <div className="kiss-slot-visual-row">
           <div className="kiss-table-scroll" tabIndex={0} role="region" aria-label={`${namespace} saved slot table`}>
             <table>
@@ -188,10 +190,10 @@ export default function DevelopmentImage() {
                   <div><span className="kiss-step">SAVED LOCATIONS</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
                   <span className="kiss-water-caveat">{locatedEntries.length} mapped entries</span>
                 </div>
-                <p className="kiss-water-intro">Locations and allocation extents come from this exact saved Namespace. Threads and Boot entries occupy memory; MMIO devices are shown separately. {input?.imageBytes ? "An immutable binary is retained for this selection." : "No retained binary is attached to this selection."}</p>
+                <p className="kiss-water-intro">Colored regions use each saved entry’s location and extent, including LUMPs, Threads, and Boot.NS / Boot.Thread. This is the Namespace layout, not a generated binary map.</p>
                 <div className="kiss-glass-layout">
                   <div className="kiss-glass-figure">
-                    <div className="kiss-glass-capacity">{glassCapacity.toLocaleString()}-word {input?.capacitySource === "reference" ? "reference scale · capacity not recorded" : "address space"}</div>
+                    <div className="kiss-glass-capacity">{glassCapacity.toLocaleString()}-word {input?.capacitySource === "reference" ? "reference scale" : "address space"}</div>
                     <svg className="kiss-water-svg" viewBox="0 0 240 500" role="group" aria-label={`Namespace memory locations within a ${glassCapacity.toLocaleString()} word reference address space`}>
                       <defs>
                         <linearGradient id="kiss-empty-glass" x1="0" x2="1">
@@ -280,13 +282,13 @@ export default function DevelopmentImage() {
                     <strong>{selected.name.replace(/_DEV$/, "").replaceAll("_", " ")}</strong>
                     {selectedIsMmio ? <>
                       <span className="kiss-device-type">{selected.name.startsWith("LED") ? "Indicator output" : selected.name.startsWith("BTN") ? "Button input" : selected.name.startsWith("TIMER") ? "Timer peripheral" : selected.name.startsWith("UART") ? "Serial interface" : "Memory-mapped device"}</span>
-                      <span className="kiss-device-location">Address {selected.location ?? "not recorded"}</span>
+                      <span className="kiss-device-location">Address {displayLocation(selected.location)}</span>
                     </> : selectedIsLump ? <dl className="kiss-inline-details">
                       <dt>Artifact</dt><dd>{selected.selection?.filename ?? selected.filename ?? "Not recorded"}</dd>
                       <dt>Revision</dt><dd>{selected.selection?.revision ?? selected.lump_version ?? "Not recorded"}</dd>
                       <dt>Token</dt><dd>{selected.selection?.token ?? selected.token ?? "Not recorded"}</dd>
                       <dt>Policy</dt><dd>{selected.policy ?? selected.load_policy ?? "Not recorded"}</dd>
-                      <dt>Location</dt><dd>{selected.location ?? "Not recorded"}</dd>
+                      <dt>Location</dt><dd>{displayLocation(selected.location)}</dd>
                       <dt>Extent</dt><dd>{selected.limit ?? "Not recorded"}</dd>
                     </dl> : <dl className="kiss-inline-details">
                       <dt>Kind</dt><dd>{selectedIsThread ? "Thread" : selectedIsNamespace ? "Namespace" : selectedKind}</dd>
@@ -294,7 +296,7 @@ export default function DevelopmentImage() {
                       <dt>Slot</dt><dd>{String(selected.slot).padStart(2, "0")}</dd>
                       <dt>Type</dt><dd>{selected.type ?? selectedKind}</dd>
                       <dt>Policy</dt><dd>{selected.policy ?? selected.load_policy ?? (selected.resident ? "Resident" : "Not recorded")}</dd>
-                      <dt>Location</dt><dd>{selected.location ?? "Not recorded"}</dd>
+                      <dt>Location</dt><dd>{displayLocation(selected.location)}</dd>
                       <dt>Extent</dt><dd>{selected.limit ?? "Not recorded"}</dd>
                       <dt>Sequence</dt><dd>{selected.sequence ?? selected.seq ?? "Not recorded"}</dd>
                     </dl>}
@@ -314,7 +316,10 @@ export default function DevelopmentImage() {
             <p className="kiss-muted">Namespace metadata</p>
             <pre>{JSON.stringify(input?.metadata ?? {}, null, 2)}</pre>
             <p>Saved identity: {input?.fingerprint ?? "Unavailable"}</p>
+            {input?.capacitySource === "reference" && <p>Total capacity was not recorded. The glass uses a labelled 16,384-word reference scale.</p>}
             {input?.imageSha256 && <p>Retained binary: {input.imageSha256} · {input.imageBytes} bytes</p>}
+            {input?.hardwareError && <p>Not ready to send: {input.hardwareError}</p>}
+            <p><a href="/simulator/#namespace">Open Namespace editor</a></p>
             {input?.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
           </details>
         </section>
@@ -323,10 +328,9 @@ export default function DevelopmentImage() {
       <footer className="kiss-send-footer">
         <div><strong>Send the bound build to FPGA</strong><span>Uses the existing Namespace binding; no rebind.</span></div>
         <button type="button" className="kiss-primary kiss-send-button" disabled={loading || !input || sending || !!receipt} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
-        {input?.hardwareError && <p className="kiss-send-status">Not ready to send: {input.hardwareError}</p>}
         {sendStatus && <p className="kiss-send-status" role="status">{sendStatus}{receipt && <> <a href="/fpga" target="_blank" rel="noreferrer">View FPGA delivery status</a></>}</p>}
       </footer>
-      <p className="kiss-footer"><span>Namespace edits and binding belong in Namespace Table. Inspection is read-only.</span><span>FPGA transfer requires explicit confirmation. No flash programming.</span></p>
+      <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This view leaves every saved input untouched.</span><span>FPGA transfer only on request</span></p>
       <dialog className="kiss-send-dialog" ref={confirmationDialog} onCancel={event => {event.preventDefault(); if (!sending) setConfirmation(null);}}>
         <h2>Send this exact build to FPGA?</h2>
         {confirmation && <>

@@ -41,6 +41,15 @@ const assert = require("node:assert/strict");
     await page.selectOption("#kiss-namespace", next);
     await page.waitForFunction(() => document.querySelectorAll("tbody tr").length === 21);
     assert.equal(await page.locator(".kiss-region.is-selected").count(), 0);
+    await page.setViewportSize({width: 1024, height: 783});
+    assert(await page.evaluate(() => {
+      const table = document.querySelector(".kiss-table-scroll").getBoundingClientRect();
+      const map = document.querySelector(".kiss-water-map").getBoundingClientRect();
+      const glass = document.querySelector(".kiss-glass-figure").getBoundingClientRect();
+      const card = document.querySelector(".kiss-device-card").getBoundingClientRect();
+      return Math.abs(table.y - map.y) < 2 && map.x >= table.right - 1 &&
+        Math.abs(glass.y - card.y) < 2 && card.x >= glass.right;
+    }), "Reference-width layout must keep table, glass and inline details side by side.");
     await page.setViewportSize({width: 390, height: 844});
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Mobile layout overflow");
     assert.deepEqual(errors, []);

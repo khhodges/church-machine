@@ -188,7 +188,7 @@
 .kiss-workbench dialog p { color: #becbdd; margin-bottom: 17px; }
 .kiss-workbench .kiss-modal-actions { display: flex; justify-content: end; gap: 10px; margin-top: 22px; }
 @media (min-width: 1450px) { .kiss-workbench { padding-left: max(28px, calc((100vw - 1420px) / 2)); padding-right: max(28px, calc((100vw - 1420px) / 2)); } }
-@media (max-width: 1100px) { .kiss-workbench .kiss-glass-layout { grid-template-columns:minmax(0,1fr); } .kiss-workbench .kiss-device-card { width:100%; max-width:360px; justify-self:center; } .kiss-workbench .kiss-device-icon { width:82px; } .kiss-workbench .kiss-glass-figure { max-width:360px; width:100%; justify-self:center; } }
+@media (max-width: 767px) { .kiss-workbench .kiss-glass-layout { grid-template-columns:minmax(0,1fr); } .kiss-workbench .kiss-device-card { width:100%; max-width:360px; justify-self:center; } .kiss-workbench .kiss-device-icon { width:82px; } .kiss-workbench .kiss-glass-figure { max-width:360px; width:100%; justify-self:center; } }
 @media (max-width: 1000px) { .kiss-workbench { padding: 0 18px 20px; } .kiss-workbench .kiss-layout { grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; } .kiss-workbench td, .kiss-workbench th { padding-right: 7px; padding-left: 7px; } }
 @media (max-width: 767px) {
   .kiss-workbench { padding: 0 14px 20px; }
@@ -216,8 +216,4 @@
   .kiss-workbench .kiss-water-heading { align-items:flex-start; flex-direction:column; gap:4px; }
   .kiss-workbench .kiss-water-heading > div { align-items:flex-start; flex-direction:column; gap:3px; }
    .kiss-workbench .kiss-glass-figure { max-width:360px; width:100%; justify-self:center; }
-}
-@media (max-width: 1100px) {
-  .kiss-workbench .kiss-slot-visual-row { grid-template-columns:minmax(0,1fr); }
-  .kiss-workbench .kiss-slot-visual-row .kiss-water-map { border-left:0; border-top:1px solid var(--kiss-line); }
 }

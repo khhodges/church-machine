@@ -92,3 +92,25 @@ not appear as a separate programmer-facing simulator workflow.
 **How to apply:** Keep internal verification behind the normal controls. Show
 actual program output and errors through the existing programmer-facing UI,
 not a duplicate diagnostic simulator panel.
+
+When graduating the approved Development image canvas, preserve its presentation,
+including simple Namespace labels, hexadecimal addresses, and the uncluttered
+send footer. Keep implementation diagnostics in Technical details unless an
+operation fails; keep genuine transfer availability visible without adding panels.
+
+**Why:** The user rejected the first functional graduation as not what they
+were shown. Matching CSS alone did not preserve the approved content and workflow.
+
+**How to apply:** Compare the running app against the selected mockup at the same
+viewport and selected row, not just the component styles. Retain real saved data
+and safeguards without replacing the approved interface with internal bookkeeping.
+
+The approved Development image reference also retains the side-by-side Namespace
+table, memory glass, and inline detail card at tablet-sized widths; stack only
+on mobile.
+
+**Why:** The first graduation's 1,100px breakpoint changed the layout at the
+user's actual preview width, despite looking correct in a wider screenshot.
+
+**How to apply:** Include the reference-width layout in visual comparisons, not
+only desktop and phone endpoints.
