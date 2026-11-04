@@ -34,3 +34,17 @@ additions then blocked publishing before the artifact build even began.
 **How to apply:** Verify the actual root package-manager setup first. Build the
 Introduction artifact from its explicit directory using the installed root
 toolchain; retain reproducible lockfile checks rather than disabling them.
+
+Apply the root-service ownership rule to every new nested artifact, not just
+the Introduction deck. A successful publication is not proof that Gunicorn
+was started.
+
+**Why:** Adding a production-enabled Development Image artifact repeated the
+takeover: runtime reported static-only mode with zero runnable services, leaving
+both public domains without a root handler. Its static output was also absent
+at runtime despite successful build output.
+
+**How to apply:** Verify effective production routing and packaged assets as well
+as build success. Preserve the primary Flask service for the IDE and APIs; serve
+compiled secondary views through it unless a different deployment architecture
+is explicitly approved.
