@@ -8,6 +8,13 @@ pre-build input freezing or readiness checks.
 Its sole scope is to convert the selected Namespace into inputs for bitstream
 creation and review the conversion result. Connection, FPGA reading/writing,
 installation, testing and final approval are outside this page.
+Display all selected slots and report their situation without treating findings
+as an approval gate or preventing progress merely because inputs are unfinished
+or untested. Attempt conversion and report actual failures honestly; never
+claim an output was produced when conversion could not produce it.
+
+**Why:** The user explicitly requires the page to "display the slots and report
+the situation without preventing progress".
 
 **Why:** The user explicitly corrected the page's functional role during the
 item-by-item review: "Build Approval is when tested in the FPGA", then narrowed
