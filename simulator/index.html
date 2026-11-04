@@ -323,6 +323,14 @@
         .ba-approve-btn { background:#1a3a1a; color:#3fb950; border:1px solid #3a7a3a; border-radius:5px; padding:0.35rem 0.9rem; font-size:0.83rem; cursor:pointer; font-weight:700; }
         .ba-approve-btn:hover:not(:disabled) { background:#2a4a2a; }
         .ba-approve-btn:disabled { opacity:0.45; cursor:not-allowed; }
+        #baApproveBtn, #baDownloadRevisionBtn, #baBitstreamRevisionSelect {
+            background:#132f50; color:#8bc8ff; border:1px solid #438bd1;
+        }
+        #baApproveBtn:hover:not(:disabled), #baDownloadRevisionBtn:hover:not(:disabled) {
+            background:#1c4470;
+        }
+        label[for="baBitstreamRevisionSelect"], #baBitstreamRevisionStatus { color:#8bc8ff; }
+        #baBitstreamRevisionSelect option { background:#132f50; color:#8bc8ff; }
         .ba-snapshot-status { font-size:0.78rem; color:#888; font-style:italic; }
         .ba-tier-header { font-size:0.8rem; font-weight:700; color:#7ec8e3; text-transform:uppercase; letter-spacing:0.07em; padding:0.6rem 0 0.3rem; margin-top:0.4rem; border-top:1px solid #2a2a4a; }
         .ba-tier-header:first-child { border-top:none; margin-top:0; }
