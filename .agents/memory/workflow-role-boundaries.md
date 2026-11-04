@@ -5,9 +5,13 @@ description: Independent LUMP, simulation Namespace, and bitstream deliverables 
 The page currently labelled Build Approval is functionally **Next Bitstream
 Prep**. Build Approval belongs after testing on the physical FPGA, not to
 pre-build input freezing or readiness checks.
+Its sole scope is to convert the selected Namespace into inputs for bitstream
+creation and review the conversion result. Connection, FPGA reading/writing,
+installation, testing and final approval are outside this page.
 
 **Why:** The user explicitly corrected the page's functional role during the
-item-by-item review: "Build Approval is when tested in the FPGA".
+item-by-item review: "Build Approval is when tested in the FPGA", then narrowed
+it to "convert the Selected Namespace and review it for bitstream creation".
 
 **How to apply:** Judge this page's controls by preparation of the next bitstream.
 Do not describe preparation, successful synthesis, or offline checks as FPGA
