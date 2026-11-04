@@ -370,7 +370,7 @@ const BuildApprovalView = {
 
     async refresh(manual) {
         if (this._inFlight) return;
-        if (manual) this._loadRevisions();
+        if (manual) { this._loadRevisions(); this._loadBitstreamRevisions(); }
         this._inFlight = true;
         const btn = document.getElementById('baRefreshBtn');
         if (btn && manual) btn.disabled = true;
@@ -1042,16 +1042,37 @@ const BuildApprovalView = {
             groups.get(day).push({row, timestamp: valid ? date.getTime() : 0,
                 time: valid ? date.toISOString().slice(11, 19) + ' UTC' : 'Time unavailable'});
         }
-        return '<option value="">Select a saved Namespace…</option>' +
+        return '<option value="">Select a Namespace or bitstream build…</option>' +
             [...groups.keys()].sort((a, b) => b.localeCompare(a)).map(day => {
                 const options = groups.get(day).sort((a, b) => b.timestamp - a.timestamp);
                 return `<optgroup label="${this._esc(day ? day + ' (UTC)' : 'Date unavailable')}">` +
                     options.map(({row, time}) =>
-                        `<option value="${this._esc(row.id)}">${this._esc(
+                        `<option value="${this._esc(row.id)}"${row.kind === 'bitstream' ? ' style="color:#8bc8ff;background:#132f50"' : ''}>${this._esc(
                             [row.name, time, row.revision_id.slice(0, 12),
                                 row.approval, row.testing, row.preparation].join(' · '))}</option>`).join('') +
                     '</optgroup>';
             }).join('');
+    },
+
+    _renderSavedBuildPicker() {
+        const select = document.getElementById('baRevisionSelect');
+        if (!select) return;
+        const entries = this._savedNamespaceEntries.slice();
+        entries.push(...this._bitstreamRevisions.map(row => ({
+            id: 'bitstream:' + row.revision_id, revision_id: row.revision_id,
+            kind: 'bitstream', name: 'Bitstream build' +
+                (row.hardware_version == null ? '' : ' · hardware v' + row.hardware_version),
+            saved_at: row.saved_at || '', approval: row.approval_state,
+            testing: 'Test status unknown',
+            preparation: row.namespace_revision_id ? 'Linked Namespace' : 'Namespace link unavailable',
+        })));
+        const pinned = this._selectedSavedEntry;
+        if (pinned && !entries.some(row => row.id === pinned.id))
+            entries.unshift({...pinned, preparation: 'Saved version changed — select a current entry'});
+        select.innerHTML = this._savedRevisionOptions(entries);
+        select.value = pinned ? pinned.id : this._selectedSnapshot
+            ? this._selectedSnapshot.namespace_revision_id : '';
+        if (select.style) select.style.color = pinned?.kind === 'bitstream' ? '#8bc8ff' : '';
     },
 
     async _loadRevisions() {
@@ -1081,16 +1102,7 @@ const BuildApprovalView = {
                     testing: record.metadata?.test_status || 'Not tested',
                     preparation: record.files?.['boot-image.bin'] ? 'Image retained' : 'Needs preparation',
                 }));
-            const select = document.getElementById('baRevisionSelect');
-            if (select) {
-                const pinned = this._selectedSavedEntry;
-                const entries = this._savedNamespaceEntries.slice();
-                if (pinned && !entries.some(row => row.id === pinned.id))
-                    entries.unshift({...pinned, preparation: 'Saved version changed — select a current entry'});
-                select.innerHTML = this._savedRevisionOptions(entries);
-                select.value = pinned ? pinned.id : this._selectedSnapshot
-                    ? this._selectedSnapshot.namespace_revision_id : '';
-            }
+            this._renderSavedBuildPicker();
         } catch (error) {
             const status = document.getElementById('baSnapshotStatus');
             if (status && !this._selectedSnapshot) status.textContent =
@@ -1099,6 +1111,34 @@ const BuildApprovalView = {
     },
 
     selectRevisionId(revisionId) {
+        if (revisionId.startsWith('bitstream:')) {
+            const id = revisionId.slice('bitstream:'.length);
+            const bitstream = this._bitstreamRevisions.find(row => row.revision_id === id);
+            if (!bitstream) return;
+            this._selectedSavedEntry = {id: revisionId, kind: 'bitstream',
+                revision_id: id, name: 'Bitstream build'};
+            this._selectedSnapshot = null;
+            this._snapFrozen = false;
+            this.selectBitstreamRevision(id);
+            const outputSelect = document.getElementById('baBitstreamRevisionSelect');
+            if (outputSelect) outputSelect.value = id;
+            const status = document.getElementById('baSnapshotStatus');
+            if (status) status.textContent = `Selected bitstream build ${id.slice(0, 12)}. ` +
+                (bitstream.namespace_revision_id
+                    ? `Retained Namespace: ${bitstream.namespace_revision_id}. `
+                    : 'Its original Namespace link was not recorded. ') +
+                'Nothing was installed or flashed.';
+            const installStatus = document.getElementById('baInstallImageStatus');
+            if (installStatus) installStatus.textContent = 'Bitstream selected for inspection only.';
+            this._updateApproveBtn();
+            this._renderSavedBuildPicker();
+            return;
+        }
+        this.selectBitstreamRevision('');
+        const outputSelect = document.getElementById('baBitstreamRevisionSelect');
+        if (outputSelect) outputSelect.value = '';
+        const picker = document.getElementById('baRevisionSelect');
+        if (picker?.style) picker.style.color = '';
         this._selectedSavedEntry = this._savedNamespaceEntries.find(row => row.id === revisionId) || null;
         const revision = this._approvedRevisions.find(row =>
             row.namespace_revision_id === revisionId);
@@ -1129,6 +1169,7 @@ const BuildApprovalView = {
         if (!['approved', 'unmatched', 'legacy-unverified'].includes(state)) return null;
         return {
             revision_id: record.revision_id,
+            saved_at: metadata.created_at || metadata.saved_at || '',
             sha256: digest,
             approval_state: state,
             namespace_revision_id: metadata.namespace_revision_id || null,
@@ -1154,6 +1195,7 @@ const BuildApprovalView = {
             if (!Array.isArray(data.revisions)) throw new Error('Bitstream revision list is malformed.');
             this._bitstreamRevisions = data.revisions.map(record =>
                 this._bitstreamChoice(record)).filter(Boolean);
+            this._renderSavedBuildPicker();
             const select = document.getElementById('baBitstreamRevisionSelect');
             if (select) {
                 const options = state => this._bitstreamRevisions

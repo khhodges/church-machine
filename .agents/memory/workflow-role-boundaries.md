@@ -17,6 +17,14 @@ deletion of other internal simulation snapshots rather than merely hiding them.
 Retain inputs/evidence needed by kept builds. This does not authorize deletion
 of LUMP revision history or hardware operations. Missing test evidence must not
 be presented as proof a version was never tested or used.
+The unified Namespace selector must include actual saved bitstream builds as
+blue entries, including builds lacking a recorded Namespace link.
+
+**Why:** The user corrected colouring buttons instead of build entries and
+explicitly approved showing named Namespaces and bitstreams together.
+
+**How to apply:** Colour the entries and selected bitstream, not merely controls;
+selection alone must never install, flash, or substitute an unrelated Namespace.
 
 Keep development-image replacement testing separate from completion of the
 SecurityRegulator audit/proof design.

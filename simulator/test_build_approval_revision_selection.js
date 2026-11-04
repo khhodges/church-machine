@@ -214,6 +214,17 @@ const historical = {
     assert.strictEqual(elements.baDownloadRevisionBtn.disabled, true);
     assert(elements.baBitstreamRevisionSelect.innerHTML.includes('Approved · exact Namespace'));
     assert(elements.baBitstreamRevisionSelect.innerHTML.includes('Legacy / unverified'));
+    assert(elements.baRevisionSelect.innerHTML.includes('value="bitstream:' + bitId + '"'));
+    assert(elements.baRevisionSelect.innerHTML.includes('value="bitstream:' + legacyId + '"'));
+    assert(elements.baRevisionSelect.innerHTML.includes('color:#8bc8ff'));
+    view.selectRevisionId('bitstream:' + legacyId);
+    assert.strictEqual(view._selectedBitstream.revision_id, legacyId);
+    assert.strictEqual(view._selectedSnapshot, null);
+    assert.strictEqual(elements.baApproveBtn.disabled, true);
+    assert(elements.baSnapshotStatus.textContent.includes('link was not recorded'));
+    view._renderSavedBuildPicker();
+    assert.strictEqual(elements.baRevisionSelect.value, 'bitstream:' + legacyId);
+    assert.strictEqual(savedFiles, 0, 'combined selection cannot download or operate hardware');
     view.selectBitstreamRevision(legacyId);
     assert(elements.baBitstreamRevisionStatus.textContent.includes('Unverified / legacy'));
     assert.strictEqual(elements.baDownloadRevisionBtn.disabled, true,

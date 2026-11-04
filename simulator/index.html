@@ -1652,8 +1652,8 @@
             <div class="ba-toolbar">
                 <span class="ba-snapshot-status">Current Namespace: editable draft · freezing approves exact saved inputs</span>
                 <button id="baFreezeBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.freezeSnapshot()">&#x2744;&#xFE0F; Freeze Snapshot</button>
-                <label for="baRevisionSelect">Saved Namespace versions (all statuses)</label>
-                <select id="baRevisionSelect" style="max-width:100%" aria-label="Choose exact saved Namespace version" onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectRevisionId(this.value)"><option value="">Select a saved Namespace…</option></select>
+                <label for="baRevisionSelect">Namespaces and bitstream builds (blue)</label>
+                <select id="baRevisionSelect" style="max-width:100%" aria-label="Choose a saved Namespace or bitstream build" onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectRevisionId(this.value)"><option value="">Select a Namespace or bitstream build…</option></select>
                 <button id="baSelectSnapshotBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectAvailableSnapshot()">Use approved revision</button>
                 <button id="baInstallImageBtn" class="ba-approve-btn" disabled onclick="BuildApprovalView.installSelectedImage()">Install Image</button>
                 <button class="ba-approve-btn" onclick="BuildApprovalView.prepareSelectedUartImage()">Check UART Image</button>
