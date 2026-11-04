@@ -44,6 +44,16 @@ I want you to help me do it for myself".
 results. Do not send hardware commands, install images or change selected
 artifacts on their behalf without a new explicit request.
 
+IDE and bridge authentication should have one user-facing setup, not separate
+manual token configuration.
+
+**Why:** The user explicitly required "One setting should do it all" after the
+IDE showed ready while the PowerShell bridge lacked authentication.
+
+**How to apply:** Design a secure shared onboarding/pairing flow; retain
+authentication and distinguish stored input from verified connection status.
+Do not silently expand a hardware walkthrough into implementing this refinement.
+
 The agreed target workflow is: programmers compile and approve LUMPs; engineers
 compile configurations for simulation and approve Namespaces; testers create
 and approve bitstreams. These role names supersede the older Builder/system
