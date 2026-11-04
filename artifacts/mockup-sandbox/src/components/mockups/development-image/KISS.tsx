@@ -1,12 +1,12 @@
 import "./_group.css";
 import "./_kiss.css";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import savedInputs from "./_saved-inputs.json";
 
 type NamespaceName = keyof typeof savedInputs;
 type Slot = {
-  slot: number; name: string; kind?: string; type?: string;
+  slot: number; name: string; kind?: string; type?: string; limit?: string | number;
   policy?: string; load_policy?: string; resident?: boolean; token?: string;
   sequence?: number; seq?: number; boot?: boolean; filename?: string;
   location?: string; selection?: { filename?: string; revision?: number; token?: string };
@@ -16,14 +16,7 @@ type Slot = {
 export default function KISS() {
   const [namespace, setNamespace] = useState<NamespaceName>("New Layout");
   const [selectedSlot, setSelectedSlot] = useState<number>(9);
-  const [prepared, setPrepared] = useState(false);
-  const [example, setExample] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [acknowledged, setAcknowledged] = useState(false);
-  const [report, setReport] = useState(false);
-  const [handoff, setHandoff] = useState<"none" | "inspect" | "accept">("none");
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [sendAttempted, setSendAttempted] = useState(false);
   const input = savedInputs[namespace];
   const slots: Slot[] = ("rows" in input ? input.rows : input.abstractions);
   const sorted = [...slots].sort((a, b) => a.slot - b.slot);
@@ -37,7 +30,6 @@ export default function KISS() {
   const unselectedCode = codeSelections.filter(row => !row.selection);
   const unfinished = slots.filter(row => row.name === "ide.Mint");
   const slotCount = capacity ? slotCapacity ?? slots.length : undefined;
-  const addressRows = slots.filter(row => row.location);
   const lumps = slots
     .filter(row => row.kind === "lump" || Boolean(row.filename))
     .sort((a, b) => a.slot - b.slot);
@@ -51,57 +43,39 @@ export default function KISS() {
   const glassTop = 42;
   const glassBottom = glassTop + glassHeight;
   const selectedLump = lumps.find(row => row.slot === selectedSlot);
+  const wordValue = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    const parsed = /^0x/i.test(value) ? Number.parseInt(value, 16) : Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const locatedLumps = lumps.map(row => ({
+    row,
+    start: wordValue(row.location),
+    words: wordValue(row.limit),
+  })).filter((item): item is typeof item & { start: number } =>
+    item.start !== undefined && item.start >= 0 && item.start < glassCapacity
+  );
 
   function changeNamespace(value: NamespaceName) {
     setNamespace(value);
     setSelectedSlot(value === "Original" ? 0 : 9);
-    setPrepared(false); setExample(false); setLoaded(false); setReport(false);
-    setAcknowledged(false);
-  }
-
-  function prepare() {
-    setPrepared(true); setLoaded(false); setReport(false);
+    setSendAttempted(false);
   }
 
   return (
     <main className="kiss-workbench">
       <header className="kiss-top">
         <div className="kiss-brand"><span className="kiss-mark" aria-hidden="true">λ</span> CHURCH MACHINE <span className="kiss-muted">/ IDE</span></div>
-        <p className="kiss-preview">Design preview — no hardware actions</p>
+        <p className="kiss-preview">Design preview — FPGA transfer unavailable</p>
       </header>
 
       <div className="kiss-heading">
-        <div><h1>Development image</h1><p className="kiss-subtitle">Inspect or accept the exact image produced by Bind Namespace Design.</p></div>
+        <div><h1>Development image</h1><p className="kiss-subtitle">Review the bound Namespace layout, then send it to the FPGA.</p></div>
         <span className="kiss-local">LOCAL UI SIMULATION</span>
       </div>
 
-      <section className="kiss-binding" aria-labelledby="kiss-binding-title">
-        <div className="kiss-binding-head">
-          <div><span className="kiss-step">FROM NAMESPACE</span><h2 id="kiss-binding-title">Bound image handoff</h2></div>
-          <span className="kiss-binding-badge">BINDING IS NOT REPEATED HERE</span>
-        </div>
-        <p className="kiss-binding-intro">The Namespace page’s <strong>Bind Namespace Design</strong> action creates the bound result. Open it here to inspect the map, or accept that exact result for the development-image workflow.</p>
-        <div className="kiss-handoff-actions">
-          <button type="button" aria-pressed={handoff === "inspect"} onClick={() => setHandoff("inspect")}>Inspect bound image</button>
-          <button type="button" className="kiss-primary" aria-pressed={handoff === "accept"} onClick={() => setHandoff("accept")}>Accept bound image</button>
-          <span>Neither action binds again. FPGA loading remains separate.</span>
-        </div>
-        {handoff !== "none" && <div className="kiss-handoff-state" role="status">
-          <strong>{handoff === "inspect" ? "Inspect · read-only review" : "Accept · exact bound result selected"}</strong>
-          <span>{handoff === "inspect"
-            ? "This opens the bound image’s slots, findings, and physical map without changing it."
-            : "This selects the bound image for this workflow. It does not transfer or activate anything on the FPGA."}</span>
-        </div>}
-        <div className={`kiss-binding-result${isNew ? " kiss-binding-failed" : ""}`} role="status">
-          <strong>{isNew ? "This preview has no accepted bound image" : "Bound-image evidence not attached"}</strong>
-          <span>{isNew
-            ? "The latest known probe produced a 65,536-byte simulator image, but Wukong projection rejected it: missing Namespace Header V2 marker."
-            : "The saved design is shown for discussion only. No binary is claimed to be bound or ready for transfer."}</span>
-        </div>
-        <p className="kiss-binding-foot">Demo controls only · a real successful bind result would carry its exact image and generated memory map here. This preview does not bind, accept a real artifact, or contact hardware.</p>
-      </section>
-
-      <div className="kiss-layout">
+      <div className="kiss-layout kiss-layout-single">
         <section className="kiss-panel" aria-labelledby="kiss-namespace-title">
           <div className="kiss-panel-head"><h2 id="kiss-namespace-title"><span className="kiss-step">01</span>Namespace Table</h2><span className="kiss-status">Saved inputs</span></div>
           <div className="kiss-selector">
@@ -170,14 +144,14 @@ export default function KISS() {
             </div>
               <section className="kiss-water-map" aria-labelledby="kiss-water-title">
                 <div className="kiss-water-heading">
-                  <div><span className="kiss-step">IMAGE CAPACITY</span><h4 id="kiss-water-title">Full-scale memory glass</h4></div>
-                  <span className="kiss-water-caveat">Empty · no bound image attached</span>
+                  <div><span className="kiss-step">SAVED LOCATIONS</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
+                  <span className="kiss-water-caveat">{locatedLumps.length} mapped LUMPs</span>
                 </div>
-                <p className="kiss-water-intro">The vessel represents the full {glassCapacity.toLocaleString()}-word address space. Saved LUMPs are listed beside it; their physical sizes and positions are unknown until a bound image supplies an allocation map.</p>
+                <p className="kiss-water-intro">Colored regions use each LUMP’s location and extent from the Namespace Table. This is the saved Namespace layout, not a claim that a converted binary has been generated.</p>
                 <div className="kiss-glass-layout">
                   <div className="kiss-glass-figure">
-                    <div className="kiss-glass-capacity">{glassCapacity.toLocaleString()} words total</div>
-                    <svg className="kiss-water-svg" viewBox="0 0 240 500" role="img" aria-label={`Empty full-scale ${glassCapacity.toLocaleString()} word memory vessel. No physical LUMP allocations are available.`}>
+                    <div className="kiss-glass-capacity">{glassCapacity.toLocaleString()}-word reference scale</div>
+                    <svg className="kiss-water-svg" viewBox="0 0 240 500" role="group" aria-label={`Namespace LUMP locations within a ${glassCapacity.toLocaleString()} word reference address space`}>
                       <defs>
                         <linearGradient id="kiss-empty-glass" x1="0" x2="1">
                           <stop offset="0" stopColor="#b9eee2" stopOpacity=".13" />
@@ -185,8 +159,24 @@ export default function KISS() {
                           <stop offset=".84" stopColor="#b9eee2" stopOpacity=".035" />
                           <stop offset="1" stopColor="#b9eee2" stopOpacity=".13" />
                         </linearGradient>
+                        <clipPath id="kiss-location-clip"><path d={`M49 ${glassTop} H191 L181 ${glassBottom - 10} Q120 ${glassBottom + 17} 59 ${glassBottom - 10} Z`} /></clipPath>
                       </defs>
                       <path d={`M49 ${glassTop} H191 L181 ${glassBottom - 10} Q120 ${glassBottom + 17} 59 ${glassBottom - 10} Z`} fill="url(#kiss-empty-glass)" stroke="#b9eee2" strokeOpacity=".84" strokeWidth="2" />
+                      <g clipPath="url(#kiss-location-clip)">
+                        {locatedLumps.map(({ row, start, words }, index) => {
+                          const hasExtent = words !== undefined && words > 0;
+                          const extentHeight = hasExtent ? words / glassCapacity * glassHeight : 0;
+                          const y = glassTop + (glassCapacity - start - (hasExtent ? words : 0)) / glassCapacity * glassHeight;
+                          const markerY = glassTop + (glassCapacity - start) / glassCapacity * glassHeight;
+                          const active = selectedSlot === row.slot;
+                          return <g key={row.slot} role="button" tabIndex={0} aria-label={`Select ${row.name}, slot ${row.slot}, location ${row.location}${words === undefined ? ", extent unknown" : `, extent ${words} words`}`} aria-pressed={active} onClick={() => setSelectedSlot(row.slot)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedSlot(row.slot); } }} className={`kiss-region${active ? " is-selected" : ""}`} style={{ "--kiss-lump-color": colors[index % colors.length] } as CSSProperties}>
+                            {hasExtent ? <>
+                              <rect x="60" y={y} width="120" height={extentHeight} rx="2" />
+                              {extentHeight >= 14 && <text x="120" y={y + Math.min(extentHeight - 3, 12)} textAnchor="middle">{row.name}</text>}
+                            </> : <line x1="113" x2="127" y1={markerY} y2={markerY} stroke={colors[index % colors.length]} strokeWidth="3" strokeLinecap="round" />}
+                          </g>;
+                        })}
+                      </g>
                       <path d={`M55 ${glassTop + 7} V${glassBottom - 19}`} stroke="#e7fff8" strokeOpacity=".25" strokeWidth="3" />
                       {[0, .25, .5, .75, 1].map((fraction, index) => {
                         const y = glassTop + fraction * glassHeight;
@@ -196,25 +186,14 @@ export default function KISS() {
                           <text x="32" y={y + 4} textAnchor="end" className="kiss-glass-tick">{words.toLocaleString()}</text>
                         </g>;
                       })}
-                      <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">EMPTY</text>
-                      <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">No placement data</text>
+                      {locatedLumps.length === 0 && <>
+                        <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">NO LOCATIONS</text>
+                        <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">Not present in this table</text>
+                      </>}
                     </svg>
-                    <div className="kiss-glass-zero">0 words allocated</div>
+                    <div className="kiss-glass-zero">{locatedLumps.length} table locations shown</div>
                   </div>
                   <div className="kiss-lump-review">
-                    <h5>Namespace LUMPs <span>{lumps.length}</span></h5>
-                    <p className="kiss-lump-list-note">Select a LUMP to highlight its Namespace slot and inspect its saved binding details.</p>
-                    <div className="kiss-lump-list" role="list" aria-label="Namespace LUMPs">
-                      {lumps.map((row, index) => {
-                        const selected = selectedSlot === row.slot;
-                        const hasBinary = Boolean(row.selection || row.filename);
-                        return <button type="button" role="listitem" key={row.slot} className={`kiss-lump-item${selected ? " is-selected" : ""}`} style={{ "--kiss-lump-color": colors[index % colors.length] } as CSSProperties} aria-pressed={selected} onClick={() => setSelectedSlot(row.slot)}>
-                          <span className="kiss-lump-dot" aria-hidden="true" />
-                          <span className="kiss-lump-item-name">{row.name}<small>Slot {String(row.slot).padStart(2, "0")}{row.name === "ide.Mint" ? " · unfinished" : ""}</small></span>
-                          <span className="kiss-lump-size">{hasBinary ? "size unknown" : "unbound"}</span>
-                        </button>;
-                      })}
-                    </div>
                     {selectedLump ? <section className="kiss-lump-details" aria-live="polite" aria-labelledby="kiss-lump-detail-title">
                       <div className="kiss-lump-detail-head"><span className="kiss-lump-detail-dot" style={{ "--kiss-lump-color": colors[Math.max(0, lumps.findIndex(row => row.slot === selectedLump.slot)) % colors.length] } as CSSProperties} /><div><span>SELECTED LUMP · SLOT {String(selectedLump.slot).padStart(2, "0")}</span><h5 id="kiss-lump-detail-title">{selectedLump.name}</h5></div></div>
                       <dl>
@@ -222,79 +201,25 @@ export default function KISS() {
                         <dt>Revision</dt><dd>{selectedLump.selection?.revision ?? selectedLump.lump_version ?? "—"}</dd>
                         <dt>Token</dt><dd>{selectedLump.selection?.token ?? selectedLump.token ?? "—"}</dd>
                         <dt>Policy</dt><dd>{selectedLump.policy ?? selectedLump.load_policy ?? "Not recorded"}</dd>
-                        <dt>Physical size</dt><dd>Unknown · no bound-image allocation data</dd>
-                        <dt>Word address</dt><dd>Unknown · no generated memory map</dd>
+                        <dt>Table location</dt><dd>{selectedLump.location ?? "Not recorded"}</dd>
+                        <dt>Table extent</dt><dd>{selectedLump.limit ?? "Not recorded"}</dd>
                       </dl>
-                    </section> : <div className="kiss-lump-details kiss-no-lump">Select a LUMP to inspect its details.</div>}
+                    </section> : <div className="kiss-lump-details kiss-no-lump">Select a LUMP slot in the Namespace Table to highlight its location and inspect the saved row.</div>}
                   </div>
                 </div>
-                <div className="kiss-water-legend"><span>Glass scale = full Namespace capacity</span><span>LUMP sizes and positions intentionally not inferred from slots.</span></div>
+                <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Select a table row or region to inspect.</span></div>
               </section>
-            <section className="kiss-physical-map" aria-labelledby="kiss-physical-title">
-              <div className="kiss-physical-head"><h4 id="kiss-physical-title">Physical word layout</h4><span>Not generated</span></div>
-              <p>Word addresses and binary region sizes are not in this saved Namespace table. The converter must produce them; slot numbers are not memory addresses.</p>
-              {addressRows.length > 0 && <details><summary>Saved location fields (not a verified image map)</summary><ul>{addressRows.map(row => <li key={row.slot}>Slot {row.slot} · {row.name}: saved location {row.location}</li>)}</ul></details>}
-              <p className="kiss-physical-caption">No physical blocks are drawn because no converted image exists.</p>
-            </section>
             <p className="kiss-review-foot">This review does not edit the Namespace or suppress unfinished entries. Preparation findings remain visible and do not prevent further inspection.</p>
           </section>
         </section>
 
-        <aside className="kiss-rail" aria-label="Prepare and load workflow">
-          <section className="kiss-panel" aria-labelledby="kiss-prepare-title">
-            <div className="kiss-panel-head"><h2 id="kiss-prepare-title"><span className="kiss-step">02</span>Prepare runtime image</h2></div>
-            <div className="kiss-content">
-              <p className="kiss-muted">Use the saved <strong>{namespace}</strong> rows as-is. Preparation does not edit the Namespace or finish Mint.</p>
-              <button className="kiss-primary kiss-wide" onClick={prepare}>{prepared ? "Prepare again (simulated)" : "Prepare image (simulated)"}</button>
-              <div aria-live="polite">
-                {!prepared ? <p className="kiss-muted" style={{ marginTop: 12 }}>Not prepared. No image has been generated.</p> : <>
-                  <div className="kiss-finding">
-                    <strong>{isNew ? "Demo finding · loader format mismatch" : missing.length ? "Demo finding · artifacts not selected" : "Demo preparation · compatibility unknown"}</strong>
-                    {isNew ? "New Layout uses a saved format that the current loader does not accept. No runtime image was converted." : missing.length ? `${missing.length} lump rows have no selected artifact, including ide.Mint. No runtime image was generated.` : "Saved rows reviewed in this UI only. No converter ran and no loadable image was generated."}
-                  </div>
-                  {slots.some(row => row.name === "ide.Mint") && <p className="kiss-muted" style={{ marginTop: 10 }}>Mint remains unfinished. {isNew ? "Its saved lazy artifact selection is retained." : "Its empty artifact selection is retained."} All {slots.length} rows are preserved.</p>}
-                  <div className="kiss-example">
-                    <label className="kiss-check"><input type="checkbox" checked={example} onChange={event => { setExample(event.target.checked); setLoaded(false); setReport(false); }} /><span>Use a synthetic example payload to try the load interaction.</span></label>
-                    <p className="kiss-muted" style={{ marginTop: 7 }}>Not a conversion of {namespace}. No supported firmware is asserted.</p>
-                  </div>
-                </>}
-              </div>
-              <details style={{ marginTop: 12 }}>
-                <summary>Preparation details</summary>
-                <pre>{`Mode: local simulation only\nSaved format: ${"format" in input ? input.format : "Original abstractions"}\nConverter executed: no\nRows modified: none\nFirmware compatibility: unverified\nHardware accessed: no`}</pre>
-              </details>
-            </div>
-          </section>
-
-          <section className="kiss-panel" aria-labelledby="kiss-load-title">
-            <div className="kiss-panel-head"><h2 id="kiss-load-title"><span className="kiss-step">03</span>Connect & load</h2><span className="kiss-status">{connected ? "Demo connected" : "Disconnected"}</span></div>
-            <div className="kiss-content">
-              <p className="kiss-muted">Optional FPGA interaction demo. No bridge, serial port, or board is contacted.</p>
-              <button className="kiss-wide" onClick={() => { setConnected(!connected); setLoaded(false); setReport(false); }}>{connected ? "Disconnect demo FPGA" : "Connect demo FPGA"}</button>
-              {connected && <p className="kiss-muted" style={{ marginTop: 9 }}>Example FPGA connection only · identity unverified</p>}
-              <button className="kiss-primary kiss-wide" disabled={!connected || !prepared || !example} onClick={() => { setAcknowledged(false); dialog.current?.showModal(); }}>Load example into demo memory…</button>
-              <p className="kiss-muted" style={{ marginTop: 9 }}>{!connected ? "Connect the demo, then choose a synthetic payload." : !example ? "Prepare and select the synthetic example to try loading." : "Loading replaces runtime memory; confirmation required."}</p>
-              <div aria-live="polite">
-                <div className="kiss-evidence">
-                  <strong>{loaded ? "Example receipt · acknowledgement only" : "Contents unverified"}</strong>
-                  <dl><dt>Payload</dt><dd>{loaded ? "Synthetic example, not saved Namespace" : "None loaded"}</dd><dt>Transport</dt><dd>{loaded ? "Demo acknowledgement" : "Not tested"}</dd><dt>Full readback</dt><dd>Not performed</dd><dt>Board contents</dt><dd>Unverified · no real board read</dd></dl>
-                </div>
-              </div>
-              <button className="kiss-wide" onClick={() => setReport(!report)}>{report ? "Hide evidence report" : "Show evidence report"}</button>
-              {report && <pre aria-label="Demo evidence report">{`DESIGN PREVIEW · EXAMPLE EVIDENCE\nNamespace: ${namespace}\nSaved rows: ${slots.length}; unchanged\nPreparation: ${prepared ? "simulated; no image generated" : "not run"}\nConnection: ${connected ? "demo only" : "none"}\nLoad: ${loaded ? "synthetic example; demo ACK only" : "not performed"}\nFull readback: not performed\nReal board contents: UNVERIFIED\nNo hardware actions occurred.`}</pre>}
-            </div>
-          </section>
-        </aside>
       </div>
-      <footer className="kiss-footer"><span>Namespace edits belong in Namespace Table. This preview leaves every saved input untouched.</span><span>No network · no storage writes · no hardware</span></footer>
-
-      <dialog ref={dialog} aria-labelledby="kiss-confirm-title" onCancel={() => setAcknowledged(false)}>
-        <h2 id="kiss-confirm-title">Replace runtime memory?</h2>
-        <p>On a real FPGA, loading replaces the current runtime image and loses runtime memory, including unsaved state. This demo changes UI state only.</p>
-        <p className="kiss-muted">Payload: synthetic example, not {namespace}. An acknowledgement is not full readback; real board contents remain unverified.</p>
-        <label className="kiss-check"><input type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /><span>I understand that a real load would lose the current runtime memory.</span></label>
-        <div className="kiss-modal-actions"><button onClick={() => dialog.current?.close()}>Cancel</button><button className="kiss-primary" disabled={!acknowledged} onClick={() => { setLoaded(true); setReport(false); dialog.current?.close(); }}>Confirm demo load</button></div>
-      </dialog>
+      <footer className="kiss-send-footer">
+        <div><strong>Send the bound build to FPGA</strong><span>Uses the existing Namespace binding; no rebind.</span></div>
+        <button type="button" className="kiss-primary kiss-send-button" onClick={() => setSendAttempted(true)}>Send build to FPGA</button>
+        {sendAttempted && <p className="kiss-send-status" role="status">Not sent — this preview has no accepted bound image or hardware connection. No FPGA action occurred.</p>}
+      </footer>
+      <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This preview leaves every saved input untouched.</span><span>No network · no storage writes · no hardware</span></p>
     </main>
   );
 }
