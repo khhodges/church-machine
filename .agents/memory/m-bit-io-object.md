@@ -275,6 +275,18 @@ reset-safe storage. Specify retention, capacity, acknowledgement and
 outcome-recording failure boundaries separately; transmission is not receipt
 and a logging fault does not imply rollback of a committed effect.
 
+The trusted IDE/Builder provisions local Passcode verification material and
+its associated audit ID into SecurityRegulator's private storage during
+Namespace preparation.
+
+**Why:** The user approved a trusted local reference so verification does not
+depend on caller-supplied reference data or a Home IDE round trip.
+
+**How to apply:** Callers supply credentials; ordinary Mint/FreeHandler
+regulator calls cannot replace the reference. Cryptographic representation
+and register ABI remain open. Private storage is the intended custody, not
+proof against Mint's Namespace-write reach or authorization to implement.
+
 The user approved allowing pending local audit records to be lost on board
 power-off in Phase 1.
 

@@ -457,6 +457,16 @@ credential representation, nested-call transport and the register ABI remain
 to be defined. This design approval authorizes no implementation or hardware
 changes.
 
+**Approved local verification provisioning:** During Namespace preparation,
+the trusted IDE/Builder provisions the Passcode verification material and
+associated audit ID into SecurityRegulator's private storage. Calls supply
+the credential, not the trusted reference against which it is checked.
+Mint and FreeHandler cannot replace that reference through an ordinary
+regulator call. Verification uses the local reference without a Home IDE
+round trip. This selects reference ownership and placement, not a hash, key,
+other cryptographic representation or register ABI. Private custody remains
+a design requirement, not proof against Mint's Namespace-write reach.
+
 The physical tuple layout and how these identities are carried and bound
 without spoofing or leaking a secret remain to be specified. The transaction
 ID is the stored ID, not an assumption that the raw CR5 GT is the ID.

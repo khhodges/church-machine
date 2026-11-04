@@ -1781,6 +1781,16 @@ secret never enters the audit record. Protected credential representation,
 transport through nested calls and register assignments remain to be defined.
 Do not assume Passcode and earlier Passkey terminology are interchangeable.
 
+**Approved local verification provisioning:** The trusted IDE/Builder
+provisions the verification material and associated audit ID into
+SecurityRegulator's private storage during Namespace preparation. Callers
+supply their credential, not its trusted verification reference. Mint and
+FreeHandler cannot replace the reference through an ordinary regulator call.
+The local reference permits verification without contacting the Home IDE for
+each invocation. The cryptographic representation and register ABI remain
+open. This is a design requirement, not implementation approval or proof of
+isolation from Mint's Namespace-write authority.
+
 Sending records to the Home IDE is required, not optional diagnostic output.
 The audit path must cover SWITCHM even though it does not immediately return,
 and faults even when ordinary method completion cannot emit a record.
