@@ -26,14 +26,7 @@ export default function KISS() {
   const missing = slots.filter(row => row.kind === "lump" && !row.selection);
   const isNew = namespace === "New Layout";
   const capacity = "capacityWords" in input ? input.capacityWords : undefined;
-  const lumps = slots
-    .filter(row => row.kind === "lump" || Boolean(row.filename))
-    .sort((a, b) => a.slot - b.slot);
   const colors = ["#73d7c0", "#9fcb72", "#e9c46a", "#ee9b70", "#e887a5", "#b8a1ee", "#72b8df", "#d4dc7b", "#f1a86c", "#70c8d5", "#d89bcc", "#a8d497", "#e9a5a0", "#9daee8", "#dfc078", "#86d5b4"];
-  const colorForSlot = (slot: number) => {
-    const index = lumps.findIndex(row => row.slot === slot);
-    return index < 0 ? undefined : colors[index % colors.length];
-  };
   const glassCapacity = capacity ?? 16384;
   const glassHeight = 420;
   const glassTop = 42;
@@ -44,13 +37,19 @@ export default function KISS() {
     const parsed = /^0x/i.test(value) ? Number.parseInt(value, 16) : Number(value);
     return Number.isFinite(parsed) ? parsed : undefined;
   };
-  const locatedLumps = lumps.map(row => ({
+  // The saved table can place LUMPs, Threads, and boot entries in the same
+  // address space. Keep only in-range saved locations; never infer placement.
+  const locatedEntries = slots.map(row => ({
     row,
     start: wordValue(row.location),
     words: wordValue(row.limit),
   })).filter((item): item is typeof item & { start: number } =>
     item.start !== undefined && item.start >= 0 && item.start < glassCapacity
   );
+  const colorForSlot = (slot: number) => {
+    const index = locatedEntries.findIndex(item => item.row.slot === slot);
+    return index < 0 ? undefined : colors[index % colors.length];
+  };
 
   function changeNamespace(value: NamespaceName) {
     setNamespace(value);
@@ -102,7 +101,7 @@ export default function KISS() {
                 const policy = row.policy ?? row.load_policy ?? (kind === "mmio" ? "Hardware" : "—");
                 return <tr key={row.slot} className={selectedSlot === row.slot ? "kiss-active" : undefined}>
                   <td>{String(row.slot).padStart(2, "0")}</td>
-                  <td>{kind === "lump" && colorForSlot(row.slot) && <span className="kiss-slot-color" style={{ "--kiss-lump-color": colorForSlot(row.slot) } as CSSProperties} aria-hidden="true" />}<button className="kiss-slot-button" style={kind === "lump" && colorForSlot(row.slot) ? { "--kiss-lump-color": colorForSlot(row.slot) } as CSSProperties : undefined} onClick={event => inspectSlot(row, event.currentTarget)} aria-pressed={selectedSlot === row.slot} aria-label={`Inspect slot ${row.slot}, ${row.name}`}>{row.name}</button>{row.boot && <span className="kiss-tag">boot</span>}{row.name === "ide.Mint" && <span className="kiss-tag">unfinished</span>}</td>
+                  <td>{colorForSlot(row.slot) && <span className="kiss-slot-color" style={{ "--kiss-lump-color": colorForSlot(row.slot) } as CSSProperties} aria-hidden="true" />}<button className="kiss-slot-button" style={colorForSlot(row.slot) ? { "--kiss-lump-color": colorForSlot(row.slot) } as CSSProperties : undefined} onClick={event => inspectSlot(row, event.currentTarget)} aria-pressed={selectedSlot === row.slot} aria-label={`Inspect slot ${row.slot}, ${row.name}`}>{row.name}</button>{row.boot || row.name.startsWith("Boot.") ? <span className="kiss-tag">boot</span> : null}{row.name === "ide.Mint" && <span className="kiss-tag">unfinished</span>}</td>
                   <td className="kiss-kind">{kind}</td><td className="kiss-kind">{policy}</td>
                   <td className="kiss-kind">{row.selection?.revision ?? row.lump_version ?? "—"}</td>
                 </tr>;
@@ -112,13 +111,13 @@ export default function KISS() {
           <section className="kiss-water-map" aria-labelledby="kiss-water-title">
                 <div className="kiss-water-heading">
                   <div><span className="kiss-step">SAVED LOCATIONS</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
-                  <span className="kiss-water-caveat">{locatedLumps.length} mapped LUMPs</span>
+                  <span className="kiss-water-caveat">{locatedEntries.length} mapped entries</span>
                 </div>
-                <p className="kiss-water-intro">Colored regions use each LUMP’s location and extent from the Namespace Table. This is the saved Namespace layout, not a claim that a converted binary has been generated.</p>
+                <p className="kiss-water-intro">Colored regions use each saved entry’s location and extent, including LUMPs, Threads, and Boot.NS / Boot.Thread. This is the Namespace layout, not a generated binary map.</p>
                 <div className="kiss-glass-layout">
                   <div className="kiss-glass-figure">
                     <div className="kiss-glass-capacity">{glassCapacity.toLocaleString()}-word reference scale</div>
-                    <svg className="kiss-water-svg" viewBox="0 0 240 500" role="group" aria-label={`Namespace LUMP locations within a ${glassCapacity.toLocaleString()} word reference address space`}>
+                    <svg className="kiss-water-svg" viewBox="0 0 240 500" role="group" aria-label={`Namespace memory locations within a ${glassCapacity.toLocaleString()} word reference address space`}>
                       <defs>
                         <linearGradient id="kiss-empty-glass" x1="0" x2="1">
                           <stop offset="0" stopColor="#b9eee2" stopOpacity=".13" />
@@ -130,14 +129,15 @@ export default function KISS() {
                       </defs>
                       <path d={`M49 ${glassTop} H191 L181 ${glassBottom - 10} Q120 ${glassBottom + 17} 59 ${glassBottom - 10} Z`} fill="url(#kiss-empty-glass)" stroke="#b9eee2" strokeOpacity=".84" strokeWidth="2" />
                       <g clipPath="url(#kiss-location-clip)">
-                        {locatedLumps.map(({ row, start, words }, index) => {
+                        {locatedEntries.map(({ row, start, words }, index) => {
                           const hasExtent = words !== undefined && words > 0;
                           const extentHeight = hasExtent ? words / glassCapacity * glassHeight : 0;
                           const y = glassTop + (glassCapacity - start - (hasExtent ? words : 0)) / glassCapacity * glassHeight;
                           const markerY = glassTop + (glassCapacity - start) / glassCapacity * glassHeight;
                           const active = selectedSlot === row.slot;
                           const color = colorForSlot(row.slot) ?? colors[index % colors.length];
-                          return <g key={row.slot} role="button" tabIndex={0} aria-label={`Inspect ${row.name}, slot ${row.slot}, location ${row.location}${words === undefined ? ", extent unknown" : `, extent ${words} words`}`} aria-pressed={active} onClick={event => inspectSlot(row, event.currentTarget)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); inspectSlot(row, event.currentTarget); } }} className={`kiss-region${active ? " is-selected" : ""}`} style={{ "--kiss-lump-color": color } as CSSProperties}>
+                          const kind = row.kind ?? (row.filename ? "lump" : row.name.startsWith("Boot.") ? "boot" : row.name.includes("Thread") ? "thread" : "entry");
+                          return <g key={row.slot} role="button" tabIndex={0} aria-label={`Inspect ${row.name}, ${kind}, slot ${row.slot}, location ${row.location}${words === undefined ? ", extent unknown" : `, extent ${words} words`}`} aria-pressed={active} onClick={event => inspectSlot(row, event.currentTarget)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); inspectSlot(row, event.currentTarget); } }} className={`kiss-region${active ? " is-selected" : ""}`} style={{ "--kiss-lump-color": color } as CSSProperties}>
                             {hasExtent ? <>
                               <rect x="60" y={y} width="120" height={extentHeight} rx="2" />
                               {extentHeight >= 14 && <text x="120" y={y + Math.min(extentHeight - 3, 12)} textAnchor="middle">{row.name}</text>}
@@ -154,15 +154,15 @@ export default function KISS() {
                           <text x="32" y={y + 4} textAnchor="end" className="kiss-glass-tick">{words.toLocaleString()}</text>
                         </g>;
                       })}
-                      {locatedLumps.length === 0 && <>
+                      {locatedEntries.length === 0 && <>
                         <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">NO LOCATIONS</text>
                         <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">Not present in this table</text>
                       </>}
                     </svg>
-                    <div className="kiss-glass-zero">{locatedLumps.length} table locations shown</div>
+                    <div className="kiss-glass-zero">{locatedEntries.length} saved locations shown</div>
                   </div>
                 </div>
-                <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Select a table row or region to inspect.</span></div>
+                <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
           </section>
           </div>
           <details className="kiss-technical">
