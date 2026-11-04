@@ -112,6 +112,21 @@ def test_routes_read_only_and_no_arbitrary_file_selection(backend):
     assert response.status_code == 200 and response.headers["Cache-Control"] == "no-store"
 
 
+def test_compiled_view_and_assets_are_served_by_primary_flask(backend):
+    root = Path(backend.__file__).parents[1] / "artifacts/development-image/dist/public"
+    (root / "assets").mkdir(parents=True)
+    (root / "index.html").write_text('<script src="/development-image/assets/app.js"></script>')
+    (root / "assets/app.js").write_text("console.log('compiled');")
+    app = Flask(__name__)
+    register(app, backend)
+    client = app.test_client()
+    page = client.get("/development-image/?namespace=design:exact")
+    assert page.status_code == 200
+    assert b"/development-image/assets/app.js" in page.data
+    assert client.get("/development-image/assets/app.js").status_code == 200
+    assert client.get("/development-image/assets/missing.js").status_code == 404
+
+
 def test_retained_image_requires_hardware_authority(backend):
     store = backend._artifact_revision_store()
     raw = Path(backend.NS_STATE_PATH).read_bytes()

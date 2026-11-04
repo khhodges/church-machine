@@ -1013,7 +1013,7 @@ outputType = "console"
 [deployment]
 deploymentTarget = "vm"
 run = ["gunicorn", "--bind", "0.0.0.0:23636", "--workers", "1", "--threads", "8", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "server.app:app"]
-build = ["bash", "-lc", "pip install -r requirements.txt && npm ci && npm --prefix artifacts/church-machine-ide-introduction run build:production"]
+build = ["bash", "-lc", "pip install -r requirements.txt && npm ci && npm --prefix artifacts/church-machine-ide-introduction run build:production && npm --prefix artifacts/development-image run build:production"]
 ignorePorts = false
 
 [nix]

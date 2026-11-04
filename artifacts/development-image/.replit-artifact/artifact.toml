@@ -14,14 +14,8 @@ localPort = 22382
 [services.development]
 run = "pnpm --filter @workspace/development-image run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/development-image", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/development-image/dist/public"
-
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+# Production is built by the root deployment and served by Flask.
+# Nested production services bypass the main IDE/API server.
 
 [services.env]
 PORT = "22382"
