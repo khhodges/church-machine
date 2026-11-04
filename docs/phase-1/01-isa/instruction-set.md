@@ -1771,14 +1771,14 @@ Passcode is provisioned. The Home IDE maintains the association between this
 ID and the Passcode's identity. Audit records contain that ID, never the
 secret Passcode. The ID grants no authority by itself and is distinct from
 `TransactionID`, which identifies the transaction rather than the credential.
-**Approved verification point:** SecurityRegulator verifies the supplied
+**Approved verification point:** SecurityRegulator verifies evidence of the
 originating Passcode and obtains its audit ID from the provisioned association,
 not from an independently supplied caller label. Nested calls through Mint or
-FreeHandler retain the originating Passcode rather than substituting the
+FreeHandler retain the originating Passcode identity rather than substituting the
 service's own identity. This is credential-to-identity verification, not
 caller-purpose policy; the invocation capability remains necessary and the
-secret never enters the audit record. Protected credential representation,
-transport through nested calls and register assignments remain to be defined.
+secret never enters the audit record. Proof encoding, nested-call transport
+details and register assignments remain to be defined.
 Do not assume Passcode and earlier Passkey terminology are interchangeable.
 
 **Approved local verification provisioning:** The trusted IDE/Builder
@@ -1790,6 +1790,15 @@ The local reference permits verification without contacting the Home IDE for
 each invocation. The cryptographic representation and register ABI remain
 open. This is a design requirement, not implementation approval or proof of
 isolation from Mint's Namespace-write authority.
+
+**Approved nested-call credential:** Pass an invocation-bound proof through
+Mint and FreeHandler rather than the reusable secret Passcode.
+SecurityRegulator verifies it using the provisioned verification material
+and obtains the associated audit ID. Bind the proof to the requested
+operation so it cannot be used for a different request or replayed later.
+The invocation capability remains necessary. Proof generation, encoding,
+exact binding fields and replay prevention remain to be specified; this
+does not adopt the existing Passkey scheme or authorize implementation.
 
 Sending records to the Home IDE is required, not optional diagnostic output.
 The audit path must cover SWITCHM even though it does not immediately return,

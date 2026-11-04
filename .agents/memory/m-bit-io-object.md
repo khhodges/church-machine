@@ -243,7 +243,7 @@ recording or transmitting its reusable secret.
 `TransactionID`. Do not trust arbitrary caller labels or invent a register ABI
 from this representation approval.
 
-The user approved SecurityRegulator verifying the supplied originating
+The user approved SecurityRegulator verifying evidence of the originating
 Passcode and obtaining the audit ID from the provisioned association.
 
 **Why:** Attribution must bind to the verified credential rather than an
@@ -251,8 +251,8 @@ independent caller-supplied identity claim.
 
 **How to apply:** Mint/FreeHandler nested calls retain the originator, not a
 substituted service credential. The invocation capability remains necessary;
-this is not purpose policy and the secret is never logged. Protected
-representation, nested-call transport and register ABI remain separate design
+this is not purpose policy and the secret is never logged. Proof encoding,
+nested-call transport details and register ABI remain separate design
 work; this is not implementation or hardware authorization.
 
 **Why:** Audit destination ownership must not pass to individual callers.
@@ -286,6 +286,18 @@ depend on caller-supplied reference data or a Home IDE round trip.
 regulator calls cannot replace the reference. Cryptographic representation
 and register ABI remain open. Private storage is the intended custody, not
 proof against Mint's Namespace-write reach or authorization to implement.
+
+The user approved invocation-bound proofs through Mint/FreeHandler instead
+of forwarding the reusable secret Passcode.
+
+**Why:** Intermediate services must not receive the reusable secret; the
+proof must not be reusable for a different request or replayed later.
+
+**How to apply:** SecurityRegulator verifies the proof with provisioned
+material and obtains the associated audit ID. Keep the invocation-capability
+requirement. Proof generation, encoding, exact operation binding and replay
+prevention remain open; do not silently adopt the existing Passkey scheme or
+treat this as implementation authorization.
 
 The user approved allowing pending local audit records to be lost on board
 power-off in Phase 1.

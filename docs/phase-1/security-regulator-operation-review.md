@@ -447,13 +447,13 @@ identity; it does not create another ID or add a SAVEM operand.
 with the Passcode. The Home IDE maintains its association with the Passcode's
 identity. Record the audit ID, not the secret; the ID confers no authority.
 It identifies the credential and remains distinct from `TransactionID`.
-**Approved verification point:** SecurityRegulator verifies the supplied
+**Approved verification point:** SecurityRegulator verifies evidence of the
 originating Passcode and obtains the audit ID from its provisioned association.
 Mint and FreeHandler must not substitute their own identity for the originator
 on nested calls. Independently supplied audit labels are not trusted.
 The invocation capability remains necessary; verification is not a
 caller-purpose policy check and the secret is never logged. Protected
-credential representation, nested-call transport and the register ABI remain
+proof encoding, nested-call transport details and the register ABI remain
 to be defined. This design approval authorizes no implementation or hardware
 changes.
 
@@ -466,6 +466,16 @@ regulator call. Verification uses the local reference without a Home IDE
 round trip. This selects reference ownership and placement, not a hash, key,
 other cryptographic representation or register ABI. Private custody remains
 a design requirement, not proof against Mint's Namespace-write reach.
+
+**Approved nested-call credential:** Mint and FreeHandler carry an
+invocation-bound proof, not the reusable secret Passcode. SecurityRegulator
+verifies that proof using its provisioned verification material and obtains
+the associated audit ID. The proof must be bound to the requested operation
+so it cannot be used for a different request or replayed later. The invocation
+capability remains necessary; this does not add caller-purpose policy.
+Proof generation, encoding, exact operation-binding fields and replay
+prevention remain to be specified. This does not adopt the existing Passkey
+scheme or authorize implementation.
 
 The physical tuple layout and how these identities are carried and bound
 without spoofing or leaking a secret remain to be specified. The transaction
