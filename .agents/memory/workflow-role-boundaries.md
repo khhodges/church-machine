@@ -2,6 +2,16 @@
 name: Workflow role boundaries
 description: Independent LUMP, simulation Namespace, and bitstream deliverables and approval boundaries.
 ---
+Keep development-image replacement testing separate from completion of the
+SecurityRegulator audit/proof design.
+
+**Why:** The user redirected the review toward testing development-image
+replacement to enable code replacement, rather than further audit refinements.
+
+**How to apply:** Use the existing complete-image installation path without
+making unfinished regulator features prerequisites unless a concrete
+dependency is demonstrated. Explain additional refinements before doing them.
+
 The agreed target workflow is: programmers compile and approve LUMPs; engineers
 compile configurations for simulation and approve Namespaces; testers create
 and approve bitstreams. These role names supersede the older Builder/system
