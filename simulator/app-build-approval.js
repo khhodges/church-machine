@@ -133,6 +133,106 @@ const BuildApprovalView = {
         try { sessionStorage.setItem('ba_build_token', val.trim()); } catch (_) {}
     },
 
+    openBridgePairing() {
+        const dialog = document.getElementById('baBridgePairing');
+        document.getElementById('baPairServer').textContent = 'Connecting to: ' + location.origin;
+        const target = window.TargetState?.resolve();
+        const uid = document.getElementById('baPairUid');
+        if (!uid.value && target?.deviceUid) uid.value = target.deviceUid;
+        document.getElementById('baPairStatus').textContent =
+            'Enter your serial port and board UID, then create the command.';
+        dialog.showModal();
+        dialog.oncancel = () => this.closeBridgePairing();
+    },
+
+    closeBridgePairing() {
+        clearInterval(this._pairTimer);
+        document.getElementById('baPairCommand').value = '';
+        document.getElementById('baPairCommand').hidden = true;
+        document.getElementById('baPairCopy').hidden = true;
+        document.getElementById('baBridgePairing').close();
+    },
+
+    async createBridgePairing() {
+        const status = document.getElementById('baPairStatus');
+        const button = document.getElementById('baPairCreate');
+        const output = document.getElementById('baPairCommand');
+        const copy = document.getElementById('baPairCopy');
+        const uid = document.getElementById('baPairUid').value.trim();
+        const port = document.getElementById('baPairPort').value.trim();
+        if (!/^[a-zA-Z0-9_.-]{1,128}$/.test(uid) || !/^(auto|COM[0-9]+)$/i.test(port)) {
+            status.textContent = 'Enter a board UID and a Windows port such as COM4 (or auto).';
+            return;
+        }
+        clearInterval(this._pairTimer);
+        output.hidden = copy.hidden = true;
+        output.value = '';
+        button.disabled = true;
+        status.textContent = 'Verifying IDE access…';
+        try {
+            const response = await fetch('/api/bridge-pairing', {
+                method: 'POST', headers: {...this._authHeaders(), 'Content-Type': 'application/json'},
+                body: JSON.stringify({device_uid: uid}),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(response.status === 401 ?
+                'IDE access token rejected. Correct the token above, then try again.' :
+                (data.error || 'Could not create pairing command.'));
+            document.getElementById('baTokenStatus').textContent = 'IDE access verified';
+            const quote = value => "'" + String(value).replace(/'/g, "''") + "'";
+            output.value = [
+                "$ErrorActionPreference = 'Stop'",
+                "$bridge = Join-Path $env:USERPROFILE 'wukong_bridge_paired.py'",
+                `Invoke-WebRequest -UseBasicParsing -Uri ${quote(location.origin + '/dl/wukong-bridge')} -OutFile $bridge`,
+                `py -3.13 $bridge --port ${quote(port)} --baud 57600 --device-uid ${quote(uid)} --ide ${quote(location.origin)} --pair-code ${quote(data.code)}`,
+            ].join('\r\n');
+            output.hidden = copy.hidden = false;
+            status.textContent = 'Access verified. Copy and run within 5 minutes. Waiting for your bridge…';
+            const deadline = Date.now() + data.expires_in * 1000;
+            this._pairTimer = setInterval(async () => {
+                if (!document.getElementById('baBridgePairing').open) {
+                    clearInterval(this._pairTimer);
+                    return;
+                }
+                try {
+                    const res = await fetch('/hardware/wukong/status', {cache: 'no-store'});
+                    if (!res.ok) throw new Error();
+                    const live = await res.json();
+                    if (live.bridge_connected && live.physical_target?.live &&
+                            live.physical_target.device_uid === uid) {
+                        status.textContent = 'Bridge connected to this IDE. Pairing has not installed an image.';
+                    } else if (Date.now() >= deadline) {
+                        status.textContent = 'No connection confirmed. If unused, create a new command; otherwise check the bridge window for its error.';
+                    } else return;
+                    output.value = '';
+                    output.hidden = copy.hidden = true;
+                    clearInterval(this._pairTimer);
+                } catch (_) {
+                    status.textContent = 'Cannot check connection. Check your network; no hardware action was requested.';
+                    clearInterval(this._pairTimer);
+                }
+            }, 2000);
+        } catch (error) {
+            status.textContent = error.message;
+        } finally {
+            button.disabled = false;
+        }
+    },
+
+    async copyBridgePairing() {
+        const command = document.getElementById('baPairCommand');
+        try {
+            await navigator.clipboard.writeText(command.value);
+            document.getElementById('baPairStatus').textContent =
+                'Copied. Stop the old bridge with Ctrl+C, then paste into PowerShell.';
+        } catch (_) {
+            command.focus();
+            command.select();
+            document.getElementById('baPairStatus').textContent =
+                'Press Ctrl+C to copy the selected command.';
+        }
+    },
+
     _onTokenInput(val) {
         this._setBuildToken(val);
         // A snapshot fetched with an earlier token must not remain actionable.
@@ -146,7 +246,7 @@ const BuildApprovalView = {
         this._snapFrozen = false;
         this._updateApproveBtn();
         const s = document.getElementById('baTokenStatus');
-        if (s) s.textContent = val.trim() ? '✅ ready' : '';
+        if (s) s.textContent = val.trim() ? 'Token entered — checking' : 'Token required';
         // Trigger a fresh load now that the token may have changed
         if (val.trim()) this.refresh(false);
     },
@@ -244,7 +344,7 @@ const BuildApprovalView = {
         const status = document.getElementById('baTokenStatus');
         const tok = this._getBuildToken();
         if (input) input.value = tok;
-        if (status) status.textContent = tok ? '✅ ready' : '';
+        if (status) status.textContent = tok ? 'Token entered — checking' : 'Token required';
 
         this.refresh(false);
         this._loadReleaseContext();
@@ -275,12 +375,17 @@ const BuildApprovalView = {
                 cache: 'no-store',
             });
             if (res.status === 401 || res.status === 403 || res.status === 503) {
+                const tokenStatus = document.getElementById('baTokenStatus');
+                if (tokenStatus) tokenStatus.textContent = 'IDE access not verified';
                 if (body) body.innerHTML =
                     '<div class="ba-error">🔑 Paste your <strong>REPORT_TOKEN</strong> into the ' +
-                    '"Build token" field above to load the NS map.</div>';
+                    '"IDE access token" field above to load the NS map.</div>';
                 this._renderIssueComments(null);
                 return;
             }
+            const tokenStatus = document.getElementById('baTokenStatus');
+            if (tokenStatus) tokenStatus.textContent = res.ok ?
+                'IDE access verified · bridge connection separate' : 'IDE check failed';
             const data = await _actionableJsonResponse(res, 'Load the Build Approval NS map', {
                 dataChanged: false,
                 nextAction: 'Check the build token, then click Refresh.',

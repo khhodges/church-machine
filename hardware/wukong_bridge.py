@@ -1973,6 +1973,7 @@ def main():
                              '/dev/ttyUSB* on Linux)')
     parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
     parser.add_argument('--ide', default='http://localhost:5000', help='IDE base URL')
+    parser.add_argument('--pair-code', help='Single-use connection code created by the IDE')
     parser.add_argument(
         '--device-uid', default=os.environ.get('WUKONG_DEVICE_UID', ''),
         help='Physical board UID for target-routed commands (or WUKONG_DEVICE_UID)',
@@ -1999,6 +2000,28 @@ def main():
         parser.error('--calls-only requires --phase1-golden')
 
     ide_base    = args.ide.rstrip('/')
+    if args.pair_code:
+        if not ide_base.startswith('https://') or args.insecure:
+            parser.error('IDE pairing requires HTTPS with certificate verification')
+        try:
+            response = requests.post(
+                ide_base + '/api/bridge-pairing/redeem',
+                json={'code': args.pair_code, 'device_uid': args.device_uid},
+                timeout=15, allow_redirects=False)
+            if response.status_code != 200:
+                print('Pairing failed. Create a new connection command in this IDE '
+                      '(HTTP %s). No serial port was opened.' % response.status_code)
+                return 1
+            paired_token = response.json().get('token', '')
+            if not paired_token.startswith('bridge-session-'):
+                print('Pairing failed: invalid server response. No serial port was opened.')
+                return 1
+            os.environ['REPORT_TOKEN'] = paired_token
+            args.pair_code = None
+            print('[bridge] IDE pairing accepted; credentials remain in this process only')
+        except (requests.RequestException, ValueError):
+            print('Pairing failed: could not reach the selected IDE. No serial port was opened.')
+            return 1
     church_only = args.church_only
     flow_trace = Phase1FlowTrace(calls_only=args.calls_only) if args.phase1_golden else None
     if flow_trace:
@@ -3140,4 +3163,4 @@ def _handle_upload(data, ser, ide_base, verify_tls, session_id=None,
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

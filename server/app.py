@@ -5523,6 +5523,9 @@ def _wukong_control_auth():
     if (app.config.get("TESTING")
             and request.path != "/hardware/wukong/skip-fault-completion"):
         return True, None
+    from server.bridge_pairing import authorized as _paired_bridge_authorized
+    if _paired_bridge_authorized():
+        return True, None
     return _optional_report_token_check()
 
 
@@ -24901,7 +24904,8 @@ def wukong_skip_fault_completion_post():
             'error': 'REPORT_TOKEN is not configured',
         }), 503
     supplied = request.headers.get('Authorization', '')
-    if not hmac.compare_digest(supplied, f'Bearer {token}'):
+    from server.bridge_pairing import authorized as _paired_completion_authorized
+    if not hmac.compare_digest(supplied, f'Bearer {token}') and not _paired_completion_authorized():
         return jsonify({
             'accepted': False, 'decision': 'unauthorized',
             'error': 'Unauthorized',
@@ -24973,7 +24977,7 @@ def wukong_skip_fault_completion_post():
 def wukong_halt_state_post():
     """Accept board-emitted halt evidence correlated by bridge session/counter."""
     global _wukong_cmd_delivery, _wukong_run_unlocked, _wukong_boot_info
-    auth_ok, auth_error = _optional_report_token_check()
+    auth_ok, auth_error = _wukong_control_auth()
     if not auth_ok:
         return auth_error
     data = request.get_json(silent=True) or {}
@@ -25151,6 +25155,8 @@ def wukong_upload_ack_get():
 
 from server.guarded_runtime_reload import register as _register_guarded_runtime_reload
 _register_guarded_runtime_reload(app, sys.modules[__name__])
+from server.bridge_pairing import register as _register_bridge_pairing
+_register_bridge_pairing(app, _optional_report_token_check)
 from server.uart_profile_install import register as _register_uart_profile_install
 _register_uart_profile_install(app, sys.modules[__name__])
 

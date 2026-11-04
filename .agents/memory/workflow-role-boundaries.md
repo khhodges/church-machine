@@ -54,6 +54,17 @@ IDE showed ready while the PowerShell bridge lacked authentication.
 authentication and distinguish stored input from verified connection status.
 Do not silently expand a hardware walkthrough into implementing this refinement.
 
+When the user explicitly requests fixing the walkthrough, repair the current
+blocking step into simple user-operated actions rather than only explaining
+the workaround.
+
+**Why:** The user requested "the walk through to fix each step as a simple
+understandable actions - fix it now" at the duplicated bridge-token step.
+
+**How to apply:** This authorizes fixing that connection workflow, not operating
+the FPGA for the user or changing saved Namespace/code selections. Keep the
+next instruction focused on the repaired step.
+
 The agreed target workflow is: programmers compile and approve LUMPs; engineers
 compile configurations for simulation and approve Namespaces; testers create
 and approve bitstreams. These role names supersede the older Builder/system
