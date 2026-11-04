@@ -86,7 +86,7 @@ export default function KISS() {
           <div className="kiss-table-scroll" tabIndex={0} role="region" aria-label={`${namespace} saved slot table`}>
             <table>
               <thead><tr><th scope="col">Slot</th><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Policy</th><th scope="col">Rev.</th></tr></thead>
-              <tbody>{sorted.map(row => {
+              <tbody>{[...sorted].reverse().map(row => {
                 const kind = row.kind ?? (row.filename ? "lump" : row.name.includes("DEV") ? "mmio" : row.name.includes("Thread") ? "thread" : "namespace");
                 const policy = row.policy ?? row.load_policy ?? (kind === "mmio" ? "Hardware" : "—");
                 return <tr key={row.slot} className={selectedSlot === row.slot ? "kiss-active" : undefined}>
