@@ -32,6 +32,16 @@ not ready” when references cannot bind. Never infer resource provisioning from
 declared name, substitute newer artifacts, or activate a runtime/hardware image.
 Binding checks passing still requires separate simulation preparation.
 
+The development-image page must consume the bindings already created by Bind
+Namespace, not bind again on page open or selection.
+
+**Why:** The user corrected the proposed automatic-bind-on-open flow: binding
+belongs to the Namespace page's explicit button, not a downstream image view.
+
+**How to apply:** Distinguish assembling or inspecting an image from creating
+bindings. Reuse exact saved binding results; report missing or stale bindings
+and direct the user to Bind Namespace rather than silently recreating them.
+
 The Namespace toolbar also needs an on-demand list of unfinished abstractions
 and missing resources, immediately ahead of Add.
 
