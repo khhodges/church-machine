@@ -104,6 +104,8 @@
 .kiss-workbench .kiss-slot-assigned { color:#dce6f1; background:#33475d; border-color:#536b85; }
 .kiss-workbench .kiss-slot-unfinished { color:#f2d279; background:#514324; border-color:#8c7134; }
 .kiss-workbench .kiss-slot-selected { outline:2px solid var(--kiss-yellow); outline-offset:1px; color:#fff; }
+.kiss-workbench .kiss-slot-cell[style*="--kiss-lump-color"] { background:color-mix(in srgb,var(--kiss-lump-color) 46%,#17202d); border-color:var(--kiss-lump-color); }
+.kiss-workbench .kiss-slot-cell.kiss-slot-selected[style*="--kiss-lump-color"] { background:color-mix(in srgb,var(--kiss-lump-color) 68%,#243347); }
 .kiss-workbench .kiss-map-legend { display:flex; flex-wrap:wrap; gap:12px; margin:8px 0 0; color:var(--kiss-muted); font-size:10px; }
 .kiss-workbench .kiss-map-legend span { display:flex; align-items:center; gap:5px; }
 .kiss-workbench .kiss-map-legend i { display:inline-block; width:9px; height:9px; border:1px solid #536b85; background:#33475d; border-radius:2px; }
@@ -118,6 +120,31 @@
 .kiss-workbench .kiss-physical-map ul { color:var(--kiss-muted); font:10px/1.6 Consolas,monospace; padding-left:18px; }
 .kiss-workbench .kiss-physical-map .kiss-physical-caption { color:#e0bd62; }
 .kiss-workbench .kiss-review-foot { border-top:1px solid var(--kiss-line); padding:10px 16px; color:var(--kiss-muted); font-size:11px; }
+.kiss-workbench .kiss-water-map { padding:15px 16px 14px; border-top:1px solid var(--kiss-line); background:#101a27; }
+.kiss-workbench .kiss-water-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.kiss-workbench .kiss-water-heading > div { display:flex; align-items:center; gap:8px; min-width:0; }
+.kiss-workbench .kiss-water-heading .kiss-step { margin:0; }
+.kiss-workbench .kiss-water-heading h4 { margin:0; color:var(--kiss-text); font-size:13px; font-weight:600; }
+.kiss-workbench .kiss-water-caveat { color:#e5c773; font:10px Consolas,monospace; text-transform:uppercase; white-space:nowrap; }
+.kiss-workbench .kiss-water-intro { color:var(--kiss-muted); font-size:11px; margin-top:5px; }
+.kiss-workbench .kiss-water-svg { display:block; width:100%; height:auto; margin-top:8px; overflow:visible; }
+.kiss-workbench .kiss-water-layer { cursor:pointer; }
+.kiss-workbench .kiss-water-layer rect { transition:fill-opacity .18s ease,stroke-width .18s ease; }
+.kiss-workbench .kiss-water-layer:hover rect,.kiss-workbench .kiss-water-layer:focus rect { fill-opacity:.86; stroke:#f4e6b9; stroke-width:2; }
+.kiss-workbench .kiss-water-layer:focus { outline:none; }
+.kiss-workbench .kiss-water-layer.is-selected rect { stroke:#fff0bd; stroke-width:2.5; fill-opacity:.78; }
+.kiss-workbench .kiss-water-name { fill:#f5f6eb; font:600 14px Consolas,monospace; pointer-events:none; }
+.kiss-workbench .kiss-water-slot { fill:#f5f6eb; font:600 11px Consolas,monospace; pointer-events:none; }
+.kiss-workbench .kiss-namespace-label { fill:#e6c66c; font:600 12px Consolas,monospace; letter-spacing:.08em; }
+.kiss-workbench .kiss-water-ns-slot { cursor:pointer; }
+.kiss-workbench .kiss-water-ns-slot rect { transition:stroke-width .18s ease,fill-opacity .18s ease; }
+.kiss-workbench .kiss-water-ns-slot:hover rect,.kiss-workbench .kiss-water-ns-slot:focus rect { stroke:#fff0bd; stroke-width:2; fill-opacity:.9; }
+.kiss-workbench .kiss-water-ns-slot:focus { outline:none; }
+.kiss-workbench .kiss-water-ns-slot.is-selected rect { stroke:#fff0bd; stroke-width:2.5; }
+.kiss-workbench .kiss-water-slot-number { fill:#eef3f3; font:600 10px Consolas,monospace; pointer-events:none; }
+.kiss-workbench .kiss-water-legend { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 18px; margin-top:4px; color:var(--kiss-muted); font-size:10px; }
+.kiss-workbench .kiss-water-legend span:first-child { display:flex; align-items:center; gap:6px; }
+.kiss-workbench .kiss-water-swatch { display:inline-block; width:11px; height:11px; border-radius:3px; background:#73d7c0; border:1px solid #a2f0df; }
 .kiss-workbench summary { cursor: pointer; color: var(--kiss-muted); font-size: 12px; }
 .kiss-workbench pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 Consolas, monospace; color: #b3c4d8; margin: 12px 0 0; max-height: 300px; overflow: auto; }
 .kiss-workbench .kiss-rail { display: grid; gap: 14px; }
@@ -163,4 +190,8 @@
   .kiss-workbench .kiss-binding-flow { flex-direction:column; }
   .kiss-workbench .kiss-binding-flow > i { align-self:flex-start; transform:rotate(90deg); margin:0 0 0 9px; }
   .kiss-workbench .kiss-binding-result { align-items:flex-start; flex-direction:column; gap:4px; }
+  .kiss-workbench .kiss-water-heading { align-items:flex-start; flex-direction:column; gap:4px; }
+  .kiss-workbench .kiss-water-heading > div { align-items:flex-start; flex-direction:column; gap:3px; }
+  .kiss-workbench .kiss-water-name { font-size:12px; }
+  .kiss-workbench .kiss-water-slot { font-size:10px; }
 }
