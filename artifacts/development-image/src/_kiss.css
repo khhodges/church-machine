@@ -190,7 +190,7 @@
 .kiss-workbench .kiss-send-footer > div strong { font-size:14px; }
 .kiss-workbench .kiss-send-footer > div span { color:var(--kiss-muted); font-size:11px; }
 .kiss-workbench .kiss-send-button { min-width:210px; padding:11px 18px; }
-.kiss-workbench .kiss-send-status { grid-column:1 / -1; padding-top:8px; border-top:1px solid var(--kiss-line); color:#efc86c; font-size:12px; }
+.kiss-workbench .kiss-send-status { grid-column:1 / -1; padding:12px; border:1px solid #8c7132; border-radius:4px; color:#efc86c; font-size:14px; overflow-wrap:anywhere; }
 .kiss-workbench dialog { width: min(440px, calc(100% - 32px)); color: var(--kiss-text); background: #192435; border: 1px solid #617087; border-radius: 7px; padding: 24px; }
 .kiss-workbench dialog::backdrop { background: #080d17bd; }
 .kiss-workbench dialog h2 { font-size: 19px; margin-bottom: 12px; }

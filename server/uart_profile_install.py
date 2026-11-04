@@ -75,10 +75,13 @@ def register(app, backend):
         if not isinstance(data, dict) or data.get("profile") != PROFILE:
             raise ValueError("Select the explicit Amoeba retry UART profile.")
         revision = data.get("namespace_revision_id")
-        if not isinstance(revision, str) or not re.fullmatch("[0-9a-f]{64}", revision):
+        if not isinstance(revision, str) or not re.fullmatch("(?:design:)?[0-9a-f]{64}", revision):
             raise ValueError("Select an exact approved hardware Namespace revision.")
         if any(key in data for key in ("data", "source_image_base64", "installation", "path")):
             raise ValueError("Browser-supplied image bytes or installation evidence are not accepted.")
+        if revision.startswith("design:"):
+            from server.development_image_prepare import build_saved_design
+            return build_saved_design(backend, revision)
         raw, _config = backend._approved_namespace_upload_source(revision)
         prepared = prepare_image(raw)
         prepared["namespace_revision_id"] = revision

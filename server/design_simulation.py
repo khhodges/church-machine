@@ -104,7 +104,7 @@ def api_only(raw):
     return struct.pack(f">{size}I", *out)
 
 
-def stage(cfg, document, directory, entry_slot):
+def stage(cfg, document, directory, entry_slot, *, saved_bound_bodies=None):
     from server import boot_image
     source_bindings = bindings(document, directory)
     # Linkers may attach diagnostics to their binding objects. Keep a separate
@@ -131,7 +131,13 @@ def stage(cfg, document, directory, entry_slot):
         if hashlib.sha256(raw).hexdigest() != binding["binaryHash"]:
             raise ValueError("Selected artifact changed during preparation; retry.")
         # No new linker authority: use only authenticated existing contracts.
-        if "portableBinding" in binding:
+        if saved_bound_bodies is not None:
+            # Hardware preparation consumes verified saved derivatives only.
+            # It must never invoke either linker or SELF materialization.
+            if binding["slot"] not in saved_bound_bodies:
+                raise ValueError(f"NS[{binding['slot']}]: saved bound bytes are unavailable.")
+            raw = saved_bound_bodies[binding["slot"]]
+        elif "portableBinding" in binding:
             raw, _ = _localize_portable(
                 raw, runtime_binding, copy.deepcopy(binding_rows),
                 copy.deepcopy(source_bindings), directory)

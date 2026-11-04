@@ -105,6 +105,41 @@ def test_exact_bytes_queue_without_projection_and_no_automatic_recovery(setup):
     assert backend._wukong_pending_cmd is command
 
 
+@pytest.mark.parametrize("failure", [None, "digest", "installation", "stop", "consent", "changed"])
+def test_saved_design_send_keeps_all_hardware_gates(setup, monkeypatch, failure):
+    client, backend, raw, _, path = setup
+    revision = "design:" + "c" * 64
+    calls = []
+    def assemble(actual_backend, identifier):
+        assert actual_backend is backend and identifier == revision
+        calls.append(identifier)
+        if failure == "changed":
+            raise ValueError("Saved Namespace changed")
+        return raw, dict(loader.prepare_image(raw), namespace_revision_id=revision,
+                         source_kind="saved-binding-image", hardware_certified=False)
+    monkeypatch.setattr("server.development_image_prepare.build_saved_design", assemble)
+    data = dict(payload(raw), namespace_revision_id=revision)
+    if failure == "digest":
+        data["artifact_sha256"] = "0" * 64
+    elif failure == "installation":
+        path.unlink()
+    elif failure == "stop":
+        backend._wukong_cmd_delivery = {}
+    elif failure == "consent":
+        data["confirm_runtime_memory_replacement"] = False
+    response = client.post("/api/namespace-image/uart-install", json=data)
+    assert calls == [revision]
+    if failure:
+        assert response.status_code == 409
+        assert backend._wukong_pending_cmd is None
+        assert not backend._upload_in_flight
+    else:
+        assert response.status_code == 200
+        assert base64.b64decode(backend._wukong_pending_cmd["data"]) == raw
+        assert response.json["namespace_revision_id"] == revision
+        assert response.json["hardware_certified"] is False
+
+
 @pytest.mark.parametrize("field,value", [
     ("bitstream_sha256", "b" * 64), ("profile", "legacy"),
     ("device_uid", "other"), ("bridge_session", "old"),

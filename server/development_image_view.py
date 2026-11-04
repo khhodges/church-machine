@@ -200,6 +200,23 @@ def register(app, backend):
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    @app.post("/api/development-image/prepare")
+    def development_image_prepare():
+        # Offline, memory-only assembly. No queue or persisted artifact is written.
+        from server.development_image_prepare import build_saved_design
+        data = request.get_json(silent=True)
+        try:
+            if not isinstance(data, dict) or set(data) != {"id"} or not re.fullmatch(
+                    r"design:[0-9a-f]{64}", str(data.get("id", ""))):
+                raise ValueError("Select an exact saved Namespace design.")
+            _raw, prepared = build_saved_design(backend, data["id"])
+            response = jsonify(prepared)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            response = jsonify(ok=False, error=str(error), dataChanged=False, queued=False)
+            response.status_code = 409
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.get("/development-image/")
     @app.get("/development-image/<path:asset>")
     def development_image_static(asset="index.html"):

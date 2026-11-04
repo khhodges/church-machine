@@ -37,7 +37,7 @@
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Hardware profiles and release evidence](hardware-release-index.md) — resource abstraction, activation proof, internal probes, builds and release provenance.
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
-- [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org
+- [Deployment and serving](deployment-index.md) — primary routing, relay hosting, packaged assets, and serving-process verification.
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
 - [Freespace validation zone per typ](freespace-validation-zone-per-typ.md) — freespace scans must branch on lump typ: Thread uses the collision zone, Namespace skips; generic cw/cc bounds reject valid Threads
@@ -48,7 +48,6 @@
 - [boot_resident manifest-only](boot-resident-manifest-only.md) — generator reads boot_resident from manifest.json only; sidecar-only flag = NS descriptor with zero-filled body
 - [Namespace reissue generation](boot-entry-generation-minting.md) — every GT minted for a reused slot must inherit the live/retained Word-1 sequence
 - [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config
-- [Release candidate completeness](release-candidate-completeness.md) — test the configured build and served assets; a Git archive or passing API smoke test can still omit runtime files.
 - [Latched multi-cycle hardware inputs](latched-multicycle-hardware-inputs.md) — capture operands, control-flow state, and security decisions at acceptance; never consume live inputs later
 - [SelfTest caller-return flow](selftest-next-lightningbolt.md) — no Next capability; CapabilityTest calls SelfTest and WukongCallHome, with CHANGE to Thread.2 each iteration.
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
@@ -57,7 +56,6 @@
 - [Fault telemetry constraints](fault-telemetry-index.md) — startup/stop proof, command correlation, UART ownership, retained incidents, and recovery boundaries.
 - [Fault recovery boot precedence](fault-boot-selftest-order.md) — boot wins after faults; three Boot steps enter the prepared lightning-bolt target, not an implicit SelfTest
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only
-- [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
 - [Top-security passkey credentials](top-security-passkeys.md) — protected-object access requires an object-scoped GT plus a 128-bit proof; never treat the GT alone as a secret
 - [Bank custody zeroization](bank-custody-zeroization.md) — wipe private lockbox storage before reuse; never expose backing records as ordinary Namespace memory
 - [Bank recovery grants](bank-recovery-grants.md) — restart recovery needs server-authorized proof-free custody envelopes and a distinct NS generation
@@ -130,8 +128,6 @@
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
-- [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
-- [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
 - [Namespace handoff authority](namespace-handoff-evidence.md) — no hidden caches; entry GT version 0; faulting CR identifies software blacklisting; hardware never changes versions.
 - [Ascending-v1 candidate boundary](ascending-v1-candidate-boundary.md) — profile approval is separate from Header V2 approval and never authorizes installation, activation, or hardware programming.
 - [Authenticated compact API admission](authenticated-compact-api-admission.md) — expand embedded rows from exact bytes; recover source PetNames only from matching signed compiler rows.
@@ -157,3 +153,4 @@
 - [Readable Mint calls](mint-readable-call-approval.md) — bounded compiler implementation authorized; saved artifacts, live bindings and hardware remain outside approval.
 - [Hardware progress watch](hardware-progress-watch.md) — programmable GT + offset monitoring of the stash counter across free-run and fault recovery.
 - [FreeHandler template review](freehandler-template-review.md) — review C-list and Thread templates on prepared inventory; Namespace remains an IDE function.
+- [Development Image preparation](development-image-preparation.md) — approved complete-image assembly from saved bindings, without rebinding or automatic transfer; hardware checks remain separate.

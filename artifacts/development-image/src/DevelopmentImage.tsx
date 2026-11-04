@@ -117,15 +117,26 @@ export default function DevelopmentImage() {
 
   async function beginSend() {
     if (busy.current || !input) return;
-    if (!input.image) { setSendStatus(`Not sent — ${input.hardwareError}`); return; }
     busy.current = true; setSending(true); setSendStatus("");
     try {
+      let image = input.image;
+      if (!image && input.id.startsWith("design:")) {
+        setSendStatus("Preparing the complete image from saved binding snapshots. No rebinding or transfer.");
+        image = await request<PreparedImage>("/api/development-image/prepare", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({id: input.id}),
+        });
+        if (image.namespace_revision_id !== input.id)
+          throw Error("Prepared Namespace identity changed. Nothing was sent.");
+      }
+      if (!image) throw Error(input.hardwareError || "No image is available for this selection.");
+      setSendStatus("Image prepared. Checking the connected FPGA; nothing has been sent.");
       const board = await request<BoardStatus>("/hardware/wukong/status");
       const target = board.physical_target;
       if (!target?.live || !target.device_uid || !target.session_id)
         throw Error("No live, identified FPGA is connected. Connect the existing bridge and retry. Nothing was sent.");
-      setConfirmation({image: input.image, target});
-    } catch (cause) { setSendStatus((cause as Error).message); }
+      setConfirmation({image, target});
+    } catch (cause) { setSendStatus("Not sent — " + (cause as Error).message); }
     finally { busy.current = false; setSending(false); }
   }
 
@@ -135,7 +146,7 @@ export default function DevelopmentImage() {
     const frozen = confirmation;
     try {
       if (!token.trim()) throw Error("IDE hardware authorization is required. Enter the existing IDE access token; nothing was sent.");
-      setSendStatus("Validating the exact retained image. No rebinding.");
+      setSendStatus("Rechecking the exact prepared image. No rebinding.");
       const prepared = await prepareExact(frozen.image, token.trim());
       setSendStatus("Submitting the confirmed image. Do not retry while its delivery is unknown.");
       const result = await installExact(prepared, frozen.target, token.trim());
@@ -150,7 +161,7 @@ export default function DevelopmentImage() {
     <main className="kiss-workbench">
       <header className="kiss-top">
         <div className="kiss-brand"><span className="kiss-mark" aria-hidden="true">λ</span> CHURCH MACHINE <span className="kiss-muted">/ IDE</span><IdeMenu /></div>
-        <p className="kiss-preview">{input?.image ? "Bound Namespace — FPGA transfer available" : "Saved Namespace — FPGA transfer unavailable"}</p>
+        <p className="kiss-preview">{input?.image ? "Bound Namespace — image ready" : input?.layoutSource === "saved-design-layout" ? "Saved Namespace — image prepared on Send" : "Saved Namespace — FPGA image unavailable"}</p>
       </header>
 
       <div className="kiss-heading">
@@ -326,7 +337,9 @@ export default function DevelopmentImage() {
             <p>Saved identity: {input?.fingerprint ?? "Unavailable"}</p>
             {input?.capacitySource === "reference" && <p>Total capacity was not recorded. The glass uses a labelled 16,384-word reference scale.</p>}
             {input?.imageSha256 && <p>Retained binary: {input.imageSha256} · {input.imageBytes} bytes</p>}
-            {input?.hardwareError && <p>Not ready to send: {input.hardwareError}</p>}
+            {input?.hardwareError && <p>{input.layoutSource === "saved-design-layout"
+              ? "Send assembles a complete image from the exact saved binding snapshots, then checks FPGA compatibility. It does not rebind."
+              : `Not ready to send: ${input.hardwareError}`}</p>}
             <p><a href="/simulator/#namespace">Open Namespace editor</a></p>
             {input?.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
           </details>
@@ -336,7 +349,7 @@ export default function DevelopmentImage() {
       <footer className="kiss-send-footer">
         <div><strong>Send the bound build to FPGA</strong><span>Uses the existing Namespace binding; no rebind.</span></div>
         <button type="button" className="kiss-primary kiss-send-button" disabled={loading || !input || sending || !!receipt} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
-        {sendStatus && <p className="kiss-send-status" role="status">{sendStatus}{receipt && <> <a href="/fpga" target="_blank" rel="noreferrer">View FPGA delivery status</a></>}</p>}
+        {sendStatus && <p className="kiss-send-status" role="status" aria-live="polite">{sendStatus}{receipt && <> <a href="/fpga" target="_blank" rel="noreferrer">View FPGA delivery status</a></>}</p>}
       </footer>
       <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This view leaves every saved input untouched.</span><span>FPGA transfer only on request</span></p>
       <dialog className="kiss-send-dialog" ref={confirmationDialog} onCancel={event => {event.preventDefault(); if (!sending) setConfirmation(null);}}>
