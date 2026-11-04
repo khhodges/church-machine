@@ -56,9 +56,33 @@ export default function KISS() {
       </header>
 
       <div className="kiss-heading">
-        <div><h1>Development image</h1><p className="kiss-subtitle">Select a Namespace. Prepare its runtime image. Review before loading.</p></div>
+        <div><h1>Development image</h1><p className="kiss-subtitle">Opening a saved Namespace should bind its exact artifacts into an image automatically.</p></div>
         <span className="kiss-local">LOCAL UI SIMULATION</span>
       </div>
+
+      <section className="kiss-binding" aria-labelledby="kiss-binding-title">
+        <div className="kiss-binding-head">
+          <div><span className="kiss-step">ON OPEN</span><h2 id="kiss-binding-title">Automatic image binding</h2></div>
+          <span className="kiss-binding-badge">{isNew ? "BLOCKED · PRIOR PROBE" : "NOT VERIFIED IN PREVIEW"}</span>
+        </div>
+        <p className="kiss-binding-intro">The intended page behavior is to resolve this Namespace’s pinned LUMPs and bind them before offering FPGA load.</p>
+        <div className="kiss-binding-flow" aria-label="Image binding stages">
+          <div><span>01</span><strong>Saved Namespace</strong><small>{slots.length} logical rows</small></div>
+          <i aria-hidden="true">→</i>
+          <div><span>02</span><strong>Resolve artifacts</strong><small>{codeSelections.length - unselectedCode.length} selected · {unselectedCode.length} missing</small></div>
+          <i aria-hidden="true">→</i>
+          <div><span>03</span><strong>Bind binary image</strong><small>Validate loader format</small></div>
+          <i aria-hidden="true">→</i>
+          <div><span>04</span><strong>FPGA transfer</strong><small>Only after validation</small></div>
+        </div>
+        <div className={`kiss-binding-result${isNew ? " kiss-binding-failed" : ""}`} role="status">
+          <strong>{isNew ? "Latest known result: projection rejected" : "No conversion result recorded for this Namespace"}</strong>
+          <span>{isNew
+            ? "A prior probe produced a 65,536-byte simulator image, but Wukong projection rejected it: missing Namespace Header V2 marker. It was not sent to the FPGA."
+            : "This design preview cannot run the binder. No binary is claimed to be bound or ready for transfer."}</span>
+        </div>
+        <p className="kiss-binding-foot">Design preview only · this panel does not run conversion, change saved inputs, or contact hardware.</p>
+      </section>
 
       <div className="kiss-layout">
         <section className="kiss-panel" aria-labelledby="kiss-namespace-title">
