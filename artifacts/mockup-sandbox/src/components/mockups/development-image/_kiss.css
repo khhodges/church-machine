@@ -134,8 +134,15 @@
 .kiss-workbench .kiss-water-caveat { color:#e5c773; font:10px Consolas,monospace; text-transform:uppercase; white-space:nowrap; }
 .kiss-workbench .kiss-water-intro { color:var(--kiss-muted); font-size:11px; margin-top:5px; }
 .kiss-workbench .kiss-water-svg { display:block; width:100%; height:auto; margin-top:8px; overflow:visible; }
-.kiss-workbench .kiss-glass-layout { display:grid; grid-template-columns:minmax(0,1fr); align-items:stretch; gap:10px; margin-top:12px; }
+.kiss-workbench .kiss-glass-layout { display:grid; grid-template-columns:minmax(0,1fr) 138px; align-items:stretch; gap:10px; margin-top:12px; }
 .kiss-workbench .kiss-glass-figure { display:flex; flex-direction:column; align-items:center; min-width:0; padding:14px 10px 10px; background:#0d1621; border:1px solid #304153; border-radius:5px; }
+.kiss-workbench .kiss-device-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-width:0; padding:12px 8px; border:1px solid #3a4b5e; border-radius:5px; background:#121e2c; text-align:center; animation:kiss-device-in .18s ease-out both; }
+.kiss-workbench .kiss-device-kicker { color:#e3c86f; font:9px Consolas,monospace; letter-spacing:.08em; }
+.kiss-workbench .kiss-device-icon { width:min(100%,112px); height:auto; }
+.kiss-workbench .kiss-device-card strong { color:#edf1f4; font:600 12px Consolas,monospace; overflow-wrap:anywhere; }
+.kiss-workbench .kiss-device-type,.kiss-workbench .kiss-device-location { color:#aabaca; font-size:10px; line-height:1.45; overflow-wrap:anywhere; }
+.kiss-workbench .kiss-device-location { font-family:Consolas,monospace; }
+@keyframes kiss-device-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 .kiss-workbench .kiss-glass-capacity,.kiss-workbench .kiss-glass-zero { color:#b4c4d1; font:10px Consolas,monospace; letter-spacing:.04em; }
 .kiss-workbench .kiss-glass-zero { color:#dfc577; }
 .kiss-workbench .kiss-water-svg { display:block; width:min(100%,260px); height:auto; margin:3px auto 0; overflow:visible; }
@@ -189,7 +196,7 @@
 .kiss-workbench dialog p { color: #becbdd; margin-bottom: 17px; }
 .kiss-workbench .kiss-modal-actions { display: flex; justify-content: end; gap: 10px; margin-top: 22px; }
 @media (min-width: 1450px) { .kiss-workbench { padding-left: max(28px, calc((100vw - 1420px) / 2)); padding-right: max(28px, calc((100vw - 1420px) / 2)); } }
-@media (max-width: 1100px) { .kiss-workbench .kiss-glass-layout { grid-template-columns:minmax(0,1fr); } .kiss-workbench .kiss-glass-figure { max-width:360px; width:100%; justify-self:center; } }
+@media (max-width: 1100px) { .kiss-workbench .kiss-glass-layout { grid-template-columns:minmax(0,1fr); } .kiss-workbench .kiss-device-card { width:100%; max-width:360px; justify-self:center; } .kiss-workbench .kiss-device-icon { width:82px; } .kiss-workbench .kiss-glass-figure { max-width:360px; width:100%; justify-self:center; } }
 @media (max-width: 1000px) { .kiss-workbench { padding: 0 18px 20px; } .kiss-workbench .kiss-layout { grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; } .kiss-workbench td, .kiss-workbench th { padding-right: 7px; padding-left: 7px; } }
 @media (max-width: 767px) {
   .kiss-workbench { padding: 0 14px 20px; }

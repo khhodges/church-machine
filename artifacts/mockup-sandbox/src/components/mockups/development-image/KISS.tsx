@@ -23,6 +23,8 @@ export default function KISS() {
   const slots: Slot[] = ("rows" in input ? input.rows : input.abstractions);
   const sorted = [...slots].sort((a, b) => a.slot - b.slot);
   const selected = slots.find(row => row.slot === selectedSlot);
+  const selectedKind = selected?.kind ?? (selected?.filename ? "lump" : selected?.name.includes("DEV") ? "mmio" : selected?.name.includes("Thread") ? "thread" : "namespace");
+  const selectedIsMmio = selectedKind === "mmio";
   const missing = slots.filter(row => row.kind === "lump" && !row.selection);
   const isNew = namespace === "New Layout";
   const capacity = "capacityWords" in input ? input.capacityWords : undefined;
@@ -161,6 +163,35 @@ export default function KISS() {
                     </svg>
                     <div className="kiss-glass-zero">{locatedEntries.length} saved locations shown</div>
                   </div>
+                  {selectedIsMmio && selected && <aside className="kiss-device-card" aria-label={`${selected.name} device illustration`}>
+                    <span className="kiss-device-kicker">SELECTED MMIO</span>
+                    <svg className="kiss-device-icon" viewBox="0 0 120 120" role="img" aria-labelledby="kiss-device-title">
+                      <title id="kiss-device-title">{selected.name.replace(/_DEV$/, "").replaceAll("_", " ").toLowerCase()} device</title>
+                      <circle cx="60" cy="60" r="48" fill="#172636" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="2" />
+                      {selected.name.startsWith("LED") ? <>
+                        <path d="M45 63a15 15 0 1 1 30 0c0 6-4 9-6 13H51c-2-4-6-7-6-13Z" fill="#f1cf73" stroke="#fff0b1" strokeWidth="2" />
+                        <path d="M52 80h16m-14 5h12m-9 5h6M60 27v-8m24 18 6-6M36 37l-6-6m30 65v7" fill="none" stroke="#f1cf73" strokeWidth="3" strokeLinecap="round" />
+                      </> : selected.name.startsWith("BTN") ? <>
+                        <path d="M35 72h50v15H35z" fill="#3b5268" stroke="#9db4c8" strokeWidth="2" />
+                        <rect x="43" y="43" width="34" height="29" rx="8" fill="#e7a6a0" stroke="#ffe2dd" strokeWidth="2" />
+                        <path d="M49 50h22" stroke="#fff1ee" strokeWidth="3" strokeLinecap="round" />
+                      </> : selected.name.startsWith("TIMER") ? <>
+                        <circle cx="60" cy="61" r="27" fill="#1d3040" stroke="#e9c46a" strokeWidth="3" />
+                        <path d="M60 43v19l13 8M52 25h16M60 25v8" fill="none" stroke="#f2d279" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="60" cy="61" r="3" fill="#f2d279" />
+                      </> : selected.name.startsWith("UART") ? <>
+                        <rect x="36" y="39" width="48" height="42" rx="5" fill="#24394a" stroke="#91d8d0" strokeWidth="2" />
+                        <path d="M45 52h10m10 0h10M45 66h10m10 0h10M45 81v8m10-8v8m10-8v8m10-8v8" fill="none" stroke="#91d8d0" strokeWidth="3" strokeLinecap="round" />
+                        <path d="M55 53l10 6-10 6" fill="none" stroke="#f1cf73" strokeWidth="2" />
+                      </> : <>
+                        <rect x="39" y="39" width="42" height="42" rx="6" fill="#25394b" stroke="#e9c46a" strokeWidth="2" />
+                        <path d="M51 51h18v18H51zM30 48h9m-9 12h9m-9 12h9m42-24h9m-9 12h9m-9 12h9M48 30v9m12-9v9m12-9v9m-24 42v9m12-9v9m12-9v9" fill="none" stroke="#e9c46a" strokeWidth="2" strokeLinecap="round" />
+                      </>}
+                    </svg>
+                    <strong>{selected.name.replace(/_DEV$/, "").replaceAll("_", " ")}</strong>
+                    <span className="kiss-device-type">{selected.name.startsWith("LED") ? "Indicator output" : selected.name.startsWith("BTN") ? "Button input" : selected.name.startsWith("TIMER") ? "Timer peripheral" : selected.name.startsWith("UART") ? "Serial interface" : "Memory-mapped device"}</span>
+                    <span className="kiss-device-location">Address {selected.location ?? "not recorded"}</span>
+                  </aside>}
                 </div>
                 <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
           </section>
