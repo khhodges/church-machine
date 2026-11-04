@@ -24,6 +24,16 @@ report the actual failure stage, and preserve the selected code. Do not demand
 functional completeness first. A disconnected physical target still prevents
 transfer; do not fabricate connectivity or bypass target-identity checks.
 
+The requested development-image reload test is on the real FPGA, not a
+simulation substitute.
+
+**Why:** The user explicitly repeated this target after objecting to assumed
+simulation work.
+
+**How to apply:** Use physical upload and execution evidence for this test.
+Offline preparation is not a reload attempt or physical success. If the bridge
+is disconnected, report that concrete limitation without redirecting to simulation.
+
 The agreed target workflow is: programmers compile and approve LUMPs; engineers
 compile configurations for simulation and approve Namespaces; testers create
 and approve bitstreams. These role names supersede the older Builder/system
