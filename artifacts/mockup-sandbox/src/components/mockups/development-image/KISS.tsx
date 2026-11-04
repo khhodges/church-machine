@@ -129,9 +129,9 @@ export default function KISS() {
                           const kind = row.kind ?? (row.filename ? "lump" : row.name.startsWith("Boot.") ? "boot" : row.name.includes("Thread") ? "thread" : "entry");
                           return <g key={row.slot} role="button" tabIndex={0} aria-label={`Select ${row.name}, ${kind}, slot ${row.slot}, location ${row.location}${words === undefined ? ", extent unknown" : `, extent ${words} words`}`} aria-pressed={active} onClick={() => setSelectedSlot(row.slot)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedSlot(row.slot); } }} className={`kiss-region${active ? " is-selected" : ""}`} style={{ "--kiss-lump-color": color } as CSSProperties}>
                             {hasExtent ? <>
-                              <rect x="60" y={y} width="120" height={extentHeight} rx="2" />
-                              {extentHeight >= 14 && <text x="120" y={y + Math.min(extentHeight - 3, 12)} textAnchor="middle">{row.name}</text>}
-                            </> : <line x1="113" x2="127" y1={markerY} y2={markerY} stroke={colors[index % colors.length]} strokeWidth="3" strokeLinecap="round" />}
+                              <rect x="60" y={y} width="120" height={extentHeight} rx="2" style={{ opacity: active ? 1 : 0.2 }} />
+                              {extentHeight >= 14 && <text x="120" y={y + Math.min(extentHeight - 3, 12)} textAnchor="middle" style={{ opacity: active ? 1 : 0.24 }}>{row.name}</text>}
+                            </> : <line x1="113" x2="127" y1={markerY} y2={markerY} stroke={colors[index % colors.length]} strokeWidth={active ? 4 : 3} strokeLinecap="round" style={{ opacity: active ? 1 : 0.2 }} />}
                           </g>;
                         })}
                       </g>
