@@ -5,9 +5,19 @@ description: Independent LUMP, simulation Namespace, and bitstream deliverables 
 The page currently labelled Build Approval is functionally **Next Bitstream
 Prep**. Build Approval belongs after testing on the physical FPGA, not to
 pre-build input freezing or readiness checks.
-Its sole scope is to convert the selected Namespace into inputs for bitstream
-creation and review the conversion result. Connection, FPGA reading/writing,
-installation, testing and final approval are outside this page.
+The user subsequently expanded this page from preparation-only to a complete
+development-image workflow: select a Namespace as defined on Namespace Table,
+prepare a development image, review its slots, load it onto the FPGA and confirm
+the load. This supersedes excluding connection and runtime installation from
+this page. Bitstream reflashing and final FPGA test approval remain separate.
+
+**Why:** After the preparation-only review, the user explicitly requested going
+"one step further" to prepare, load and confirm a development image.
+
+**How to apply:** Preserve exact named Namespace selections and user-operated
+loading. Runtime replacement discards runtime data/progress. Distinguish queued,
+bridge-sent, board-acknowledged and verified image states; never equate an upload
+ACK with full memory readback or successful program execution.
 Display all selected slots and report their situation without treating findings
 as an approval gate or preventing progress merely because inputs are unfinished
 or untested. Attempt conversion and report actual failures honestly; never
