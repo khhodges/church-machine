@@ -12,6 +12,18 @@ replacement to enable code replacement, rather than further audit refinements.
 making unfinished regulator features prerequisites unless a concrete
 dependency is demonstrated. Explain additional refinements before doing them.
 
+Development-image testing is intended to discover failures, including failures
+in the reload mechanism itself. Unfinished Mint is not a reason to defer the
+requested test or substitute a known-good image.
+
+**Why:** The user explicitly corrected treating possible failures as reasons
+not to test: "the purpose of testing is to find things that fail".
+
+**How to apply:** Attempt the authorized path with the exact selected image,
+report the actual failure stage, and preserve the selected code. Do not demand
+functional completeness first. A disconnected physical target still prevents
+transfer; do not fabricate connectivity or bypass target-identity checks.
+
 The agreed target workflow is: programmers compile and approve LUMPs; engineers
 compile configurations for simulation and approve Namespaces; testers create
 and approve bitstreams. These role names supersede the older Builder/system
