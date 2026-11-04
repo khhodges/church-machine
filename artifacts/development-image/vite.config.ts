@@ -70,6 +70,7 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: true,
     proxy: {
+      '^/$': { target: 'http://127.0.0.1:5000', changeOrigin: false },
       '/api': { target: 'http://127.0.0.1:5000', changeOrigin: false },
       '/hardware': { target: 'http://127.0.0.1:5000', changeOrigin: false },
       '/simulator': { target: 'http://127.0.0.1:5000', changeOrigin: false },

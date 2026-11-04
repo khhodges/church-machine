@@ -1,6 +1,7 @@
 import "./_group.css";
 import "./_kiss.css";
 import { useEffect, useRef, useState } from "react";
+import IdeMenu from "./IdeMenu";
 import type { CSSProperties } from "react";
 import {request, prepareExact, installExact, receiptState} from "./image-api";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
@@ -148,7 +149,7 @@ export default function DevelopmentImage() {
   return (
     <main className="kiss-workbench">
       <header className="kiss-top">
-        <div className="kiss-brand"><span className="kiss-mark" aria-hidden="true">λ</span> CHURCH MACHINE <span className="kiss-muted">/ IDE</span></div>
+        <div className="kiss-brand"><span className="kiss-mark" aria-hidden="true">λ</span> CHURCH MACHINE <span className="kiss-muted">/ IDE</span><IdeMenu /></div>
         <p className="kiss-preview">{input?.image ? "Bound Namespace — FPGA transfer available" : "Saved Namespace — FPGA transfer unavailable"}</p>
       </header>
 

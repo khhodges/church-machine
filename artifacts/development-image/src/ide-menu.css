@@ -1,0 +1,14 @@
+.kiss-workbench .kiss-ide-menu { position: relative; display: flex; align-items: center; }
+.kiss-workbench .kiss-ide-menu-button { display: grid; place-items: center; width: 32px; height: 32px; padding: 5px; color: var(--kiss-yellow); background: transparent; border: 1px solid var(--kiss-line); }
+.kiss-workbench .kiss-ide-menu-button:hover,
+.kiss-workbench .kiss-ide-menu-button[aria-expanded="true"] { background: #243247; border-color: var(--kiss-yellow); }
+.kiss-workbench .kiss-ide-navigation { position: absolute; top: calc(100% + 8px); left: 0; width: 260px; max-height: min(650px, calc(100dvh - 85px)); overflow-y: auto; z-index: 100; padding: 6px 0; background: #151e2c; border: 1px solid #354258; border-radius: 6px; box-shadow: 0 8px 24px #0008; font-weight: 400; letter-spacing: normal; }
+.kiss-workbench .kiss-ide-navigation section + section { border-top: 1px solid var(--kiss-line); }
+.kiss-workbench .kiss-ide-navigation h2 { margin: 0; padding: 10px 14px 4px; color: var(--kiss-muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.kiss-workbench .kiss-ide-navigation a { display: block; padding: 7px 14px; color: var(--kiss-text); font-size: 12px; line-height: 1.4; text-decoration: none; }
+.kiss-workbench .kiss-ide-navigation a:hover,
+.kiss-workbench .kiss-ide-navigation a:focus-visible { background: #29384e; color: var(--kiss-yellow); }
+.kiss-workbench .kiss-ide-navigation a[aria-current="page"] { color: var(--kiss-yellow); }
+@media (max-width: 600px) {
+  .kiss-workbench .kiss-ide-navigation { left: auto; right: 0; width: min(280px, calc(100vw - 28px)); }
+}
