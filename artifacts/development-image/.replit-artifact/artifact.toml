@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/development-image/"
+title = "Church Machine — Development Image"
+description = "Inspect exact saved Namespace bindings and memory allocations, then explicitly send the selected bound runtime image to the FPGA. Separate from the existing IDE."
+version = "1.0.0"
+id = "artifacts/development-image"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/development-image/" ]
+localPort = 22382
+
+[services.development]
+run = "pnpm --filter @workspace/development-image run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/development-image", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/development-image/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22382"
+BASE_PATH = "/development-image/"

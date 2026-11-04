@@ -1,0 +1,3 @@
+html, body, #root { min-height: 100%; margin: 0; background: #101722; }
+* { box-sizing: border-box; }
+button, select, input { font: inherit; }

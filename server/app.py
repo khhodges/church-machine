@@ -25163,6 +25163,8 @@ from server.bridge_pairing import register as _register_bridge_pairing
 _register_bridge_pairing(app, _optional_report_token_check)
 from server.uart_profile_install import register as _register_uart_profile_install
 _register_uart_profile_install(app, sys.modules[__name__])
+from server.development_image_view import register as _register_development_image
+_register_development_image(app, sys.modules[__name__])
 
 
 def _approved_namespace_upload_source(revision_id):
