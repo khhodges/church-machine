@@ -92,6 +92,19 @@ const historical = {
     const draft = {id: 'design:' + 'c'.repeat(64), revision_id: 'c'.repeat(64),
         name: 'New Layout', saved_at: '2026-11-04', approval: 'Not approved',
         testing: 'Not tested', preparation: 'Needs preparation'};
+    const grouped = view._savedRevisionOptions([
+        {...draft, id: 'old', saved_at: '20261006T143256136794Z'},
+        {...draft, id: 'unknown', saved_at: 'not a date'},
+        {...draft, id: 'early', saved_at: '2026-11-04T10:00:00Z'},
+        {...draft, id: 'late', saved_at: '2026-11-04T15:00:00Z', name: '<Latest>'},
+    ]);
+    assert.strictEqual((grouped.match(/<optgroup /g) || []).length, 3);
+    assert(grouped.indexOf('2026-11-04 (UTC)') < grouped.indexOf('2026-10-06 (UTC)'));
+    assert(grouped.indexOf('value="late"') < grouped.indexOf('value="early"'));
+    assert(grouped.indexOf('value="old"') < grouped.indexOf('value="unknown"'));
+    assert(grouped.includes('14:32:56 UTC'));
+    assert(grouped.includes('&lt;Latest&gt;'));
+    assert(grouped.includes('Not tested'));
     context.fetch = async () => ({ok: true, status: 200,
         json: async () => ({revisions: [historical], saved_entries: [draft]})});
     await view._loadRevisions();

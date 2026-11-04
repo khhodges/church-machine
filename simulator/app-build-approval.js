@@ -1025,6 +1025,35 @@ const BuildApprovalView = {
         });
     },
 
+    _savedRevisionOptions(entries) {
+        const groups = new Map();
+        for (const row of entries) {
+            const raw = String(row.saved_at || '');
+            // Historical snapshots use compact UTC timestamps with optional
+            // fractional seconds; current records use ISO dates.
+            const compact = raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d*)Z$/);
+            const normalized = compact
+                ? `${compact[1]}-${compact[2]}-${compact[3]}T${compact[4]}:${compact[5]}:${compact[6]}Z`
+                : raw;
+            const date = normalized ? new Date(normalized) : null;
+            const valid = date && Number.isFinite(date.getTime());
+            const day = valid ? date.toISOString().slice(0, 10) : '';
+            if (!groups.has(day)) groups.set(day, []);
+            groups.get(day).push({row, timestamp: valid ? date.getTime() : 0,
+                time: valid ? date.toISOString().slice(11, 19) + ' UTC' : 'Time unavailable'});
+        }
+        return '<option value="">Select a saved Namespace…</option>' +
+            [...groups.keys()].sort((a, b) => b.localeCompare(a)).map(day => {
+                const options = groups.get(day).sort((a, b) => b.timestamp - a.timestamp);
+                return `<optgroup label="${this._esc(day ? day + ' (UTC)' : 'Date unavailable')}">` +
+                    options.map(({row, time}) =>
+                        `<option value="${this._esc(row.id)}">${this._esc(
+                            [row.name, time, row.revision_id.slice(0, 12),
+                                row.approval, row.testing, row.preparation].join(' · '))}</option>`).join('') +
+                    '</optgroup>';
+            }).join('');
+    },
+
     async _loadRevisions() {
         const token = this._getBuildToken();
         try {
@@ -1058,11 +1087,7 @@ const BuildApprovalView = {
                 const entries = this._savedNamespaceEntries.slice();
                 if (pinned && !entries.some(row => row.id === pinned.id))
                     entries.unshift({...pinned, preparation: 'Saved version changed — select a current entry'});
-                select.innerHTML = '<option value="">Select a saved Namespace…</option>' +
-                    entries.map(row =>
-                        `<option value="${this._esc(row.id)}">${this._esc(
-                            [row.name, row.saved_at || 'Date unavailable', row.revision_id.slice(0, 12),
-                                row.approval, row.testing, row.preparation].join(' · '))}</option>`).join('');
+                select.innerHTML = this._savedRevisionOptions(entries);
                 select.value = pinned ? pinned.id : this._selectedSnapshot
                     ? this._selectedSnapshot.namespace_revision_id : '';
             }
