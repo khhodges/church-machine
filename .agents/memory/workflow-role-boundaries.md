@@ -2,6 +2,18 @@
 name: Workflow role boundaries
 description: Independent LUMP, simulation Namespace, and bitstream deliverables and approval boundaries.
 ---
+The page currently labelled Build Approval is functionally **Next Bitstream
+Prep**. Build Approval belongs after testing on the physical FPGA, not to
+pre-build input freezing or readiness checks.
+
+**Why:** The user explicitly corrected the page's functional role during the
+item-by-item review: "Build Approval is when tested in the FPGA".
+
+**How to apply:** Judge this page's controls by preparation of the next bitstream.
+Do not describe preparation, successful synthesis, or offline checks as FPGA
+approval. This clarification alone is not permission to reorganise the UI
+before the collaborative review.
+
 List every saved Namespace build/version newest first, regardless of approval
 or test outcome. Include saved designs without images as Needs preparation.
 
