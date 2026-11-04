@@ -10,6 +10,11 @@ labels, not visibility filters, during the FPGA reload walkthrough.
 
 **How to apply:** Keep exact selection separate from preparation, approval and
 installation. Never substitute an old approved build or silently adopt new LUMPs.
+Do not interpret “all saved builds” as a request to fill the primary selector
+with every internal simulation checkpoint. The user subsequently called these
+copies clutter and requested only helpful buttons and data. Preserve access to
+history without confusing it with distinct operator choices; missing test
+evidence must not be presented as proof a version was never tested or used.
 
 Keep development-image replacement testing separate from completion of the
 SecurityRegulator audit/proof design.
