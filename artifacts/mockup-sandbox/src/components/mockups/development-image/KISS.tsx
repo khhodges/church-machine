@@ -23,21 +23,11 @@ export default function KISS() {
   const selected = slots.find(row => row.slot === selectedSlot);
   const missing = slots.filter(row => row.kind === "lump" && !row.selection);
   const isNew = namespace === "New Layout";
-  const format = "format" in input ? input.format : "Original saved Namespace format";
   const capacity = "capacityWords" in input ? input.capacityWords : undefined;
-  const slotCapacity = "slotCount" in input ? input.slotCount : undefined;
-  const codeSelections = slots.filter(row => row.kind === "lump");
-  const unselectedCode = codeSelections.filter(row => !row.selection);
-  const unfinished = slots.filter(row => row.name === "ide.Mint");
-  const slotCount = capacity ? slotCapacity ?? slots.length : undefined;
   const lumps = slots
     .filter(row => row.kind === "lump" || Boolean(row.filename))
     .sort((a, b) => a.slot - b.slot);
   const colors = ["#73d7c0", "#9fcb72", "#e9c46a", "#ee9b70", "#e887a5", "#b8a1ee", "#72b8df", "#d4dc7b", "#f1a86c", "#70c8d5", "#d89bcc", "#a8d497", "#e9a5a0", "#9daee8", "#dfc078", "#86d5b4"];
-  const colorForSlot = (slot: number) => {
-    const index = lumps.findIndex(row => row.slot === slot);
-    return index < 0 ? undefined : colors[index % colors.length];
-  };
   const glassCapacity = capacity ?? 16384;
   const glassHeight = 420;
   const glassTop = 42;
@@ -107,42 +97,7 @@ export default function KISS() {
             <p className="kiss-muted">Namespace metadata</p>
             <pre>{JSON.stringify(Object.fromEntries(Object.entries(input).filter(([key]) => key !== "rows" && key !== "abstractions")), null, 2)}</pre>
           </details>
-          <section className="kiss-design-review" aria-labelledby="kiss-design-review-title">
-            <div className="kiss-review-head">
-              <div><span className="kiss-step">REVIEW</span><h3 id="kiss-design-review-title">Binary design &amp; memory layout</h3></div>
-              <span className="kiss-review-note">Observations · not a build gate</span>
-            </div>
-            <div className="kiss-review-grid">
-              <article>
-                <h4>Binary design</h4>
-                <dl>
-                  <dt>Saved format</dt><dd>{format}</dd>
-                  <dt>Code slots</dt><dd>{codeSelections.length} selected rows · {unselectedCode.length} without a selected artifact</dd>
-                  {unfinished.length > 0 && <><dt>Unfinished code</dt><dd>Mint remains in this saved design{unfinished[0].selection ? " with its selected revision retained" : " without a selected artifact"}.</dd></>}
-                  <dt>Conversion</dt><dd>{isNew ? "Prior probe produced a 65,536-byte simulator image; Wukong projection rejected it: missing Namespace Header V2 marker." : "Not converted in this design preview. Image format and loader compatibility need a real conversion result."}</dd>
-                </dl>
-              </article>
-              <article>
-                <h4>Namespace slot map</h4>
-                <dl>
-                  <dt>Address space</dt><dd>{capacity ? `${capacity.toLocaleString()} words` : "Not recorded for this saved layout"}</dd>
-                  <dt>Logical slots</dt><dd>{slotCount ? `${slotCount} slots · ${slots.length} saved rows` : `${slots.length} saved rows · capacity not recorded`}</dd>
-                </dl>
-                {slotCount && <div className="kiss-slot-map" role="img" aria-label={`${slots.length} saved logical slot rows in a ${slotCount}-slot Namespace table; this is not physical word placement`}>
-                 {Array.from({length: slotCount}, (_, slot) => {
-                    const row = slots.find(item => item.slot === slot);
-                    const status = row
-                      ? row.name === "ide.Mint" ? "unfinished" : "assigned"
-                      : "empty";
-                    const label = row ? row.name : "Unassigned";
-                     const color = colorForSlot(slot);
-                     return <span key={slot} className={`kiss-slot-cell kiss-slot-${status}${selectedSlot === slot ? " kiss-slot-selected" : ""}`} style={color ? { "--kiss-lump-color": color } as CSSProperties : undefined} title={`Slot ${slot}: ${label}`} aria-hidden="true">{slot}</span>;
-                  })}
-                </div>}
-                <p className="kiss-map-legend"><span><i className="kiss-legend-assigned" /> Saved row</span><span><i className="kiss-legend-empty" /> Empty</span><span><i className="kiss-legend-unfinished" /> Unfinished</span></p>
-              </article>
-            </div>
-              <section className="kiss-water-map" aria-labelledby="kiss-water-title">
+          <section className="kiss-water-map" aria-labelledby="kiss-water-title">
                 <div className="kiss-water-heading">
                   <div><span className="kiss-step">SAVED LOCATIONS</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
                   <span className="kiss-water-caveat">{locatedLumps.length} mapped LUMPs</span>
@@ -208,8 +163,6 @@ export default function KISS() {
                   </div>
                 </div>
                 <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Select a table row or region to inspect.</span></div>
-              </section>
-            <p className="kiss-review-foot">This review does not edit the Namespace or suppress unfinished entries. Preparation findings remain visible and do not prevent further inspection.</p>
           </section>
         </section>
 
