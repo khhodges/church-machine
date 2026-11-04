@@ -124,3 +124,26 @@ def test_retained_image_requires_hardware_authority(backend):
     assert result["image"] is None
     assert result["imageBytes"] == 65536
     assert result["hardwareError"] == "Simulation is not hardware approval."
+
+
+def test_prepare_load_handoff_selects_exact_saved_profile(backend):
+    from server.namespace_design_v1 import seed, digest
+    folder = Path(backend.NS_STATE_PATH).parent / "design-drafts"
+    folder.mkdir()
+    document = seed({"abstractions": []})
+    raw = json.dumps(document).encode()
+    (folder / "ascending-v1.json").write_bytes(raw)
+    app = Flask(__name__)
+    register(app, backend)
+    client = app.test_client()
+    response = client.get("/api/development-image/open", query_string={
+        "profile": "ascending", "fingerprint": digest(document)})
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/development-image/?namespace=design:" + hashlib.sha256(raw).hexdigest()
+    assert (folder / "ascending-v1.json").read_bytes() == raw
+    stale = client.get("/api/development-image/open?profile=ascending&fingerprint=stale")
+    assert stale.status_code == 409 and stale.json["dataChanged"] is False
+    assert client.get("/api/development-image/open?profile=ascending&design=../../etc").status_code == 409
+    original = client.get("/api/development-image/open?profile=legacy")
+    assert original.status_code == 302
+    assert original.headers["Location"].endswith(original_id(backend))

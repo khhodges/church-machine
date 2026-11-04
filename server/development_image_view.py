@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 
-from flask import jsonify, request, send_from_directory
+from flask import jsonify, request, send_from_directory, redirect
 
 from server.saved_namespace_catalog import catalog, saved_slots
 
@@ -147,6 +147,33 @@ def inspect(backend, identifier):
 
 
 def register(app, backend):
+    @app.get("/api/development-image/open")
+    def development_image_open():
+        try:
+            with backend._namespace_commit_guard():
+                profile = request.args.get("profile", "")
+                identifier = request.args.get("design", "")
+                if profile == "legacy" and not identifier:
+                    path = Path(backend.NS_STATE_PATH)
+                else:
+                    from server.namespace_design_copies import resolve_store
+                    store = resolve_store(profile, identifier,
+                                          Path(backend.NS_STATE_PATH).parent,
+                                          Path(backend.NS_STATE_PATH))
+                    path = store.path
+                raw = path.read_bytes()
+                if profile != "legacy":
+                    from server.namespace_design_v1 import digest
+                    if request.args.get("fingerprint") != digest(json.loads(raw)):
+                        raise ValueError("The saved Namespace changed. Reload its Namespace page before opening Prepare & Load. Nothing was changed.")
+                identity = "design:" + hashlib.sha256(raw).hexdigest()
+            response = redirect("/development-image/?namespace=" + identity)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            response = jsonify(ok=False, error=str(error), dataChanged=False)
+            response.status_code = 409
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.get("/api/development-image/catalog")
     def development_image_catalog():
         try:

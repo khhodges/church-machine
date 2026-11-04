@@ -252,6 +252,28 @@
         // Supply design rows without projecting them into the live simulator.
         root.updateNamespace(true);
     }
+    function prepareLoad() {
+        if (state.loading || state.saving) {
+            root.alert('Wait for the Namespace operation to finish. Nothing was sent.');
+            return;
+        }
+        if (state.active && (state.dirty || state.persisted !== true || !state.fingerprint)) {
+            root.alert('Bind Namespace Design to save your changes first, then open Prepare & Load FPGA. Nothing was changed or sent.');
+            return;
+        }
+        if (!state.active && (root._nsTableDirty || root._nsPrefetchDirty)) {
+            root.alert('Save the Namespace Table first, then open Prepare & Load FPGA. Nothing was changed or sent.');
+            return;
+        }
+        const query = new URLSearchParams({profile: state.active ? state.profile : 'legacy'});
+        if (state.active) {
+            query.set('fingerprint', state.fingerprint);
+            if (state.designId) query.set('design', state.designId);
+        }
+        // Open synchronously from the click so browsers permit a separate tab.
+        // The server resolves and checks the exact saved design before redirect.
+        root.open('/api/development-image/open?' + query.toString(), '_blank', 'noopener,noreferrer');
+    }
     function snapshot() {
         const rows=state.document.rows;
         return {counts:{max:slotCount(),assigned:rows.length,resident:rows.filter(r=>r.policy!=='Lazy').length,
@@ -735,7 +757,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery};
+    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');
