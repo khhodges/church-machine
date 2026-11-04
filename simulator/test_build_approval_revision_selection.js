@@ -8,6 +8,8 @@ const crypto = require('crypto');
 const source = fs.readFileSync('simulator/app-build-approval.js', 'utf8');
 const actionable = require('./actionable_errors.js');
 const elements = {
+    baMapBody: {innerHTML: ''},
+    baIssueComments: {innerHTML: ''},
     baApproveBtn: { disabled: true },
     baFreezeBtn: { disabled: true },
     baSelectSnapshotBtn: { disabled: true },
@@ -91,7 +93,8 @@ const historical = {
         historical.metadata.snapshot.fingerprint);
     const draft = {id: 'design:' + 'c'.repeat(64), revision_id: 'c'.repeat(64),
         name: 'New Layout', saved_at: '2026-11-04', approval: 'Not approved',
-        testing: 'Not tested', preparation: 'Needs preparation'};
+        testing: 'Not tested', preparation: 'Needs preparation',
+        slots: [{slot: 21, name: '<Saved entry>', kind: 'lump', policy: 'Resident', boot: true}]};
     const grouped = view._savedRevisionOptions([
         {...draft, id: 'old', saved_at: '20261006T143256136794Z'},
         {...draft, id: 'unknown', saved_at: 'not a date'},
@@ -113,6 +116,13 @@ const historical = {
     assert.strictEqual(view._selectedSnapshot, null, 'draft selection clears old hardware authority');
     assert.strictEqual(elements.baApproveBtn.disabled, true);
     assert(elements.baSnapshotStatus.textContent.includes('Needs preparation'));
+    assert(elements.baMapBody.innerHTML.includes('&lt;Saved entry&gt;'));
+    assert(!elements.baMapBody.innerHTML.includes('<select'));
+    view._render({slot_rules: [{slot: 99, name: 'Unrelated live draft'}]});
+    view._renderIssueComments({slot_rules: []});
+    assert(elements.baMapBody.innerHTML.includes('&lt;Saved entry&gt;'));
+    assert(!elements.baMapBody.innerHTML.includes('Unrelated live draft'));
+    assert(!elements.baIssueComments.innerHTML.includes('All current validation checks pass'));
     context.fetch = async () => ({ok: true, status: 200,
         json: async () => ({revisions: [historical], saved_entries: []})});
     await view._loadRevisions();
@@ -222,6 +232,13 @@ const historical = {
     assert.strictEqual(view._selectedSnapshot, null);
     assert.strictEqual(elements.baApproveBtn.disabled, true);
     assert(elements.baSnapshotStatus.textContent.includes('link was not recorded'));
+    assert(elements.baMapBody.innerHTML.includes('No saved Namespace slot data'));
+    assert(!elements.baMapBody.innerHTML.includes('&lt;Saved entry&gt;'));
+    view._savedNamespaceEntries = [{id: revisionId, revision_id: revisionId, name: 'Frozen Namespace',
+        slots: [{slot: 4, name: 'Frozen only'}]}];
+    view.selectRevisionId('bitstream:' + bitId);
+    assert(elements.baMapBody.innerHTML.includes('Frozen only'));
+    view.selectRevisionId('bitstream:' + legacyId);
     view._renderSavedBuildPicker();
     assert.strictEqual(elements.baRevisionSelect.value, 'bitstream:' + legacyId);
     assert.strictEqual(savedFiles, 0, 'combined selection cannot download or operate hardware');

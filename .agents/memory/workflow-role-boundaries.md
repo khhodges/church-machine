@@ -25,6 +25,12 @@ explicitly approved showing named Namespaces and bitstreams together.
 
 **How to apply:** Colour the entries and selected bitstream, not merely controls;
 selection alone must never install, flash, or substitute an unrelated Namespace.
+The NS slots list must follow that exact dropdown selection, including during
+background refresh. Missing historical Namespace data must be explicit, not
+replaced with today's editable slots or current-draft validation results.
+
+**Why:** The user repeatedly requested the list track the selected dropdown;
+unrelated live slots made inspection of saved builds misleading.
 
 Keep development-image replacement testing separate from completion of the
 SecurityRegulator audit/proof design.

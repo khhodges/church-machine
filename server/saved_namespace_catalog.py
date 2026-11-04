@@ -5,6 +5,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def saved_slots(document):
+    """Only saved fields; never enrich from today's Namespace or catalog."""
+    for key in ("rows", "abstractions", "slot_rules"):
+        if isinstance(document.get(key), list):
+            return [row for row in document[key] if isinstance(row, dict)]
+    ns_map = document.get("ns_map")
+    if isinstance(ns_map, dict):
+        if isinstance(ns_map.get("slot_rules"), list):
+            return saved_slots(ns_map)
+        tiers = ns_map.get("tiers") or {}
+        return [row for key in ("bootstrap", "resident", "lazy", "unused")
+                for row in tiers.get(key, []) if isinstance(row, dict)]
+    return None
+
+
 def catalog(records, snapshots, namespace_path):
     entries = []
     known = set()
@@ -24,6 +39,7 @@ def catalog(records, snapshots, namespace_path):
         except (ValueError, UnicodeError) as error:
             entry["preparation"] = f"Unreadable saved data: {error}"
             document = {}
+        entry["slots"] = saved_slots(document)
         entries.append(entry)
         return entry, document
 
@@ -37,8 +53,16 @@ def catalog(records, snapshots, namespace_path):
         saved_at = provenance.get("approval_frozen_at") or metadata.get("created_at") or ""
         if not saved_at and retained_path.is_file():
             saved_at = datetime.fromtimestamp(retained_path.stat().st_mtime, timezone.utc).isoformat()
+        slots = None
+        if "namespace.json" in record.get("files", {}):
+            namespace_file = retained_path.parent / "namespace.json"
+            raw = namespace_file.read_bytes()
+            if hashlib.sha256(raw).hexdigest() != record["files"]["namespace.json"]:
+                raise ValueError("Retained Namespace bytes changed; refresh before inspection")
+            slots = saved_slots(json.loads(raw))
         entries.append(dict(
             id=revision, revision_id=revision,
+            slots=slots,
             name=metadata.get("name") or metadata.get("purpose") or "Namespace build",
             saved_at=saved_at,
             approval=metadata.get("approval_state") or "Not approved",

@@ -2,6 +2,34 @@ import json
 import os
 
 from server.saved_namespace_catalog import catalog
+from server.saved_namespace_catalog import saved_slots
+
+
+def test_saved_slot_shapes_use_only_exact_saved_rows():
+    rows = [{"slot": 21, "name": "Saved"}]
+    assert saved_slots({"rows": rows}) == rows
+    assert saved_slots({"abstractions": rows}) == rows
+    assert saved_slots({"ns_map": {"slot_rules": rows}}) == rows
+    assert saved_slots({"ns_map": {"tiers": {"resident": rows}}}) == rows
+    assert saved_slots({"rows": []}) == []
+    assert saved_slots({}) is None
+
+
+def test_retained_namespace_rows_are_hash_verified(tmp_path):
+    import hashlib
+    revision = "a" * 64
+    folder = tmp_path / "revisions/namespace" / revision
+    folder.mkdir(parents=True)
+    raw = b'{"abstractions":[{"slot":2,"name":"Frozen"}]}'
+    (folder / "namespace.json").write_bytes(raw)
+    record = dict(revision_id=revision, metadata={},
+                  files={"namespace.json": hashlib.sha256(raw).hexdigest()})
+    rows = catalog([record], tmp_path, tmp_path / "ns-state.json")
+    assert rows[0]["slots"] == [{"slot": 2, "name": "Frozen"}]
+    (folder / "namespace.json").write_text("{}")
+    import pytest
+    with pytest.raises(ValueError, match="bytes changed"):
+        catalog([record], tmp_path, tmp_path / "ns-state.json")
 
 
 def test_all_statuses_and_saved_designs_are_visible_without_writes(tmp_path):

@@ -441,6 +441,7 @@ const BuildApprovalView = {
             }
             this._renderIssueComments(null);
         } finally {
+            if (this._selectedSavedEntry || this._selectedSnapshot) this._renderSelectedSlots();
             this._inFlight = false;
             if (btn) btn.disabled = false;
             const lc = document.getElementById('baLastChecked');
@@ -449,6 +450,10 @@ const BuildApprovalView = {
     },
 
     _render(data) {
+        if (this._selectedSavedEntry || this._selectedSnapshot) {
+            this._renderSelectedSlots();
+            return;
+        }
         const body = document.getElementById('baMapBody');
         if (!body) return;
 
@@ -476,6 +481,43 @@ const BuildApprovalView = {
         }
 
         body.innerHTML = html || '<div class="ba-empty">No NS map data available.</div>';
+    },
+
+    _renderSelectedSlots() {
+        const body = document.getElementById('baMapBody');
+        if (!body) return;
+        const selected = this._selectedSavedEntry;
+        let entry = selected;
+        let title = selected?.name || 'Selected Namespace';
+        if (selected?.kind === 'bitstream') {
+            const bit = this._bitstreamRevisions.find(row => row.revision_id === selected.revision_id);
+            entry = bit?.namespace_revision_id
+                ? this._savedNamespaceEntries.find(row => row.id === bit.namespace_revision_id) : null;
+            title = `Bitstream ${selected.revision_id.slice(0, 12)} — Namespace slots`;
+        } else if (!entry && this._selectedSnapshot) {
+            entry = this._savedNamespaceEntries.find(
+                row => row.id === this._selectedSnapshot.namespace_revision_id);
+        }
+        const issues = document.getElementById('baIssueComments');
+        if (issues) issues.innerHTML = '<div class="ba-context-note">Saved selection — live draft checks do not apply to this view.</div>';
+        if (!Array.isArray(entry?.slots)) {
+            body.innerHTML = `<div class="ba-tier-header">${this._esc(title)}</div>` +
+                '<div class="ba-empty">No saved Namespace slot data is available for this selection. The current draft is not shown in its place.</div>';
+            return;
+        }
+        const cell = value => this._esc(value == null || value === '' ? '—' :
+            Array.isArray(value) ? value.join('+') : typeof value === 'object' ? JSON.stringify(value) : value);
+        const rows = entry.slots.slice().sort((a, b) => Number(a.slot) - Number(b.slot));
+        body.innerHTML = `<div class="ba-tier-header">${this._esc(title)} · ${rows.length} slots · read-only</div>` +
+            (rows.length ? '<table class="ba-table"><thead><tr><th>Slot</th><th>Name</th><th>Type</th>' +
+                '<th>Load policy</th><th>Location</th><th>Limit / words</th><th>Saved artifact</th><th>Boot</th></tr></thead><tbody>' +
+                rows.map(row => '<tr>' + [
+                    row.slot, row.name, row.kind || row.type, row.policy || row.load_policy,
+                    row.location ?? row.address, row.limit ?? row.words,
+                    row.selection?.filename || row.artifact_pin?.filename || row.filename || row.token,
+                    row.boot ? 'Yes' : '—',
+                ].map(value => `<td>${cell(value)}</td>`).join('') + '</tr>').join('') +
+                '</tbody></table>' : '<div class="ba-empty">This saved Namespace has no slots.</div>');
     },
 
     async _loadReleaseContext() {
@@ -532,6 +574,10 @@ const BuildApprovalView = {
     },
 
     _renderIssueComments(data) {
+        if (this._selectedSavedEntry || this._selectedSnapshot) {
+            this._renderSelectedSlots();
+            return;
+        }
         const el = document.getElementById('baIssueComments');
         if (!el) return;
         if (!data || (!data.tiers && !Array.isArray(data.slot_rules))) {
@@ -905,6 +951,7 @@ const BuildApprovalView = {
             (snapshot.namespace_revision_id ? ' · revision ' + snapshot.namespace_revision_id : '') +
             ' · provenance ' + snapshot.provenance_identity;
         this._updateApproveBtn();
+        this._renderSelectedSlots();
     },
 
     selectAvailableSnapshot() {
@@ -1103,6 +1150,7 @@ const BuildApprovalView = {
                     preparation: record.files?.['boot-image.bin'] ? 'Image retained' : 'Needs preparation',
                 }));
             this._renderSavedBuildPicker();
+            if (this._selectedSavedEntry || this._selectedSnapshot) this._renderSelectedSlots();
         } catch (error) {
             const status = document.getElementById('baSnapshotStatus');
             if (status && !this._selectedSnapshot) status.textContent =
@@ -1132,6 +1180,7 @@ const BuildApprovalView = {
             if (installStatus) installStatus.textContent = 'Bitstream selected for inspection only.';
             this._updateApproveBtn();
             this._renderSavedBuildPicker();
+            this._renderSelectedSlots();
             return;
         }
         this.selectBitstreamRevision('');
@@ -1154,6 +1203,8 @@ const BuildApprovalView = {
                 'Select a saved Namespace version.';
             const installStatus = document.getElementById('baInstallImageStatus');
             if (installStatus) installStatus.textContent = 'Nothing was sent to hardware.';
+            if (row) this._renderSelectedSlots();
+            else if (this._lastMap) { this._render(this._lastMap); this._renderIssueComments(this._lastMap); }
             return;
         }
         this._selectSnapshot(revision);
