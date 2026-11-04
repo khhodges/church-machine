@@ -24,6 +24,9 @@ export default function KISS() {
   const selectedKind = selected?.kind ?? (selected?.filename ? "lump" : selected?.name.includes("DEV") ? "mmio" : selected?.name.includes("Thread") ? "thread" : "namespace");
   const selectedIsMmio = selectedKind === "mmio";
   const selectedIsLump = selectedKind === "lump";
+  const selectedIsThread = selectedKind === "thread" || selected?.name.includes("Thread") === true;
+  const selectedIsNamespace = selectedKind === "namespace" || selected?.name === "Boot.NS";
+  const selectedIsBoot = selected?.name.startsWith("Boot.") === true || selected?.boot === true;
   const missing = slots.filter(row => row.kind === "lump" && !row.selection);
   const isNew = namespace === "New Layout";
   const capacity = "capacityWords" in input ? input.capacityWords : undefined;
@@ -151,7 +154,7 @@ export default function KISS() {
                     </svg>
                     <div className="kiss-glass-zero">{locatedEntries.length} saved locations shown</div>
                   </div>
-                  {selected && (selectedIsMmio || selectedIsLump) && <aside className="kiss-device-card" aria-label={`${selected.name} selected slot details`}>
+                  {selected && <aside className="kiss-device-card" aria-label={`${selected.name} selected slot details`}>
                     {selectedIsMmio ? <svg className="kiss-device-icon" viewBox="0 0 120 120" role="img" aria-labelledby="kiss-device-title">
                       <title id="kiss-device-title">{selected.name.replace(/_DEV$/, "").replaceAll("_", " ").toLowerCase()} device</title>
                       <circle cx="60" cy="60" r="48" fill="#172636" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="2" />
@@ -174,23 +177,44 @@ export default function KISS() {
                         <rect x="39" y="39" width="42" height="42" rx="6" fill="#25394b" stroke="#e9c46a" strokeWidth="2" />
                         <path d="M51 51h18v18H51zM30 48h9m-9 12h9m-9 12h9m42-24h9m-9 12h9m-9 12h9M48 30v9m12-9v9m12-9v9m-24 42v9m12-9v9m12-9v9" fill="none" stroke="#e9c46a" strokeWidth="2" strokeLinecap="round" />
                       </>}
-                    </svg> : <svg className="kiss-device-icon kiss-lump-icon" viewBox="0 0 120 120" role="img" aria-label="LUMP binary artifact">
+                    </svg> : selectedIsLump ? <svg className="kiss-device-icon kiss-lump-icon" viewBox="0 0 120 120" role="img" aria-label="LUMP binary artifact">
                       <path d="M34 18h36l18 18v64H34z" fill="#1d3040" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" />
                       <path d="M70 18v20h18M45 56h32M45 68h32M45 80h24" fill="none" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                       <circle cx="46" cy="94" r="3" fill={colorForSlot(selected.slot) ?? "#73d7c0"} />
+                    </svg> : <svg className="kiss-device-icon kiss-lump-icon" viewBox="0 0 120 120" role="img" aria-label={selectedIsNamespace ? "Namespace icon" : selectedIsThread ? "Thread icon" : selectedIsBoot ? "Boot entry icon" : "Namespace entry icon"}>
+                      <circle cx="60" cy="60" r="43" fill="#172636" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" />
+                      {selectedIsThread ? <>
+                        <circle cx="60" cy="43" r="10" fill="none" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" />
+                        <path d="M38 83c2-14 10-21 22-21s20 7 22 21M28 51h12m40 0h12M34 45l6 6-6 6m52-12-6 6 6 6" fill="none" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      </> : selectedIsNamespace ? <>
+                        <path d="M36 42h48v39H36zM44 34h40v39M52 26h32v39" fill="#1d3040" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinejoin="round" />
+                        <path d="M47 53h25M47 63h25M47 73h17" stroke="#dce9e7" strokeWidth="3" strokeLinecap="round" />
+                      </> : <>
+                        <path d="M60 28l7 14 16 2-12 11 3 16-14-8-14 8 3-16-12-11 16-2z" fill="#1d3040" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinejoin="round" />
+                        <path d="M43 84h34" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinecap="round" />
+                      </>}
                     </svg>}
-                    <span className="kiss-device-kicker">{selectedIsMmio ? "SELECTED MMIO" : "SELECTED LUMP"}</span>
+                    <span className="kiss-device-kicker">{selectedIsMmio ? "SELECTED MMIO" : selectedIsLump ? "SELECTED LUMP" : selectedIsBoot ? "SELECTED BOOT ENTRY" : selectedIsThread ? "SELECTED THREAD" : "SELECTED NAMESPACE"}</span>
                     <strong>{selected.name.replace(/_DEV$/, "").replaceAll("_", " ")}</strong>
                     {selectedIsMmio ? <>
                       <span className="kiss-device-type">{selected.name.startsWith("LED") ? "Indicator output" : selected.name.startsWith("BTN") ? "Button input" : selected.name.startsWith("TIMER") ? "Timer peripheral" : selected.name.startsWith("UART") ? "Serial interface" : "Memory-mapped device"}</span>
                       <span className="kiss-device-location">Address {selected.location ?? "not recorded"}</span>
-                    </> : <dl className="kiss-inline-details">
+                    </> : selectedIsLump ? <dl className="kiss-inline-details">
                       <dt>Artifact</dt><dd>{selected.selection?.filename ?? selected.filename ?? "Not recorded"}</dd>
                       <dt>Revision</dt><dd>{selected.selection?.revision ?? selected.lump_version ?? "Not recorded"}</dd>
                       <dt>Token</dt><dd>{selected.selection?.token ?? selected.token ?? "Not recorded"}</dd>
                       <dt>Policy</dt><dd>{selected.policy ?? selected.load_policy ?? "Not recorded"}</dd>
                       <dt>Location</dt><dd>{selected.location ?? "Not recorded"}</dd>
                       <dt>Extent</dt><dd>{selected.limit ?? "Not recorded"}</dd>
+                    </dl> : <dl className="kiss-inline-details">
+                      <dt>Kind</dt><dd>{selectedIsThread ? "Thread" : selectedIsNamespace ? "Namespace" : selectedKind}</dd>
+                      <dt>Role</dt><dd>{selectedIsBoot ? "Boot entry" : selectedIsThread ? "Thread entry" : "Namespace entry"}</dd>
+                      <dt>Slot</dt><dd>{String(selected.slot).padStart(2, "0")}</dd>
+                      <dt>Type</dt><dd>{selected.type ?? selectedKind}</dd>
+                      <dt>Policy</dt><dd>{selected.policy ?? selected.load_policy ?? (selected.resident ? "Resident" : "Not recorded")}</dd>
+                      <dt>Location</dt><dd>{selected.location ?? "Not recorded"}</dd>
+                      <dt>Extent</dt><dd>{selected.limit ?? "Not recorded"}</dd>
+                      <dt>Sequence</dt><dd>{selected.sequence ?? selected.seq ?? "Not recorded"}</dd>
                     </dl>}
                   </aside>}
                 </div>
