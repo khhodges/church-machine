@@ -34,6 +34,16 @@ simulation work.
 Offline preparation is not a reload attempt or physical success. If the bridge
 is disconnected, report that concrete limitation without redirecting to simulation.
 
+The development-image reload is a user-operated walkthrough, not delegated
+hardware operation.
+
+**Why:** The user explicitly clarified: "I don't want you to do it for me
+I want you to help me do it for myself".
+
+**How to apply:** Guide one step at a time and interpret the user's observed
+results. Do not send hardware commands, install images or change selected
+artifacts on their behalf without a new explicit request.
+
 The agreed target workflow is: programmers compile and approve LUMPs; engineers
 compile configurations for simulation and approve Namespaces; testers create
 and approve bitstreams. These role names supersede the older Builder/system
