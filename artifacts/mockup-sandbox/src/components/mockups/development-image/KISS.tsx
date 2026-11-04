@@ -15,7 +15,7 @@ type Slot = {
 
 export default function KISS() {
   const [namespace, setNamespace] = useState<NamespaceName>("Original");
-  const [selectedSlot, setSelectedSlot] = useState<number>(6);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [sendAttempted, setSendAttempted] = useState(false);
   const input = savedInputs[namespace];
   const slots: Slot[] = ("rows" in input ? input.rows : input.abstractions);
@@ -57,9 +57,7 @@ export default function KISS() {
 
   function changeNamespace(value: NamespaceName) {
     setNamespace(value);
-    const nextInput = savedInputs[value];
-    const nextSlots: Slot[] = ("rows" in nextInput ? nextInput.rows : nextInput.abstractions);
-    setSelectedSlot(nextSlots.find(row => row.kind === "lump" || Boolean(row.filename))?.slot ?? nextSlots[0]?.slot ?? 0);
+    setSelectedSlot(null);
     setSendAttempted(false);
   }
 
@@ -154,7 +152,7 @@ export default function KISS() {
                     </svg>
                     <div className="kiss-glass-zero">{locatedEntries.length} saved locations shown</div>
                   </div>
-                  {selected && <aside className="kiss-device-card" aria-label={`${selected.name} selected slot details`}>
+                  {selected ? <aside className="kiss-device-card" aria-label={`${selected.name} selected slot details`}>
                     {selectedIsMmio ? <svg className="kiss-device-icon" viewBox="0 0 120 120" role="img" aria-labelledby="kiss-device-title">
                       <title id="kiss-device-title">{selected.name.replace(/_DEV$/, "").replaceAll("_", " ").toLowerCase()} device</title>
                       <circle cx="60" cy="60" r="48" fill="#172636" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="2" />
@@ -216,6 +214,10 @@ export default function KISS() {
                       <dt>Extent</dt><dd>{selected.limit ?? "Not recorded"}</dd>
                       <dt>Sequence</dt><dd>{selected.sequence ?? selected.seq ?? "Not recorded"}</dd>
                     </dl>}
+                  </aside> : <aside className="kiss-device-card kiss-device-card-idle" aria-live="polite">
+                    <span className="kiss-device-kicker">MEMORY LOCATIONS</span>
+                    <strong>Select a slot</strong>
+                    <span className="kiss-device-type">Saved regions are shown dimmed until you choose a row.</span>
                   </aside>}
                 </div>
                 <div className="kiss-water-legend"><span>Position and extent come directly from Namespace Table fields.</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
