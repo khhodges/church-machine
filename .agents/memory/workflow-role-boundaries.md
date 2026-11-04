@@ -11,10 +11,12 @@ labels, not visibility filters, during the FPGA reload walkthrough.
 **How to apply:** Keep exact selection separate from preparation, approval and
 installation. Never substitute an old approved build or silently adopt new LUMPs.
 Do not interpret “all saved builds” as a request to fill the primary selector
-with every internal simulation checkpoint. The user subsequently called these
-copies clutter and requested only helpful buttons and data. Preserve access to
-history without confusing it with distinct operator choices; missing test
-evidence must not be presented as proof a version was never tested or used.
+with every internal simulation checkpoint. The user subsequently specified
+keeping current/prior bitstreams and named Namespace Table options, authorizing
+deletion of other internal simulation snapshots rather than merely hiding them.
+Retain inputs/evidence needed by kept builds. This does not authorize deletion
+of LUMP revision history or hardware operations. Missing test evidence must not
+be presented as proof a version was never tested or used.
 
 Keep development-image replacement testing separate from completion of the
 SecurityRegulator audit/proof design.
