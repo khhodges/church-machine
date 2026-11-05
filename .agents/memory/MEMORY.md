@@ -19,7 +19,7 @@
 - [Structured merge corruption](structured-merge-corruption.md) — compare conflict output to clean index stages; corruption can occur outside the marked regions
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
-- [Hardware trace protocols](hardware-trace-index.md) — protocol generations, packet framing and disassembly limits.
+- [Hardware trace protocols](hardware-trace-index.md) — Church-first defaults, breakpoint detail, protocol generations, framing and disassembly limits.
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire/Ti60 build lessons](sapphire-ti60-index.md) — ROM bus conflicts, Efinity BRAM initialization, MAP placeholders, and full firmware pipeline constraints.
 - [Shared fetch dedup for concurrent UI lookups](shared-fetch-dedup-for-concurrent-ui-lookups.md) — two independent render paths fetching the same detail endpoint for the same entity will double-fire it; dedupe via shared in-flight-promise cache

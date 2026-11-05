@@ -4,6 +4,9 @@ description: Index of protocol-specific lessons; select the active packet versio
 ---
 Use the active protocol version, not historical packet sizes.
 
+For the default trace scope and selected Turing breakpoint behavior, read
+[Church-first hardware tracing](church-first-hardware-tracing.md).
+
 **Why:** Multiple trace generations coexist in this project's hardware history.
 
 **How to apply:** Read the relevant detailed notes:

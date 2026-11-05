@@ -305,7 +305,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 26
+BRIDGE_VERSION    = 27
 # Hold a complete bounded acceptance run while HTTPS catches up. This does
 # not promise unlimited recording; any overflow must be explicitly reported.
 TRACE_BACKLOG_CAPACITY = 8192
@@ -982,7 +982,38 @@ def _is_turing_only_result(decoded):
     """
     return (decoded['ev_type'] == TRACE_EV_RESULT
             and not decoded['fault_valid']
+            and not decoded.get('bp_hit', False)
             and not decoded['payload_gt'])
+
+
+class ChurchTracePolicy:
+    """Keep Church flow until the FPGA reports a breakpoint or operator Steps.
+
+    Selection/arming alone never exposes all arithmetic traffic. Run returns
+    to Church-only tracing; faults and the actual breakpoint always survive.
+    """
+    def __init__(self):
+        self.detail = False
+
+    def command(self, cmd, ok=True):
+        if not ok:
+            return
+        if cmd == 's':
+            self.detail = True
+        elif cmd in ('r', 'f', 'u'):
+            self.detail = False
+
+    def keep(self, decoded, church_only=True):
+        if decoded.get('bp_hit'):
+            self.detail = True
+        # RESULT alone is not an instruction classification. Preserve a
+        # Church instruction identified by the exact uploaded image too.
+        mapped = (_uploaded_trace_rows or {}).get(str(decoded.get('nia')))
+        if mapped and isinstance(mapped.get('map_instr_word'), int):
+            if (mapped['map_instr_word'] >> 27) <= 9:
+                return True
+        return (not church_only or self.detail or
+                not _is_turing_only_result(decoded))
 
 
 def _crc16_ccitt(data, crc=0xFFFF):
@@ -2212,7 +2243,7 @@ def main():
     )
     parser.add_argument('--insecure', action='store_true',
                         help='Skip TLS certificate verification')
-    parser.add_argument('--church-only', action='store_true',
+    parser.add_argument('--church-only', action=argparse.BooleanOptionalAction, default=True,
                         help='Suppress bare Turing RESULT packets (no fault, no GT '
                              'payload).  CALL/RETURN sequences and any faulting '
                              'instruction always pass through.  Dramatically reduces '
@@ -2262,6 +2293,7 @@ def main():
                   'No serial port was opened.')
             return 1
     church_only = args.church_only
+    trace_policy = ChurchTracePolicy()
     flow_trace = Phase1FlowTrace(calls_only=args.calls_only) if args.phase1_golden else None
     if flow_trace:
         print('[trace] Phase 1 ' + ('CALL only' if args.calls_only else 'CALL/RETURN/CHANGE') +
@@ -2359,6 +2391,7 @@ def main():
 
     def _command_write_result(cmd, data, ok):
         nonlocal pending_halt
+        trace_policy.command(cmd, ok)
         if cmd == 'h':
             pending_halt = ({
                 'command_id': data.get('id'),
@@ -2394,7 +2427,7 @@ def main():
             'event': event, 'state': state or bridge_state, 'reason': reason,
             'reconnect_attempt': reconnect_attempt,
             'last_read_ts': last_read_ts, 'last_write_ts': last_write_ts,
-            'church_only': church_only,
+            'church_only': church_only and not trace_policy.detail,
         }
         if device_uid:
             payload['device_uid'] = device_uid
@@ -2804,7 +2837,7 @@ def main():
                     if flow_trace and not flow_trace.annotate(decoded):
                         i += TRACE_LEN
                         continue
-                    if not flow_trace and church_only and _is_turing_only_result(decoded):
+                    if not flow_trace and not trace_policy.keep(decoded, church_only):
                         i += TRACE_LEN
                         continue
                     # Queue pending ASCII first so console text and trace
@@ -3158,6 +3191,7 @@ def main():
                                                else state_counter),
                                 write_result=_command_write_result)
                         elif cmd == 'u':
+                            trace_policy.command('u')
                             if flow_trace:
                                 print('[trace] golden map disabled before upload; '
                                       'restart with the correct image selection '
