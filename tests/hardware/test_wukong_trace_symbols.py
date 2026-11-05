@@ -8,6 +8,14 @@ from hardware.wukong_trace_symbols import (
 )
 
 
+def test_faulting_data_words_are_not_displayed_as_legacy_positive_immediates():
+    from hardware.wukong_trace_symbols import _disassemble_word
+    assert _disassemble_word(0x87414198) == "DREAD DR8, CR2, DR8 - 25"
+    assert _disassemble_word(0x8F094197) == "DWRITE DR1, CR2, DR7 - 25"
+    assert _disassemble_word(0x87411980) == "DREAD DR8, CR2, #408, DR0"
+    assert _disassemble_word(0x8F091970) == "DWRITE DR1, CR2, #407, DR0"
+
+
 def test_callhome_fallback_matches_canonical_compact_load_words():
     from hardware.boot_rom import WUKONG_NUC_PROGRAM
 

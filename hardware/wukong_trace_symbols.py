@@ -123,7 +123,7 @@ def _disassemble_word(word):
         return f"{mnemonic} CR{dst}, CR{src}[0x{imm:04X}]"
     if opcode in (16, 17):
         if imm & 0x4000:
-            return f"{mnemonic} DR{dst}, CR{src}, #{imm & 0x3FFF}"
+            return f"{mnemonic} DR{dst}, CR{src}, DR{imm & 0xF} - {(imm >> 4) & 0x3FF}"
         return f"{mnemonic} DR{dst}, CR{src}, #{(imm >> 4) & 0x3FF}, DR{imm & 0xF}"
     if opcode in (18, 19):
         return f"{mnemonic} DR{dst}, DR{src}, #{(imm >> 5) & 0x1F}, #{imm & 0x1F}"

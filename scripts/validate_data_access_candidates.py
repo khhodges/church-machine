@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "tests/server"), str(ROOT / "scripts")]
 OUT = ROOT / "generated-artifacts/data-access-validation"
+CANDIDATES = ROOT / "generated-artifacts/data-access-candidates"
 
 
 def digest_live():
@@ -21,7 +22,7 @@ def digest_live():
             for p in paths if p.is_file()}
 
 
-def main():
+def main(*, native=False):
     before = digest_live()
     from bootstrap_test_support import isolate_application
     private = isolate_application()
@@ -39,6 +40,7 @@ def main():
                 raise RuntimeError(f"Live write prohibited: {path}")
     sys.addaudithook(guard)
     from server.app import app
+    import server.app as backend
     import publish_factory_build as publisher
     client = app.test_client()
 
@@ -56,18 +58,38 @@ def main():
             return io.BytesIO(response.data)
 
     OUT.mkdir(parents=True, exist_ok=True)
+    def native_candidate(request, saved, published, entries):
+        """Use the same native builder as Development Image, in private storage.
+
+        Unresolved rows remain unresolved; never invent grants to satisfy the
+        older simulator-admission harness's all-residents-bound prerequisite.
+        This is a candidate document, not a retained/live Namespace revision.
+        """
+        from server.development_image_prepare import build_saved_design
+        from server.namespace_design_v1 import digest
+        identifier = "design:" + digest(saved["document"])
+        with patch("server.development_image_view.retained_document",
+                   return_value=saved["document"]):
+            raw, prepared = build_saved_design(backend, identifier)
+        (OUT / "candidate-native.bin").write_bytes(raw)
+        prepared["privateCandidateOnly"] = True
+        prepared["savedNamespaceChanged"] = False
+        prepared["physicalHardwareAccessed"] = False
+        (OUT / "candidate-native.json").write_text(json.dumps(prepared, indent=2))
+
     # Historical Boot.Thread reference used by the existing execution checker.
     shutil.copyfile(ROOT / "generated-artifacts/factory-build/before.bin", OUT / "before.bin")
     try:
-        with patch.object(publisher, "OUT", OUT), patch.object(
+        with patch.object(publisher, "admit", native_candidate if native else publisher.admit), \
+                patch.object(publisher, "OUT", OUT), patch.object(
                 publisher.urllib.request, "build_opener", return_value=Transport()):
             with patch.object(sys, "argv", ["private-review"]):
                 publisher.main()
             review = json.loads((OUT / "review.json").read_text())
-            prepared = json.loads((ROOT / "generated-artifacts/data-access-candidates/review.json").read_text())
+            prepared = json.loads((CANDIDATES / "review.json").read_text())
             for candidate in prepared["candidates"]:
                 assert review["sources"][candidate["name"]]["sourceHash"] == candidate["sourceHash"]
-                expected = json.loads((ROOT / "generated-artifacts/data-access-candidates" /
+                expected = json.loads((CANDIDATES /
                                       (candidate["name"] + ".json")).read_text())["words"]
                 assert review["sources"][candidate["name"]]["codeWords"] == expected[1:1+((expected[0]>>10)&8191)]
             with patch.object(sys, "argv", ["private-apply", "--apply", "--fingerprint",
@@ -78,7 +100,8 @@ def main():
         (OUT / "isolation.json").write_text(json.dumps({"liveFilesUnchanged":unchanged,
             "transport":"Flask test client; no network", "physicalHardwareAccessed":False},indent=2))
         assert unchanged, "Live catalog/configuration changed"
-    print("PASS isolated compilation, reviewed save, binding and admission; live files unchanged")
+    stage = "native candidate assembly (not execution admission)" if native else "admission"
+    print(f"PASS isolated compilation, reviewed save, binding and {stage}; live files unchanged")
 
 
 if __name__ == "__main__":

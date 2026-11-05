@@ -70,6 +70,19 @@ the saved word reproduced the BOUNDS fault without an undersized capability.
 recorded BIT, distinguish mapped bytes from UART-captured instruction evidence,
 and audit related encodings before preparing a replacement software image.
 
+Use the native Development Image preparation contract when validating a
+replacement UART image, not an older simulator-admission harness's blanket
+requirement that every resident C-list be resolved.
+
+**Why:** That stronger harness prerequisite rejected an offline correction
+because unrelated dormant Mint references were unresolved. Native preparation
+retains those unresolved references for runtime checks; resolving them would
+change the programmer's authority design rather than fix instruction encoding.
+
+**How to apply:** Keep private candidate assembly distinct from complete-program
+execution qualification. Preserve unresolved bindings, run the actual native
+builder, and report separately which execution paths were replayed.
+
 For a UART-only developer workflow, preserve the exact installed FPGA profile
 while allowing separately approved native software images to change. Do not
 rebuild hardware or reject its operator installation evidence solely because
