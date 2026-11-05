@@ -2,6 +2,12 @@
 name: Approved revision input isolation
 description: Immutable downstream deliverables must retain bytes, not mutable upstream catalog locators.
 ---
+For NEW Development Image construction, the user superseded older selected-input
+pinning: use the latest compilation of every included LUMP, of every kind.
+See [Development Image preparation](development-image-preparation.md).
+The frozen-byte rules below still govern historical replay and preservation of
+an already-built artifact; they must not justify stale inputs in a new development build.
+
 Unsigned candidates in ignored staging directories are not durable saved LUMPs.
 Verify that their bytes actually exist in the current workspace before describing
 them as available for installation.

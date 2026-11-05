@@ -3,6 +3,11 @@ name: Explicit LUMP selection versus latest revisions
 description: Namespace assignments and explicit artifact choices outrank automatic latest-revision selection.
 ---
 
+For NEW Development Image builds, latest compilation of every included LUMP
+overrides an older saved revision selection. See
+[Development Image preparation](development-image-preparation.md).
+The inspection/navigation rules below do not override that build requirement.
+
 Related: [Catalog grouping and compilation provenance](attention-compilation-provenance.md)
 records the approved expandable source/revision grouping and date/time requirements.
 

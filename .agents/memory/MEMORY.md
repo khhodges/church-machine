@@ -153,7 +153,7 @@
 - [Readable Mint calls](mint-readable-call-approval.md) — bounded compiler implementation authorized; saved artifacts, live bindings and hardware remain outside approval.
 - [Hardware progress watch](hardware-progress-watch.md) — programmable GT + offset monitoring of the stash counter across free-run and fault recovery.
 - [FreeHandler template review](freehandler-template-review.md) — review C-list and Thread templates on prepared inventory; Namespace remains an IDE function.
-- [Development Image preparation](development-image-preparation.md) — approved complete-image assembly from saved bindings, without rebinding or automatic transfer; hardware checks remain separate.
+- [Development Image preparation](development-image-preparation.md) — new development builds must use the latest compilation of every LUMP kind, never stale saved bindings; transfer stays separate.
 - [Namespace DNA containment](namespace-dna-containment.md) — NS[1] encloses all slots; Metadata Slot[0] and Slot[1] form its text header.
 - [Bridge pairing restarts](bridge-pairing-restarts.md) — private installation-local grants; unchanged expiry; notify before active server restarts.
 - [TypeScript test transpilation](typescript-test-transpilation.md) — the TypeScript CLI may work without the legacy JS compiler API; use esbuild for isolated helper tests.

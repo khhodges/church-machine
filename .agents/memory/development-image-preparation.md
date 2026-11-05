@@ -1,24 +1,34 @@
 ---
 name: Development Image preparation authority
-description: Approved assembly from saved bindings without a second bind or automatic FPGA transfer.
+description: Development builds must use the latest compilation of every included LUMP; historical replay and physical transfer remain separate.
 ---
 
-The user approved preparing a complete Namespace image from the exact saved
-binding snapshots when using Development Image. Do not run Bind Namespace again
-as part of preparation.
+## Governing development-build rule (2026-11-05)
 
-**Why:** Bind Namespace retains per-LUMP derivatives, not a complete upload
-image. A sender restricted to historical certified revisions left the new
-saved-design workflow unable to send despite its apparently enabled button.
+The user requires: “the development image must be built from the latest copy
+of each and every LUMP of any kind.” Every included LUMP uses its latest
+compilation, including system, application, Thread and Namespace LUMPs and
+their dependencies. An older saved selection, cached binding, historical build
+or private candidate must not override a newer compilation.
 
-**How to apply:** Assemble memory geometry and fresh Thread contexts from the
-saved design using its exact authenticated bound LUMP bytes. Keep this separate
-from hardware certification. Revalidate the source identity and resulting digest
-before transfer; preserve operator authorization, exact installed BIT evidence,
-physical target/session checks, confirmed STOP, and explicit replacement consent.
-Missing snapshots or incompatible profiles must produce visible actionable
-errors, never rebinding, conversion, or replacement with newer catalog artifacts.
-Implementation/testing approval never authorizes an actual FPGA transfer.
+**Why:** A corrected WukongCallHome went into an isolated image used for a
+bitstream while the saved Development Image still selected an older compiled
+copy. The user rejected this split as an unacceptable development workflow.
+
+**How to apply:** This supersedes the former saved-binding-only/no-rebinding
+rule for NEW Development Image builds and the explicit-adoption rule where it
+would retain older development inputs. Resolve a coherent latest input set,
+rebuild derived bindings/layout as needed, and preserve exact identity evidence
+for the resulting build. A cache is usable only if it matches those inputs.
+Do not silently fall back to an older compilation to hide an error. Distinguish
+historical exact-byte replay from a new development build; keep history immutable.
+This is a required behavior, not a claim that the existing builder enforces it.
+
+Image construction does not itself authorize physical transfer, FPGA
+reprogramming, or replacing an image already running. Preserve authentication,
+target/session checks, transfer serialization and replacement consent.
+Do not add a manual installed-BIT certification gate; the existing programmer
+compatibility-choice rule below still applies.
 
 Keep the operator's goal focused on loading the new development image.
 **Why:** The user corrected a diversion into UI cleanup and a separate
