@@ -15003,7 +15003,7 @@ const VersionsView = {
 
     _buildStatusHeaders() {
         try {
-            const token = sessionStorage.getItem('ba_build_token') || '';
+            const token = localStorage.getItem('ba_build_token') ?? sessionStorage.getItem('ba_build_token') ?? '';
             return token ? { 'Authorization': 'Bearer ' + token } : {};
         } catch (_) {
             return {};

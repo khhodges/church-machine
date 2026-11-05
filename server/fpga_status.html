@@ -693,7 +693,9 @@
     var headers = { 'Content-Type': 'application/json' };
     // Share the IDE's tab-scoped operator credential; never put it in a URL.
     try {
-      var token = sessionStorage.getItem('ba_build_token') || '';
+      var saved = null;
+      try { saved = localStorage.getItem('ba_build_token'); } catch (_) {}
+      var token = saved !== null ? saved : (sessionStorage.getItem('ba_build_token') || '');
       if (token) headers.Authorization = 'Bearer ' + token;
     } catch (_) {}
     return headers;

@@ -3,6 +3,13 @@ name: IDE configuration authorization
 description: Authorization boundary between ordinary project configuration and privileged operations
 ---
 
+User-entered privileged authorization should be remembered across browser sessions
+on the same origin, with an explicit Forget action.
+**Why:** The user explicitly requested remembering the token after repeated loss
+of the tab-only authorization. This does not authorize exposing the server secret.
+**How to apply:** Persist only credentials the user enters, retain the existing
+server-side checks, and let forgetting override stale copies in other tabs.
+
 Ordinary project-configuration writes such as Namespace policy saves must not
 depend on REPORT_TOKEN. Never copy or expose REPORT_TOKEN to browser JavaScript.
 Validate these configuration payloads at the endpoint. Keep hardware control,

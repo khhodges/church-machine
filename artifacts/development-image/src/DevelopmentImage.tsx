@@ -17,9 +17,16 @@ export default function DevelopmentImage() {
   const [sendStatus, setSendStatus] = useState("");
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [token, setToken] = useState(() => {
-    try { return sessionStorage.getItem("ba_build_token") || ""; } catch { return ""; }
+    try { return localStorage.getItem("ba_build_token") ?? sessionStorage.getItem("ba_build_token") ?? ""; } catch { return ""; }
   });
   const [confirmation, setConfirmation] = useState<{image: PreparedImage; target: Target} | null>(null);
+  useEffect(() => {
+    const update = (event: StorageEvent) => {
+      if (event.key === "ba_build_token" && event.storageArea === localStorage) setToken(event.newValue || "");
+    };
+    window.addEventListener("storage", update);
+    return () => window.removeEventListener("storage", update);
+  }, []);
   const confirmationDialog = useRef<HTMLDialogElement>(null);
   const busy = useRef(false);
   const slots = input?.layoutRows ?? input?.rows ?? [];
@@ -374,7 +381,11 @@ export default function DevelopmentImage() {
             <dt>Required bitstream</dt><dd>{confirmation.image.required_bitstream_sha256}</dd></dl>
           <p>A fresh board-confirmed STOP and matching operator installation evidence are required by the existing installer. An upload acknowledgement is not memory readback.</p>
           <label htmlFor="hardware-token">IDE hardware access token</label>
-          <input id="hardware-token" type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)} disabled={sending} />
+          <input id="hardware-token" type="password" autoComplete="off" value={token} onChange={event => {
+            setToken(event.target.value);
+            try { localStorage.setItem("ba_build_token", event.target.value.trim()); }
+            catch { setError("Browser storage is blocked. The token cannot be remembered."); }
+          }} disabled={sending} />
           {sendStatus && <p role="status">{sendStatus}</p>}
           <div className="kiss-dialog-actions">
             <button disabled={sending} onClick={() => setConfirmation(null)}>Cancel</button>

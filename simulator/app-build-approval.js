@@ -122,17 +122,36 @@ const BuildApprovalView = {
     },
 
     // ── Build-token auth helpers ───────────────────────────────────────────
-    // The REPORT_TOKEN is held in sessionStorage (never leaves the tab).
+    // User-entered authorization is remembered on this browser/origin.
     // It is sent as Authorization: Bearer on all Build Approval API calls.
     // The build_nonce (issued by /api/build-approval/ns-map after token
     // verification) acts as a CSRF guard on top of the Bearer token.
 
     _getBuildToken() {
+        try {
+            const saved = localStorage.getItem('ba_build_token');
+            if (saved !== null) return saved;
+            const legacy = sessionStorage.getItem('ba_build_token') || '';
+            if (legacy) localStorage.setItem('ba_build_token', legacy);
+            return legacy;
+        } catch (_) {}
         try { return sessionStorage.getItem('ba_build_token') || ''; } catch (_) { return ''; }
     },
 
     _setBuildToken(val) {
+        let remembered = true;
+        // An empty value is intentional: other tabs must not revive old session copies.
+        try { localStorage.setItem('ba_build_token', val.trim()); } catch (_) {
+            remembered = false;
+        }
         try { sessionStorage.setItem('ba_build_token', val.trim()); } catch (_) {}
+        return remembered;
+    },
+
+    forgetToken() {
+        this._onTokenInput('');
+        const input = document.getElementById('baBuildTokenInput');
+        if (input) input.value = '';
     },
 
     openBridgePairing() {
@@ -236,7 +255,7 @@ const BuildApprovalView = {
     },
 
     _onTokenInput(val) {
-        this._setBuildToken(val);
+        const remembered = this._setBuildToken(val);
         // A snapshot fetched with an earlier token must not remain actionable.
         this._selectedSnapshot = null;
         this._availableSnapshot = null;
@@ -255,6 +274,7 @@ const BuildApprovalView = {
         if (s) s.textContent = val.trim() ? 'Token entered — checking' : 'Token required';
         // Trigger a fresh load now that the token may have changed
         if (val.trim()) this.refresh(false);
+        if (!remembered) alert('Browser storage is blocked. This token cannot be remembered across browser sessions.');
     },
 
     _authHeaders() {

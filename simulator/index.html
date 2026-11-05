@@ -1629,6 +1629,7 @@
                        autocomplete="off"
                        oninput="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._onTokenInput(this.value)">
                 <span id="baTokenStatus" class="ba-token-status"></span>
+                <button type="button" class="ba-refresh-btn" title="Remove remembered authorization from this browser" onclick="BuildApprovalView.forgetToken()">Forget token</button>
                 <button type="button" class="ba-refresh-btn" onclick="BuildApprovalView.openBridgePairing()">Connect bridge</button>
             </form>
             <dialog id="baBridgePairing" style="background:#171b30;color:#eee;border:1px solid #68718c;border-radius:8px;max-width:640px;width:90%">
