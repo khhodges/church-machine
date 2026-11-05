@@ -74,3 +74,4 @@ server/ide-hierarchy.json
 /server/lumps/design-drafts/
 /build/guarded-runtime-installation.json
 /artifacts/development-image/dist/
+**/instance/bridge-pairing/
