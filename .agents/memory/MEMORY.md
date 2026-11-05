@@ -155,3 +155,4 @@
 - [FreeHandler template review](freehandler-template-review.md) — review C-list and Thread templates on prepared inventory; Namespace remains an IDE function.
 - [Development Image preparation](development-image-preparation.md) — approved complete-image assembly from saved bindings, without rebinding or automatic transfer; hardware checks remain separate.
 - [Namespace DNA containment](namespace-dna-containment.md) — NS[1] encloses all slots; Metadata Slot[0] and Slot[1] form its text header.
+- [Bridge pairing restarts](bridge-pairing-restarts.md) — private installation-local grants; unchanged expiry; notify before active server restarts.

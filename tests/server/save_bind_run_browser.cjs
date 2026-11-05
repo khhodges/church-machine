@@ -160,7 +160,15 @@ async function main() {
         const prepared = await prepare(page);
         const machine = await snapshot(page);
         const resident = saved.rows.filter(r=>r.kind==='lump' && r.policy==='Resident');
-        assert.equal(resident.length, 9);
+        // The disposable clone includes Mint, PkVerify and MintCleaner as well
+        // as the original nine residents. Pin membership, not just its count:
+        // replacing one resident with another must not silently pass.
+        assert.deepEqual(resident.map(r=>[r.slot,r.name]).sort((a,b)=>a[0]-b[0]), [
+            [6,'ide.SelfTest'], [7,'ide.WukongCallHome'], [9,'ide.Mint'],
+            [10,'ide.CapabilityTest'], [14,'ide.PkVerify'], [15,'ide.MintCleaner'],
+            [16,'ide.Alice'], [17,'ide.Mallory'], [18,'ide.AliceDriver'],
+            [19,'ide.MalloryDriver'], [20,'ide.ActorManager'], [21,'ide.AmoebaStartup'],
+        ], 'Acceptance fixture resident membership drifted; do not repair it');
         const schemas = new Set();
         for (const row of resident) {
             const item = bound.bindingReport.lists.find(b=>b.slot===row.slot);
