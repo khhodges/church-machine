@@ -58,6 +58,18 @@ instruction and image contracts. Use separately approved complete UART software
 images; do not claim the revised ABI is physically qualified yet. Hardware
 changes and updating the power-on image remain separately approved work.
 
+Do not use trace-map disassembly text as the installed BIT's decoding authority.
+Compare the raw instruction with the archived decoder and replay captured
+operands before changing capability bounds.
+
+**Why:** A legacy-form DREAD was displayed as a legal positive immediate while
+the frozen FPGA interpreted those bits as an indexed subtraction. Replaying
+the saved word reproduced the BOUNDS fault without an undersized capability.
+
+**How to apply:** Match the archived source bundle to the vendor manifest and
+recorded BIT, distinguish mapped bytes from UART-captured instruction evidence,
+and audit related encodings before preparing a replacement software image.
+
 For a UART-only developer workflow, preserve the exact installed FPGA profile
 while allowing separately approved native software images to change. Do not
 rebuild hardware or reject its operator installation evidence solely because
