@@ -215,6 +215,14 @@ In the historical pre-migration configuration, NS slots 8 and 9 were intended
 to be empty. This is not a rule for the new ascending layout: its reviewed
 assignments move UART_DEV to slot 8 while slot 9 remains empty.
 
+Build Approval's inspection table must show the exact explicitly selected
+Namespace revision, not a reconstructed legacy draft when no revision is selected.
+**Why:** The user mistook its hardcoded older boot rows for current board data
+after connecting the bridge and approved correcting the table's source.
+**How to apply:** Label selected evidence separately from installed contents.
+No selection or unavailable evidence must be explicit; connection alone never
+proves installed bytes. Frozen experimental evidence remains inspection-only.
+
 **Why:** The user explicitly confirmed these are empty slots, not legacy Tunnel
 or Ethernet assignments to restore from catalog defaults.
 

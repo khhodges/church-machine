@@ -2606,8 +2606,13 @@ def artifact_revision_history(kind, revision_id=None):
             records = _decorate_namespace_revision_history(records)
             if not revision_id:
                 from server.saved_namespace_catalog import catalog
+                entries = catalog(records, _BUILD_SNAPSHOTS_DIR, NS_STATE_PATH)
+                from server.testing_dna_evidence import ARCHIVE
+                if ARCHIVE.is_file():
+                    from server.development_image_view import frozen_catalog_entry
+                    entries.append(frozen_catalog_entry())
                 return jsonify(ok=True, revisions=records,
-                               saved_entries=catalog(records, _BUILD_SNAPSHOTS_DIR, NS_STATE_PATH))
+                               saved_entries=entries)
         return jsonify(ok=True, **(
             {"revision": records[0]} if revision_id else {"revisions": records}))
     except (ValueError, OSError) as exc:

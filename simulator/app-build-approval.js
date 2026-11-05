@@ -479,30 +479,11 @@ const BuildApprovalView = {
         const body = document.getElementById('baMapBody');
         if (!body) return;
 
-        let html = '';
-        if (data.hardware_budget) {
-            html += this._renderBudget('Boot RAM budget (individual slot rules)', data.hardware_budget);
-        }
-        const fallbackTiers = data.tiers || {};
-        const slots = Array.isArray(data.slot_rules)
-            ? data.slot_rules
-            : ['bootstrap', 'resident', 'lazy', 'unused']
-                .flatMap(key => Array.isArray(fallbackTiers[key]) ? fallbackTiers[key] : []);
-        if (slots.length) {
-            html += '<div class="ba-tier-header">🧭 Namespace slots (individual load policies)</div>';
-            html += `<table class="ba-table">
-<thead><tr>
-  <th>Slot</th><th>Name</th><th>Token</th><th>Header</th>
-  <th>cw</th><th>cc</th><th>Location</th><th>Slot rule</th><th>Perms</th><th>Source</th>
-  <th>Checks</th><th>Size budget</th>
-</tr></thead><tbody>`;
-            for (const s of slots) {
-                html += this._renderRow(s);
-            }
-            html += '</tbody></table>';
-        }
-
-        body.innerHTML = html || '<div class="ba-empty">No NS map data available.</div>';
+        body.innerHTML = '<div class="ba-tier-header">Namespace slots — no revision selected</div>' +
+            '<div class="ba-empty">Choose an exact Namespace or bitstream in the selector above. ' +
+            'The legacy draft map is not substituted for a selection.</div>' +
+            '<div class="ba-context-note">Installed FPGA contents: not verified by this table. ' +
+            'A connected bridge alone does not verify installed memory.</div>';
     },
 
     _renderSelectedSlots() {
@@ -521,7 +502,8 @@ const BuildApprovalView = {
                 row => row.id === this._selectedSnapshot.namespace_revision_id);
         }
         const issues = document.getElementById('baIssueComments');
-        if (issues) issues.innerHTML = '<div class="ba-context-note">Saved selection — live draft checks do not apply to this view.</div>';
+        if (issues) issues.innerHTML = '<div class="ba-context-note">Saved selection — live draft checks do not apply to this view. ' +
+            'Installed FPGA contents are not verified by this table; bridge connectivity is separate.</div>';
         if (!Array.isArray(entry?.slots)) {
             body.innerHTML = `<div class="ba-tier-header">${this._esc(title)}</div>` +
                 '<div class="ba-empty">No saved Namespace slot data is available for this selection. The current draft is not shown in its place.</div>';
@@ -531,12 +513,16 @@ const BuildApprovalView = {
             Array.isArray(value) ? value.join('+') : typeof value === 'object' ? JSON.stringify(value) : value);
         const rows = entry.slots.slice().sort((a, b) => Number(a.slot) - Number(b.slot));
         body.innerHTML = `<div class="ba-tier-header">${this._esc(title)} · ${rows.length} slots · read-only</div>` +
+            `<div class="ba-context-note">Exact selection: ${cell(entry.id || entry.revision_id)}<br>` +
+            `Source: ${cell(entry.source || 'Retained Namespace document')}` +
+            (entry.imageSha256 ? `<br>Image SHA-256: ${cell(entry.imageSha256)}` : '') +
+            '<br>Installed FPGA contents: not verified. These rows are selected evidence, not live readback.</div>' +
             (rows.length ? '<table class="ba-table"><thead><tr><th>Slot</th><th>Name</th><th>Type</th>' +
                 '<th>Load policy</th><th>Location</th><th>Limit / words</th><th>Saved artifact</th><th>Boot</th></tr></thead><tbody>' +
                 rows.map(row => '<tr>' + [
                     row.slot, row.name, row.kind || row.type, row.policy || row.load_policy,
-                    row.location ?? row.address, row.limit ?? row.words,
-                    row.selection?.filename || row.artifact_pin?.filename || row.filename || row.token,
+                    row.location ?? row.address, row.limit ?? row.words ?? row.allocationWords,
+                    row.selection?.filename || row.artifact_pin?.filename || row.filename || row.token || row.binary_hash,
                     row.boot ? 'Yes' : '—',
                 ].map(value => `<td>${cell(value)}</td>`).join('') + '</tr>').join('') +
                 '</tbody></table>' : '<div class="ba-empty">This saved Namespace has no slots.</div>');
@@ -624,7 +610,7 @@ const BuildApprovalView = {
         }
         if (!issues.length) {
             el.innerHTML = `<div class="ba-context-head"><strong>⚠️ Approval issues &amp; comments</strong>${this._badge('ok', 'No issues')}</div>` +
-                '<div class="ba-context-note">All current validation checks pass without warnings.</div>';
+                '<div class="ba-context-note">Local draft checks pass. This is not validation of the selected image or installed FPGA contents.</div>';
             return;
         }
         const issueHtml = issues.map(({ slot, check }) => {
@@ -640,6 +626,7 @@ const BuildApprovalView = {
         }).join('');
         el.innerHTML =
             `<div class="ba-context-head"><strong>⚠️ Approval issues &amp; comments</strong>${this._badge('warn', `${issues.length} to review`)}</div>` +
+            '<div class="ba-context-note">Local draft validation only — not the selected image or installed FPGA contents.</div>' +
             '<div class="ba-context-note">Blocking items prevent Freeze and Build. Lazy-load and unused-slot items remain visible for review but do not necessarily block a hardware build.</div>' +
             `<div class="ba-issue-list">${issueHtml}</div>`;
     },
@@ -932,7 +919,7 @@ const BuildApprovalView = {
         const freezeBtn = document.getElementById('baFreezeBtn');
         if (!btn) return;
         const checksOk = this._allChecksPass();
-        if (freezeBtn) freezeBtn.disabled = !checksOk || this._buildRunning;
+        if (freezeBtn) freezeBtn.disabled = !checksOk || this._buildRunning || !!this._selectedSavedEntry?.inspectionOnly;
         // Live draft checks govern a NEW approval, not an already approved
         // immutable input. Building a selected older revision is intentional.
         btn.disabled = !this._selectedSnapshot || this._buildRunning;

@@ -173,6 +173,17 @@ def inspect_frozen(backend, identifier):
                 warnings=evidence["issues"], metadata={})
 
 
+def frozen_catalog_entry():
+    """Read-only evidence choice; deliberately not an approved build record."""
+    from server.testing_dna_evidence import NS_ID
+    result = inspect_frozen(None, NS_ID)
+    return dict(id=NS_ID, revision_id=NS_ID, name="Amoeba retry — frozen image",
+                saved_at="", approval="Inspection only", testing="Not verified installed",
+                preparation="Read-only image evidence", inspectionOnly=True,
+                source="Exact frozen image bytes", imageSha256=result["imageSha256"],
+                slots=result["rows"])
+
+
 def register(app, backend):
     @app.get("/api/development-image/open")
     def development_image_open():

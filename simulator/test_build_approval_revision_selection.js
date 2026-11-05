@@ -37,6 +37,23 @@ const context = {
 vm.createContext(context);
 vm.runInContext(source, context, { filename: 'app-build-approval.js' });
 const view = vm.runInContext('BuildApprovalView', context);
+view._render({slot_rules: [{slot: 0, name: 'Legacy Boot.NS'}]});
+assert(elements.baMapBody.innerHTML.includes('no revision selected'));
+assert(!elements.baMapBody.innerHTML.includes('Legacy Boot.NS'));
+assert(elements.baMapBody.innerHTML.includes('not verified'));
+view._selectedSavedEntry = {id:'inspection-example', name:'Frozen image', inspectionOnly:true,
+    source:'Exact frozen image bytes', imageSha256:'a'.repeat(64),
+    slots:[{slot:1,name:'Namespace',allocationWords:256}]};
+view._renderSelectedSlots();
+assert(elements.baMapBody.innerHTML.includes('inspection-example'));
+assert(elements.baMapBody.innerHTML.includes('a'.repeat(64)));
+assert(elements.baMapBody.innerHTML.includes('256'));
+view._lastMap = {slot_rules:[]};
+view._updateApproveBtn();
+assert(elements.baFreezeBtn.disabled);
+assert(elements.baApproveBtn.disabled);
+view._selectedSavedEntry = null;
+view._lastMap = null;
 
 const first = {
     filename: 'build-approval-202610010001.json',
