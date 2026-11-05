@@ -11,6 +11,13 @@ export type PreparedImage = {
   required_bitstream_sha256: string; size: number;
   freshness_policy?: string;
   layout_rows?: Slot[];
+  memory_map?: {
+    artifact_sha256: string; namespace_revision_id: string; size: number;
+    address_unit: "byte";
+    regions: Array<{slot: number; name: string; kind: string; type: string;
+      byteAddress: number | null; byteLength: number; resident: boolean;
+      policy?: string; sequence?: number; boot?: boolean}>;
+  };
   build_inputs?: Array<{slot: number; name: string; kind: string; origin: string;
     revision?: number; sourceArtifact?: string; sourceHash?: string; binaryHash?: string}>;
 };

@@ -245,7 +245,13 @@ async function main() {
         assert.deepEqual(await document(page), saved);
         assert.equal(await page.evaluate(() => DesignSimulation.traceContext()), null);
         const stale = held.body;
+        // fulfill() can finish before Playwright emits the page response.
+        // Drain that event before prepare() installs its fresh response waiter,
+        // otherwise it may compare the stale configuration with fresh approval.
+        const staleResponse = page.waitForResponse(r =>
+            r.url().includes('/api/simulation/design/ascending/prepare') && r.status() === 200);
         await held.route.fulfill({response:held.response});
+        await (await staleResponse).finished();
         held = null;
         // Wait for the stale browser promise to settle; fresh preparation then
         // provides a causal barrier before checking the complete request log.

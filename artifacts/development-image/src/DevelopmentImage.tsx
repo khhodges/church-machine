@@ -10,6 +10,7 @@ import {connectionStatus, reconnectHelp} from "./connection-status";
 import {useBridgeConnection} from "./use-bridge-connection";
 import {stopBeforeSend} from "./stop-before-send";
 import {inspectChoice, latestChoices, sourceId} from "./latest-image";
+import {builtSlots, byteToWord, containingRegion} from "./memory-map";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
 export default function DevelopmentImage() {
@@ -21,6 +22,10 @@ export default function DevelopmentImage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const [builtImage, setBuiltImage] = useState<PreparedImage | null>(null);
+  const [builtRows, setBuiltRows] = useState<Inspection["rows"]>([]);
+  const [view, setView] = useState<"saved" | "built">("saved");
+  const [address, setAddress] = useState("");
   const [sendStatus, setSendStatus] = useState("");
   const connection = useBridgeConnection();
   const {connected} = connection;
@@ -61,18 +66,20 @@ export default function DevelopmentImage() {
     return () => window.removeEventListener("message", receive);
   }, []);
   const busy = useRef(false);
-  const slots = input?.layoutRows ?? input?.rows ?? [];
+  const slots = view === "built" ? builtRows : input?.layoutRows ?? input?.rows ?? [];
+  const addressWord = byteToWord(address);
+  const addressRegion = addressWord === null ? undefined : containingRegion(slots, addressWord);
   const sorted = [...slots].sort((a, b) => a.slot - b.slot);
   const selected = slots.find(row => row.slot === selectedSlot);
   const selectedKind = selected?.kind ?? (selected?.filename ? "lump" : selected?.name.includes("DEV") ? "mmio" : selected?.name.includes("Thread") ? "thread" : "namespace");
   const selectedIsMmio = selectedKind === "mmio";
   const selectedIsLump = selectedKind === "lump";
-  const selectedIsThread = selectedKind === "thread" || selected?.name.includes("Thread") === true;
-  const selectedIsNamespace = selectedKind === "namespace" || selected?.name === "Boot.NS";
+  const selectedIsThread = selectedKind === "thread";
+  const selectedIsNamespace = selectedKind === "namespace";
   const selectedIsBoot = selected?.name.startsWith("Boot.") === true || selected?.boot === true;
   const displayLocation = (value: number | null | undefined) =>
     value == null ? "Not recorded" : `0x${value.toString(16).toUpperCase().padStart(8, "0")}`;
-  const capacity = input?.capacityWords;
+  const capacity = view === "built" ? (builtImage?.size ?? 0) / 4 : input?.capacityWords;
   const colors = ["#73d7c0", "#9fcb72", "#e9c46a", "#ee9b70", "#e887a5", "#b8a1ee", "#72b8df", "#d4dc7b", "#f1a86c", "#70c8d5", "#d89bcc", "#a8d497", "#e9a5a0", "#9daee8", "#dfc078", "#86d5b4"];
   const glassCapacity = capacity ?? 16384;
   const glassHeight = 420;
@@ -120,8 +127,13 @@ export default function DevelopmentImage() {
     NamespaceSelection.remember(sourceId(namespace));
     const controller = new AbortController();
     setLoading(true); setInput(null); setError("");
+    setBuiltImage(null); setBuiltRows([]); setView("saved"); setSelectedSlot(null);
     inspectChoice(namespace, controller.signal)
-      .then(result => { if (!controller.signal.aborted) setInput(result); })
+      .then(result => {
+        if (controller.signal.aborted) return;
+        if (result.layoutSource === "latest-built-image" && result.image) showBuilt(result.image);
+        setInput(result);
+      })
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -179,10 +191,33 @@ export default function DevelopmentImage() {
     if (busy.current) return;
     setNamespace(value);
     setSelectedSlot(null);
+    setBuiltImage(null); setBuiltRows([]); setView("saved"); setAddress("");
     setSendStatus(""); setReceipt(null);
     const url = new URL(location.href); url.searchParams.set("namespace", value);
     history.replaceState(null, "", url);
     notifyIde({type: "development-image:selection", namespace: sourceId(value)});
+  }
+
+  function showBuilt(image: PreparedImage) {
+    const rows = builtSlots(image);
+    setBuiltImage(image); setBuiltRows(rows); setView("built"); setSelectedSlot(null);
+  }
+
+  async function prepareInspection() {
+    if (busy.current || !input) return;
+    busy.current = true; setSending(true);
+    setSendStatus("Preparing latest compilations for inspection only. Nothing will be sent.");
+    try {
+      const image = await request<PreparedImage>("/api/development-image/prepare", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({id: input.id}),
+      });
+      if (image.namespace_revision_id !== input.id) throw Error("Prepared Namespace identity changed.");
+      requireLatestBuild(image);
+      showBuilt(image);
+      setSendStatus("Built image ready for inspection. Nothing was sent; installation is not established.");
+    } catch (cause) { setSendStatus("Inspection preparation failed — " + (cause as Error).message); }
+    finally { busy.current = false; setSending(false); }
   }
 
   async function beginSend() {
@@ -201,6 +236,7 @@ export default function DevelopmentImage() {
       }
       if (!image) throw Error(input.hardwareError || "No image is available for this selection.");
       requireLatestBuild(image);
+      if (image.memory_map) showBuilt(image);
       setSendStatus("Image prepared. Checking the connected FPGA; nothing has been sent.");
       const board = await request<BoardStatus>("/hardware/wukong/status");
       const target = board.physical_target;
@@ -249,7 +285,7 @@ export default function DevelopmentImage() {
 
       <div className="kiss-layout kiss-layout-single">
         <section className="kiss-panel" aria-labelledby="kiss-namespace-title">
-          <div className="kiss-panel-head"><h2 id="kiss-namespace-title"><span className="kiss-step">01</span>Namespace Table</h2><span className="kiss-status">Saved inputs</span></div>
+          <div className="kiss-panel-head"><h2 id="kiss-namespace-title"><span className="kiss-step">01</span>Namespace Table</h2><span className="kiss-status">{view === "built" ? "Built-image allocations" : "Saved inputs"}</span></div>
           <div className="kiss-selector">
             <label htmlFor="kiss-namespace">Namespace</label>
             <select id="kiss-namespace" value={namespace} disabled={sending || !!confirmation} onChange={event => changeNamespace(event.target.value)}>
@@ -257,7 +293,15 @@ export default function DevelopmentImage() {
               {entries.map(entry => <option key={entry.id} value={entry.id}>{entry.name}{entries.filter(other => other.name === entry.name).length > 1 ? ` · ${entry.id.slice(-12)}` : ""}</option>)}
             </select>
           </div>
-          <p className="kiss-meta">{slots.length} saved rows{typeof input?.metadata.slotCount === "number" ? ` · ${input.metadata.slotCount} slots` : input?.name === "Original" ? " · original slot assignments" : ""} · Select a name to inspect its saved data.</p>
+          <div className="kiss-selector">
+            <label htmlFor="memory-view">Memory view</label>
+            <select id="memory-view" value={view} onChange={event => {setView(event.target.value as "saved" | "built"); setSelectedSlot(null);}}>
+              <option value="saved">Saved design</option>
+              <option value="built" disabled={!builtImage}>Built image — prepared, not installation evidence</option>
+            </select>
+            <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare for inspection (no transfer)</button>
+          </div>
+          <p className="kiss-meta">{slots.length} {view === "built" ? "built-image" : "saved"} rows · Select a name to inspect this view’s data.</p>
           <div className="kiss-slot-visual-row">
           <div className="kiss-table-scroll" tabIndex={0} role="region" aria-label={`${namespace} saved slot table`}>
             <table>
@@ -276,10 +320,13 @@ export default function DevelopmentImage() {
           </div>
           <section className="kiss-water-map" aria-labelledby="kiss-water-title">
                 <div className="kiss-water-heading">
-                  <div><span className="kiss-step">SAVED LOCATIONS</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
+                  <div><span className="kiss-step">{view === "built" ? "BUILT-IMAGE LOCATIONS" : "SAVED LOCATIONS"}</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
                   <span className="kiss-water-caveat">{locatedEntries.length} mapped entries</span>
                 </div>
-                <p className="kiss-water-intro">{input?.layoutSource === "saved-design-layout"
+                {view === "built" && <p className="kiss-meta" style={{overflowWrap: "anywhere"}}>Prepared image SHA-256: {builtImage?.artifact_sha256}. Preparation is not installation evidence.</p>}
+                <p className="kiss-water-intro">{view === "built"
+                  ? "Exact staged allocations in word coordinates. Namespace shows its table, not its enclosing authority range. Threads occupy RAM; MMIO and unallocated lazy LUMPs are not painted. Names come only from this build."
+                  : input?.layoutSource === "saved-design-layout"
                   ? "Colored regions show the saved design’s memory layout, using its exact selected LUMPs and Thread allocations. Lazy entries stay outside resident memory. This is not an installed binary map."
                   : "Colored regions use each saved entry’s location and extent, including LUMPs, Threads, and Boot.NS / Boot.Thread. This is the Namespace layout, not a generated binary map."}</p>
                 <div className="kiss-glass-layout">
@@ -327,7 +374,7 @@ export default function DevelopmentImage() {
                         <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">Not present in this table</text>
                       </>}
                     </svg>
-                    <div className="kiss-glass-zero">{locatedEntries.length} saved locations shown</div>
+                    <div className="kiss-glass-zero">{locatedEntries.length} {view === "built" ? "built-image" : "saved"} locations shown</div>
                   </div>
                   {selected ? <aside className="kiss-device-card" aria-label={`${selected.name} selected slot details`}>
                     {selectedIsMmio ? <svg className="kiss-device-icon" viewBox="0 0 120 120" role="img" aria-labelledby="kiss-device-title">
@@ -373,13 +420,13 @@ export default function DevelopmentImage() {
                     <strong>{selected.name.replace(/_DEV$/, "").replaceAll("_", " ")}</strong>
                     {selectedIsMmio ? <>
                       <span className="kiss-device-type">{selected.name.startsWith("LED") ? "Indicator output" : selected.name.startsWith("BTN") ? "Button input" : selected.name.startsWith("TIMER") ? "Timer peripheral" : selected.name.startsWith("UART") ? "Serial interface" : "Memory-mapped device"}</span>
-                      <span className="kiss-device-location">Address {displayLocation(selected.location)}</span>
+                      <span className="kiss-device-location">Word address {displayLocation(selected.location)} · byte address {displayLocation(selected.location == null ? null : selected.location * 4)}</span>
                     </> : selectedIsLump ? <dl className="kiss-inline-details">
                       <dt>Artifact</dt><dd>{selected.selection?.filename ?? selected.filename ?? "Not recorded"}</dd>
                       <dt>Revision</dt><dd>{selected.selection?.revision ?? selected.lump_version ?? "Not recorded"}</dd>
                       <dt>Token</dt><dd>{selected.selection?.token ?? selected.token ?? "Not recorded"}</dd>
                       <dt>Policy</dt><dd>{selected.policy ?? selected.load_policy ?? "Not recorded"}</dd>
-                      <dt>Location</dt><dd>{displayLocation(selected.location)}</dd>
+                      <dt>Word location</dt><dd>{displayLocation(selected.location)}</dd>
                       <dt>Extent</dt><dd>{selected.limit ?? "Not recorded"}</dd>
                     </dl> : <dl className="kiss-inline-details">
                       <dt>Kind</dt><dd>{selectedIsThread ? "Thread" : selectedIsNamespace ? "Namespace" : selectedKind}</dd>
@@ -387,24 +434,27 @@ export default function DevelopmentImage() {
                       <dt>Slot</dt><dd>{String(selected.slot).padStart(2, "0")}</dd>
                       <dt>Type</dt><dd>{selected.type ?? selectedKind}</dd>
                       <dt>Policy</dt><dd>{selected.policy ?? selected.load_policy ?? (selected.resident ? "Resident" : "Not recorded")}</dd>
-                      <dt>Location</dt><dd>{displayLocation(selected.location)}</dd>
+                      <dt>Word location</dt><dd>{displayLocation(selected.location)}</dd>
                       <dt>Extent</dt><dd>{selected.limit ?? "Not recorded"}</dd>
                       <dt>Sequence</dt><dd>{selected.sequence ?? selected.seq ?? "Not recorded"}</dd>
                     </dl>}
                   </aside> : <aside className="kiss-device-card kiss-device-card-idle" aria-live="polite">
                     <span className="kiss-device-kicker">MEMORY LOCATIONS</span>
                     <strong>Select a slot</strong>
-                    <span className="kiss-device-type">Saved regions are shown dimmed until you choose a row.</span>
+                    <span className="kiss-device-type">Regions in this view are dimmed until you choose a row.</span>
                   </aside>}
                 </div>
-                <div className="kiss-water-legend"><span>{input?.layoutSource === "latest-built-image" ? "Actual freshly built image addresses (words). MMIO is separate; installation is not verified." : input?.layoutSource === "saved-design-layout" ? "Uses the same read-only layout as Namespace Table. No rebinding." : "Position and extent come directly from Namespace Table fields."}</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
+                <label htmlFor="memory-byte-address">FPGA byte address (decimal or 0x hex)</label>
+                <input id="memory-byte-address" value={address} onChange={event => setAddress(event.target.value)} placeholder="0x1000" />
+                {address && <p role="status">{addressWord === null ? "Enter a valid 32-bit byte address." : <>Word coordinate {addressWord} · {addressRegion ? `${addressRegion.name} (${addressRegion.kind}), NS[${addressRegion.slot}], byte offset ${Number(address) - addressRegion.location! * 4}` : "No containing resident region in this view."}</>}</p>}
+                <div className="kiss-water-legend"><span>{view === "built" ? "Digest-bound staged map; not installed-memory readback." : "Saved design only; preparing can change allocations and bindings."}</span><span>Threads and boot entries share the same word scale.</span></div>
           </section>
           </div>
           <details className="kiss-technical">
             <summary>Technical details · {selected?.name ?? "Namespace"}</summary>
-            <p className="kiss-muted">Exact saved row. Kind labels for Original are inferred for display; saved data is unchanged.</p>
-            <pre>{JSON.stringify(input?.rows.find(row => row.slot === selectedSlot), null, 2)}</pre>
-            {input?.layoutSource === "saved-design-layout" && <>
+            <p className="kiss-muted">{view === "built" ? "Exact built-image allocation; not installation evidence." : "Exact saved row. Kind labels for Original are inferred for display; saved data is unchanged."}</p>
+            <pre>{JSON.stringify(view === "built" ? selected : input?.rows.find(row => row.slot === selectedSlot), null, 2)}</pre>
+            {view === "saved" && input?.layoutSource === "saved-design-layout" && <>
               <p className="kiss-muted">Displayed design allocation (not installed memory)</p>
               <pre>{JSON.stringify(selected, null, 2)}</pre>
             </>}
@@ -423,7 +473,7 @@ export default function DevelopmentImage() {
 
       </div>
       <footer className="kiss-send-footer">
-        <div><strong>Send the bound build to FPGA</strong><span>Uses the existing Namespace binding; no rebind.</span></div>
+        <div><strong>Send the latest build to FPGA</strong><span>Compiles latest inputs and rebuilds bindings; explicit confirmation required.</span></div>
         <span className="kiss-send-hint" tabIndex={sendUnavailable ? 0 : undefined} aria-label={sendUnavailable ? "Send build to FPGA unavailable" : undefined} aria-describedby={sendUnavailable ? "send-unavailable-reason" : undefined}>
           <button type="button" className="kiss-primary kiss-send-button" disabled={!!sendUnavailable} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
           {sendUnavailable && <span id="send-unavailable-reason" role="tooltip">{sendUnavailable}</span>}

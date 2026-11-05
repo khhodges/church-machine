@@ -40,6 +40,22 @@ def test_latest_sources_build_with_private_binding_and_no_live_mutation(setup_de
         assert row["location"] == struct.unpack_from("<I", raw, row["slot"] * 16)[0]
         assert row["allocationWords"] == row["limit"] + 1
     assert next(r for r in prepared["layout_rows"] if r["kind"] == "namespace")["allocationWords"] == len(raw)//4
+    memory_map = prepared["memory_map"]
+    assert memory_map["artifact_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert memory_map["namespace_revision_id"] == identity(path)
+    assert memory_map["address_unit"] == "byte"
+    assert memory_map["size"] == len(raw)
+    for region in memory_map["regions"]:
+        assert region["byteAddress"] == struct.unpack_from("<I", raw, region["slot"] * 16)[0] * 4
+        if region["kind"] == "namespace":
+            assert region["byteLength"] == document["slotCount"] * 16
+        elif region["kind"] == "thread":
+            definition = next(r for r in document["rows"] if r["slot"] == region["slot"])
+            assert region["byteLength"] == definition["words"] * 4
+        elif region["kind"] == "lump":
+            mapped = prepared["trace_rows"][str(region["byteAddress"])]
+            assert mapped["pet_name"] == region["name"]
+            assert str(region["byteAddress"] + region["byteLength"] - 4) in prepared["trace_rows"]
     for address, mapped in prepared["trace_rows"].items():
         assert mapped["map_instr_word"] == struct.unpack_from("<I", raw, int(address))[0]
         assert mapped["source_map"] == "uploaded"
@@ -57,6 +73,20 @@ def test_missing_snapshot_is_rebuilt_privately(setup_design):
     assert response.status_code == 200, response.json
     assert response.json["bindings_changed"] is True
     assert snapshots(root) == before
+
+
+def test_mmio_map_is_not_resident_ram(setup_design):
+    root, client, document, path, _ = setup_design
+    document["rows"].append(dict(slot=8, name="UART_DEV", kind="mmio",
+        policy="Hardware", sequence=1, address=0x40000014, limit=2))
+    path.write_text(json.dumps(document))
+    raw, prepared = build_saved_design(app_module, identity(path))
+    region = next(r for r in prepared["memory_map"]["regions"] if r["slot"] == 8)
+    assert region["kind"] == "mmio"
+    assert region["resident"] is False
+    assert region["byteAddress"] == struct.unpack_from("<I", raw, 8 * 16)[0] * 4
+    assert region["byteLength"] == 12
+    assert str(region["byteAddress"]) not in prepared["trace_rows"]
 
 
 def test_changed_saved_design_is_not_substituted(setup_design):
@@ -116,6 +146,10 @@ def test_lazy_lump_also_uses_newest_source(setup_design):
     assert response.status_code == 200, response.json
     item = next(i for i in response.json["build_inputs"] if i["name"] == "ide.Helper")
     assert item["sourceArtifact"] == new["filename"]
+    lazy = next(r for r in response.json["memory_map"]["regions"] if r["slot"] == 9)
+    assert lazy["byteAddress"] is None
+    assert lazy["byteLength"] == 0
+    assert lazy["resident"] is False
 
 
 def test_concurrent_compilation_invalidates_prepared_image(setup_design, monkeypatch):

@@ -21,7 +21,7 @@ export async function inspectChoice(id: string, signal: AbortSignal): Promise<In
   if (image.namespace_revision_id !== original || !image.layout_rows?.length)
     throw Error("The latest image has no matching built layout. Nothing was sent.");
   return {...saved, name: `Latest Development Image — ${saved.name}`,
-    image, rows: image.layout_rows, layoutRows: image.layout_rows,
+    image,
     layoutSource: "latest-built-image", fingerprint: image.artifact_sha256,
     capacityWords: image.size / 4, capacitySource: "Exact freshly built image",
     imageSha256: image.artifact_sha256, imageBytes: image.size,

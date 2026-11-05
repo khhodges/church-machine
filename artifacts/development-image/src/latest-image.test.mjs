@@ -24,7 +24,8 @@ try {
           layout_rows: bad ? undefined : [{slot: 6, location: 160, allocationWords: 64}]}};
   };
   const built = await inspectChoice("latest:design:one", new AbortController().signal);
-  assert.equal(built.layoutRows[0].location, 160);
+  assert.equal(built.rows[0].location, 9000, "Saved inspection remains separate");
+  assert.equal(built.image.layout_rows[0].location, 160);
   assert.equal(built.capacityWords, 16384);
   assert.equal(built.fingerprint, "hash");
   assert.equal(calls.length, 2);

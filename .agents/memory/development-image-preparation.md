@@ -93,6 +93,13 @@ the reconstructed upload digest matched the acknowledged image.
 **How to apply:** Freeze the map alongside the upload, bind its use to the
 artifact and bridge session, and keep mapped words distinct from observed words.
 
+Memory inspection must keep saved-design and freshly prepared maps separate.
+**Why:** Latest compilation and source-frame stripping can move allocations;
+looking up a prepared FPGA address in saved layout can name the wrong LUMP.
+**How to apply:** Bind allocation evidence to the exact prepared image digest
+and Namespace identity, convert byte addresses explicitly to word coordinates,
+and never treat preparation alone as installation evidence.
+
 Boot-sentinel expectations come from the selected frozen BIT build, never
 from the new uploaded Namespace or today's mutable boot sources.
 **Why:** The installed hardware retains its initializer count when runtime

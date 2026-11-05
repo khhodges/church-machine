@@ -99,6 +99,29 @@ def _assemble_latest(backend, identifier, document, directory, inputs):
                 emitted["limit"] = len(raw)//4-1 if original["kind"] == "namespace" else staged["limit"]
             image_rows.append(emitted)
         prepared["layout_rows"] = normalize_rows(image_rows)
+        # Allocation evidence belongs to these staged bytes, not the saved
+        # authoring projection. Namespace encloses memory; only its table is
+        # painted in the glass so it does not conceal contained objects.
+        definitions = {row["slot"]: row for row in document["rows"]}
+        regions = []
+        for row in rows:
+            definition = definitions[row["slot"]]
+            kind = definition["kind"]
+            absent = row.get("unresolved") or definition.get("policy") == "Lazy"
+            words = (document["slotCount"] * 4 if kind == "namespace"
+                     else row.get("allocationWords", row.get("limit", -1) + 1))
+            regions.append(dict(
+                slot=row["slot"], name=row["name"], kind=kind,
+                type=row["type"], policy=definition.get("policy"),
+                byteAddress=None if absent else row["location"] * 4,
+                byteLength=0 if absent else words * 4,
+                resident=not absent and kind != "mmio",
+                sequence=row["seq"], boot=definition.get("boot", False),
+            ))
+        prepared["memory_map"] = dict(
+            artifact_sha256=prepared["artifact_sha256"],
+            namespace_revision_id=identifier, size=len(raw),
+            address_unit="byte", regions=regions)
         prepared.update(namespace_revision_id=identifier,
                         source_kind="latest-compilation-image", namespace_fingerprint=fingerprint,
                         hardware_certified=False, bindings_changed=True,
