@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { notifyIde, acceptLoadRequest, loadRequestReady } from "./embedding";
 import type { LoadRequest } from "./embedding";
 import type { CSSProperties } from "react";
-import {request, sendAllowed, prepareExact, installExact, receiptState} from "./image-api";
+import {request, sendAllowed, prepareExact, installExact, receiptState, requireLatestBuild} from "./image-api";
 import {connectionStatus, reconnectHelp} from "./connection-status";
 import {useBridgeConnection} from "./use-bridge-connection";
 import {stopBeforeSend} from "./stop-before-send";
@@ -188,7 +188,7 @@ export default function DevelopmentImage() {
     try {
       let image = input.image;
       if (!image && input.id.startsWith("design:")) {
-        setSendStatus("Preparing the complete image from saved binding snapshots. No rebinding or transfer.");
+        setSendStatus("Compiling the latest source of every LUMP and rebuilding bindings. Nothing has been sent.");
         image = await request<PreparedImage>("/api/development-image/prepare", {
           method: "POST", headers: {"Content-Type": "application/json"},
           body: JSON.stringify({id: input.id}),
@@ -197,6 +197,7 @@ export default function DevelopmentImage() {
           throw Error("Prepared Namespace identity changed. Nothing was sent.");
       }
       if (!image) throw Error(input.hardwareError || "No image is available for this selection.");
+      requireLatestBuild(image);
       setSendStatus("Image prepared. Checking the connected FPGA; nothing has been sent.");
       const board = await request<BoardStatus>("/hardware/wukong/status");
       const target = board.physical_target;
@@ -213,7 +214,7 @@ export default function DevelopmentImage() {
     const frozen = confirmation;
     try {
       if (!token.trim()) throw Error("IDE hardware authorization is required. Enter the existing IDE access token; nothing was sent.");
-      setSendStatus("Rechecking the exact prepared image. No rebinding.");
+      setSendStatus("Rechecking latest compilations against the confirmed image. Nothing has been sent.");
       const prepared = await prepareExact(frozen.image, token.trim());
       setSendStatus("Stopping the selected board and waiting for its acknowledgement…");
       await stopBeforeSend(frozen.target, token.trim());
@@ -406,7 +407,7 @@ export default function DevelopmentImage() {
             {input?.capacitySource === "reference" && <p>Total capacity was not recorded. The glass uses a labelled 16,384-word reference scale.</p>}
             {input?.imageSha256 && <p>Retained binary: {input.imageSha256} · {input.imageBytes} bytes</p>}
             {input?.hardwareError && <p>{input.layoutSource === "saved-design-layout"
-              ? "Send assembles a complete image from the exact saved binding snapshots, then checks FPGA compatibility. It does not rebind."
+              ? "Send compiles the latest source of every included LUMP, regenerates Threads and Namespace data, and rebuilds bindings. Older saved selections are not reused."
               : `Not ready to send: ${input.hardwareError}`}</p>}
             <p><a href="/simulator/#namespace" target="_top" onClick={event => { event.preventDefault(); notifyIde({type: "development-image:navigate", view: "namespace"}); }}>Open Namespace editor</a></p>
             {input?.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
@@ -453,6 +454,17 @@ export default function DevelopmentImage() {
           <dl><dt>Namespace</dt><dd>{input?.name}</dd><dt>Board</dt><dd>{confirmation.target.device_uid}</dd>
             <dt>Image SHA-256</dt><dd>{confirmation.image.artifact_sha256}</dd>
             <dt>Required bitstream</dt><dd>{confirmation.image.required_bitstream_sha256}</dd></dl>
+          {confirmation.image.build_inputs && <details>
+            <summary>Latest build inputs ({confirmation.image.build_inputs.length})</summary>
+            <p>Every compiled LUMP uses its latest saved source and the current compiler.
+              Namespace and Thread bodies are regenerated for this build.</p>
+            <ul>{confirmation.image.build_inputs.map(item => <li key={item.slot}>
+              <strong>NS[{item.slot}] {item.name}</strong> — {item.origin === "current-definition"
+                ? "generated from current definition"
+                : `latest source revision ${item.revision}; freshly compiled`}
+              {item.binaryHash && <div style={{overflowWrap: "anywhere"}}>SHA-256: {item.binaryHash}</div>}
+            </li>)}</ul>
+          </details>}
           <p>After confirmation, the IDE stops the board, waits for acknowledgement, then sends this image. Bitstream compatibility is your responsibility. An upload acknowledgement is not memory readback.</p>
           <label htmlFor="hardware-token">IDE hardware access token</label>
           <input id="hardware-token" type="password" autoComplete="off" value={token} onChange={event => {

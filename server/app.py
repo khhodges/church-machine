@@ -16455,7 +16455,7 @@ def get_lump_detail(token):
     return jsonify(detail)
 
 
-def _latest_primary_compilation(abstraction):
+def _latest_primary_compilation(abstraction, *, include_system_managed=False):
     """Resolve exact primary bytes with intrinsic or verified revision source."""
     name = str(abstraction or "").strip()
     if not name:
@@ -16463,7 +16463,7 @@ def _latest_primary_compilation(abstraction):
     manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
     rows = [row for row in manifest if isinstance(row, dict)
             and str(row.get("abstraction") or "") == name
-            and not row.get("system_managed")]
+            and (include_system_managed or not row.get("system_managed"))]
     candidates = []
     for row in rows:
         filename = row.get("filename")
@@ -22406,8 +22406,6 @@ def api_compile():
     If COMPILE_API_TOKEN is unset the endpoint is open (no auth required),
     matching the IDE's own no-login default.
     """
-    from compile_api import run_compile, VALID_LANGUAGES
-
     if _COMPILE_API_TOKEN:
         auth_header  = request.headers.get('Authorization', '')
         token_param  = request.args.get('token', '')
@@ -22416,6 +22414,12 @@ def api_compile():
             return jsonify({'error': 'Unauthorized — supply COMPILE_API_TOKEN via Authorization: Bearer <token>'}), 401
 
     body = request.get_json(silent=True)
+    return _compile_development_source(body)
+
+
+def _compile_development_source(body):
+    """Internal trusted compiler entry; HTTP authentication stays in its route."""
+    from compile_api import run_compile, VALID_LANGUAGES
     if not body:
         return jsonify({'error': 'Request body must be application/json'}), 400
 

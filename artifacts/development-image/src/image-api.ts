@@ -9,6 +9,9 @@ export type CatalogEntry = {id: string; name: string; saved_at: string; preparat
 export type PreparedImage = {
   profile: string; namespace_revision_id: string; artifact_sha256: string;
   required_bitstream_sha256: string; size: number;
+  freshness_policy?: string;
+  build_inputs?: Array<{slot: number; name: string; kind: string; origin: string;
+    revision?: number; sourceArtifact?: string; sourceHash?: string; binaryHash?: string}>;
 };
 export type Inspection = {
   id: string; name: string; rows: Slot[]; fingerprint: string;
@@ -43,11 +46,19 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
 }
 
 export const PROFILE = "amoeba-retry-25mhz-uart-v1";
+export function requireLatestBuild(image: PreparedImage) {
+  if (image.namespace_revision_id.startsWith("design:") &&
+      image.freshness_policy !== "latest-every-lump") {
+    throw Error("The IDE server has not activated latest-compilation builds. Nothing was sent.");
+  }
+}
 export async function prepareExact(image: PreparedImage, token: string) {
+  requireLatestBuild(image);
   const prepared = await request<PreparedImage>("/api/namespace-image/uart-prepare", {
     method: "POST", headers: {"Content-Type": "application/json", Authorization: `Bearer ${token}`},
     body: JSON.stringify({profile: image.profile, namespace_revision_id: image.namespace_revision_id}),
   });
+  requireLatestBuild(prepared);
   if (prepared.artifact_sha256 !== image.artifact_sha256 ||
       prepared.namespace_revision_id !== image.namespace_revision_id ||
       prepared.profile !== PROFILE || prepared.size !== 65536) {
@@ -57,6 +68,7 @@ export async function prepareExact(image: PreparedImage, token: string) {
 }
 
 export async function installExact(image: PreparedImage, target: Target, token: string): Promise<Receipt> {
+  requireLatestBuild(image);
   const sent = await request<Receipt & {queued: boolean}>("/api/namespace-image/uart-install", {
     method: "POST", headers: {"Content-Type": "application/json", Authorization: `Bearer ${token}`},
     body: JSON.stringify({

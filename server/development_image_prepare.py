@@ -1,6 +1,6 @@
-"""Assemble an exact saved design using existing binding snapshots only.
+"""Build a new development image from latest sources and current compilation.
 
-No binding, approval, activation, installation or publication occurs here.
+Binding is private to the build. No activation, installation or publication occurs.
 UART installation separately checks authorization, exact digest, physical
 target, installed BIT evidence, STOP and explicit replacement consent.
 """
@@ -14,19 +14,24 @@ from server.namespace_design_v1 import FORMAT, PHASE1_FORMAT, digest, validate
 
 def build_saved_design(backend, identifier):
     from server.development_image_view import retained_document
-    from server.namespace_binding_report import binding_report
-    from server.design_simulation import configuration, stage
-    from server.uart_profile_install import prepare_image
-
+    from server.development_latest import latest_build
     directory = Path(backend.NS_STATE_PATH).parent
     with backend._namespace_commit_guard(), binding_lock(directory):
-        document = retained_document(backend, identifier, None)
+        saved = retained_document(backend, identifier, None)
+        with latest_build(backend, saved, directory) as (document, private, inputs):
+            return _assemble_latest(backend, identifier, document, private, inputs)
+
+
+def _assemble_latest(backend, identifier, document, directory, inputs):
+        from server.namespace_binding_report import binding_report
+        from server.design_simulation import configuration, stage
+        from server.uart_profile_install import prepare_image
         if document.get("format") not in (FORMAT, PHASE1_FORMAT):
             raise ValueError("This saved Namespace uses a historical layout. Select New Layout or "
                              "a compatible saved copy; no layout conversion or rebinding was performed.")
         validate(document)
         fingerprint = digest(document)
-        report = binding_report(document, directory, fingerprint, bind_now=False)
+        report = binding_report(document, directory, fingerprint, bind_now=True)
         items = {item["slot"]: item for item in report["lists"]}
         bodies, errors = {}, []
         for row in document["rows"]:
@@ -43,7 +48,7 @@ def build_saved_design(backend, identifier):
             bodies[row["slot"]] = raw
         if errors:
             raise ValueError("Cannot prepare this saved Namespace. " + " ".join(errors) +
-                             " Nothing was rebound or sent.")
+                             " No live bindings were changed and nothing was sent.")
         boots = [row for row in document["rows"] if row.get("boot")]
         if len(boots) != 1 or boots[0]["slot"] not in bodies:
             raise ValueError("Select one resident boot LUMP with saved binding bytes. Nothing was sent.")
@@ -79,6 +84,8 @@ def build_saved_design(backend, identifier):
                     source_map="uploaded")
         prepared["trace_rows"] = trace_rows
         prepared.update(namespace_revision_id=identifier,
-                        source_kind="saved-binding-image", namespace_fingerprint=fingerprint,
-                        hardware_certified=False, bindings_changed=False)
+                        source_kind="latest-compilation-image", namespace_fingerprint=fingerprint,
+                        hardware_certified=False, bindings_changed=True,
+                        build_inputs=inputs, freshness_policy="latest-every-lump",
+                        saved_namespace_changed=False)
         return raw, prepared

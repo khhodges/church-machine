@@ -22,7 +22,14 @@ rebuild derived bindings/layout as needed, and preserve exact identity evidence
 for the resulting build. A cache is usable only if it matches those inputs.
 Do not silently fall back to an older compilation to hide an error. Distinguish
 historical exact-byte replay from a new development build; keep history immutable.
-This is a required behavior, not a claim that the existing builder enforces it.
+Source revision and compiler identity jointly define freshness: unchanged
+source can require different instruction bytes after a compiler correction.
+
+Fresh builds must reuse the normal compiler's authenticated source and
+relocation contracts, including unresolved SELF, rather than treating an old
+binding snapshot as authority or manufacturing replacement capabilities.
+**Why:** A private build must not become a second, less strict compiler-admission
+path merely because it does not publish its intermediate LUMPs.
 
 Image construction does not itself authorize physical transfer, FPGA
 reprogramming, or replacing an image already running. Preserve authentication,
