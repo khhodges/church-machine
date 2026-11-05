@@ -305,7 +305,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 25
+BRIDGE_VERSION    = 26
 # Hold a complete bounded acceptance run while HTTPS catches up. This does
 # not promise unlimited recording; any overflow must be explicitly reported.
 TRACE_BACKLOG_CAPACITY = 8192
@@ -2050,6 +2050,147 @@ def device_identity_notice(uid):
             'selected in the IDE. Do not use COM3 or a bridge session as board identity.')
 
 
+class PairingConnectionError(ValueError):
+    """Safe operator guidance; never includes credentials or HTTP bodies."""
+
+
+def _windows_protect(data, decrypt=False):
+    """DPAPI current-user scope. No machine-wide key or plaintext fallback."""
+    import ctypes
+    from ctypes import wintypes
+    if sys.platform != 'win32':
+        raise OSError("Protected credential storage requires Windows")
+
+    class Blob(ctypes.Structure):
+        _fields_ = [('size', wintypes.DWORD),
+                    ('data', ctypes.POINTER(ctypes.c_ubyte))]
+
+    buffer = ctypes.create_string_buffer(data)
+    source = Blob(len(data), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_ubyte)))
+    result = Blob()
+    crypt = ctypes.WinDLL('crypt32', use_last_error=True)
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    function = crypt.CryptUnprotectData if decrypt else crypt.CryptProtectData
+    function.argtypes = [ctypes.POINTER(Blob), ctypes.c_void_p,
+                        ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p,
+                        wintypes.DWORD, ctypes.POINTER(Blob)]
+    function.restype = wintypes.BOOL
+    kernel.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel.LocalFree.restype = ctypes.c_void_p
+    if not function(ctypes.byref(source), None, None, None, None, 1,
+                    ctypes.byref(result)):
+        raise OSError("Windows protected credential storage failed")
+    try:
+        return ctypes.string_at(result.data, result.size)
+    finally:
+        kernel.LocalFree(ctypes.cast(result.data, ctypes.c_void_p))
+
+
+def _credential_file(ide, uid):
+    from pathlib import Path
+    from urllib.parse import urlsplit
+    url = urlsplit(ide)
+    if url.scheme != 'https' or not url.hostname or url.username or url.password:
+        raise ValueError("Saved pairing requires an HTTPS IDE URL")
+    scope = f'{url.scheme}://{url.hostname.lower()}:{url.port or 443}{url.path.rstrip("/")}\n{uid}'
+    directory = os.environ.get('LOCALAPPDATA')
+    if not directory:
+        raise OSError("Windows LOCALAPPDATA is unavailable")
+    return Path(directory) / 'ChurchMachine' / 'Bridge' / (
+        hashlib.sha256(scope.encode()).hexdigest() + '.dpapi')
+
+
+def _load_pairing(ide, uid):
+    import json
+    path = _credential_file(ide, uid)
+    if not path.exists():
+        return None
+    if path.stat().st_size > 16384:
+        raise ValueError("Invalid saved pairing size")
+    record = json.loads(_windows_protect(path.read_bytes(), decrypt=True))
+    if not isinstance(record, dict) or type(record.get('expires_at')) not in (int, float):
+        raise ValueError("Invalid saved pairing record")
+    if record.get('ide') != ide or record.get('uid') != uid:
+        raise ValueError("Saved pairing scope does not match")
+    if record['expires_at'] <= time.time():
+        path.unlink()
+        return None
+    if not str(record.get('token', '')).startswith('bridge-session-'):
+        raise ValueError("Invalid saved pairing")
+    return record
+
+
+def _save_pairing(ide, uid, token, expires_at):
+    import json
+    import tempfile
+    path = _credential_file(ide, uid)
+    # Encrypt before touching disk, including temporary files.
+    protected = _windows_protect(json.dumps(dict(
+        ide=ide, uid=uid, token=token, expires_at=expires_at)).encode())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+            temporary = stream.name
+            stream.write(protected)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary and os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def _connect_pairing(ide, uid, code=None):
+    """Authenticate before serial access; never re-redeem a consumed code."""
+    persistent = sys.platform == 'win32'
+    saved = _load_pairing(ide, uid) if persistent else None
+    if saved:
+        response = requests.post(
+            ide + '/api/bridge-pairing/validate',
+            headers={'Authorization': 'Bearer ' + saved['token']},
+            json={'device_uid': uid}, timeout=15, allow_redirects=False)
+        if response.status_code == 200 and response.json().get('ok') is True:
+            os.environ['REPORT_TOKEN'] = saved['token']
+            print('[bridge] Saved Windows authorization accepted')
+            return True
+        if response.status_code in (401, 403):
+            _credential_file(ide, uid).unlink(missing_ok=True)
+            raise PairingConnectionError("Saved authorization expired or was revoked. "
+                             "Create a fresh connection command in this IDE.")
+        raise PairingConnectionError("Could not validate saved authorization. It was retained; "
+                         "retry when the IDE is reachable.")
+    if not code:
+        return False
+    if persistent:
+        # Check DPAPI and destination before consuming a single-use code.
+        path = _credential_file(ide, uid)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if _windows_protect(_windows_protect(b'check'), decrypt=True) != b'check':
+            raise OSError("Windows credential protection is unavailable")
+    started = time.time()
+    response = requests.post(
+        ide + '/api/bridge-pairing/redeem',
+        json={'code': code, 'device_uid': uid},
+        timeout=15, allow_redirects=False)
+    if response.status_code != 200:
+        raise PairingConnectionError("Pairing code is expired, consumed or rejected. "
+                         "Create a fresh connection command in this IDE.")
+    record = response.json()
+    token = record.get('token', '')
+    lifetime = record.get('expires_in')
+    if (not isinstance(token, str) or not token.startswith('bridge-session-')
+            or type(lifetime) not in (int, float) or not 0 < lifetime <= 86400 * 365):
+        raise ValueError("Invalid pairing response")
+    if persistent:
+        _save_pairing(ide, uid, token, started + lifetime)
+    os.environ['REPORT_TOKEN'] = token
+    print('[bridge] IDE pairing accepted; ' + (
+        'authorization saved with Windows protection' if persistent else
+        'authorization is process-only on this platform'))
+    return True
+
+
 def main():
     if serial is None:
         print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
@@ -2091,27 +2232,34 @@ def main():
         parser.error('--calls-only requires --phase1-golden')
 
     ide_base    = args.ide.rstrip('/')
-    if args.pair_code:
+    if args.pair_code or sys.platform == 'win32':
         if not ide_base.startswith('https://') or args.insecure:
             parser.error('IDE pairing requires HTTPS with certificate verification')
         try:
-            response = requests.post(
-                ide_base + '/api/bridge-pairing/redeem',
-                json={'code': args.pair_code, 'device_uid': args.device_uid},
-                timeout=15, allow_redirects=False)
-            if response.status_code != 200:
-                print('Pairing failed. Create a new connection command in this IDE '
-                      '(HTTP %s). No serial port was opened.' % response.status_code)
+            connected = _connect_pairing(ide_base, args.device_uid, args.pair_code)
+            if not connected and not os.environ.get('REPORT_TOKEN', '').strip():
+                print('No saved authorization. Create a fresh connection command '
+                      'in this IDE once; Windows will retain the resulting authorization. '
+                      'No serial port was opened.')
                 return 1
-            paired_token = response.json().get('token', '')
-            if not paired_token.startswith('bridge-session-'):
-                print('Pairing failed: invalid server response. No serial port was opened.')
-                return 1
-            os.environ['REPORT_TOKEN'] = paired_token
             args.pair_code = None
-            print('[bridge] IDE pairing accepted; credentials remain in this process only')
-        except (requests.RequestException, ValueError):
-            print('Pairing failed: could not reach the selected IDE. No serial port was opened.')
+        except requests.RequestException:
+            print('IDE authorization check could not reach the server. Saved '
+                  'authorization was retained; retry when connected. '
+                  'No serial port was opened.')
+            return 1
+        except (OSError, KeyError):
+            print('Windows credential storage is unavailable or invalid. Check '
+                  'your Windows user profile and LOCALAPPDATA access, then retry. '
+                  'No plaintext fallback was used. No serial port was opened.')
+            return 1
+        except PairingConnectionError as error:
+            print(str(error) + ' No serial port was opened.')
+            return 1
+        except ValueError:
+            print('Authorization was rejected or saved pairing is invalid. '
+                  'Create a fresh connection command in this IDE. '
+                  'No serial port was opened.')
             return 1
     church_only = args.church_only
     flow_trace = Phase1FlowTrace(calls_only=args.calls_only) if args.phase1_golden else None

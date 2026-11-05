@@ -131,6 +131,23 @@ def authorized():
 
 
 def register(app, authenticate):
+    @app.post("/api/bridge-pairing/validate")
+    def validate_saved_pairing():
+        # Read-only validation: no renewal, grant creation or command polling.
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        data = request.get_json(silent=True) or {}
+        uid = data.get("device_uid") if isinstance(data, dict) else None
+        record = None
+        if token.startswith("bridge-session-") and isinstance(uid, str) and uid:
+            with _store() as db:
+                record = _get(db, "session", _digest(token))
+                if record and record["uid"] != uid:
+                    record = None
+        response = jsonify(ok=bool(record))
+        response.status_code = 200 if record else 401
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.errorhandler(PairingStoreUnavailable)
     def pairing_store_unavailable(error):
         return jsonify(error="Pairing storage is unavailable. Check the IDE server's private storage and retry."), 503

@@ -38,3 +38,14 @@ a consumed pairing code cannot restore that lost credential.
 OS-protected client credential storage and reuse for the exact IDE/device.
 Do not claim server-side grant persistence solves client-side credential loss;
 never recover by trusting a UID or reviving a consumed pairing code.
+
+Client authorization belongs to the Windows user profile, not the downloaded
+script's directory or filename, and reuse must not extend its original expiry.
+**Why:** Browser duplicate-download names and script replacement must not create
+new pairing identities. Server grant persistence alone cannot preserve a stopped
+client's bearer credential.
+**How to apply:** Use current-user OS protection and an exact IDE/device scope;
+validate saved authorization before opening serial, preserve it on transient
+network failure, and do not retry a consumed pairing code when a valid saved
+grant exists. Linux tests with simulated protection are not native Windows
+cryptography verification.

@@ -41,6 +41,20 @@ def test_requires_auth(app):
         json={"device_uid": "board-test"}).status_code == 401
 
 
+def test_saved_pairing_validation(app):
+    token = redeem(app, issue(app)).json["token"]
+    client = app.test_client()
+    headers = {"Authorization": "Bearer " + token}
+    for uid, status in [("board-test", 200), ("wrong-board", 401)]:
+        response = client.post("/api/bridge-pairing/validate",
+                               json={"device_uid": uid}, headers=headers)
+        assert response.status_code == status
+        assert response.headers["Cache-Control"] == "no-store"
+        assert token not in response.text
+    assert client.post("/api/bridge-pairing/validate",
+                       json={"device_uid": "board-test"}).status_code == 401
+
+
 def test_single_use_scoped_session(app):
     code = issue(app)
     assert redeem(app, code, "wrong-board").status_code == 401
