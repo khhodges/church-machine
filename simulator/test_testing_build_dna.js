@@ -1,6 +1,11 @@
 'use strict';
 const assert = require('assert');
 const m = require('./testing-build-dna.js');
+assert.deepStrictEqual(m.objectWordTotal([
+  {slot:1,sizeWords:256}, {slot:2,sizeWords:64}, {slot:2,sizeWords:64},
+  {slot:3,sizeWords:5,kind:'Hardware'}, {slot:4,sizeWords:999,availability:'not-in-image'},
+  {slot:5}
+]), {total:325,ram:320,mmio:5,missing:1});
 assert.equal(m.nodeLabel({slot: 1, kind: 'Namespace', name: 'NS[1]'}).name, 'Namespace.Boot');
 assert.equal(m.nodeLabel({slot: 6, name: 'NS[6]', dotName: 'ide.SelfTest'}).name, 'ide.SelfTest');
 assert.equal(m.nodeLabel({slot: 9, name: 'NS[9]'}).name, null);

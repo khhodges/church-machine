@@ -15,6 +15,7 @@ export type Inspection = {
   layoutRows?: Slot[]; layoutSource?: string;
   capacityWords: number; capacitySource: string; image: PreparedImage | null;
   imageSha256: string | null; imageBytes: number | null;
+  inspectionOnly?: boolean; releaseApproved?: boolean;
   hardwareError: string | null; warnings: string[]; metadata: Record<string, unknown>;
 };
 export type Target = {device_uid: string; session_id: string; live: boolean};
@@ -83,4 +84,9 @@ export function receiptState(receipt: Receipt, board: BoardStatus): string {
   }
   if (delivery.write_ok === true) return "Sent by bridge — awaiting matching upload acknowledgement. Contents unverified.";
   return delivery.consumed_ts ? "Delivered to bridge — board acknowledgement pending." : "Queued — waiting for bridge.";
+}
+
+/** Inspection-only (experimental/frozen evidence) inputs can never enable Send. */
+export function sendAllowed(input: Pick<Inspection, "inspectionOnly" | "releaseApproved"> | null | undefined): boolean {
+  return !!input && input.inspectionOnly !== true && input.releaseApproved !== false;
 }

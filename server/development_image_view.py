@@ -86,6 +86,9 @@ def inventory(backend):
 
 
 def inspect(backend, identifier):
+    from server.testing_dna_evidence import NS_ID
+    if identifier == NS_ID:
+        return inspect_frozen(backend, identifier)
     entries, records, warnings = inventory(backend)
     entry = next((item for item in entries if item["id"] == identifier), None)
     if entry is None:
@@ -146,6 +149,30 @@ def inspect(backend, identifier):
                 readOnly=True, bindingsChanged=False)
 
 
+def inspect_frozen(backend, identifier):
+    from server.testing_build_dna import graph
+    from server.testing_dna_evidence import InspectionEvidence, NS_ID
+    store = InspectionEvidence() if identifier == NS_ID else backend._artifact_revision_store()
+    evidence = graph(store, identifier)
+    record = store.read("namespace", identifier)
+    image_name = next(k for k in ("boot-image.bin", "simulation.bin") if k in record["files"])
+    from server.testing_build_dna import read_bytes
+    raw = read_bytes(store, "namespace", identifier, image_name)
+    rows = [dict(slot=n["slot"], name=n.get("dotName") or n["name"],
+                 kind={"Hardware": "mmio", "Thread": "thread", "Namespace": "namespace"}.get(n["kind"], "lump"),
+                 location=n.get("location"), allocationWords=n.get("sizeWords"),
+                 policy="Hardware" if n["kind"] == "Hardware" else "Resident",
+                 binary_hash=n.get("binaryHash"))
+            for n in evidence["nodes"] if n.get("availability") != "not-in-image"]
+    return dict(ok=True, id=identifier, name="Inspected Namespace", rows=rows,
+                layoutRows=rows, layoutSource="frozen-image", fingerprint=evidence["imageHash"],
+                capacityWords=len(raw)//4, capacitySource="Exact inspected image",
+                image=None, imageSha256=evidence["imageHash"], imageBytes=len(raw),
+                inspectionOnly=True, releaseApproved=False, readOnly=True,
+                hardwareError="Read-only frozen image inspection. Sending is disabled.",
+                warnings=evidence["issues"], metadata={})
+
+
 def register(app, backend):
     @app.get("/api/development-image/open")
     def development_image_open():
@@ -179,6 +206,10 @@ def register(app, backend):
         try:
             with backend._namespace_commit_guard():
                 entries, _records, warnings = inventory(backend)
+            from server.testing_dna_evidence import NS_ID, ARCHIVE
+            if ARCHIVE.is_file():
+                entries.append(dict(id=NS_ID, name="Amoeba retry — inspected Namespace",
+                                    preparation="Inspection only"))
             response = jsonify(ok=True, entries=[
                 {k: item.get(k) for k in ("id", "name", "saved_at", "preparation")}
                 for item in entries], warnings=warnings)

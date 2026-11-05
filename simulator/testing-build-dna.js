@@ -72,7 +72,7 @@
       return { slot: slot, node: nodes.filter(function (n) { return n.slot === slot; })[0] || null };
     });
     var inner = nodes.filter(function (n) { return n.slot !== 0 && n.slot !== 1; });
-    var hh = HDR_TOP + 3 * HDR_LINE + 10;
+    var hh = HDR_TOP + 3 * HDR_LINE + 36;
     var aw = Math.max(1, (width || 800) - 48), ah = Math.max(1, (height || 600) - 48);
     var L = inner.length ? viewportLayout(inner, mode, aw, Math.max(1, ah - hh)) : { pos: {}, order: [], width: 0, height: 0 };
     var cw = Math.max(380, L.width + 2 * HDR_PAD), ch = hh + L.height + 2 * HDR_PAD;
@@ -153,6 +153,17 @@
     return { outgoing: out, incoming: inc };
   }
   // Identity metadata shown once, compactly inside NS[1]; full values in detail panel.
+  function objectWordTotal(nodes) {
+    var seen = new Set(), result = {total: 0, ram: 0, mmio: 0, missing: 0};
+    (nodes || []).forEach(function (n) {
+      if (!Number.isInteger(n.slot) || n.availability === 'not-in-image' || seen.has(n.slot)) return;
+      seen.add(n.slot);
+      if (!Number.isInteger(n.sizeWords) || n.sizeWords < 0) { result.missing++; return; }
+      result.total += n.sizeWords;
+      result[n.kind === 'Hardware' || n.availability === 'hardware-address' ? 'mmio' : 'ram'] += n.sizeWords;
+    });
+    return result;
+  }
   function metaItems(kind, id, g, b) {
     g = g || {}; b = b || {};
     var items = [];
@@ -183,6 +194,7 @@
     return { next: function () { return ++seq; }, isCurrent: function (t) { return t === seq; } };
   }
   var pure = { nodeLabel: nodeLabel, wrapName: wrapName, hex32: hex32, buildUrl: buildUrl, layoutGraph: layoutGraph, viewportLayout: viewportLayout, containerLayout: containerLayout, metaItems: metaItems, metaSummary: metaSummary, unresolvedGroups: unresolvedGroups, placeUnresolved: placeUnresolved, filterDetail: filterDetail, clampZoom: clampZoom, makeRequestGate: makeRequestGate };
+  pure.objectWordTotal = objectWordTotal;
   if (typeof module !== 'undefined' && module.exports) { module.exports = pure; return; }
 
   // ---------- DOM ----------
@@ -539,7 +551,7 @@
 
     var drag = null;
     ui.stage.addEventListener('pointerdown', function (e) {
-      if (e.target.closest && e.target.closest('.tbd-node')) return;
+      if (e.target.closest && e.target.closest('.tbd-node, .tbd-word-total')) return;
       drag = { x: e.clientX, y: e.clientY, ox: view.x, oy: view.y };
       ui.stage.setPointerCapture(e.pointerId); ui.stage.classList.add('is-panning');
     });
@@ -653,6 +665,22 @@
       var et = svg('text', { x: HDR_PAD, y: 20, class: 'tbd-encl-title' });
       et.textContent = 'Enclosing Namespace NS[1] · ' + (nodeLabel(L.enclosing).name || 'dot.name unavailable');
       cg.appendChild(et);
+      var total = objectWordTotal(nodes);
+      var revision = g.namespaceRevisionId || (kind === 'namespace' ? id : null);
+      if (revision) {
+        var link = svg('a', {href: '/simulator/#development-image?namespace=' + encodeURIComponent(revision),
+          target: '_top', class: 'tbd-word-total', 'aria-label': 'Open Memory Glass: ' + total.total + ' object words'});
+        var label = total.total.toLocaleString() + ' words' + (total.missing ? ' (partial)' : '') + ' · Memory Glass';
+        var width = 240;
+        link.appendChild(svg('rect', {x: HDR_PAD, y: C.headerHeight-28, width: width, height: 22, rx: 4, fill: '#1b3444', stroke: '#66c8bf'}));
+        var text = svg('text', {x: HDR_PAD+8, y: C.headerHeight-13, fill: '#b6f2e9', 'font-size': 12});
+        text.textContent = label;
+        link.appendChild(text);
+        var tip = svg('title', {});
+        tip.textContent = total.ram + ' RAM words + ' + total.mmio + ' MMIO words; ' + total.missing + ' unknown sizes. Each occupied slot counted once.';
+        link.appendChild(tip);
+        cg.appendChild(link);
+      }
       root.appendChild(cg);
       meta.hidden = true;
       var ms = metaSummary(mItems, g.issues), M = L.meta;

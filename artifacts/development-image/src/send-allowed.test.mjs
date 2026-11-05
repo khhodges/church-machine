@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+const src = (await import("node:fs")).readFileSync(new URL("./image-api.ts", import.meta.url), "utf8");
+const body = src.match(/export function sendAllowed[^{]*\{([\s\S]*?)\n\}/)[1];
+const sendAllowed = new Function("input", body);
+assert.equal(sendAllowed(null), false);
+assert.equal(sendAllowed({inspectionOnly: true, releaseApproved: false}), false);
+assert.equal(sendAllowed({inspectionOnly: true}), false);
+assert.equal(sendAllowed({releaseApproved: false}), false);
+assert.equal(sendAllowed({}), true);
+console.log("send-allowed ok");

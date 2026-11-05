@@ -3,7 +3,7 @@ import "./_kiss.css";
 import { useEffect, useRef, useState } from "react";
 import { notifyIde } from "./embedding";
 import type { CSSProperties } from "react";
-import {request, prepareExact, installExact, receiptState} from "./image-api";
+import {request, sendAllowed, prepareExact, installExact, receiptState} from "./image-api";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
 export default function DevelopmentImage() {
@@ -129,7 +129,7 @@ export default function DevelopmentImage() {
   }
 
   async function beginSend() {
-    if (busy.current || !input) return;
+    if (busy.current || !input || !sendAllowed(input)) return;
     busy.current = true; setSending(true); setSendStatus("");
     try {
       let image = input.image;
@@ -360,7 +360,8 @@ export default function DevelopmentImage() {
       </div>
       <footer className="kiss-send-footer">
         <div><strong>Send the bound build to FPGA</strong><span>Uses the existing Namespace binding; no rebind.</span></div>
-        <button type="button" className="kiss-primary kiss-send-button" disabled={loading || !input || sending || !!receipt} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
+        <button type="button" className="kiss-primary kiss-send-button" disabled={loading || !input || !sendAllowed(input) || sending || !!receipt} title={input && !sendAllowed(input) ? "Inspection only — not approved for installation" : undefined} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
+        {input && !sendAllowed(input) && <p className="kiss-send-status" role="note">Inspection only — this frozen evidence is not approved for installation. Send is disabled.</p>}
         {sendStatus && <p className="kiss-send-status" role="status" aria-live="polite">{sendStatus}{receipt && <> <a href="/fpga" target="_blank" rel="noreferrer">View FPGA delivery status</a></>}</p>}
       </footer>
       <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This view leaves every saved input untouched.</span><span>FPGA transfer only on request</span></p>

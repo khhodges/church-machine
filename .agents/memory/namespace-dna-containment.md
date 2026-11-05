@@ -35,3 +35,10 @@ separate tall strip above it; remove repeated labels.
 **Why:** The user explicitly requested less duplication and height.
 **How to apply:** Use compact summaries with full identities and warnings
 accessible through details, preserving installation-unverified status.
+
+The total object-word count links to Memory Glass for the exact inspected
+Namespace, never an unrelated default design.
+**Why:** The user requested the total as a navigable memory overview.
+**How to apply:** Count each occupied slot once, show RAM versus MMIO in the
+breakdown, and exclude unresolved placeholders. Experimental evidence stays
+read-only when opened in Memory Glass.
