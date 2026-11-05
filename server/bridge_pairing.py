@@ -105,6 +105,19 @@ def authorized():
         with _store() as db:
             record = _get(db, "session", _digest(token))
             if not record:
+                # An old bridge keeps retrying with its original credential.
+                # Record only its digest for explicit IDE-owner approval; a
+                # rejected request never authorizes itself or updates telemetry.
+                data = request.get_json(silent=True) or {}
+                uid = data.get("device_uid") if isinstance(data, dict) else None
+                if (request.path == "/hardware/wukong/bridge-status"
+                        and request.method == "POST" and 32 <= len(token) <= 128
+                        and isinstance(uid, str) and 1 <= len(uid) <= 128
+                        and all(c.isalnum() or c in "-_." for c in uid)
+                        and os.environ.get("REPORT_TOKEN", "").strip()
+                        and not _get(db, "reconnect", _digest(token))
+                        and _count(db, "reconnect") < 64):
+                    _put(db, "reconnect", token, uid, TICKET_SECONDS)
                 return False
             data = request.get_json(silent=True) or {}
             if not isinstance(data, dict):
@@ -121,6 +134,49 @@ def register(app, authenticate):
     @app.errorhandler(PairingStoreUnavailable)
     def pairing_store_unavailable(error):
         return jsonify(error="Pairing storage is unavailable. Check the IDE server's private storage and retry."), 503
+
+    @app.get("/api/bridge-pairing/reconnect")
+    def list_reconnect():
+        ok, error = authenticate()
+        if not ok:
+            return error
+        with _pairing_store() as db:
+            rows = db.execute("SELECT digest FROM grants WHERE kind = 'reconnect'").fetchall()
+            requests = []
+            for row in rows:
+                record = _get(db, "reconnect", row["digest"])
+                if record:
+                    requests.append(dict(request_id=record["digest"],
+                                         device_uid=record["uid"], expires_at=record["expires"]))
+        response = jsonify(requests=requests)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.post("/api/bridge-pairing/reconnect")
+    def approve_reconnect():
+        if not os.environ.get("REPORT_TOKEN", "").strip():
+            return jsonify(error="IDE authentication is not configured."), 503
+        ok, error = authenticate()
+        if not ok:
+            return error
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not isinstance(data.get("request_id"), str):
+            return jsonify(error="Select a waiting bridge."), 400
+        with _pairing_store() as db:
+            record = _get(db, "reconnect", data["request_id"])
+            if not record or record["uid"] != data.get("device_uid"):
+                return jsonify(error="This request expired or changed. Reopen Connect bridge."), 409
+            if _count(db, "session") >= 64:
+                return jsonify(error="Too many pairing sessions."), 429
+            digest, uid = record["digest"], record["uid"]
+            expires, authority = time.time() + SESSION_SECONDS, _authority()
+            db.execute("DELETE FROM grants WHERE digest = ?", (digest,))
+            db.execute("INSERT INTO grants VALUES (?, ?, ?, ?, ?, ?)",
+                       ("session", digest, uid, expires, authority,
+                        _signature("session", digest, uid, expires, authority)))
+        response = jsonify(ok=True, device_uid=uid, expires_in=SESSION_SECONDS)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.post("/api/bridge-pairing")
     def create_bridge_pairing():

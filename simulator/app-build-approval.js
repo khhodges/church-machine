@@ -162,12 +162,61 @@ const BuildApprovalView = {
         uid.value = target?.deviceUid || '';
         uid.oninput = () => window.TargetState?.select({deviceUid: uid.value.trim() || null});
         document.getElementById('baPairStatus').textContent =
-            'Enter your serial port and board UID, then create the command.';
+            'Leave your existing PowerShell bridge running. Approve its waiting request above.';
         dialog.showModal();
+        this.refreshBridgeReconnect();
+        clearInterval(this._reconnectTimer);
+        this._reconnectTimer = setInterval(() => this.refreshBridgeReconnect(), 4000);
         dialog.oncancel = () => this.closeBridgePairing();
     },
 
+    async refreshBridgeReconnect() {
+        const panel = document.getElementById('baReconnectList');
+        if (!panel || !document.getElementById('baBridgePairing').open) return;
+        try {
+            const response = await fetch('/api/bridge-pairing/reconnect', {
+                headers: this._authHeaders(), cache: 'no-store'});
+            const data = await response.json();
+            if (!response.ok) throw Error(response.status === 401
+                ? 'Enter your IDE access token to reconnect the running bridge.' : data.error);
+            panel.replaceChildren();
+            if (!data.requests.length) {
+                panel.textContent = 'No running bridge is waiting for approval. Leave PowerShell running; this list refreshes automatically.';
+            }
+            for (const row of data.requests) {
+                const item = document.createElement('div');
+                const label = document.createElement('p');
+                label.textContent = 'Running bridge requests access for board ' + row.device_uid +
+                    '. Only reconnect if this is your running bridge.';
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = 'Reconnect running bridge';
+                button.onclick = async () => {
+                    button.disabled = true;
+                    try {
+                        const res = await fetch('/api/bridge-pairing/reconnect', {
+                            method: 'POST',
+                            headers: {...this._authHeaders(), 'Content-Type': 'application/json'},
+                            body: JSON.stringify(row),
+                        });
+                        const result = await res.json();
+                        if (!res.ok) throw Error(result.error || 'Reconnect was not approved.');
+                        document.getElementById('baPairStatus').textContent =
+                            'Access restored. Leave PowerShell running; the bridge will reconnect on its next retry. No FPGA command was sent.';
+                        await this.refreshBridgeReconnect();
+                    } catch (error) {
+                        document.getElementById('baPairStatus').textContent = error.message;
+                        button.disabled = false;
+                    }
+                };
+                item.append(label, button);
+                panel.appendChild(item);
+            }
+        } catch (error) { panel.textContent = error.message || 'Could not check waiting bridges.'; }
+    },
+
     closeBridgePairing() {
+        clearInterval(this._reconnectTimer);
         clearInterval(this._pairTimer);
         document.getElementById('baPairCommand').value = '';
         document.getElementById('baPairCommand').hidden = true;

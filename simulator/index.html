@@ -1640,18 +1640,22 @@
                        oninput="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._onTokenInput(this.value)">
                 <span id="baTokenStatus" class="ba-token-status"></span>
             </form>
-            <dialog id="baBridgePairing" style="background:#171b30;color:#eee;border:1px solid #68718c;border-radius:8px;max-width:640px;width:90%">
+            <dialog id="baBridgePairing" style="background:#171b30;color:#eee;border:1px solid #68718c;border-radius:8px;max-width:640px;width:90%;margin:auto;padding:1.4rem;max-height:85vh;overflow-y:auto">
                 <h3>Connect your physical FPGA</h3>
                 <p>Use the token entered above. No second token is needed in PowerShell.</p>
                 <p id="baPairServer" style="overflow-wrap:anywhere"></p>
                 <p>This connects to the IDE shown here, not a different published IDE. Pairing does not install an image or reflash the FPGA.</p>
+                <h4>Reconnect without stopping PowerShell</h4>
+                <div id="baReconnectList" role="status" aria-live="polite">Checking for a running bridge…</div>
+                <details><summary>Start a new bridge instead</summary>
                 <label>Serial port <input id="baPairPort" value="auto" placeholder="COM4"></label>
                 <label>Board UID <input id="baPairUid" autocomplete="off" placeholder="Physical board UID"></label>
                 <p><button id="baPairCreate" type="button" onclick="BuildApprovalView.createBridgePairing()">Create connection command</button></p>
-                <p id="baPairStatus" role="status" aria-live="polite"></p>
                 <textarea id="baPairCommand" readonly hidden rows="7" aria-label="PowerShell connection command" style="width:100%;box-sizing:border-box"></textarea>
                 <button id="baPairCopy" type="button" hidden onclick="BuildApprovalView.copyBridgePairing()">Copy command</button>
                 <p>Stop the old bridge with Ctrl+C, then paste this command into PowerShell. The command downloads the updated bridge and starts it. Keep that window open.</p>
+                </details>
+                <p id="baPairStatus" role="status" aria-live="polite"></p>
                 <button type="button" onclick="BuildApprovalView.closeBridgePairing()">Close</button>
             </dialog>
             <div class="ba-primary" aria-label="Load development image">
@@ -3750,7 +3754,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="compile-progress.js?v=sha256-f38e2911f69c"></script>
     <script src="app-actions.js?v=sha256-1f195eefda4e"></script>
     <script src="app-heap-record.js?v=sha256-653a8f689f16"></script>
-    <script src="app-build-approval.js?v=sha256-51ac1628a5ee"></script>
+    <script src="app-build-approval.js?v=sha256-03715efcde6d"></script>
     <script src="app-source-library.js?v=sha256-3277a7eecc9e"></script>
     <script src="app-editor-view-switcher.js?v=sha256-0890f98dcbf5"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>
