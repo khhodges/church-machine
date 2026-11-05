@@ -105,16 +105,12 @@
 
   function getJSON(url) {
     var headers = { Accept: 'application/json' };
-    try {
-      var token = sessionStorage.getItem('ba_build_token');
-      if (token) headers.Authorization = 'Bearer ' + token;
-    } catch (_) {}
     return fetch(url, { method: 'GET', credentials: 'include', headers: headers })
       .then(function (r) {
         return r.json().catch(function () { return { ok: false, error: 'HTTP ' + r.status }; })
           .then(function (j) {
             if (!r.ok && j && j.ok !== false) j.ok = false;
-            if (r.status === 401 || r.status === 403) j.error = 'Build evidence authorization required. Authorize in Builder → Build Approval in this tab, then Retry here.';
+            if (r.status === 401 || r.status === 403) j.error = j.error || 'Open build inspection from this IDE, then Retry.';
             else if (!r.ok && !j.error) j.error = 'HTTP ' + r.status;
             return j;
           });
@@ -218,7 +214,7 @@
       ui.body.textContent = '';
       var box = el('div', 'tbd-empty tbd-error');
       box.appendChild(el('div', null, 'Could not load the build catalog: ' + (err && err.message || err)));
-      box.appendChild(el('p', 'tbd-note', 'Your remembered selection has not been erased. Catalog authorization is required to verify it; this is not evidence of the bitstream installed on the FPGA.'));
+      box.appendChild(el('p', 'tbd-note', 'Any remembered selection has not been erased. The catalog must load to verify it; this is not evidence of the bitstream installed on the FPGA.'));
       var retry = el('button', 'tbd-btn', 'Retry'); retry.type = 'button';
       retry.addEventListener('click', loadCatalog);
       box.appendChild(retry);

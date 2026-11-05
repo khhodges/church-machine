@@ -104,6 +104,36 @@ def test_authorization_precedes_store_access():
     assert app.test_client().get("/api/testing/build-dna").status_code == 401
 
 
+def test_ide_inspection_uses_shared_origin_policy_without_reporting_secret(tmp_path):
+    """Exercise the real app wiring without importing its hardware/database startup."""
+    import ast
+    from pathlib import Path
+    from flask import jsonify, request
+    import os
+    import re
+    source = Path("server/app.py").read_text()
+    tree = ast.parse(source)
+    names = {"_ide_origin_is_same_site", "_authorize_testing_build_inspection"}
+    functions = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
+    scope = dict(request=request, jsonify=jsonify, os=os, re=re)
+    exec(compile(ast.Module(body=functions, type_ignores=[]), "server/app.py", "exec"), scope)
+    assert "_install_testing_build_dna(app, _artifact_revision_store, _authorize_testing_build_inspection)" in source
+    app = Flask("ide-read-only-dna")
+    store = RevisionStore(str(tmp_path))
+    install(app, lambda: store, scope["_authorize_testing_build_inspection"], no_archive)
+    client = app.test_client()
+    # Public preview host may differ from the internal proxy host.
+    response = client.get("/api/testing/build-dna", headers={
+        "Sec-Fetch-Site": "same-origin", "Origin": "https://preview.example",
+    })
+    assert response.status_code == 200
+    assert response.json["ok"]
+    assert client.get("/api/testing/build-dna", headers={
+        "Sec-Fetch-Site": "cross-site", "Origin": "https://foreign.example",
+    }).status_code == 403
+    assert client.post("/api/testing/build-dna").status_code == 405
+
+
 def test_fixture_payloads_excluded_and_not_inspectable(evidence):
     store, ns, bit, client = evidence
     fake = store.publish("bitstream", {}, {"bitstream.bit": b"VERIFIED WUKONG BUILD"})

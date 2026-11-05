@@ -2498,7 +2498,20 @@ def _artifact_revision_store():
     return RevisionStore(os.path.join(_BUILD_SNAPSHOTS_DIR, "revisions"))
 
 from server.testing_build_dna import install as _install_testing_build_dna
-_install_testing_build_dna(app, _artifact_revision_store, lambda: _ba_check_report_token())
+
+
+def _authorize_testing_build_inspection():
+    # Read-only IDE inspection is not a build, approval, download or hardware
+    # operation. Never require the server reporting secret in the browser.
+    if _ide_origin_is_same_site():
+        return True, None
+    return False, (jsonify(
+        ok=False,
+        error="Open build inspection from this IDE; cross-site inspection is not allowed."
+    ), 403)
+
+
+_install_testing_build_dna(app, _artifact_revision_store, _authorize_testing_build_inspection)
 
 
 def _namespace_revision_build_intent(ns_map, revision_id, metadata):

@@ -36,3 +36,10 @@ after the main save path was corrected, reproducing the failure only for
 combined saves.
 **How to apply:** Cover review and commit with and without staged configuration
 while a reporting token is configured; never require that token in the browser.
+
+Read-only bitstream catalog and Build DNA inspection use the same shared IDE
+origin policy, not the reporting-token gate for privileged build operations.
+**Why:** Gating the catalog on a tab-scoped reporting credential left the
+bitstream picker empty; displaying a cached ID did not solve selection.
+**How to apply:** Keep inspection separate from build, approval, download and
+hardware authorization. Remembering a selection never proves installation.
