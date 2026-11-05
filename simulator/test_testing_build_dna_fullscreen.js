@@ -67,16 +67,16 @@ const { chromium } = require('playwright');
     await page.getByRole('button', { name: 'Close details', exact: true }).click();
     await checkFit();
     await page.locator('#tbdLayout-namespace').selectOption('organized');
-    assert.deepStrictEqual(await page.locator('.tbd-node title').allTextContents(), ['ns', 't', 'm']);
+    assert.deepStrictEqual(await page.locator('.tbd-node:not(.tbd-hdr) title').allTextContents(), ['NS[2] Thread', 'NS[3] MMIO']);
     // NS[1] encloses every inner node; Slot[0] absent is shown as missing, not invented.
     const contain = await page.evaluate(() => {
       const box = document.querySelector('.tbd-encl-box').getBoundingClientRect();
       const inner = [...document.querySelectorAll('.tbd-node:not(.tbd-hdr)')].map(n => n.getBoundingClientRect());
       return { ok: inner.every(r => r.left >= box.left && r.right <= box.right && r.top >= box.top && r.bottom <= box.bottom),
-        missing: document.querySelector('.tbd-hdr-missing').textContent, hdr: document.querySelectorAll('.tbd-node.tbd-hdr').length };
+        missing: document.querySelector('.tbd-hdr-missing').textContent, hdr: document.querySelectorAll('.tbd-node.tbd-hdr:not(.tbd-hdr-meta)').length };
     });
     assert.ok(contain.ok); assert.equal(contain.hdr, 1); assert.match(contain.missing, /Slot\[0\].*no slot evidence/);
-    await page.locator('.tbd-node.tbd-hdr').click();
+    await page.locator('.tbd-node.tbd-hdr:not(.tbd-hdr-meta)').click();
     assert.match(await page.locator('.tbd-detail-body h3').textContent(), /NS\[1\]/);
     assert.equal(await page.locator('.tbd-edge.is-hot').count(), 1);
     await page.getByRole('button', { name: 'Close details', exact: true }).click();
@@ -112,6 +112,24 @@ const { chromium } = require('playwright');
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('.tbd-workspace').open);
     assert.equal(await frame.locator('#tbdNamespace').count(), 1);
+    await page.evaluate(() => {
+      window.DevelopmentImageView = {show(id) {
+        window.glassSelection = id;
+        window.glassActive = true;
+      }};
+    });
+    await frame.getByRole('button', {name: 'Open Namespace DNA', exact: true}).click();
+    // Restoring the launch button's focus after navigation must not return
+    // focus to Testing. Capture the real asynchronous close-event ordering.
+    await frame.locator('body').evaluate(body => {
+      body.addEventListener('focusin', () => {
+        if (parent.glassActive) parent.focusReturnedToTesting = true;
+      });
+    });
+    await page.locator('.tbd-word-total').click();
+    await page.waitForFunction(() => window.glassSelection === 'fixture');
+    assert.equal(await page.evaluate(() => !!window.focusReturnedToTesting), false);
+    assert.equal(await page.locator('.tbd-workspace').evaluate(el => el.open), false);
     assert.deepStrictEqual(errors, []);
     console.log('Build DNA full-window iframe escape, mobile sizing, layout and close: passed');
   } finally {

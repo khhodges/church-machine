@@ -437,7 +437,7 @@
     }
     return host.document;
   }
-  var viewers = {}, workspace, panes, controlsHome;
+  var viewers = {}, workspace, panes, controlsHome, afterWorkspaceClose;
   function openWorkspace() {
     if (!workspace) {
       var hostDoc = dialogHost();
@@ -459,7 +459,10 @@
       workspace.addEventListener('close', function () {
         Object.keys(viewers).forEach(function (key) { viewers[key].close(); });
         if (controlsHome) controlsHome.replaceWith(ui.controls);
-        if (ui.workspaceFocus && ui.workspaceFocus.isConnected) ui.workspaceFocus.focus();
+        var navigate = afterWorkspaceClose;
+        afterWorkspaceClose = null;
+        if (navigate) navigate();
+        else if (ui.workspaceFocus && ui.workspaceFocus.isConnected) ui.workspaceFocus.focus();
       });
       root.addEventListener('pagehide', function () { workspace.remove(); });
     }
@@ -673,13 +676,21 @@
           class: 'tbd-word-total', tabindex: '0', 'aria-label': 'Open Memory Glass: ' + total.total + ' object words'});
         function openGlass(event) {
           event.preventDefault();
+          event.stopPropagation();
           var host = dialogHost().defaultView;
-          if (workspace && workspace.open) workspace.close();
-          if (host.DevelopmentImageView && typeof host.DevelopmentImageView.show === 'function') {
-            host.DevelopmentImageView.show(revision);
-          } else {
-            host.location.assign(destination);
+          function navigate() {
+            if (host.DevelopmentImageView && typeof host.DevelopmentImageView.show === 'function') {
+              host.DevelopmentImageView.show(revision);
+            } else {
+              host.location.assign(destination);
+            }
           }
+          // A dialog's close event is asynchronous. Finish teardown first and
+          // do not restore focus to the Testing iframe after changing pages.
+          if (workspace && workspace.open) {
+            afterWorkspaceClose = navigate;
+            workspace.close();
+          } else navigate();
         }
         link.addEventListener('click', openGlass);
         link.addEventListener('keydown', function (event) {

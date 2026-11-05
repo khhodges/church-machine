@@ -50,3 +50,11 @@ also targeted the outer Replit frame instead of the app.
 **How to apply:** Navigation from DNA must stay in the highest same-origin
 IDE host, close the DNA modal, and preserve the exact Namespace selection;
 never navigate the cross-origin preview shell via `_top`.
+
+Complete DNA's asynchronous dialog-close cleanup before navigating away, and
+skip restoring focus to its Testing launch control during navigation.
+**Why:** A close event runs after `dialog.close()` returns; restoring focus
+after switching pages leaves focus owned by the previous iframe. The user
+reported returning to Testing despite fresh-load navigation checks passing.
+**How to apply:** Test the completed close event, not only the destination
+URL or a loaded-but-hidden iframe.
