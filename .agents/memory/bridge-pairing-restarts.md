@@ -28,3 +28,13 @@ delegates that responsibility incorrectly.
 authority. Preserve automatic authentication across lifecycle events; unknown
 authority remains rejected. The existing manual recovery implementation is not
 the approved product behavior.
+
+Bridge process restarts and downloaded-script upgrades must preserve pairing,
+not only IDE server restarts.
+**Why:** The user again rejected manual reconnection after an update instructed
+them to stop a bridge whose credential existed only in process memory. Reusing
+a consumed pairing code cannot restore that lost credential.
+**How to apply:** Before recommending a bridge restart, verify durable,
+OS-protected client credential storage and reuse for the exact IDE/device.
+Do not claim server-side grant persistence solves client-side credential loss;
+never recover by trusting a UID or reviving a consumed pairing code.
