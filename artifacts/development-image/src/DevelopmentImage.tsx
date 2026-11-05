@@ -422,13 +422,20 @@ export default function DevelopmentImage() {
             {!connection.needsHelp ? <p>Checking the connection automatically…</p> : <>
               <p>{connection.issue === "server"
                 ? "The IDE connection check could not complete. Check your internet connection; I’ll keep retrying."
-                : "The bridge has not reconnected after four checks. Check that the FPGA has power, its USB cable is connected, and the bridge’s PowerShell window is still running. I’ll keep checking."}</p>
-              <details>
-                <summary>Still disconnected?</summary>
-                <p>{connection.issue === "server"
-                  ? "If other pages work, the IDE server may be unavailable or rejecting this request. Try the connection check again after the server is available."
-                  : "If PowerShell is closed, open Connect bridge in the IDE to start it. If it is running but reports an error, share the error text without any credentials so the cause can be corrected."}</p>
-              </details>
+                : "The bridge has not reconnected after four checks. If PowerShell shows “IDE registration rejected — HTTP 401”, the IDE is rejecting the bridge’s credentials. Checking again cannot repair that."}</p>
+              {connection.issue === "bridge" ? <div>
+                <p><strong>For HTTP 401, create a fresh connection:</strong></p>
+                <ol>
+                  <li>In the bridge’s PowerShell window, press <strong>Ctrl+C</strong>.</li>
+                  <li>On the Church Machine page, open <strong>Build Approval → Advanced → Connect bridge → Start a new bridge instead</strong>.</li>
+                  <li>Check the serial port and board UID, then click <strong>Create connection command</strong>.</li>
+                  <li>Copy the new command into PowerShell, run it, and leave that window open.</li>
+                </ol>
+                <p>No FPGA rebuild or reflash is needed for this authentication error. Keep credentials out of chat. Send will become available automatically when the connection returns.</p>
+                <details><summary>If PowerShell does not show HTTP 401</summary>
+                  <p>Check that the FPGA has power, its USB cable is connected, and the bridge is running. If it reports a different error, share that error text without credentials.</p>
+                </details>
+              </div> : <p>If other pages work, the IDE server may be unavailable or rejecting this request. Try the connection check again after the server is available.</p>}
               <button type="button" onClick={connection.retry}>Check again now</button>
             </>}
           </div>
