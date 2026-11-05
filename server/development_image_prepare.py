@@ -83,6 +83,22 @@ def _assemble_latest(backend, identifier, document, directory, inputs):
                     disasm=backend._wukong_disassemble_word(word, row["name"]),
                     source_map="uploaded")
         prepared["trace_rows"] = trace_rows
+        # Geometry comes from the emitted descriptor words, not the authoring
+        # allocation (source stripping can change every subsequent address).
+        from server.development_image_view import normalize_rows
+        image_rows = []
+        for staged in rows:
+            original = next(item for item in document["rows"] if item["slot"] == staged["slot"])
+            emitted = dict(staged, kind=original["kind"], policy=original.get("policy"))
+            if staged.get("unresolved"):
+                emitted.update(location=None, limit=None)
+            else:
+                location = struct.unpack_from("<I", raw, staged["slot"] * 16)[0]
+                emitted["location"] = location
+                # Use the staged inclusive limit; the Namespace spans the image.
+                emitted["limit"] = len(raw)//4-1 if original["kind"] == "namespace" else staged["limit"]
+            image_rows.append(emitted)
+        prepared["layout_rows"] = normalize_rows(image_rows)
         prepared.update(namespace_revision_id=identifier,
                         source_kind="latest-compilation-image", namespace_fingerprint=fingerprint,
                         hardware_certified=False, bindings_changed=True,

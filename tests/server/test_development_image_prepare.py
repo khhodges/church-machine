@@ -36,6 +36,10 @@ def test_latest_sources_build_with_private_binding_and_no_live_mutation(setup_de
     assert {item["kind"] for item in prepared["build_inputs"]} == {"namespace", "thread", "lump"}
     assert prepared["hardware_certified"] is False
     assert prepared["trace_rows"]
+    for row in prepared["layout_rows"]:
+        assert row["location"] == struct.unpack_from("<I", raw, row["slot"] * 16)[0]
+        assert row["allocationWords"] == row["limit"] + 1
+    assert next(r for r in prepared["layout_rows"] if r["kind"] == "namespace")["allocationWords"] == len(raw)//4
     for address, mapped in prepared["trace_rows"].items():
         assert mapped["map_instr_word"] == struct.unpack_from("<I", raw, int(address))[0]
         assert mapped["source_map"] == "uploaded"

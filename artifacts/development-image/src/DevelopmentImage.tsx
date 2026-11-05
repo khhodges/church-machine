@@ -9,11 +9,13 @@ import {request, sendAllowed, prepareExact, installExact, receiptState, requireL
 import {connectionStatus, reconnectHelp} from "./connection-status";
 import {useBridgeConnection} from "./use-bridge-connection";
 import {stopBeforeSend} from "./stop-before-send";
+import {inspectChoice, latestChoices, sourceId} from "./latest-image";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
 export default function DevelopmentImage() {
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [namespace, setNamespace] = useState("");
+  const [refresh, setRefresh] = useState(0);
   const [input, setInput] = useState<Inspection | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,7 @@ export default function DevelopmentImage() {
     request<{entries: CatalogEntry[]}>("/api/development-image/catalog", {signal: controller.signal})
       .then(result => {
         result.entries = result.entries.map(entry => ({...entry, name: NamespaceSelection.name(entry.id, entry.name)}));
+        result.entries = latestChoices(result.entries);
         setEntries(result.entries);
         const linked = new URLSearchParams(location.search).get("namespace") ?? NamespaceSelection.read();
         const choice = linked !== null ? result.entries.find(item => item.id === linked) :
@@ -114,15 +117,15 @@ export default function DevelopmentImage() {
 
   useEffect(() => {
     if (!namespace) return;
-    NamespaceSelection.remember(namespace);
+    NamespaceSelection.remember(sourceId(namespace));
     const controller = new AbortController();
     setLoading(true); setInput(null); setError("");
-    request<Inspection>("/api/development-image/inspect?id=" + encodeURIComponent(namespace), {signal: controller.signal})
+    inspectChoice(namespace, controller.signal)
       .then(result => { if (!controller.signal.aborted) setInput(result); })
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [namespace]);
+  }, [namespace, refresh]);
 
   useEffect(() => {
     if (!receipt) return;
@@ -141,7 +144,7 @@ export default function DevelopmentImage() {
   }, [receipt]);
 
   useEffect(() => {
-    if (namespace) notifyIde({type: "development-image:selection", namespace});
+    if (namespace) notifyIde({type: "development-image:selection", namespace: sourceId(namespace)});
   }, [namespace]);
 
   useEffect(() => {
@@ -179,7 +182,7 @@ export default function DevelopmentImage() {
     setSendStatus(""); setReceipt(null);
     const url = new URL(location.href); url.searchParams.set("namespace", value);
     history.replaceState(null, "", url);
-    notifyIde({type: "development-image:selection", namespace: value});
+    notifyIde({type: "development-image:selection", namespace: sourceId(value)});
   }
 
   async function beginSend() {
@@ -230,7 +233,7 @@ export default function DevelopmentImage() {
   return (
     <main className="kiss-workbench">
       <header className="kiss-top kiss-top-embedded">
-        <p className="kiss-preview">{input?.image ? "Bound Namespace — image ready" : input?.layoutSource === "saved-design-layout" ? "Saved Namespace — image prepared on Send" : "Saved Namespace — FPGA image unavailable"}</p>
+        <p className="kiss-preview">{input?.layoutSource === "latest-built-image" ? "Latest built image — not verified installed" : input?.image ? "Bound Namespace — image ready" : input?.layoutSource === "saved-design-layout" ? "Saved Namespace — image prepared on Send" : "Saved Namespace — FPGA image unavailable"}</p>
       </header>
 
       <div className="kiss-heading">
@@ -238,7 +241,11 @@ export default function DevelopmentImage() {
         <span className="kiss-local">SAVED NAMESPACE</span>
       </div>
       {error && <p className="kiss-api-error" role="alert">{error} No saved data was changed. <a href={location.pathname}>Reload saved Namespaces</a></p>}
-      {loading && <p className="kiss-api-message" role="status">Reading the exact saved Namespace…</p>}
+      {namespace.startsWith("latest:") && <button type="button" disabled={loading || sending || !!confirmation}
+        onClick={() => {setReceipt(null); setSendStatus(""); setRefresh(value => value + 1);}}>Rebuild latest image</button>}
+      {loading && <p className="kiss-api-message" role="status">{namespace.startsWith("latest:")
+        ? "Building the latest Development Image for inspection. Nothing will be sent…"
+        : "Reading the exact saved Namespace…"}</p>}
 
       <div className="kiss-layout kiss-layout-single">
         <section className="kiss-panel" aria-labelledby="kiss-namespace-title">
@@ -390,7 +397,7 @@ export default function DevelopmentImage() {
                     <span className="kiss-device-type">Saved regions are shown dimmed until you choose a row.</span>
                   </aside>}
                 </div>
-                <div className="kiss-water-legend"><span>{input?.layoutSource === "saved-design-layout" ? "Uses the same read-only layout as Namespace Table. No rebinding." : "Position and extent come directly from Namespace Table fields."}</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
+                <div className="kiss-water-legend"><span>{input?.layoutSource === "latest-built-image" ? "Actual freshly built image addresses (words). MMIO is separate; installation is not verified." : input?.layoutSource === "saved-design-layout" ? "Uses the same read-only layout as Namespace Table. No rebinding." : "Position and extent come directly from Namespace Table fields."}</span><span>Threads and boot entries share the same scale. Select a row or region to inspect.</span></div>
           </section>
           </div>
           <details className="kiss-technical">

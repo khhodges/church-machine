@@ -10,6 +10,7 @@ export type PreparedImage = {
   profile: string; namespace_revision_id: string; artifact_sha256: string;
   required_bitstream_sha256: string; size: number;
   freshness_policy?: string;
+  layout_rows?: Slot[];
   build_inputs?: Array<{slot: number; name: string; kind: string; origin: string;
     revision?: number; sourceArtifact?: string; sourceHash?: string; binaryHash?: string}>;
 };
