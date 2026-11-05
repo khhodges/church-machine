@@ -1,5 +1,6 @@
 import "./_group.css";
 import "./_kiss.css";
+import "../../../simulator/namespace-selection.js";
 import { useEffect, useRef, useState } from "react";
 import { notifyIde } from "./embedding";
 import type { CSSProperties } from "react";
@@ -71,9 +72,10 @@ export default function DevelopmentImage() {
     const controller = new AbortController();
     request<{entries: CatalogEntry[]}>("/api/development-image/catalog", {signal: controller.signal})
       .then(result => {
+        result.entries = result.entries.map(entry => ({...entry, name: NamespaceSelection.name(entry.id, entry.name)}));
         setEntries(result.entries);
-        const linked = new URLSearchParams(location.search).get("namespace");
-        const choice = linked ? result.entries.find(item => item.id === linked) :
+        const linked = new URLSearchParams(location.search).get("namespace") ?? NamespaceSelection.read();
+        const choice = linked !== null ? result.entries.find(item => item.id === linked) :
           result.entries.find(item => item.name === "Original") ?? result.entries[0];
         if (!choice) throw Error(linked ? "The linked Namespace is unavailable. Select an exact saved Namespace." : "No saved Namespaces are available. Save a Namespace in the IDE first.");
         setNamespace(choice.id);
@@ -83,6 +85,7 @@ export default function DevelopmentImage() {
 
   useEffect(() => {
     if (!namespace) return;
+    NamespaceSelection.remember(namespace);
     const controller = new AbortController();
     setLoading(true); setInput(null); setError("");
     request<Inspection>("/api/development-image/inspect?id=" + encodeURIComponent(namespace), {signal: controller.signal})

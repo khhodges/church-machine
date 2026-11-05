@@ -35,7 +35,10 @@
         if (force || el.getAttribute('src') !== src) el.setAttribute('src', src);
     }
     function show(namespace) {
-        if (typeof namespace === 'string') selection = namespace;
+        if (typeof namespace === 'string') {
+            selection = namespace;
+            root.NamespaceSelection?.remember(selection);
+        } else selection = root.NamespaceSelection?.read() ?? selection;
         load(false);
         if (!isActive()) root.switchView(VIEW); else syncHash();
     }
@@ -57,13 +60,19 @@
 
     // Capture a linked selection before the shell rewrites the hash to the bare view id.
     const initial = parseHash(root.location.hash);
-    if (initial.view === VIEW) selection = initial.namespace;
+    if (initial.view === VIEW && initial.namespace) {
+        selection = initial.namespace;
+        root.NamespaceSelection?.remember(selection);
+    }
 
     const original = root.switchView;
     if (typeof original === 'function' && !original._developmentImage) {
         const wrapped = function(viewId) {
             const result = original.apply(this, arguments);
-            if (viewId === VIEW && isActive()) { load(false); syncHash(); }
+            if (viewId === VIEW && isActive()) {
+                selection = root.NamespaceSelection?.read() ?? selection;
+                load(false); syncHash();
+            }
             return result;
         };
         wrapped._developmentImage = true;

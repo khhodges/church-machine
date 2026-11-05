@@ -1158,8 +1158,27 @@ const BuildApprovalView = {
                     testing: record.metadata?.test_status || 'Not tested',
                     preparation: record.files?.['boot-image.bin'] ? 'Image retained' : 'Needs preparation',
                 }));
+            this._savedNamespaceEntries = this._savedNamespaceEntries.map(row => ({
+                ...row, name: window.NamespaceSelection?.name(row.id, row.name) || row.name,
+            }));
+            const remembered = window.NamespaceSelection?.read();
+            const currentNamespace = this._selectedSavedEntry?.kind === 'bitstream'
+                ? this._bitstreamRevisions.find(row => row.revision_id === this._selectedSavedEntry.revision_id)?.namespace_revision_id
+                : this._selectedSavedEntry?.id;
+            if (remembered != null && remembered !== currentNamespace) {
+                // Restore inspection only, never silently adopt an approved build.
+                this._selectedSavedEntry = this._savedNamespaceEntries.find(row => row.id === remembered) || null;
+                this._selectedSnapshot = null;
+                this._snapFrozen = false;
+                this._updateApproveBtn();
+                if (remembered && !this._selectedSavedEntry) {
+                    const status = document.getElementById('baSnapshotStatus');
+                    if (status) status.textContent = 'Remembered Namespace is unavailable. No replacement was selected.';
+                }
+            }
             this._renderSavedBuildPicker();
             if (this._selectedSavedEntry || this._selectedSnapshot) this._renderSelectedSlots();
+            else this._render(this._lastMap || {});
         } catch (error) {
             const status = document.getElementById('baSnapshotStatus');
             if (status && !this._selectedSnapshot) status.textContent =
@@ -1168,6 +1187,11 @@ const BuildApprovalView = {
     },
 
     selectRevisionId(revisionId) {
+        if (!revisionId.startsWith('bitstream:')) window.NamespaceSelection?.remember(revisionId);
+        else {
+            const bit = this._bitstreamRevisions.find(row => row.revision_id === revisionId.slice(10));
+            window.NamespaceSelection?.remember(bit?.namespace_revision_id || '');
+        }
         if (revisionId.startsWith('bitstream:')) {
             const id = revisionId.slice('bitstream:'.length);
             const bitstream = this._bitstreamRevisions.find(row => row.revision_id === id);

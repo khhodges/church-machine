@@ -38,6 +38,12 @@ accessible through details, preserving installation-unverified status.
 
 The total object-word count links to Memory Glass for the exact inspected
 Namespace, never an unrelated default design.
+The user approved one consistent image name and remembered exact selection
+across DNA, Memory Glass and Build Approval, to simplify the IDE.
+**Why:** Near-identical choices and newly invented labels made the same image
+look like unrelated builds. Keep revision details separate from its display name.
+**How to apply:** Restore inspection identity only; do not infer approval or
+installed contents, and show unavailable evidence rather than selecting a replacement.
 **Why:** The user requested the total as a navigable memory overview.
 **How to apply:** Count each occupied slot once, show RAM versus MMIO in the
 breakdown, and exclude unresolved placeholders. Experimental evidence stays

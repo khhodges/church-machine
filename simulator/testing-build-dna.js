@@ -280,12 +280,23 @@
       var id = ui.bsSel.value;
       try { id ? localStorage.setItem(STORE, id) : localStorage.removeItem(STORE); } catch (_) {}
       if (state.catalog) renderSelected(); else showRememberedSelection();
+      var selected = findBs(id);
+      root.NamespaceSelection?.remember(selected?.namespaceRevisionId || '');
     });
     ui.clearBtn.addEventListener('click', function () { ui.bsSel.value = ''; ui.bsSel.dispatchEvent(new Event('change')); });
-    ui.nsSel.addEventListener('change', function () { ui.nsBtn.disabled = !ui.nsSel.value; });
+    ui.nsSel.addEventListener('change', function () {
+      ui.nsBtn.disabled = !ui.nsSel.value;
+      root.NamespaceSelection?.remember(ui.nsSel.value);
+    });
     ui.viewBtn.addEventListener('click', function () { if (ui.bsSel.value) loadGraph('bitstream', ui.bsSel.value); });
     ui.nsBtn.addEventListener('click', function () { if (ui.nsSel.value) loadGraph('namespace', ui.nsSel.value); });
     loadCatalog();
+    root.addEventListener('storage', function (event) {
+      if (event.key === 'church_inspected_namespace_v1' && state.catalog) {
+        fillSelects();
+        renderSelected();
+      }
+    });
   }
 
   function setStatus(text, kind) { ui.status.textContent = text || ''; ui.status.className = 'tbd-status' + (kind ? ' tbd-status-' + kind : ''); }
@@ -343,6 +354,8 @@
 
   function fillSelects() {
     var c = state.catalog;
+    (c.bitstreams || []).forEach(function (b) { b.label = root.NamespaceSelection?.name(b.id, b.label || b.id) || b.label; });
+    (c.namespaces || []).forEach(function (n) { n.label = root.NamespaceSelection?.name(n.id, n.label || n.id) || n.label; });
     ui.bsSel.disabled = false;
     ui.nsSel.disabled = false;
     ui.bsSel.textContent = '';
@@ -354,6 +367,14 @@
     });
     var saved = null;
     try { saved = localStorage.getItem(STORE); } catch (_) {}
+    var shared = root.NamespaceSelection?.read();
+    if (shared != null) {
+      var matched = (c.bitstreams || []).find(function (b) { return b.namespaceRevisionId === shared; });
+      saved = matched ? matched.id : '';
+    } else if (saved) {
+      var legacy = (c.bitstreams || []).find(function (b) { return b.id === saved; });
+      if (legacy?.namespaceRevisionId) root.NamespaceSelection?.remember(legacy.namespaceRevisionId);
+    }
     var valid = saved && (c.bitstreams || []).some(function (b) { return b.id === saved; });
     if (saved && !valid) { try { localStorage.removeItem(STORE); } catch (_) {} setStatus('Previously selected bitstream no longer in catalog; selection cleared.', 'warn'); }
     ui.bsSel.value = valid ? saved : '';
@@ -364,7 +385,9 @@
       var o = el('option', null, (n.label || n.id) + (n.imageAvailable ? '' : ' (image unavailable)'));
       o.value = n.id; o.disabled = !n.imageAvailable; ui.nsSel.appendChild(o);
     });
-    ui.nsBtn.disabled = true;
+    if (shared && (c.namespaces || []).some(function (n) { return n.id === shared && n.imageAvailable; })) ui.nsSel.value = shared;
+    ui.nsBtn.disabled = !ui.nsSel.value;
+    if (shared && !ui.bsSel.value && !ui.nsSel.value) setStatus('Remembered Namespace is unavailable. No replacement was selected.', 'warn');
   }
 
   function findBs(id) { return ((state.catalog && state.catalog.bitstreams) || []).filter(function (b) { return b.id === id; })[0]; }
@@ -614,6 +637,8 @@
     getJSON(buildUrl(kind, id)).then(function (j) {
       if (!gate.isCurrent(t)) return;
       if (!j || !j.ok) throw new Error((j && (j.error || j.reason)) || 'Request failed');
+      root.NamespaceSelection?.remember(j.namespaceRevisionId || (kind === 'namespace' ? id : ''));
+      if (j.bitstream) j.bitstream.label = root.NamespaceSelection?.name(id, j.bitstream.label || id) || j.bitstream.label;
       state.graph = j; renderGraph(kind, id);
     }).catch(function (err) {
       if (!gate.isCurrent(t)) return;
