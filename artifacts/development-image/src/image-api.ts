@@ -20,6 +20,8 @@ export type Inspection = {
 };
 export type Target = {device_uid: string; session_id: string; live: boolean};
 export type BoardStatus = {
+  bridge_poll_age?: number | null;
+  last_trace_age?: number | null;
   physical_target?: Target;
   command_delivery?: Record<string, unknown>;
   runtime_upload_ack?: Record<string, unknown>;
@@ -31,6 +33,8 @@ export type Receipt = {
 
 export async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {...options, cache: "no-store"});
+  if (response.status === 401 || response.status === 403)
+    throw Error(`Server authorization rejected (HTTP ${response.status}) for this browser request. This does not diagnose UART health or bridge authorization. Check access to the intended IDE server; nothing was confirmed.`);
   const data = await response.json().catch(() => {
     throw Error(`The server returned an unreadable response (${response.status}). Nothing was confirmed.`);
   });

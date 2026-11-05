@@ -169,6 +169,10 @@ async function main() {
             [16,'ide.Alice'], [17,'ide.Mallory'], [18,'ide.AliceDriver'],
             [19,'ide.MalloryDriver'], [20,'ide.ActorManager'], [21,'ide.AmoebaStartup'],
         ], 'Acceptance fixture resident membership drifted; do not repair it');
+        // Also verify that saving preserves the original resident set.
+        const originalResident = original.rows.filter(r=>r.kind==='lump' && r.policy==='Resident');
+        assert(originalResident.length > 0, 'The fixture must exercise resident LUMPs');
+        assert.deepEqual(resident.map(r=>r.slot), originalResident.map(r=>r.slot));
         const schemas = new Set();
         for (const row of resident) {
             const item = bound.bindingReport.lists.find(b=>b.slot===row.slot);

@@ -58,6 +58,14 @@ import zlib
 # These are network limits, not UART ACK or board-state confirmation deadlines.
 IDE_HTTP_TIMEOUT = (3.0, 2.0)
 
+BRIDGE_AUTH_GUIDANCE = (
+    'Server authorization rejected; this does not diagnose UART health. '
+    'Check the --ide address and securely configure REPORT_TOKEN in the '
+    'terminal running this bridge to match that server, then restart the bridge. '
+    'Never paste credentials into logs, URLs or chat. Wait for accepted '
+    'registration and a fresh identified session before retrying any action; '
+    'a remembered UID is not a live connection.')
+
 
 class CommandPoll:
     """One outstanding dequeue request, without blocking UART reception.
@@ -1416,9 +1424,7 @@ class FaultDeliveryWorker:
         self._registration_http_failure = status
         self._registration_http_log_at = now
         if status in (401, 403):
-            action = ('Check that REPORT_TOKEN is configured in the terminal '
-                      'running this bridge and matches the intended IDE server. '
-                      'Do not paste the credential into logs or chat.')
+            action = BRIDGE_AUTH_GUIDANCE
         else:
             action = ('Check the --ide address and server availability; '
                       'serial output alone does not confirm an IDE connection.')
@@ -1629,6 +1635,11 @@ def _post_json_retry(url, payload, verify_tls, label, accept_reply,
                       f'{reply.get("decision", "invalid response")}', flush=True)
                 return None
             if 400 <= response.status_code < 500:
+                if response.status_code in (401, 403):
+                    print(f'  [{label} rejected] HTTP {response.status_code}. '
+                          f'{BRIDGE_AUTH_GUIDANCE} No hardware command was '
+                          'issued by this diagnostic.', flush=True)
+                    return None
                 print(f'  [{label} rejected] HTTP {response.status_code} '
                       f'decision={reply.get("decision", "unknown")}', flush=True)
                 return None

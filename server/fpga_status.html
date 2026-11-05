@@ -187,6 +187,10 @@
   <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages statusGrid" aria-expanded="true" title="Collapse or expand FPGA health details">Collapse</button>
 </div>
 <div id="controlTargetStatus" class="status-note" role="status">Checking physical target…</div>
+<div id="connectionEvidence" class="status-note" role="status">UART: current reception unconfirmed. Bridge authorization: unconfirmed. Live session: unconfirmed.</div>
+<details class="status-note"><summary>Connection help — UART and authorization are independent</summary>
+  Working UART output does not prove server authorization. If the bridge terminal reports HTTP 401/403 for registration or snapshots, check the intended --ide server and securely configure its REPORT_TOKEN in the terminal running the bridge, then restart the bridge. Never paste credentials into logs, URLs or chat. A rejected bridge may be invisible to this page. Old logs do not establish current UART health. Wait for accepted registration and a fresh identified session before retrying actions; a remembered UID is not authorization. Reconnecting does not resend an unconfirmed command.
+</details>
 <div id="controlResult" class="status-note" role="status" aria-live="polite">No control command sent from this page.</div>
 
 <div id="healthStrip" style="margin-bottom:8px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
@@ -336,7 +340,7 @@
         trace = { state: 'red', detail: 'No trace packets ever received — is the board powered and the FPGA bitstream loaded?' };
       }
     } else {
-      trace = { state: 'red', detail: 'No trace in ' + ageStr(traceAge) + ' — board halted or UART disconnected' };
+      trace = { state: 'red', detail: 'No trace in ' + ageStr(traceAge) + ' — current UART reception unconfirmed; check local bridge output and server authorization separately' };
     }
     stages.push({ name: 'Board trace', state: trace.state, detail: trace.detail });
 
@@ -1443,7 +1447,19 @@
   }
 
   function pollStatus() {
-    fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
+    fetch('/hardware/wukong/status', {cache: 'no-store'}).then(function (r) {
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403
+        ? 'Browser status request authorization rejected (HTTP ' + r.status + '); bridge authorization is separately unconfirmed.'
+        : 'Status request failed (HTTP ' + r.status + ').');
+      return r.json();
+    }).then(function (s) {
+      var freshPoll = typeof s.bridge_poll_age === 'number' && s.bridge_poll_age >= 0 && s.bridge_poll_age < 3;
+      var freshTrace = typeof s.last_trace_age === 'number' && s.last_trace_age >= 0 && s.last_trace_age < 3;
+      var target = s.physical_target || {};
+      document.getElementById('connectionEvidence').textContent =
+        'UART: ' + (freshPoll && freshTrace ? 'recent board trace received; not proof of continued health.' : 'current reception unconfirmed; old logs are historical only.') +
+        ' Bridge authorization: ' + (freshPoll ? 'recent command poll accepted.' : 'unconfirmed; inspect bridge terminal for HTTP 401/403.') +
+        ' Live session: ' + (target.live && target.device_uid && target.session_id ? 'identified target reported live.' : 'no live identified target confirmed.');
       observeControlTarget(s);
       handleBridgeAlert(s.bridge_alert);
       if (s.bridge_connected) setState('bridgeState', 'ok', 'connected');
@@ -1612,8 +1628,10 @@
       // Render pipeline health strip and explain empty log.
       renderHealthStrip(s);
       maybeExplainEmptyLog(s);
-    }).catch(function () {
-      setState('bridgeState', 'bad', 'server unreachable');
+    }).catch(function (error) {
+      setState('bridgeState', 'bad', 'status unavailable');
+      document.getElementById('connectionEvidence').textContent =
+        'UART: current reception unconfirmed. Bridge authorization: unconfirmed. Live session: unconfirmed. ' + error.message;
     });
   }
 

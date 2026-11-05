@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { notifyIde } from "./embedding";
 import type { CSSProperties } from "react";
 import {request, sendAllowed, prepareExact, installExact, receiptState} from "./image-api";
+import {connectionStatus, reconnectHelp} from "./connection-status";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
 export default function DevelopmentImage() {
@@ -16,6 +17,21 @@ export default function DevelopmentImage() {
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [sendStatus, setSendStatus] = useState("");
+  const [connection, setConnection] = useState(connectionStatus());
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const board = await request<BoardStatus>("/hardware/wukong/status");
+        if (active) setConnection(connectionStatus(board));
+      } catch (cause) {
+        if (active) setConnection(connectionStatus() + " " + (cause as Error).message);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 3000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [token, setToken] = useState(() => {
     try { return localStorage.getItem("ba_build_token") ?? sessionStorage.getItem("ba_build_token") ?? ""; } catch { return ""; }
@@ -157,7 +173,7 @@ export default function DevelopmentImage() {
       const board = await request<BoardStatus>("/hardware/wukong/status");
       const target = board.physical_target;
       if (!target?.live || !target.device_uid || !target.session_id)
-        throw Error("No live, identified FPGA is connected. Connect the existing bridge and retry. Nothing was sent.");
+        throw Error(connectionStatus(board) + " " + reconnectHelp + " Nothing was sent.");
       setConfirmation({image, target});
     } catch (cause) { setSendStatus("Not sent — " + (cause as Error).message); }
     finally { busy.current = false; setSending(false); }
@@ -372,6 +388,8 @@ export default function DevelopmentImage() {
         <div><strong>Send the bound build to FPGA</strong><span>Uses the existing Namespace binding; no rebind.</span></div>
         <button type="button" className="kiss-primary kiss-send-button" disabled={loading || !input || !sendAllowed(input) || sending || !!receipt} title={input && !sendAllowed(input) ? "Inspection only — not approved for installation" : undefined} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
         {input && !sendAllowed(input) && <p className="kiss-send-status" role="note">Inspection only — this frozen evidence is not approved for installation. Send is disabled.</p>}
+        <p className="kiss-send-status" role="status">{connection}</p>
+        <details><summary>Connection help</summary><p>{reconnectHelp}</p><a href="/fpga" target="_blank" rel="noreferrer">View FPGA connection status</a></details>
         {sendStatus && <p className="kiss-send-status" role="status" aria-live="polite">{sendStatus}{receipt && <> <a href="/fpga" target="_blank" rel="noreferrer">View FPGA delivery status</a></>}</p>}
       </footer>
       <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This view leaves every saved input untouched.</span><span>FPGA transfer only on request</span></p>
