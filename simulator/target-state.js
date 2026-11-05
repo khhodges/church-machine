@@ -152,7 +152,11 @@
         var targetIdent = document.getElementById('programmingTargetIdentity');
         var runtimeIdent = document.getElementById('programmingRuntimeIdentity');
         var bitstreamIdent = document.getElementById('programmingBitstreamIdentity');
-        if (sel) sel.value = s.mode;
+        // Status polling must not reset a native select while its popup is
+        // open or keyboard selection is in progress. Even redundant value
+        // assignments can disrupt browser-native selection UI.
+        if (sel && document.activeElement !== sel && sel.value !== s.mode)
+            sel.value = s.mode;
         if (status) status.textContent = s.ok ? s.reason : s.reason;
         if (targetIdent) targetIdent.textContent = s.mode === MODES.SIMULATOR ?
             'Target: browser simulator' : 'Target UID: ' + (s.deviceUid || 'Unresolved');
@@ -198,7 +202,12 @@
         if (toggle) toggle.addEventListener('click', function() {
             setDetailsExpanded(toggle.getAttribute('aria-expanded') !== 'true');
         });
-        if (sel) sel.addEventListener('change', function() { select({ mode: sel.value }); });
+        if (sel) {
+            sel.addEventListener('change', function() { select({ mode: sel.value }); });
+            // Reconcile an external state change or a cancelled selection
+            // only after the operator has left the control.
+            sel.addEventListener('blur', function() { render(resolve()); });
+        }
         if (uid) {
             uid.value = requested.deviceUid || '';
             uid.addEventListener('input', function() { select({ deviceUid: uid.value.trim() || null }); });

@@ -21,6 +21,7 @@ const context = vm.createContext({
     window, document, localStorage: { getItem: () => JSON.stringify(selected) },
     Date: { now: () => now }, console, JSON, Object,
     ctlBusy: false, controlTarget: null, controlTargetSeenAt: 0,
+    pendingExecutionCmd: null, cmdWatch: null,
     note: text => notes.push(text),
     setCtlBusy: value => { context.ctlBusy = value; },
     controlHeaders: () => ({Authorization: 'Bearer test-only'}),
