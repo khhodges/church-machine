@@ -51,6 +51,14 @@ Send as confusing and explicitly requested a disabled button with a popup.
 **How to apply:** Use a short, actionable explanation; retain actual transfer
 results and server-side enforcement without exposing internal security bookkeeping.
 
+Attempt automatic recovery before asking the operator to correct a disabled
+Send action, then give specific help if it remains unavailable.
+**Why:** The user requested guidance rather than a disabled dead end, with the
+IDE trying automatically first.
+**How to apply:** Retry safe connection checks, observe automatic bridge recovery,
+and re-enable Send when live evidence returns. Never describe polling as repairing
+credentials, auto-approve unknown authority, or automatically retry a transfer.
+
 Development Image belongs inside the established IDE, using the same shared
 header and view navigation as Namespace, not a separate page with a copied menu.
 

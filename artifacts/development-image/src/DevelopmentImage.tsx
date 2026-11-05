@@ -7,6 +7,7 @@ import type { LoadRequest } from "./embedding";
 import type { CSSProperties } from "react";
 import {request, sendAllowed, prepareExact, installExact, receiptState} from "./image-api";
 import {connectionStatus, reconnectHelp} from "./connection-status";
+import {useBridgeConnection} from "./use-bridge-connection";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
 export default function DevelopmentImage() {
@@ -18,29 +19,17 @@ export default function DevelopmentImage() {
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [sendStatus, setSendStatus] = useState("");
-  const [connected, setConnected] = useState(false);
-  useEffect(() => {
-    let active = true;
-    const refresh = async () => {
-      try {
-        const board = await request<BoardStatus>("/hardware/wukong/status");
-        if (active) setConnected(!!(board.physical_target?.live &&
-          board.physical_target.device_uid && board.physical_target.session_id));
-      } catch {
-        if (active) setConnected(false);
-      }
-    };
-    void refresh();
-    const timer = window.setInterval(refresh, 3000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, []);
+  const connection = useBridgeConnection();
+  const {connected} = connection;
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const sendUnavailable = sending ? "Preparing the image. Please wait." :
     receipt ? "This image has already been submitted." :
     loading ? "Loading the selected image. Please wait." :
     !input ? "Select an available development image first." :
     !sendAllowed(input) ? "This image is for inspection only and cannot be sent." :
-    !connected ? "No live FPGA connection. Sending will be available when the bridge reconnects." : "";
+    !connected ? connection.needsHelp
+      ? "The connection has not recovered. Follow the connection help below."
+      : "Checking the FPGA connection automatically. Sending will become available when it reconnects." : "";
   const [token, setToken] = useState(() => {
     try { return localStorage.getItem("ba_build_token") ?? sessionStorage.getItem("ba_build_token") ?? ""; } catch { return ""; }
   });
@@ -428,6 +417,22 @@ export default function DevelopmentImage() {
           <button type="button" className="kiss-primary kiss-send-button" disabled={!!sendUnavailable} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
           {sendUnavailable && <span id="send-unavailable-reason" role="tooltip">{sendUnavailable}</span>}
         </span>
+        {!sending && !receipt && input && sendAllowed(input) && !connected && (
+          <div className="kiss-connection-recovery" role="status" aria-live="polite">
+            {!connection.needsHelp ? <p>Checking the connection automatically…</p> : <>
+              <p>{connection.issue === "server"
+                ? "The IDE connection check could not complete. Check your internet connection; I’ll keep retrying."
+                : "The bridge has not reconnected after four checks. Check that the FPGA has power, its USB cable is connected, and the bridge’s PowerShell window is still running. I’ll keep checking."}</p>
+              <details>
+                <summary>Still disconnected?</summary>
+                <p>{connection.issue === "server"
+                  ? "If other pages work, the IDE server may be unavailable or rejecting this request. Try the connection check again after the server is available."
+                  : "If PowerShell is closed, open Connect bridge in the IDE to start it. If it is running but reports an error, share the error text without any credentials so the cause can be corrected."}</p>
+              </details>
+              <button type="button" onClick={connection.retry}>Check again now</button>
+            </>}
+          </div>
+        )}
         {sendStatus && <p className="kiss-send-status" role="status" aria-live="polite">{sendStatus}{receipt && <> <a href="/fpga" target="_blank" rel="noreferrer">View FPGA delivery status</a></>}</p>}
       </footer>
       <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This view leaves every saved input untouched.</span><span>FPGA transfer only on request</span></p>

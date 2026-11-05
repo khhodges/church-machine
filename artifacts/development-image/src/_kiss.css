@@ -233,3 +233,7 @@
 .kiss-workbench .kiss-send-hint [role="tooltip"] { display:none; position:absolute; bottom:calc(100% + 10px); right:0; width:280px; max-width:80vw; padding:10px 12px; background:#101827; color:#e4ebf5; border:1px solid #63748b; border-radius:6px; font-size:13px; line-height:1.5; z-index:20; box-shadow:0 4px 16px #0006; }
 .kiss-workbench .kiss-send-hint:hover [role="tooltip"], .kiss-workbench .kiss-send-hint:focus [role="tooltip"] { display:block; }
 .kiss-workbench .kiss-send-hint:focus-visible { outline:2px solid #e7bd62; outline-offset:4px; }
+.kiss-workbench .kiss-connection-recovery { grid-column:1 / -1; color:#becbdd; font-size:13px; line-height:1.5; }
+.kiss-workbench .kiss-connection-recovery p { margin:6px 0; }
+.kiss-workbench .kiss-connection-recovery summary { cursor:pointer; }
+.kiss-workbench .kiss-connection-recovery button { margin-top:8px; }
