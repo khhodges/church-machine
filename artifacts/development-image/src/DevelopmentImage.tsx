@@ -8,6 +8,7 @@ import type { CSSProperties } from "react";
 import {request, sendAllowed, prepareExact, installExact, receiptState} from "./image-api";
 import {connectionStatus, reconnectHelp} from "./connection-status";
 import {useBridgeConnection} from "./use-bridge-connection";
+import {stopBeforeSend} from "./stop-before-send";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
 export default function DevelopmentImage() {
@@ -214,6 +215,8 @@ export default function DevelopmentImage() {
       if (!token.trim()) throw Error("IDE hardware authorization is required. Enter the existing IDE access token; nothing was sent.");
       setSendStatus("Rechecking the exact prepared image. No rebinding.");
       const prepared = await prepareExact(frozen.image, token.trim());
+      setSendStatus("Stopping the selected board and waiting for its acknowledgement…");
+      await stopBeforeSend(frozen.target, token.trim());
       setSendStatus("Submitting the confirmed image. Do not retry while its delivery is unknown.");
       const result = await installExact(prepared, frozen.target, token.trim());
       setReceipt(result);
@@ -450,7 +453,7 @@ export default function DevelopmentImage() {
           <dl><dt>Namespace</dt><dd>{input?.name}</dd><dt>Board</dt><dd>{confirmation.target.device_uid}</dd>
             <dt>Image SHA-256</dt><dd>{confirmation.image.artifact_sha256}</dd>
             <dt>Required bitstream</dt><dd>{confirmation.image.required_bitstream_sha256}</dd></dl>
-          <p>Bitstream compatibility is your responsibility; no separate installation approval is required. The board must be stopped for transfer. An upload acknowledgement is not memory readback.</p>
+          <p>After confirmation, the IDE stops the board, waits for acknowledgement, then sends this image. Bitstream compatibility is your responsibility. An upload acknowledgement is not memory readback.</p>
           <label htmlFor="hardware-token">IDE hardware access token</label>
           <input id="hardware-token" type="password" autoComplete="off" value={token} onChange={event => {
             setToken(event.target.value);

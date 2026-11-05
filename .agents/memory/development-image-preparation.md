@@ -59,6 +59,15 @@ IDE trying automatically first.
 and re-enable Send when live evidence returns. Never describe polling as repairing
 credentials, auto-approve unknown authority, or automatically retry a transfer.
 
+Explicit image replacement consent includes obtaining the board's STOP
+acknowledgement automatically before upload; do not require a separate manual
+STOP or ask the operator to race an acknowledgement expiry.
+**Why:** The user reached Send after reconnecting but was blocked because the
+one-button flow never obtained the installer's required fresh stop evidence.
+**How to apply:** Prepare first, stop the exact target, correlate acknowledgement
+to the issued command and session, then upload. Timeout, changed target or failed
+STOP aborts the upload; never reset or release a fault as a fallback.
+
 Development Image belongs inside the established IDE, using the same shared
 header and view navigation as Namespace, not a separate page with a copied menu.
 
