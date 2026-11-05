@@ -77,3 +77,12 @@ assert.deepStrictEqual(ug.map(g => [g.name, g.edges.map(e => e.id)]), [['Sys.Clo
 const CU = m.placeUnresolved(m.containerLayout(nsNodes, 'default', 1000, 600), ug);
 CU.unresolved.forEach(u => assert.ok(u.box.y > CU.container.headerHeight && u.box.y + u.box.h <= CU.container.h));
 console.log('unresolve: ok');
+const mi = m.metaItems('bitstream', 'bs1', { namespaceRevisionId: 'rev'.repeat(10), imageHash: 'f'.repeat(64), status: 'available', imageKind: 'lump', installed: null }, { sha256: 'a'.repeat(64) });
+assert.deepStrictEqual(mi.map(i => i.k), ['Bitstream', 'SHA-256', 'Namespace revision', 'Evidence status', 'Image hash', 'Image format', 'Installed']);
+assert.strictEqual(mi[1].v.length, 64);
+const ms = m.metaSummary(mi, ['x', 'y']);
+assert.ok(ms.text.length < 120 && /sha aaaaaaaaaaaa…/.test(ms.text) && /UNVERIFIED/.test(ms.text));
+assert.strictEqual(ms.warnings, '2 warnings');
+assert.strictEqual(m.metaSummary(m.metaItems('namespace', 'n1', {}), []).warnings, '');
+assert.ok(C.meta.y + C.meta.h <= C.pos['slot-0'].y && C.pos['slot-1'].y + C.pos['slot-1'].h <= C.container.headerHeight);
+console.log('meta header: ok');

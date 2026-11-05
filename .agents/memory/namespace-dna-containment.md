@@ -29,3 +29,9 @@ Namespace.Boot” as the desired format.
 **How to apply:** Prefer names retained in the exact inspected object's
 self-definition and references; archived slot maps can describe a different
 layout. Keep presentation labels distinct from retained identity evidence.
+
+Keep image/build metadata inside the enclosing Namespace header, not in a
+separate tall strip above it; remove repeated labels.
+**Why:** The user explicitly requested less duplication and height.
+**How to apply:** Use compact summaries with full identities and warnings
+accessible through details, preserving installation-unverified status.

@@ -72,7 +72,7 @@
       return { slot: slot, node: nodes.filter(function (n) { return n.slot === slot; })[0] || null };
     });
     var inner = nodes.filter(function (n) { return n.slot !== 0 && n.slot !== 1; });
-    var hh = HDR_TOP + 2 * HDR_LINE + 16;
+    var hh = HDR_TOP + 3 * HDR_LINE + 10;
     var aw = Math.max(1, (width || 800) - 48), ah = Math.max(1, (height || 600) - 48);
     var L = inner.length ? viewportLayout(inner, mode, aw, Math.max(1, ah - hh)) : { pos: {}, order: [], width: 0, height: 0 };
     var cw = Math.max(380, L.width + 2 * HDR_PAD), ch = hh + L.height + 2 * HDR_PAD;
@@ -84,10 +84,11 @@
       var p = L.pos[id]; pos[id] = { x: p.x + ox, y: p.y + oy, w: p.w, h: p.h };
     });
     headerSlots.forEach(function (h, i) {
-      h.box = { x: HDR_PAD, y: HDR_TOP + i * HDR_LINE, w: cw - 2 * HDR_PAD, h: HDR_LINE - 2 };
+      h.box = { x: HDR_PAD, y: HDR_TOP + (i + 1) * HDR_LINE, w: cw - 2 * HDR_PAD, h: HDR_LINE - 2 };
       if (h.node) pos[h.node.id] = h.box;
     });
     return { pos: pos, order: L.order, header: headerSlots, enclosing: encl,
+      meta: { x: HDR_PAD, y: HDR_TOP, w: cw - 2 * HDR_PAD, h: HDR_LINE - 2 },
       container: { x: 0, y: 0, w: cw, h: ch, headerHeight: hh }, width: cw, height: ch };
   }
   // One Unresolve box per unique retained dot.name; unnamed non-NULL refs share
@@ -151,12 +152,37 @@
     }
     return { outgoing: out, incoming: inc };
   }
+  // Identity metadata shown once, compactly inside NS[1]; full values in detail panel.
+  function metaItems(kind, id, g, b) {
+    g = g || {}; b = b || {};
+    var items = [];
+    if (kind === 'bitstream') {
+      items.push({ k: 'Bitstream', v: (g.bitstream && g.bitstream.label) || id, mono: true });
+      items.push({ k: 'SHA-256', v: b.sha256, mono: true, hash: true });
+      items.push({ k: 'Namespace revision', v: g.namespaceRevisionId, mono: true, hash: true });
+      items.push({ k: 'Evidence status', v: String(g.status || '').toUpperCase() });
+    } else items.push({ k: 'Namespace revision', v: g.namespaceRevisionId || id, mono: true, hash: true });
+    items.push({ k: 'Image hash', v: g.imageHash, mono: true, hash: true });
+    items.push({ k: 'Image format', v: [g.imageKind, g.imageLayout].filter(Boolean).join(' · ') });
+    items.push({ k: 'Installed', v: ((g.installed && g.installed.status) || 'unverified').toUpperCase() + (g.installed && g.installed.reason ? ' — ' + g.installed.reason : '') });
+    return items;
+  }
+  function metaSummary(items, issues) {
+    var abbr = { 'SHA-256': 'sha', 'Namespace revision': 'rev', 'Image hash': 'img', 'Evidence status': '', 'Image format': '', 'Installed': 'installed', 'Bitstream': '' };
+    var parts = items.filter(function (i) { return i.v != null && i.v !== ''; }).map(function (i) {
+      var v = String(i.v); if (i.hash && v.length > 12) v = v.slice(0, 12) + '…';
+      if (i.k === 'Installed') v = v.split(' — ')[0];
+      var a = abbr[i.k]; return a ? a + ' ' + v : v;
+    });
+    var n = (issues || []).length;
+    return { text: parts.join(' · '), warnings: n ? n + ' warning' + (n > 1 ? 's' : '') : '' };
+  }
   function clampZoom(z) { return Math.min(4, Math.max(0.15, z)); }
   function makeRequestGate() {
     var seq = 0;
     return { next: function () { return ++seq; }, isCurrent: function (t) { return t === seq; } };
   }
-  var pure = { nodeLabel: nodeLabel, wrapName: wrapName, hex32: hex32, buildUrl: buildUrl, layoutGraph: layoutGraph, viewportLayout: viewportLayout, containerLayout: containerLayout, unresolvedGroups: unresolvedGroups, placeUnresolved: placeUnresolved, filterDetail: filterDetail, clampZoom: clampZoom, makeRequestGate: makeRequestGate };
+  var pure = { nodeLabel: nodeLabel, wrapName: wrapName, hex32: hex32, buildUrl: buildUrl, layoutGraph: layoutGraph, viewportLayout: viewportLayout, containerLayout: containerLayout, metaItems: metaItems, metaSummary: metaSummary, unresolvedGroups: unresolvedGroups, placeUnresolved: placeUnresolved, filterDetail: filterDetail, clampZoom: clampZoom, makeRequestGate: makeRequestGate };
   if (typeof module !== 'undefined' && module.exports) { module.exports = pure; return; }
 
   // ---------- DOM ----------
@@ -589,19 +615,10 @@
     var g = state.graph;
     var meta = ui.dlgMeta;
     meta.textContent = '';
-    if (kind === 'bitstream') {
-      var b = findBs(id) || {};
-      kv(meta, 'Bitstream', (g.bitstream && g.bitstream.label) || id, true);
-      kv(meta, 'SHA-256', b.sha256, true);
-      kv(meta, 'Namespace revision', g.namespaceRevisionId, true);
-      kv(meta, 'Evidence status', String(g.status || '').toUpperCase());
-    } else {
-      kv(meta, 'Namespace revision', g.namespaceRevisionId || id, true);
-    }
-    kv(meta, 'Image hash', g.imageHash, true);
-    kv(meta, 'Image format', [g.imageKind, g.imageLayout].filter(Boolean).join(' · '));
-    kv(meta, 'Installed', ((g.installed && g.installed.status) || 'unverified').toUpperCase() + (g.installed && g.installed.reason ? ' — ' + g.installed.reason : ''));
+    var mItems = state.metaItems = metaItems(kind, id, g, kind === 'bitstream' ? findBs(id) : null);
+    mItems.forEach(function (i) { kv(meta, i.k, i.v, i.mono); });
     renderIssues(meta, g.issues);
+    meta.hidden = false;
     ui.stage.textContent = '';
     if (kind === 'bitstream' && g.status !== 'available') {
       var u = el('div', 'tbd-empty');
@@ -612,6 +629,7 @@
     }
     var nodes = g.nodes || [], edges = g.edges || [];
     if (!nodes.length) { ui.stage.appendChild(el('div', 'tbd-empty', 'No objects in this image.')); return; }
+    meta.hidden = nodes.some(function (n) { return n.slot === 1; });
     var viewport = ui.stage.getBoundingClientRect();
     var L = state.layout = containerLayout(nodes, state.layoutMode, viewport.width, viewport.height) ||
       viewportLayout(nodes, state.layoutMode, viewport.width, viewport.height);
@@ -636,13 +654,29 @@
       et.textContent = 'Enclosing Namespace NS[1] · ' + (nodeLabel(L.enclosing).name || 'dot.name unavailable');
       cg.appendChild(et);
       root.appendChild(cg);
+      meta.hidden = true;
+      var ms = metaSummary(mItems, g.issues), M = L.meta;
+      var mg = svg('g', { class: 'tbd-node tbd-hdr tbd-hdr-meta', transform: 'translate(' + M.x + ' ' + M.y + ')', tabindex: '0', role: 'button' });
+      mg.setAttribute('aria-label', 'Image identity: ' + mItems.map(function (i) { return i.k + ' ' + (i.v || '—'); }).join('; ') + (ms.warnings ? '; ' + ms.warnings : '') + '. Activate for full values.');
+      mg.appendChild(svg('rect', { width: M.w, height: M.h, rx: 3 }));
+      var mt = svg('text', { x: 6, y: 13, class: 'tbd-hdr-text tbd-hdr-id' });
+      var mt1 = svg('tspan', {}); mt1.textContent = ms.text; mt.appendChild(mt1);
+      if (ms.warnings) { var mw = svg('tspan', { class: 'tbd-hdr-warn' }); mw.textContent = ' · ' + ms.warnings; mt.appendChild(mw); }
+      var md = svg('tspan', { class: 'tbd-hdr-more' }); md.textContent = '  details ›'; mt.appendChild(md);
+      mt.setAttribute('textLength', M.w - 12);
+      mt.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+      mg.appendChild(mt);
+      var mtt = svg('title', {}); mtt.textContent = '__meta'; mg.appendChild(mtt);
+      mg.addEventListener('click', function () { selectNode('__meta'); });
+      mg.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNode('__meta'); } });
+      ng.appendChild(mg);
       L.header.forEach(function (h) {
         var b = h.box, n = h.node;
         var hg = svg('g', { class: n ? 'tbd-node tbd-hdr' : 'tbd-hdr tbd-hdr-missing', transform: 'translate(' + b.x + ' ' + b.y + ')' });
         hg.dataset.slot = h.slot;
         hg.appendChild(svg('rect', { width: b.w, height: b.h, rx: 3 }));
         var tx = svg('text', { x: 6, y: 13, class: 'tbd-hdr-text' });
-        tx.textContent = (h.slot === 0 ? 'Metadata Slot[0] ' : 'Slot[1] ') + (n ? nodeLabel(n).ns + ' ' + (nodeLabel(n).name || 'name unavailable') + ' · ' + (n.kind || '?') +
+        tx.textContent = (h.slot === 0 ? 'Slot[0] raw metadata · ' : 'Slot[1] info · ') + (n ? (h.slot === 0 ? (nodeLabel(n).name ? nodeLabel(n).name + ' · ' : '') : '') + (n.kind || '?') +
           (n.sizeWords != null ? ' · ' + n.sizeWords + 'w' : '') + (n.binaryHash ? ' · ' + String(n.binaryHash).slice(0, 12) : '')
           : h.slot === 0 && Array.isArray(g.metadataWords)
             ? g.metadataWords.map(hex32).join(' · ')
@@ -766,6 +800,11 @@
 
   function renderDetail() {
     var g = state.graph; if (!g || !state.selectedNode) return;
+    if (state.selectedNode === '__meta') {
+      ui.detail.textContent = ''; ui.detail.appendChild(el('h3', null, 'Image identity'));
+      (state.metaItems || []).forEach(function (i) { kv(ui.detail, i.k, i.v, i.mono); });
+      renderIssues(ui.detail, g.issues); return;
+    }
     var n = (g.nodes || []).filter(function (x) { return x.id === state.selectedNode; })[0]; if (!n) return;
     var d = ui.detail; d.textContent = '';
     d.appendChild(el('h3', null, n.name || n.id));
