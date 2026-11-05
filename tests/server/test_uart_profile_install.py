@@ -44,7 +44,7 @@ def setup(tmp_path, monkeypatch):
                   expires_at=NOW + 120, **TARGET)
     path = tmp_path / "installation.json"
     path.write_text(json.dumps(record))
-    monkeypatch.setattr(loader, "INSTALLATION_PATH", path)
+    monkeypatch.setattr(loader, "INSTALLATION_PATH", path, raising=False)
     monkeypatch.setattr(loader.time, "time", lambda: NOW)
     backend = SimpleNamespace(
         _approved_namespace_upload_source=lambda revision: (raw, {}) if revision == REVISION else
@@ -84,6 +84,7 @@ def test_offline_prepare_never_contacts_target_or_requires_installation(setup):
     assert response.json["artifact_sha256"] == hashlib.sha256(raw).hexdigest()
     assert response.json["thread_contexts"] == [dict(number=1, slot=2, base_word=256)]
     assert response.json["queued"] is False
+    assert response.json["requires_operator_verified_installation"] is False
     assert backend._wukong_pending_cmd is None and not backend._upload_in_flight
     assert backend._wukong_upload_ack == {"old": True}
 
@@ -129,7 +130,7 @@ def test_saved_design_send_keeps_all_hardware_gates(setup, monkeypatch, failure)
         data["confirm_runtime_memory_replacement"] = False
     response = client.post("/api/namespace-image/uart-install", json=data)
     assert calls == [revision]
-    if failure:
+    if failure and failure != "installation":
         assert response.status_code == 409
         assert backend._wukong_pending_cmd is None
         assert not backend._upload_in_flight
@@ -146,12 +147,12 @@ def test_saved_design_send_keeps_all_hardware_gates(setup, monkeypatch, failure)
     ("operator_verified_installation", False), ("expires_at", NOW),
     ("expires_at", NOW + 301), ("expires_at", True), ("expires_at", float("nan")),
 ])
-def test_installation_proof_is_exact_and_session_bound(setup, field, value):
+def test_manual_installation_records_do_not_gate_programmer_choice(setup, field, value):
     client, backend, raw, record, path = setup
     record[field] = value
     path.write_text(json.dumps(record))
-    assert client.post("/api/namespace-image/uart-install", json=payload(raw)).status_code == 409
-    assert backend._wukong_pending_cmd is None and not backend._upload_in_flight
+    assert client.post("/api/namespace-image/uart-install", json=payload(raw)).status_code == 200
+    assert base64.b64decode(backend._wukong_pending_cmd["data"]) == raw
 
 
 @pytest.mark.parametrize("change", [

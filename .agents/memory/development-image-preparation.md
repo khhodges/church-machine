@@ -35,6 +35,15 @@ actual task. Preparation and compatibility checks belong inside the loading flow
 separate and collapsed. Preserve explicit runtime-memory replacement confirmation;
 selection, navigation, and refresh alone must never initiate a load.
 
+Development-image loading must not require a manually certified installed-BIT
+record or a fresh operator compatibility approval.
+**Why:** The user explicitly said “Its the programmers choice to make mistakes
+dont get in the way” after the hidden installation-record gate blocked loading.
+**How to apply:** Treat installed-bitstream compatibility as the programmer's
+responsibility, not a veto. Retain authorization, exact-byte/target delivery,
+transfer serialization and replacement consent. This supersedes the earlier
+manual installation-evidence requirement for this loading flow.
+
 Development Image belongs inside the established IDE, using the same shared
 header and view navigation as Namespace, not a separate page with a copied menu.
 

@@ -1,14 +1,11 @@
 """Native UART installation for the exact Amoeba retry FPGA profile.
 
-Preparation is offline. Installation additionally needs trusted operator evidence
-and a fresh physical stop; neither a build number nor browser data grants these.
+Preparation is offline. Installation needs an authorized target and a fresh
+physical stop. Installed-bitstream compatibility is the programmer's choice.
 No legacy projection, address conversion, compiler substitution, or fault release.
 """
 import base64
 import hashlib
-import json
-import math
-from pathlib import Path
 import re
 import struct
 import time
@@ -19,7 +16,6 @@ from server.namespace_ascending_image import FORMAT, validate_image
 
 PROFILE = "amoeba-retry-25mhz-uart-v1"
 BIT_SHA256 = "a4acb0ef9a39ba985d7769031cf146edb68fb65ff96e0b4f4a895093b54e5d4e"
-INSTALLATION_PATH = Path(__file__).resolve().parents[1] / "build/uart-profile-installation.json"
 
 
 def prepare_image(raw):
@@ -46,28 +42,8 @@ def prepare_image(raw):
                          for n, slot in enumerate(slots)],
         installed_bytes_verified=False,
         requires_fresh_confirmed_halt=True,
-        requires_operator_verified_installation=True,
+        requires_operator_verified_installation=False,
     )
-
-
-def verify_installation(target, now):
-    try:
-        record = json.loads(INSTALLATION_PATH.read_text())
-    except (OSError, ValueError) as error:
-        raise ValueError("No operator-verified installation record for this UART profile. Nothing was sent.") from error
-    if not isinstance(record, dict) or any((
-        record.get("schema") != "church.uart-profile-installation/v1",
-        record.get("profile") != PROFILE,
-        record.get("operator_verified_installation") is not True,
-        record.get("bitstream_sha256") != BIT_SHA256,
-        record.get("device_uid") != target["device_uid"],
-        record.get("bridge_session") != target["bridge_session"],
-    )):
-        raise ValueError("Installation evidence does not match this exact BIT and board session. Nothing was sent.")
-    expires = record.get("expires_at")
-    if (type(expires) not in (int, float) or not math.isfinite(expires)
-            or not now < expires <= now + 300):
-        raise ValueError("Installation evidence needs a fresh five-minute operator approval. Nothing was sent.")
 
 
 def register(app, backend):
@@ -116,10 +92,6 @@ def register(app, backend):
             target, error = backend._wukong_target_error(data)
             if error:
                 return backend._wukong_target_rejection(error)
-            try:
-                verify_installation(target, time.time())
-            except ValueError as error:
-                return jsonify(ok=False, queued=False, error=str(error)), 409
             if backend._wukong_pending_cmd or not halted(
                     backend._wukong_cmd_delivery or {}, target, time.time()):
                 return jsonify(ok=False, queued=False, error=(
