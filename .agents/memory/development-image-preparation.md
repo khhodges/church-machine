@@ -27,6 +27,14 @@ Keep the operator's goal focused on loading the new development image.
 design to be prepared and sent; do not substitute the historical image as the
 upload target or turn the loading workflow into unrelated maintenance work.
 
+The user requested a one-button operation on Build Approval for loading the
+selected development image.
+**Why:** Many competing build, install, UART, and download buttons obscured the
+actual task. Preparation and compatibility checks belong inside the loading flow.
+**How to apply:** Keep one primary loading action, with advanced maintenance
+separate and collapsed. Preserve explicit runtime-memory replacement confirmation;
+selection, navigation, and refresh alone must never initiate a load.
+
 Development Image belongs inside the established IDE, using the same shared
 header and view navigation as Namespace, not a separate page with a copied menu.
 

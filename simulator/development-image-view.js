@@ -6,6 +6,24 @@
     const VIEW = 'development-image';
     const APP = '/development-image/';
     let selection = '';
+    // One-shot, in-memory user request from Build Approval. Never derived from
+    // the URL, so reloads and selections cannot start preparation.
+    let pendingLoad = null;
+    let loadCounter = 0;
+    function deliverLoad() {
+        const el = frame();
+        if (!pendingLoad || !el || !el.contentWindow) return;
+        el.contentWindow.postMessage({type: 'development-image:load',
+            namespace: pendingLoad.namespace, requestId: pendingLoad.requestId}, root.location.origin);
+    }
+    function requestLoad(namespace) {
+        if (typeof namespace !== 'string' || !namespace || namespace.startsWith('bitstream:')) return false;
+        loadCounter += 1;
+        pendingLoad = {namespace, requestId: 'ba-' + Date.now().toString(36) + '-' + loadCounter};
+        show(namespace);
+        deliverLoad();
+        return true;
+    }
 
     function parseHash(hash) {
         const raw = String(hash || '').replace(/^#/, '');
@@ -96,9 +114,14 @@
         const el = frame();
         if (!el || event.origin !== root.location.origin || event.source !== el.contentWindow) return;
         const data = event.data || {};
-        if (data.type === 'development-image:selection' && typeof data.namespace === 'string') {
+        if (data.type === 'development-image:ready') {
+            deliverLoad();
+        } else if (data.type === 'development-image:load-accepted') {
+            if (pendingLoad && data.requestId === pendingLoad.requestId) pendingLoad = null;
+        } else if (data.type === 'development-image:selection' && typeof data.namespace === 'string') {
             selection = data.namespace;
             syncHash();
+            deliverLoad();
         } else if (data.type === 'development-image:height' && Number.isFinite(data.height)) {
             el.style.height = Math.max(480, Math.ceil(data.height)) + 'px';
         } else if (data.type === 'development-image:navigate' && data.view === 'namespace') {
@@ -106,6 +129,7 @@
         }
     });
 
-    root.DevelopmentImageView = {show, openFromNamespace, parseHash, routeFor, frameSrc,
+    root.DevelopmentImageView = {show, openFromNamespace, requestLoad,
+        pendingLoad: () => pendingLoad, parseHash, routeFor, frameSrc,
         selection: () => selection};
 })(window);

@@ -303,6 +303,16 @@
         .r1-step-btn-secondary:hover { background:#1a1408; color:#daa520; border-color:#daa520; }
         @media (max-width:600px) { .r1-step-card { flex-direction:column; } .r1-step-action { width:100%; align-items:stretch; } .r1-step-btn { width:100%; text-align:center; } }
         /* ── Build Approval panel ────────────────────────────────────── */
+        .ba-primary { display:flex; align-items:center; gap:0.7rem; flex-wrap:wrap; padding:0.9rem 1.4rem 0.6rem; }
+        .ba-primary label { color:#daa520; font-weight:700; font-size:0.85rem; }
+        .ba-primary select { min-width:min(360px,100%); max-width:100%; }
+        .ba-load-btn { padding:0.45rem 1.1rem; font-size:0.88rem; }
+        .ba-advanced { margin:1rem 1.4rem 1.4rem; border:1px solid #2a2a4a; border-radius:6px; background:#0d0d18; }
+        .ba-advanced > summary { cursor:pointer; padding:0.55rem 0.8rem; color:#aab0c9; font-size:0.8rem; }
+        .ba-advanced[open] > summary { border-bottom:1px solid #2a2a4a; }
+        .ba-advanced > .ba-header, .ba-advanced > .ba-toolbar, .ba-advanced > .ba-release-context, .ba-advanced > .ba-issue-comments, .ba-advanced > .ba-console, .ba-advanced > .ba-build-log-wrap { margin-left:0.8rem; margin-right:0.8rem; }
+        .ba-advanced > .ba-header { margin-top:0.7rem; }
+        .ba-panel > .ba-map-body { padding-left:1.4rem; padding-right:1.4rem; }
         .ba-panel { padding:0; overflow-y:auto; max-height:calc(100vh - 120px); }
         .ba-panel > .ba-header, .ba-panel > .ba-toolbar, .ba-panel > .ba-release-context, .ba-panel > .ba-issue-comments, .ba-panel > .ba-map-body, .ba-panel > .ba-build-log-wrap { padding-left:1.4rem; padding-right:1.4rem; }
         .ba-panel > .ba-header { padding-top:1rem; }
@@ -1629,8 +1639,6 @@
                        autocomplete="off"
                        oninput="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._onTokenInput(this.value)">
                 <span id="baTokenStatus" class="ba-token-status"></span>
-                <button type="button" class="ba-refresh-btn" title="Remove remembered authorization from this browser" onclick="BuildApprovalView.forgetToken()">Forget token</button>
-                <button type="button" class="ba-refresh-btn" onclick="BuildApprovalView.openBridgePairing()">Connect bridge</button>
             </form>
             <dialog id="baBridgePairing" style="background:#171b30;color:#eee;border:1px solid #68718c;border-radius:8px;max-width:640px;width:90%">
                 <h3>Connect your physical FPGA</h3>
@@ -1646,6 +1654,21 @@
                 <p>Stop the old bridge with Ctrl+C, then paste this command into PowerShell. The command downloads the updated bridge and starts it. Keep that window open.</p>
                 <button type="button" onclick="BuildApprovalView.closeBridgePairing()">Close</button>
             </dialog>
+            <div class="ba-primary" aria-label="Load development image">
+                <label for="baRevisionSelect">Namespace</label>
+                <select id="baRevisionSelect" style="max-width:100%" aria-label="Choose a saved Namespace or bitstream build" onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectRevisionId(this.value);BuildApprovalView._updateLoadBtn()"><option value="">Select a Namespace or bitstream build…</option></select>
+                <button type="button" id="baLoadDevImageBtn" class="ba-approve-btn ba-load-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.loadDevelopmentImage()">Load development image</button>
+                <span id="baLoadDevImageStatus" class="ba-snapshot-status" role="status" aria-live="polite">Prepares the exact Namespace and checks the FPGA. You confirm before runtime memory is replaced.</span>
+            </div>
+            <div id="baMapBody" class="ba-map-body">
+                <div class="ba-loading">Select the &#x1F528; Build tab to load NS map&hellip;</div>
+            </div>
+            <details id="baAdvanced" class="ba-advanced">
+                <summary>Advanced — bitstream builds, downloads, bridge connection</summary>
+                <div class="ba-toolbar">
+                <button type="button" class="ba-refresh-btn" title="Remove remembered authorization from this browser" onclick="BuildApprovalView.forgetToken()">Forget token</button>
+                <button type="button" class="ba-refresh-btn" onclick="BuildApprovalView.openBridgePairing()">Connect bridge</button>
+                </div>
             <div class="ba-header">
                 <h2>&#x1F528; Build Approval</h2>
                 <button id="baRefreshBtn" class="ba-refresh-btn" onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.refresh(true)">&#x21BB; Refresh</button>
@@ -1654,8 +1677,6 @@
             <div class="ba-toolbar">
                 <span class="ba-snapshot-status">Local draft approval · separate from selected revision inspection and installed-board evidence</span>
                 <button id="baFreezeBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.freezeSnapshot()">&#x2744;&#xFE0F; Freeze Snapshot</button>
-                <label for="baRevisionSelect">Namespaces and bitstream builds (blue)</label>
-                <select id="baRevisionSelect" style="max-width:100%" aria-label="Choose a saved Namespace or bitstream build" onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectRevisionId(this.value)"><option value="">Select a Namespace or bitstream build…</option></select>
                 <button id="baSelectSnapshotBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectAvailableSnapshot()">Use approved revision</button>
                 <button id="baInstallImageBtn" class="ba-approve-btn" disabled onclick="BuildApprovalView.installSelectedImage()">Install Image</button>
                 <button class="ba-approve-btn" onclick="BuildApprovalView.prepareSelectedUartImage()">Check UART Image</button>
@@ -1677,9 +1698,6 @@
                 <button type="button" id="baDownloadRevisionBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.downloadSelectedBitstream()">Download selected .bit</button>
                 <span id="baBitstreamRevisionStatus" class="ba-snapshot-status">Downloading an older output does not activate or flash it.</span>
             </div>
-            <div id="baMapBody" class="ba-map-body">
-                <div class="ba-loading">Select the &#x1F528; Build tab to load NS map&hellip;</div>
-            </div>
             <div id="baConsole" class="ba-console">
                 <div class="ba-console-header">
                     <span class="ba-console-title">&#x1F4DF; Build console</span>
@@ -1696,6 +1714,7 @@
                 </div>
                 <pre id="baBuildLog" class="ba-build-log"></pre>
             </div>
+            </details>
         </div>
         <div id="versionsPanel" style="display:none;" class="ti60-connect-panel">
             <div class="versions-header">
@@ -3700,7 +3719,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="breakpoint-inspector.js?v=sha256-72e74713d889"></script>
     <script src="design-simulation.js?v=sha256-35c7e05323f7"></script>
     <script src="namespace-selection.js"></script>
-    <script src="development-image-view.js?v=sha256-39e40501c40e"></script>
+    <script src="development-image-view.js?v=sha256-8d82d339f04f"></script>
     <script src="namespace-design-v1.js?v=sha256-f39ed0445ded"></script>
     <script src="namespace-ide-node.js?v=sha256-94708018f5d1"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>
@@ -3731,7 +3750,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="compile-progress.js?v=sha256-f38e2911f69c"></script>
     <script src="app-actions.js?v=sha256-1f195eefda4e"></script>
     <script src="app-heap-record.js?v=sha256-653a8f689f16"></script>
-    <script src="app-build-approval.js?v=sha256-79b790d6d844"></script>
+    <script src="app-build-approval.js?v=sha256-51ac1628a5ee"></script>
     <script src="app-source-library.js?v=sha256-3277a7eecc9e"></script>
     <script src="app-editor-view-switcher.js?v=sha256-0890f98dcbf5"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>

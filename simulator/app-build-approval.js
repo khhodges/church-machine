@@ -291,6 +291,8 @@ const BuildApprovalView = {
     openRevisionHistory() {
         if (typeof switchView === 'function') switchView('builder');
         if (typeof switchBuilderViewTab === 'function') switchBuilderViewTab('build');
+        const advanced = document.getElementById('baAdvanced');
+        if (advanced) advanced.open = true;
         const picker = document.getElementById('baBitstreamRevisionSelect');
         if (picker) { picker.scrollIntoView({ block: 'center' }); picker.focus(); }
         return false;
@@ -1129,6 +1131,7 @@ const BuildApprovalView = {
         select.value = pinned ? pinned.id : this._selectedSnapshot
             ? this._selectedSnapshot.namespace_revision_id : '';
         if (select.style) select.style.color = pinned?.kind === 'bitstream' ? '#8bc8ff' : '';
+        this._updateLoadBtn();
     },
 
     async _loadRevisions() {
@@ -1186,7 +1189,39 @@ const BuildApprovalView = {
         }
     },
 
+    // Primary action: one explicit click hands the exact saved Namespace to the
+    // Development Image view, which prepares it, checks the live target, and
+    // stops at its runtime-replacement confirmation. Nothing is sent here.
+    _updateLoadBtn() {
+        const select = document.getElementById('baRevisionSelect');
+        const btn = document.getElementById('baLoadDevImageBtn');
+        if (!select || !btn) return;
+        const value = select.value || '';
+        btn.disabled = !value || value.startsWith('bitstream:');
+        btn.title = value.startsWith('bitstream:')
+            ? 'Select a saved Namespace (not a bitstream build) to load a development image.' : '';
+    },
+
+    loadDevelopmentImage() {
+        const select = document.getElementById('baRevisionSelect');
+        const status = document.getElementById('baLoadDevImageStatus');
+        const namespace = select ? select.value : '';
+        const say = text => { if (status) status.textContent = text; };
+        if (!namespace || namespace.startsWith('bitstream:')) {
+            say('Select an exact saved Namespace first. Nothing was prepared or sent.');
+            return false;
+        }
+        if (!window.DevelopmentImageView || typeof window.DevelopmentImageView.requestLoad !== 'function' ||
+                !window.DevelopmentImageView.requestLoad(namespace)) {
+            say('Development Image view is unavailable. Nothing was prepared or sent.');
+            return false;
+        }
+        say('Opening Development Image — preparing and checking the FPGA. You will confirm before anything is sent.');
+        return true;
+    },
+
     selectRevisionId(revisionId) {
+        this._updateLoadBtn();
         if (!revisionId.startsWith('bitstream:')) window.NamespaceSelection?.remember(revisionId);
         else {
             const bit = this._bitstreamRevisions.find(row => row.revision_id === revisionId.slice(10));

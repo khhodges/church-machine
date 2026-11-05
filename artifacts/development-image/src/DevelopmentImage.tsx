@@ -2,7 +2,8 @@ import "./_group.css";
 import "./_kiss.css";
 import "../../../simulator/namespace-selection.js";
 import { useEffect, useRef, useState } from "react";
-import { notifyIde } from "./embedding";
+import { notifyIde, acceptLoadRequest, loadRequestReady } from "./embedding";
+import type { LoadRequest } from "./embedding";
 import type { CSSProperties } from "react";
 import {request, sendAllowed, prepareExact, installExact, receiptState} from "./image-api";
 import {connectionStatus, reconnectHelp} from "./connection-status";
@@ -45,6 +46,21 @@ export default function DevelopmentImage() {
     return () => window.removeEventListener("storage", update);
   }, []);
   const confirmationDialog = useRef<HTMLDialogElement>(null);
+  // Explicit Build Approval "Load development image" handoff (never from URL/reload).
+  const [loadRequest, setLoadRequest] = useState<LoadRequest | null>(null);
+  const handledLoads = useRef(new Set<string>());
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      const accepted = acceptLoadRequest(event, window);
+      if (accepted && !handledLoads.current.has(accepted.requestId)) {
+        setLoadRequest(accepted);
+        notifyIde({type: "development-image:load-accepted", requestId: accepted.requestId});
+      }
+    };
+    window.addEventListener("message", receive);
+    notifyIde({type: "development-image:ready"});
+    return () => window.removeEventListener("message", receive);
+  }, []);
   const busy = useRef(false);
   const slots = input?.layoutRows ?? input?.rows ?? [];
   const sorted = [...slots].sort((a, b) => a.slot - b.slot);
@@ -143,6 +159,21 @@ export default function DevelopmentImage() {
     if (confirmation) confirmationDialog.current?.showModal();
     else confirmationDialog.current?.close();
   }, [confirmation]);
+
+  useEffect(() => {
+    if (!loadRequest) return;
+    if (namespace !== loadRequest.namespace) {
+      if (entries.some(entry => entry.id === loadRequest.namespace)) changeNamespace(loadRequest.namespace);
+      else if (entries.length) { handledLoads.current.add(loadRequest.requestId); setLoadRequest(null);
+        setSendStatus("Not sent — the requested Namespace is not an exact saved Namespace."); }
+      return;
+    }
+    if (loading || !loadRequestReady(loadRequest, input?.id, handledLoads.current)) return;
+    handledLoads.current.add(loadRequest.requestId);
+    setLoadRequest(null);
+    if (!sendAllowed(input)) { setSendStatus("Not sent — inspection only; this evidence is not approved for installation."); return; }
+    void beginSend();
+  });
 
   function changeNamespace(value: string) {
     if (busy.current) return;
