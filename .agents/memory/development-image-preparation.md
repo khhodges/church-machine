@@ -20,6 +20,13 @@ Missing snapshots or incompatible profiles must produce visible actionable
 errors, never rebinding, conversion, or replacement with newer catalog artifacts.
 Implementation/testing approval never authorizes an actual FPGA transfer.
 
+Keep the operator's goal focused on loading the new development image.
+**Why:** The user corrected a diversion into UI cleanup and a separate
+“Amoeba retry readiness” exercise when they were trying to load a new image.
+**How to apply:** Distinguish an inspection-only historical image from the saved
+design to be prepared and sent; do not substitute the historical image as the
+upload target or turn the loading workflow into unrelated maintenance work.
+
 Development Image belongs inside the established IDE, using the same shared
 header and view navigation as Namespace, not a separate page with a copied menu.
 
