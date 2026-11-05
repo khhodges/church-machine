@@ -270,9 +270,10 @@
             query.set('fingerprint', state.fingerprint);
             if (state.designId) query.set('design', state.designId);
         }
-        // Open synchronously from the click so browsers permit a separate tab.
-        // The server resolves and checks the exact saved design before redirect.
-        root.open('/api/development-image/open?' + query.toString(), '_blank', 'noopener,noreferrer');
+        // The server resolves and checks the exact saved design; the IDE then
+        // shows Development Image as its own view inside this shell.
+        if (root.DevelopmentImageView) root.DevelopmentImageView.openFromNamespace(query.toString());
+        else root.location.href = '/api/development-image/open?' + query.toString();
     }
     function snapshot() {
         const rows=state.document.rows;

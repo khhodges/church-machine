@@ -19,3 +19,12 @@ physical target/session checks, confirmed STOP, and explicit replacement consent
 Missing snapshots or incompatible profiles must produce visible actionable
 errors, never rebinding, conversion, or replacement with newer catalog artifacts.
 Implementation/testing approval never authorizes an actual FPGA transfer.
+
+Development Image belongs inside the established IDE, using the same shared
+header and view navigation as Namespace, not a separate page with a copied menu.
+
+**Why:** The user explicitly rejected its standalone presentation and approved
+integration with the existing IDE on 2026-11-05.
+
+**How to apply:** Preserve the approved review contents and explicit send
+confirmation when changing presentation; integration must not rebind or send.

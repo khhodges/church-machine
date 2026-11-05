@@ -517,6 +517,7 @@
                                 <div class="ham-subhead ham-category ham-section-head">Namespace</div>
                                 <div class="ham-group">
                                     <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace Table<kbd class="ham-kbd">C+N</kbd></button>
+                                    <button class="ham-item" id="hamItem-development-image" onclick="switchView('development-image');closeHamburger()">Development Image</button>
                                     <button class="ham-item" id="hamItem-gt-view" onclick="switchView('gt-view');closeHamburger()">GT Inspector</button>
                                     <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
                                 </div>
@@ -3678,7 +3679,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=sha256-c9ca39b9633d"></script>
     <script src="lump-registry.js?v=sha256-750a8c261af2"></script>
     <script src="target-state.js?v=sha256-5c980f1de9d9"></script>
-    <script src="app-shell.js?v=sha256-9eb46c3dc911"></script>
+    <script src="app-shell.js?v=sha256-1ae3950886c0"></script>
     <script src="app-tools.js?v=sha256-51daf085db3f"></script>
     <script src="thread-frame-decoder.js?v=sha256-923870b179d9"></script>
     <script src="app-cr-display.js?v=sha256-1081ddf02623"></script>
@@ -3697,7 +3698,8 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <link rel="stylesheet" href="breakpoint-inspector.css?v=sha256-ce2b11b57a59">
     <script src="breakpoint-inspector.js?v=sha256-72e74713d889"></script>
     <script src="design-simulation.js?v=sha256-35c7e05323f7"></script>
-    <script src="namespace-design-v1.js?v=sha256-a59473652076"></script>
+    <script src="development-image-view.js?v=sha256-fc7b05915ffb"></script>
+    <script src="namespace-design-v1.js?v=sha256-f39ed0445ded"></script>
     <script src="namespace-ide-node.js?v=sha256-94708018f5d1"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>
     <script src="app-abstractions.js?v=sha256-2b7042544808"></script>
@@ -4174,6 +4176,13 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
             from source to target. Hover a node or edge for details.
         </p>
         <div id="namespace-dna-body"></div>
+    </div>
+</div>
+
+<div id="development-image" class="view">
+    <div class="panel">
+        <div class="panel-title">Development Image</div>
+        <iframe id="developmentImageFrame" title="Development Image — saved Namespace review and FPGA send" style="display:block;width:100%;min-height:70vh;border:0;background:transparent"></iframe>
     </div>
 </div>
 

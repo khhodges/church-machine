@@ -226,3 +226,4 @@
   .kiss-workbench .kiss-water-heading > div { align-items:flex-start; flex-direction:column; gap:3px; }
    .kiss-workbench .kiss-glass-figure { max-width:360px; width:100%; justify-self:center; }
 }
+.kiss-workbench .kiss-top.kiss-top-embedded { justify-content: flex-start; padding: 8px 0; }

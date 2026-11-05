@@ -1,7 +1,7 @@
 import "./_group.css";
 import "./_kiss.css";
 import { useEffect, useRef, useState } from "react";
-import IdeMenu from "./IdeMenu";
+import { notifyIde } from "./embedding";
 import type { CSSProperties } from "react";
 import {request, prepareExact, installExact, receiptState} from "./image-api";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
@@ -102,6 +102,18 @@ export default function DevelopmentImage() {
   }, [receipt]);
 
   useEffect(() => {
+    if (namespace) notifyIde({type: "development-image:selection", namespace});
+  }, [namespace]);
+
+  useEffect(() => {
+    const report = () => notifyIde({type: "development-image:height", height: document.documentElement.scrollHeight});
+    const observer = new ResizeObserver(() => requestAnimationFrame(report));
+    observer.observe(document.body);
+    report();
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (confirmation) confirmationDialog.current?.showModal();
     else confirmationDialog.current?.close();
   }, [confirmation]);
@@ -113,6 +125,7 @@ export default function DevelopmentImage() {
     setSendStatus(""); setReceipt(null);
     const url = new URL(location.href); url.searchParams.set("namespace", value);
     history.replaceState(null, "", url);
+    notifyIde({type: "development-image:selection", namespace: value});
   }
 
   async function beginSend() {
@@ -159,13 +172,12 @@ export default function DevelopmentImage() {
 
   return (
     <main className="kiss-workbench">
-      <header className="kiss-top">
-        <div className="kiss-brand"><span className="kiss-mark" aria-hidden="true">λ</span> CHURCH MACHINE <span className="kiss-muted">/ IDE</span><IdeMenu /></div>
+      <header className="kiss-top kiss-top-embedded">
         <p className="kiss-preview">{input?.image ? "Bound Namespace — image ready" : input?.layoutSource === "saved-design-layout" ? "Saved Namespace — image prepared on Send" : "Saved Namespace — FPGA image unavailable"}</p>
       </header>
 
       <div className="kiss-heading">
-        <div><h1>Development image</h1><p className="kiss-subtitle">Review the bound Namespace layout, then send it to the FPGA.</p></div>
+        <div><p className="kiss-subtitle">Review the bound Namespace layout, then send it to the FPGA.</p></div>
         <span className="kiss-local">SAVED NAMESPACE</span>
       </div>
       {error && <p className="kiss-api-error" role="alert">{error} No saved data was changed. <a href={location.pathname}>Reload saved Namespaces</a></p>}
@@ -340,7 +352,7 @@ export default function DevelopmentImage() {
             {input?.hardwareError && <p>{input.layoutSource === "saved-design-layout"
               ? "Send assembles a complete image from the exact saved binding snapshots, then checks FPGA compatibility. It does not rebind."
               : `Not ready to send: ${input.hardwareError}`}</p>}
-            <p><a href="/simulator/#namespace">Open Namespace editor</a></p>
+            <p><a href="/simulator/#namespace" target="_top" onClick={event => { event.preventDefault(); notifyIde({type: "development-image:navigate", view: "namespace"}); }}>Open Namespace editor</a></p>
             {input?.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
           </details>
         </section>
