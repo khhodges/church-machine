@@ -11,9 +11,11 @@ function check(ok, message) {
     passed++;
     console.log('✓ ' + message);
 }
-function load(storage, now) {
+function load(storage, now, uidInput) {
+    let ready;
     const document = {
-        addEventListener: function() {}, getElementById: function() { return null; }
+        addEventListener: function(type, fn) { if (type === 'DOMContentLoaded') ready = fn; },
+        getElementById: function(id) { return id === 'programmingTargetUid' ? uidInput || null : null; }
     };
     const sandbox = {
         window: null, document, Date: { now: () => now.value },
@@ -25,6 +27,7 @@ function load(storage, now) {
     sandbox.window = sandbox;
     vm.createContext(sandbox);
     vm.runInContext(source, sandbox);
+    if (uidInput) ready();
     return sandbox.TargetState;
 }
 
@@ -90,4 +93,18 @@ target.observeDevice({ connected: false });
 check(target.resolve().runtimeArtifactId === null && target.resolve().liveBuildId === null,
     'disconnect clears runtime and reported build identities');
 
+const inputEvents = {};
+const input = {value: '', addEventListener: (type, fn) => { inputEvents[type] = fn; }};
+target = load(storage, now, input);
+input.value = 'typed-board';
+inputEvents.input(); // no blur/change before reload
+target = load(storage, now);
+check(target.resolve().deviceUid === 'typed-board' && !target.resolve().ok,
+    'typing UID persists before blur without restoring live authority');
+target.select({mode: target.MODES.SIMULATOR});
+target = load(storage, now, input);
+check(input.value === 'typed-board', 'remembered UID survives Simulator mode and reopened tab');
+input.value = '';
+inputEvents.input();
+check(load(storage, now).resolve().deviceUid === null, 'explicitly clearing UID remains cleared');
 console.log('target-state: ' + passed + ' assertions passed');

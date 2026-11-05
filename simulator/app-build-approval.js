@@ -159,7 +159,8 @@ const BuildApprovalView = {
         document.getElementById('baPairServer').textContent = 'Connecting to: ' + location.origin;
         const target = window.TargetState?.resolve();
         const uid = document.getElementById('baPairUid');
-        if (!uid.value && target?.deviceUid) uid.value = target.deviceUid;
+        uid.value = target?.deviceUid || '';
+        uid.oninput = () => window.TargetState?.select({deviceUid: uid.value.trim() || null});
         document.getElementById('baPairStatus').textContent =
             'Enter your serial port and board UID, then create the command.';
         dialog.showModal();
@@ -180,6 +181,7 @@ const BuildApprovalView = {
         const output = document.getElementById('baPairCommand');
         const copy = document.getElementById('baPairCopy');
         const uid = document.getElementById('baPairUid').value.trim();
+        window.TargetState?.select({deviceUid: uid || null});
         const port = document.getElementById('baPairPort').value.trim();
         if (!/^[a-zA-Z0-9_.-]{1,128}$/.test(uid) || !/^(auto|COM[0-9]+)$/i.test(port)) {
             status.textContent = 'Enter a board UID and a Windows port such as COM4 (or auto).';

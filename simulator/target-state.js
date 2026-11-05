@@ -146,6 +146,8 @@
     }
     function render(s) {
         var sel = document.getElementById('programmingTargetSelect');
+        var uid = document.getElementById('programmingTargetUid');
+        if (uid && document.activeElement !== uid) uid.value = s.deviceUid || '';
         var status = document.getElementById('programmingTargetStatus');
         var targetIdent = document.getElementById('programmingTargetIdentity');
         var runtimeIdent = document.getElementById('programmingRuntimeIdentity');
@@ -199,6 +201,7 @@
         if (sel) sel.addEventListener('change', function() { select({ mode: sel.value }); });
         if (uid) {
             uid.value = requested.deviceUid || '';
+            uid.addEventListener('input', function() { select({ deviceUid: uid.value.trim() || null }); });
             uid.addEventListener('change', function() { select({ deviceUid: uid.value.trim() || null }); });
         }
         if (build) {

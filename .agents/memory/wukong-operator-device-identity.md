@@ -3,6 +3,13 @@ name: Wukong operator device identity
 description: Confirmed continuity of the physical board and its configured control-routing UID.
 ---
 
+Remember the user's selected Wukong UID across browser sessions and share that
+selection between the Target panel and Connect bridge.
+**Why:** The user explicitly reported the blank Target UID as unwanted forgetting.
+**How to apply:** Persist edits immediately, even before focus leaves the field.
+Remembered selection is not live connection evidence, and must never authorize
+hardware operations without the existing live UID/session checks.
+
 On 2026-10-29 the user confirmed the currently programmed Wukong is the same
 physical board used on October 26. Reuse its previously recorded operator UID
 `20250619ac5c01` for bridge/IDE target configuration.
