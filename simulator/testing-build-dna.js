@@ -165,7 +165,7 @@
     ui.bsSel.addEventListener('change', function () {
       var id = ui.bsSel.value;
       try { id ? localStorage.setItem(STORE, id) : localStorage.removeItem(STORE); } catch (_) {}
-      renderSelected();
+      if (state.catalog) renderSelected(); else showRememberedSelection();
     });
     ui.clearBtn.addEventListener('click', function () { ui.bsSel.value = ''; ui.bsSel.dispatchEvent(new Event('change')); });
     ui.nsSel.addEventListener('change', function () { ui.nsBtn.disabled = !ui.nsSel.value; });
@@ -176,6 +176,23 @@
 
   function setStatus(text, kind) { ui.status.textContent = text || ''; ui.status.className = 'tbd-status' + (kind ? ' tbd-status-' + kind : ''); }
 
+  // A remembered choice is not authenticated catalog or installed-board evidence.
+  function showRememberedSelection() {
+    var saved = '';
+    try { saved = localStorage.getItem(STORE) || ''; } catch (_) {}
+    ui.bsSel.textContent = '';
+    var option = el('option', null, saved ? saved + ' — remembered, unverified' : '— none selected —');
+    option.value = saved;
+    ui.bsSel.appendChild(option);
+    ui.bsSel.value = saved;
+    ui.bsSel.disabled = true;
+    ui.viewBtn.disabled = true;
+    ui.nsSel.disabled = true;
+    ui.nsBtn.disabled = true;
+    ui.headState.textContent = saved ? 'Remembered · installed unverified' : 'No bitstream selected';
+    ui.headState.className = 'tbd-pill tbd-pill-dim';
+  }
+
   function skeleton(target) {
     target.textContent = '';
     var s = el('div', 'tbd-skel'); s.setAttribute('aria-hidden', 'true');
@@ -185,6 +202,8 @@
 
   function loadCatalog() {
     var t = gate.next();
+    state.catalog = null;
+    showRememberedSelection();
     setStatus('Loading bitstream catalog…');
     skeleton(ui.body);
     getJSON(API).then(function (j) {
@@ -199,6 +218,7 @@
       ui.body.textContent = '';
       var box = el('div', 'tbd-empty tbd-error');
       box.appendChild(el('div', null, 'Could not load the build catalog: ' + (err && err.message || err)));
+      box.appendChild(el('p', 'tbd-note', 'Your remembered selection has not been erased. Catalog authorization is required to verify it; this is not evidence of the bitstream installed on the FPGA.'));
       var retry = el('button', 'tbd-btn', 'Retry'); retry.type = 'button';
       retry.addEventListener('click', loadCatalog);
       box.appendChild(retry);
@@ -209,6 +229,8 @@
 
   function fillSelects() {
     var c = state.catalog;
+    ui.bsSel.disabled = false;
+    ui.nsSel.disabled = false;
     ui.bsSel.textContent = '';
     var none = el('option', null, '— none selected —'); none.value = '';
     ui.bsSel.appendChild(none);
