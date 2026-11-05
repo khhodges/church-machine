@@ -62,7 +62,14 @@ def decode_gt(value, source, register, entries, ordinal, portable=False):
             status = "generation-mismatch"
         else:
             target, status = f"slot-{slot}", "resolved"
-    return {"id": f"gt-{ordinal}", "source": source, "target": target,
+    extra = {}
+    if typ and target is None:
+        # A GT word carries no dot.name, and no frozen record retains one per
+        # reference. Never infer a name from the slot number.
+        extra = {"unresolvedName": None,
+                 "unresolvedNameReason": "No dot.name retained in frozen evidence for this GT; "
+                                         "the GT word encodes only slot/sequence."}
+    return {**extra, "id": f"gt-{ordinal}", "source": source, "target": target,
             "raw": value, "register": register, "kind": ("NULL", "Inform", "Outform", "Abstract")[typ],
             "permissions": permissions, "sequence": sequence, "status": status,
             "targetSlot": slot if typ == 1 else None}
@@ -73,6 +80,26 @@ def read_bytes(store, kind, revision, name):
         return store.read_bytes(kind, revision, name)
     with open(store.file_path(kind, revision, name), "rb") as stream:
         return stream.read()
+
+
+def embedded_api(body):
+    """Read only the bounded self-definition frame, never scan arbitrary bytes."""
+    if not body or (body[0] >> 8) & 3 != 0:
+        return {}
+    cw, cc = (body[0] >> 10) & 8191, body[0] & 255
+    pos = cw + 1
+    if pos >= len(body) - cc:
+        return {}
+    frame = body[pos]
+    length = frame & 65535
+    if frame >> 24 != 0xAB or not length or pos + 1 + (length + 3) // 4 > len(body) - cc:
+        return {}
+    try:
+        raw = b"".join(struct.pack(">I", w) for w in body[pos + 1:len(body) - cc])
+        api = json.loads(raw[:length])
+        return api if isinstance(api, dict) else {}
+    except (ValueError, UnicodeError, struct.error):
+        return {}
 
 
 def graph(store, revision):
@@ -110,6 +137,7 @@ def graph(store, revision):
                 for r in meta.get("selected_lumps", meta.get("provenance", {}).get("artifactBindings", []))
                 if isinstance(r, dict) and isinstance(r.get("slot"), int)}
     nodes, edges, issues = [], [], []
+    reference_names = {}
     for slot, entry in entries.items():
         row = labels.get(slot, {})
         base, limit = entry["w0"], entry["w1"] & 0x1FFFFF
@@ -161,6 +189,17 @@ def graph(store, revision):
         if header >> 27 != 31 or size != len(body):
             issues.append(f"NS[{slot}] malformed or incomplete body; GT decoding withheld.")
             continue
+        api = embedded_api(body)
+        if isinstance(api.get("name"), str) and "." in api["name"]:
+            node.update(dotName=api["name"], nameSource="Embedded self-definition in inspected bytes")
+        imports = api.get("imports", {})
+        if isinstance(imports, dict):
+            for rows in imports.values():
+                if not isinstance(rows, dict):
+                    continue
+                for index, name in rows.items():
+                    if str(index).isdigit() and isinstance(name, str) and "." in name:
+                        reference_names.setdefault((node["id"], f"C-list[{int(index)}]"), set()).add(name)
         homes = []
         if typ == 0 and count <= size and ((header >> 10) & 8191) + 1 <= size - count:
             homes = [(f"C-list[{i}]", size - count + i) for i in range(count)]
@@ -182,6 +221,24 @@ def graph(store, revision):
             issues.append(f"NS[{slot}] invalid C-list geometry.")
         for register, offset in homes:
             edges.append(decode_gt(body[offset], node["id"], register, entries, len(edges), portable))
+    # Names on exact source rows follow the decoded GT, never an archived slot map.
+    target_names = {}
+    for edge in edges:
+        names = reference_names.get((edge["source"], edge["register"]), set())
+        if len(names) == 1 and edge["kind"] != "NULL":
+            name = next(iter(names))
+            if edge["target"] is None:
+                edge["unresolvedName"] = name
+                edge.pop("unresolvedNameReason", None)
+            else:
+                target_names.setdefault(edge["target"], set()).add(name)
+    for node in nodes:
+        names = target_names.get(node["id"], set())
+        if not node.get("dotName") and len(names) == 1:
+            node.update(dotName=next(iter(names)),
+                        nameSource="Embedded import on a resolved C-list GT in inspected bytes")
+        if not node.get("dotName"):
+            node["nameUnavailableReason"] = "No unique dot.name retained for this object in the inspected image."
     # Frozen metadata selections absent from the table remain visible but never
     # gain local target resolution by pretending an occupied slot exists.
     for slot, row in {**labels, **selected}.items():
@@ -193,6 +250,7 @@ def graph(store, revision):
     return {"status": "available", "reason": "Decoded frozen image, not live runtime memory.",
             "imageHash": files[image_name], "imageKind": image_name, "imageLayout": image_layout,
             "nodes": nodes, "edges": edges, "issues": issues,
+            "metadataWords": list(words[:4]) if image_layout == "ascending-native" else None,
             "scope": "GT fields in retained C-lists, Thread homes and saved continuation frames. "
                      "Arbitrary data/heap words are not assumed to be GTs. Namespace table membership is not a GT edge."}
 

@@ -13,3 +13,19 @@ of this diagram, rather than a flat collection of equal boxes.
 **How to apply:** Preserve slot identities and capability relationships while
 rendering this hierarchy; this is a presentation requirement, not permission
 to alter Namespace contents or hardware.
+
+Unresolved dot.names need explicit “Unresolve” boxes and incoming connections,
+distinct from allocated slots.
+
+**Why:** The user requested visible destinations for unresolved names rather
+than dangling connections.
+
+**How to apply:** Group references by their retained name; never invent names
+from raw slot numbers or treat NULL as an unresolved named reference.
+
+Display dot.names alongside slot IDs on DNA boxes, not slot IDs alone.
+**Why:** The user asked for readable object names, giving “NS[1]
+Namespace.Boot” as the desired format.
+**How to apply:** Prefer names retained in the exact inspected object's
+self-definition and references; archived slot maps can describe a different
+layout. Keep presentation labels distinct from retained identity evidence.

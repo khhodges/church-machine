@@ -30,8 +30,8 @@ const { chromium } = require('playwright');
         body = JSON.stringify(url.search ? {
           ok: true, status: 'available',
           namespaceRevisionId: 'fixture',
-          nodes: [{ id: 'm', slot: 1, name: 'MMIO', kind: 'Hardware' },
-            { id: 't', slot: 2, name: 'Thread', kind: 'Thread' }], edges: [],
+          nodes: [{ id: 'ns', slot: 1, name: 'NS[1]', kind: 'Namespace' }, { id: 'm', slot: 3, name: 'MMIO', kind: 'Hardware' },
+            { id: 't', slot: 2, name: 'Thread', kind: 'Thread' }], edges: [{ id: 'e1', source: 'ns', target: 't', raw: 2, register: 'CR0', kind: 'Inform', status: 'resolved' }],
         } : { ok: true, bitstreams: [{ id: 'bit', label: 'Bit fixture', namespaceRevisionId: 'fixture' }],
           namespaces: [{ id: 'fixture', label: 'Fixture', imageAvailable: true }] });
       } else {
@@ -67,7 +67,19 @@ const { chromium } = require('playwright');
     await page.getByRole('button', { name: 'Close details', exact: true }).click();
     await checkFit();
     await page.locator('#tbdLayout-namespace').selectOption('organized');
-    assert.deepStrictEqual(await page.locator('.tbd-node title').allTextContents(), ['t', 'm']);
+    assert.deepStrictEqual(await page.locator('.tbd-node title').allTextContents(), ['ns', 't', 'm']);
+    // NS[1] encloses every inner node; Slot[0] absent is shown as missing, not invented.
+    const contain = await page.evaluate(() => {
+      const box = document.querySelector('.tbd-encl-box').getBoundingClientRect();
+      const inner = [...document.querySelectorAll('.tbd-node:not(.tbd-hdr)')].map(n => n.getBoundingClientRect());
+      return { ok: inner.every(r => r.left >= box.left && r.right <= box.right && r.top >= box.top && r.bottom <= box.bottom),
+        missing: document.querySelector('.tbd-hdr-missing').textContent, hdr: document.querySelectorAll('.tbd-node.tbd-hdr').length };
+    });
+    assert.ok(contain.ok); assert.equal(contain.hdr, 1); assert.match(contain.missing, /Slot\[0\].*no slot evidence/);
+    await page.locator('.tbd-node.tbd-hdr').click();
+    assert.match(await page.locator('.tbd-detail-body h3').textContent(), /NS\[1\]/);
+    assert.equal(await page.locator('.tbd-edge.is-hot').count(), 1);
+    await page.getByRole('button', { name: 'Close details', exact: true }).click();
     await page.locator('#tbdBitstream').selectOption('bit');
     await page.getByRole('button', { name: 'Open Bitstream DNA', exact: true }).click();
     const bit = page.locator('[data-viewer="bitstream"]');

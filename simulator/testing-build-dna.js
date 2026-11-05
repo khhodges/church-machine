@@ -61,6 +61,86 @@
     }
     return best;
   }
+  // NS[1] is the enclosing Namespace: Slot[0] and Slot[1] become header lines,
+  // all other slots are laid out inside. Absent slots are reported, never invented.
+  var HDR_PAD = 24, HDR_LINE = 20, HDR_TOP = 30;
+  function containerLayout(nodes, mode, width, height) {
+    nodes = nodes || [];
+    var encl = nodes.filter(function (n) { return n.slot === 1; })[0];
+    if (!encl) return null;
+    var headerSlots = [0, 1].map(function (slot) {
+      return { slot: slot, node: nodes.filter(function (n) { return n.slot === slot; })[0] || null };
+    });
+    var inner = nodes.filter(function (n) { return n.slot !== 0 && n.slot !== 1; });
+    var hh = HDR_TOP + 2 * HDR_LINE + 16;
+    var aw = Math.max(1, (width || 800) - 48), ah = Math.max(1, (height || 600) - 48);
+    var L = inner.length ? viewportLayout(inner, mode, aw, Math.max(1, ah - hh)) : { pos: {}, order: [], width: 0, height: 0 };
+    var cw = Math.max(380, L.width + 2 * HDR_PAD), ch = hh + L.height + 2 * HDR_PAD;
+    var aspect = aw / ah;
+    if (cw / ch < aspect) cw = ch * aspect; else ch = cw / aspect;
+    var ox = (cw - L.width) / 2, oy = hh + (ch - hh - L.height) / 2;
+    var pos = {};
+    Object.keys(L.pos).forEach(function (id) {
+      var p = L.pos[id]; pos[id] = { x: p.x + ox, y: p.y + oy, w: p.w, h: p.h };
+    });
+    headerSlots.forEach(function (h, i) {
+      h.box = { x: HDR_PAD, y: HDR_TOP + i * HDR_LINE, w: cw - 2 * HDR_PAD, h: HDR_LINE - 2 };
+      if (h.node) pos[h.node.id] = h.box;
+    });
+    return { pos: pos, order: L.order, header: headerSlots, enclosing: encl,
+      container: { x: 0, y: 0, w: cw, h: ch, headerHeight: hh }, width: cw, height: ch };
+  }
+  // One Unresolve box per unique retained dot.name; unnamed non-NULL refs share
+  // one explicit "name unavailable" box. Names are never derived from slots.
+  function unresolvedGroups(edges) {
+    var map = {}, list = [];
+    (edges || []).forEach(function (e) {
+      if (e.kind === 'NULL' || e.target != null) return;
+      var name = typeof e.unresolvedName === 'string' && e.unresolvedName ? e.unresolvedName : null;
+      var id = name ? 'unresolve:' + name : 'unresolve:(unnamed)';
+      if (!map[id]) { map[id] = { id: id, name: name, edges: [], reason: name ? null : (e.unresolvedNameReason || 'No dot.name available in frozen evidence.') }; list.push(map[id]); }
+      map[id].edges.push(e);
+    });
+    list.sort(function (a, b) { return a.name === null ? 1 : b.name === null ? -1 : a.name.localeCompare(b.name); });
+    return list;
+  }
+  function placeUnresolved(L, groups) {
+    if (!L || !L.container || !groups.length) return L;
+    var W = 190, H = 64, G = 24, C = L.container;
+    var cols = Math.max(1, Math.floor((C.w - 2 * HDR_PAD + G) / (W + G)));
+    var top = C.h - HDR_PAD + 28;
+    L.unresolved = groups.map(function (g, i) {
+      return { group: g, box: { x: HDR_PAD + (i % cols) * (W + G), y: top + Math.floor(i / cols) * (H + G), w: W, h: H } };
+    });
+    L.unresolvedTop = top - 16;
+    C.h = top + Math.ceil(groups.length / cols) * (H + G) - G + HDR_PAD;
+    L.height = C.h;
+    return L;
+  }
+  // Name shown only if backend proved it (dotName / non-slot-derived name).
+  function nodeLabel(n) {
+    var ns = 'NS[' + (n && n.slot != null ? n.slot : '?') + ']';
+    var name = n && typeof n.dotName === 'string' && n.dotName ? n.dotName :
+      (n && typeof n.name === 'string' && n.name && !/^NS\[\d+\]$/.test(n.name) ? n.name : null);
+    if (!name && n && n.slot === 1 && n.kind === 'Namespace') {
+      return {ns: ns, name: 'Namespace.Boot', source: 'User-specified display label; not a retained image identity', reason: null};
+    }
+    return { ns: ns, name: name, source: n && n.nameSource || null,
+      reason: (n && n.nameUnavailableReason) || 'No dot.name provable from frozen evidence.' };
+  }
+  function wrapName(name, width, max) {
+    var parts = String(name).split(/(?<=\.)/), lines = [''];
+    parts.forEach(function (p) {
+      while (p.length) {
+        var cur = lines[lines.length - 1];
+        if (cur && cur.length + p.length > width) { lines.push(''); continue; }
+        var take = p.slice(0, width - cur.length); lines[lines.length - 1] = cur + take; p = p.slice(take.length);
+        if (p.length) lines.push('');
+      }
+    });
+    if (lines.length > max) { lines = lines.slice(0, max); lines[max - 1] = lines[max - 1].slice(0, width - 1) + '…'; }
+    return lines;
+  }
   function filterDetail(node, edges, q) {
     q = (q || '').trim().toLowerCase();
     var out = (edges || []).filter(function (e) { return e.source === node.id; });
@@ -76,7 +156,7 @@
     var seq = 0;
     return { next: function () { return ++seq; }, isCurrent: function (t) { return t === seq; } };
   }
-  var pure = { hex32: hex32, buildUrl: buildUrl, layoutGraph: layoutGraph, viewportLayout: viewportLayout, filterDetail: filterDetail, clampZoom: clampZoom, makeRequestGate: makeRequestGate };
+  var pure = { nodeLabel: nodeLabel, wrapName: wrapName, hex32: hex32, buildUrl: buildUrl, layoutGraph: layoutGraph, viewportLayout: viewportLayout, containerLayout: containerLayout, unresolvedGroups: unresolvedGroups, placeUnresolved: placeUnresolved, filterDetail: filterDetail, clampZoom: clampZoom, makeRequestGate: makeRequestGate };
   if (typeof module !== 'undefined' && module.exports) { module.exports = pure; return; }
 
   // ---------- DOM ----------
@@ -533,7 +613,11 @@
     var nodes = g.nodes || [], edges = g.edges || [];
     if (!nodes.length) { ui.stage.appendChild(el('div', 'tbd-empty', 'No objects in this image.')); return; }
     var viewport = ui.stage.getBoundingClientRect();
-    var L = state.layout = viewportLayout(nodes, state.layoutMode, viewport.width, viewport.height);
+    var L = state.layout = containerLayout(nodes, state.layoutMode, viewport.width, viewport.height) ||
+      viewportLayout(nodes, state.layoutMode, viewport.width, viewport.height);
+    placeUnresolved(L, unresolvedGroups(edges));
+    var uPos = {};
+    (L.unresolved || []).forEach(function (u) { u.group.edges.forEach(function (e) { uPos[e.id] = u.box; }); });
     var s = svg('svg', { class: 'tbd-svg', role: 'img', 'aria-label': nodes.length + ' objects, ' + edges.length + ' GT links' });
     var defs = svg('defs', {});
     [['tbdArrow', 'tbd-arrow'], ['tbdArrowBad', 'tbd-arrow-bad']].forEach(function (m) {
@@ -544,12 +628,47 @@
     var root = ui.gRoot = svg('g', {});
     var eg = svg('g', { class: 'tbd-edges' }), ng = svg('g', { class: 'tbd-nodes' });
     var unresolvedCount = {};
+    if (L.container) {
+      var C = L.container, cg = svg('g', { class: 'tbd-encl' });
+      cg.appendChild(svg('rect', { x: C.x, y: C.y, width: C.w, height: C.h, rx: 10, class: 'tbd-encl-box' }));
+      cg.appendChild(svg('line', { x1: C.x, x2: C.x + C.w, y1: C.headerHeight, y2: C.headerHeight, class: 'tbd-encl-rule' }));
+      var et = svg('text', { x: HDR_PAD, y: 20, class: 'tbd-encl-title' });
+      et.textContent = 'Enclosing Namespace NS[1] · ' + (nodeLabel(L.enclosing).name || 'dot.name unavailable');
+      cg.appendChild(et);
+      root.appendChild(cg);
+      L.header.forEach(function (h) {
+        var b = h.box, n = h.node;
+        var hg = svg('g', { class: n ? 'tbd-node tbd-hdr' : 'tbd-hdr tbd-hdr-missing', transform: 'translate(' + b.x + ' ' + b.y + ')' });
+        hg.dataset.slot = h.slot;
+        hg.appendChild(svg('rect', { width: b.w, height: b.h, rx: 3 }));
+        var tx = svg('text', { x: 6, y: 13, class: 'tbd-hdr-text' });
+        tx.textContent = (h.slot === 0 ? 'Metadata Slot[0] ' : 'Slot[1] ') + (n ? nodeLabel(n).ns + ' ' + (nodeLabel(n).name || 'name unavailable') + ' · ' + (n.kind || '?') +
+          (n.sizeWords != null ? ' · ' + n.sizeWords + 'w' : '') + (n.binaryHash ? ' · ' + String(n.binaryHash).slice(0, 12) : '')
+          : h.slot === 0 && Array.isArray(g.metadataWords)
+            ? g.metadataWords.map(hex32).join(' · ')
+            : '— no slot evidence in this image');
+        hg.appendChild(tx);
+        if (n) {
+          hg.setAttribute('tabindex', '0'); hg.setAttribute('role', 'button');
+          hg.setAttribute('aria-label', 'Header Metadata Slot ' + h.slot + ' object ' + (n.name || n.id));
+          var ht = svg('title', {}); ht.textContent = n.id; hg.appendChild(ht);
+          hg.addEventListener('click', function () { selectNode(n.id); });
+          hg.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNode(n.id); } });
+        }
+        ng.appendChild(hg);
+      });
+    }
     edges.forEach(function (e) {
       if (e.kind === 'NULL') return;
       var a = L.pos[e.source]; if (!a) return;
       var b = e.target != null ? L.pos[e.target] : null;
       var x1 = a.x + a.w / 2, y1 = a.y + a.h, d, cls = 'tbd-edge';
-      if (!b) {
+      var ub = !b && uPos[e.id];
+      if (ub) {
+        var ux = ub.x + ub.w / 2, uy = ub.y, umy = (y1 + uy) / 2;
+        d = 'M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + umy + ' ' + ux + ' ' + umy + ' ' + ux + ' ' + uy;
+        cls += ' tbd-edge-bad';
+      } else if (!b) {
         var k = unresolvedCount[e.source] = (unresolvedCount[e.source] || 0) + 1;
         var tx = a.x + a.w + 14 + k * 10, ty = a.y + a.h + 26 + k * 6;
         d = 'M' + (a.x + a.w) + ' ' + (a.y + a.h / 2) + ' Q' + (tx) + ' ' + (a.y + a.h / 2) + ' ' + tx + ' ' + ty;
@@ -564,7 +683,7 @@
       }
       if (e.status && e.status !== 'resolved' && b) cls += ' tbd-edge-warn';
       var p = svg('path', { d: d, class: cls, 'marker-end': 'url(#' + (b ? 'tbdArrow' : 'tbdArrowBad') + '-' + viewerKind + ')' });
-      p.dataset.src = e.source; p.dataset.tgt = e.target == null ? '' : e.target;
+      p.dataset.src = e.source; p.dataset.tgt = e.target == null ? (ub ? 'unresolve-box' : '') : e.target;
       var tt = svg('title', {}); tt.textContent = (e.register || '') + ' ' + hex32(e.raw) + ' → ' + (e.target == null ? 'UNRESOLVED' : e.target);
       p.appendChild(tt); eg.appendChild(p);
     });
@@ -573,16 +692,38 @@
       var grp = svg('g', { class: 'tbd-node tbd-av-' + String(n.availability || 'unknown').replace(/[^a-z0-9-]/gi, ''), transform: 'translate(' + p.x + ' ' + p.y + ')', tabindex: '0', role: 'button' });
       grp.setAttribute('aria-label', 'Object ' + (n.name || n.id) + ' slot ' + n.slot);
       grp.appendChild(svg('rect', { width: p.w, height: p.h, rx: 6 }));
-      var t1 = svg('text', { x: 10, y: 22, class: 'tbd-n-name' }); t1.textContent = String(n.name || n.id).slice(0, 22); grp.appendChild(t1);
-      var t2 = svg('text', { x: 10, y: 40, class: 'tbd-n-sub' }); t2.textContent = 'slot ' + n.slot + ' · ' + (n.kind || '?'); grp.appendChild(t2);
-      var t3 = svg('text', { x: 10, y: 55, class: 'tbd-n-sub' }); t3.textContent = (n.sizeWords != null ? n.sizeWords + 'w · ' : '') + String(n.binaryHash || '').slice(0, 12); grp.appendChild(t3);
-      var tt = svg('title', {}); tt.textContent = n.id; grp.appendChild(tt);
+      var lb = nodeLabel(n), lines = wrapName(lb.name || 'name unavailable', 24, 2);
+      var t0 = svg('text', { x: 10, y: 15, class: 'tbd-n-slot' }); t0.textContent = lb.ns + ' · ' + (n.kind || '?'); grp.appendChild(t0);
+      lines.forEach(function (ln, li) {
+        var t1 = svg('text', { x: 10, y: 30 + li * 13, class: lb.name ? 'tbd-n-name' : 'tbd-n-noname' }); t1.textContent = ln; grp.appendChild(t1);
+      });
+      var t3 = svg('text', { x: 10, y: 58, class: 'tbd-n-sub' }); t3.textContent = (n.sizeWords != null ? n.sizeWords + 'w · ' : '') + String(n.binaryHash || '').slice(0, 12); grp.appendChild(t3);
+      var tt = svg('title', {}); tt.textContent = lb.ns + ' ' + (lb.name || 'dot.name unavailable — ' + lb.reason) + (lb.source ? '\nName evidence: ' + lb.source : ''); grp.appendChild(tt);
       function pick() { selectNode(n.id); }
       grp.addEventListener('click', pick);
       grp.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
       ng.appendChild(grp);
     });
+    if (L.unresolved && L.unresolved.length) {
+      var ul = svg('text', { x: HDR_PAD, y: L.unresolvedTop, class: 'tbd-unres-title' });
+      ul.textContent = 'Unresolve · not allocated slots';
+      ng.appendChild(ul);
+      L.unresolved.forEach(function (u) {
+        var b = u.box, gp = u.group;
+        var ugrp = svg('g', { class: 'tbd-unres', transform: 'translate(' + b.x + ' ' + b.y + ')' });
+        ugrp.appendChild(svg('rect', { width: b.w, height: b.h, rx: 6 }));
+        var a1 = svg('text', { x: 10, y: 18, class: 'tbd-unres-kicker' }); a1.textContent = 'Unresolve'; ugrp.appendChild(a1);
+        var a2 = svg('text', { x: 10, y: 36, class: gp.name ? 'tbd-n-name' : 'tbd-unres-none' });
+        a2.textContent = gp.name ? wrapName(gp.name, 26, 1)[0] : 'dot.name unavailable'; ugrp.appendChild(a2);
+        var a3 = svg('text', { x: 10, y: 54, class: 'tbd-n-sub' }); a3.textContent = gp.edges.length + ' incoming GT' + (gp.edges.length === 1 ? '' : 's'); ugrp.appendChild(a3);
+        var ut = svg('title', {});
+        ut.textContent = 'Unresolve: ' + (gp.name || 'dot.name unavailable — ' + gp.reason) + '\n' +
+          gp.edges.map(function (e) { return e.source + ' ' + e.register + ' ' + hex32(e.raw) + ' ' + e.status; }).join('\n');
+        ugrp.appendChild(ut); ng.appendChild(ugrp);
+      });
+    }
     root.appendChild(eg); root.appendChild(ng); s.appendChild(root);
+    ui.stage.dataset.enclosing = L.container ? L.enclosing.id : '';
     ui.stage.appendChild(s);
     ui.detail.textContent = '';
     ui.detail.appendChild(el('p', 'tbd-dim', 'Select an object to see its descriptor and every GT, including unresolved ones.'));

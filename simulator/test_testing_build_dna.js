@@ -1,6 +1,10 @@
 'use strict';
 const assert = require('assert');
 const m = require('./testing-build-dna.js');
+assert.equal(m.nodeLabel({slot: 1, kind: 'Namespace', name: 'NS[1]'}).name, 'Namespace.Boot');
+assert.equal(m.nodeLabel({slot: 6, name: 'NS[6]', dotName: 'ide.SelfTest'}).name, 'ide.SelfTest');
+assert.equal(m.nodeLabel({slot: 9, name: 'NS[9]'}).name, null);
+assert.ok(m.wrapName('example.ALongObjectNameWithMoreThanTwentyFourCharacters', 24, 2).length <= 2);
 assert.strictEqual(m.hex32(0xdeadbeef), '0xDEADBEEF');
 assert.strictEqual(m.hex32(0), '0x00000000');
 assert.strictEqual(m.buildUrl('bitstream', 'a b'), '/api/testing/build-dna?bitstream=a%20b');
@@ -48,4 +52,28 @@ assert.deepStrictEqual(f.outgoing.map(e => e.id), ['e2']);
 assert.strictEqual(m.clampZoom(100), 4); assert.strictEqual(m.clampZoom(0), 0.15);
 const g = m.makeRequestGate(); const t1 = g.next(); const t2 = g.next();
 assert.ok(!g.isCurrent(t1) && g.isCurrent(t2));
+const nsNodes = [{ id: 'slot-0', slot: 0, kind: 'Abstraction' }, { id: 'slot-1', slot: 1, kind: 'Namespace' },
+  { id: 'slot-2', slot: 2, kind: 'Thread' }, { id: 'slot-5', slot: 5, kind: 'Abstraction' }];
+const C = m.containerLayout(nsNodes, 'default', 1000, 600);
+assert.strictEqual(C.enclosing.id, 'slot-1');
+assert.deepStrictEqual(C.header.map(h => h.node && h.node.id), ['slot-0', 'slot-1']);
+assert.deepStrictEqual(C.order.map(n => n.id), ['slot-2', 'slot-5']);
+['slot-2', 'slot-5'].forEach(id => { const p = C.pos[id];
+  assert.ok(p.x >= 0 && p.y >= C.container.headerHeight && p.x + p.w <= C.container.w && p.y + p.h <= C.container.h); });
+assert.ok(C.pos['slot-0'].y + C.pos['slot-0'].h <= C.container.headerHeight);
+assert.ok(C.pos['slot-1'].y > C.pos['slot-0'].y);
+assert.ok(Math.abs(C.container.w / C.container.h - 952 / 552) < 0.01);
+const C2 = m.containerLayout(nsNodes.slice(1), 'organized', 400, 800);
+assert.strictEqual(C2.header[0].node, null); assert.ok(!('slot-0' in C2.pos));
+assert.strictEqual(m.containerLayout([{ id: 'x', slot: 2 }], 'default', 500, 500), null);
 console.log('test_testing_build_dna: ok');
+const ug = m.unresolvedGroups([
+  { id: 'n', kind: 'NULL', target: null }, { id: 'r', kind: 'Inform', target: 'slot-2' },
+  { id: 'u1', kind: 'Inform', target: null, unresolvedName: null, unresolvedNameReason: 'none', targetSlot: 9 },
+  { id: 'u2', kind: 'Outform', target: null },
+  { id: 'u3', kind: 'Inform', target: null, unresolvedName: 'Sys.Clock' },
+  { id: 'u4', kind: 'Inform', target: null, unresolvedName: 'Sys.Clock' }]);
+assert.deepStrictEqual(ug.map(g => [g.name, g.edges.map(e => e.id)]), [['Sys.Clock', ['u3', 'u4']], [null, ['u1', 'u2']]]);
+const CU = m.placeUnresolved(m.containerLayout(nsNodes, 'default', 1000, 600), ug);
+CU.unresolved.forEach(u => assert.ok(u.box.y > CU.container.headerHeight && u.box.y + u.box.h <= CU.container.h));
+console.log('unresolve: ok');

@@ -100,3 +100,18 @@
   .tbd-dialog { width:100vw; height:100dvh; border-radius:0; padding:8px; }
 }
 @media (prefers-reduced-motion: reduce) { .tbd-skel-line { animation:none; } }
+.tbd-encl-box { fill:#0f1828; stroke:#5eead4; stroke-width:1.6; }
+.tbd-encl-rule { stroke:#1f3b44; stroke-width:1; }
+.tbd-encl-title { fill:#5eead4; font-size:12px; font-weight:600; letter-spacing:.6px; text-transform:uppercase; }
+.tbd-hdr rect { fill:transparent; stroke:none; }
+.tbd-node.tbd-hdr:hover rect, .tbd-node.tbd-hdr:focus rect { fill:#13263a; stroke:#5eead4; stroke-width:1; }
+.tbd-node.tbd-hdr.is-sel rect { fill:#0b2422; stroke:#5eead4; stroke-width:1.6; }
+.tbd-hdr-text { fill:#c8d6e5; font-size:11px; font-family:ui-monospace,monospace; }
+.tbd-hdr-missing .tbd-hdr-text { fill:#7a8ba3; font-style:italic; }
+.tbd-unres rect { fill:#1c1414; stroke:#ef4444; stroke-width:1.2; stroke-dasharray:5 3; }
+.tbd-unres-kicker { fill:#f87171; font-size:10px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; }
+.tbd-unres-none { fill:#fca5a5; font-size:12px; font-style:italic; }
+.tbd-unres-title { fill:#f87171; font-size:11px; letter-spacing:.6px; }
+.tbd-n-slot { fill:#5eead4; font-size:10px; font-family:ui-monospace,monospace; letter-spacing:.4px; }
+.tbd-n-noname { fill:#7a8ba3; font-size:11px; font-style:italic; }
+.tbd-node .tbd-n-name { font-size:11px; }

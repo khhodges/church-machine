@@ -4,12 +4,26 @@ import struct
 import pytest
 from flask import Flask
 from server.artifact_revisions import RevisionStore
-from server.testing_build_dna import graph, install, decode_gt
+from server.testing_build_dna import graph, install, decode_gt, embedded_api
 from server.testing_dna_evidence import InspectionEvidence, BIT_ID, NS_ID
 
 
 def bit_bytes(suffix=b""):
     return bytes.fromhex("00090ff00ff00ff00ff000") + b"\xaa\x99\x55\x66" + b"\x00" * 1024 + suffix
+
+
+def test_names_only_from_bounded_self_definition_frame():
+    body = [0] * 64
+    body[0] = (31 << 27) | (1 << 10) | 1
+    payload = b'{"name":"example.Object"}'
+    body[2] = 0xAB000000 | len(payload)
+    padded = payload + b"\0" * (-len(payload) % 4)
+    body[3:3 + len(padded) // 4] = struct.unpack(f">{len(padded)//4}I", padded)
+    assert embedded_api(body)["name"] == "example.Object"
+    body[2] = 0xAB00FFFF
+    assert embedded_api(body) == {}
+    body[2] = 0  # JSON elsewhere in the body is not an identity frame.
+    assert embedded_api(body) == {}
 
 
 def no_archive():
@@ -154,9 +168,18 @@ def test_real_experimental_pair_read_only(evidence):
     result = client.get("/api/testing/build-dna?bitstream=" + BIT_ID).json
     assert result["ok"] and result["status"] == "available"
     assert result["namespaceRevisionId"] == NS_ID
+    assert len(result["metadataWords"]) == 4
+    assert result["metadataWords"][0] >> 27 == 31
     assert result["inspectionOnly"] and result["releaseApproved"] is False
     assert result["installed"]["status"] == "unverified"
     assert len(result["nodes"]) == 18 and len(result["edges"]) == 69
+    by_slot = {n["slot"]: n for n in result["nodes"]}
+    assert by_slot[6]["dotName"] == "ide.SelfTest"
+    assert by_slot[8]["dotName"] == "ide.UART_DEV"
+    assert by_slot[2]["dotName"] == "ide.BootThread"
+    assert by_slot[16]["dotName"] == "ide.Alice"
+    assert sum(bool(n.get("dotName")) for n in result["nodes"]) == 17
+    assert not by_slot[1].get("dotName")  # Namespace.Boot is a display label, not invented evidence.
     assert result["association"] == "receipt-backed"
     assert client.get("/api/testing/build-dna?namespace=" + NS_ID).json["association"] == "unassociated"
     assert client.post("/api/testing/build-dna?bitstream=" + BIT_ID).status_code == 405
@@ -174,3 +197,11 @@ def test_experimental_corruption_withheld(evidence, monkeypatch):
     assert not any(b["id"] == BIT_ID for b in catalog["bitstreams"])
     assert catalog["issues"]
     assert client.get("/api/testing/build-dna?bitstream=" + BIT_ID).status_code == 409
+
+
+def test_unresolved_gts_never_get_inferred_names():
+    entries = {1: {"w1": 7 << 21}}
+    gt = decode_gt(0x4A000009, "x", "CR0", entries, 0)
+    assert gt["target"] is None and gt["unresolvedName"] is None and gt["unresolvedNameReason"]
+    assert "unresolvedName" not in decode_gt(0, "x", "CR0", entries, 0)
+    assert "unresolvedName" not in decode_gt(0x4A070001, "x", "CR0", entries, 0)
