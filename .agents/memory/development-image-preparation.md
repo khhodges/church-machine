@@ -44,6 +44,13 @@ responsibility, not a veto. Retain authorization, exact-byte/target delivery,
 transfer serialization and replacement consent. This supersedes the earlier
 manual installation-evidence requirement for this loading flow.
 
+For unavailable Send operations, disable the button and explain the reason on
+hover or keyboard focus, rather than displaying the verbose connection warning.
+**Why:** The user identified the UART/authorization/live-session warning beneath
+Send as confusing and explicitly requested a disabled button with a popup.
+**How to apply:** Use a short, actionable explanation; retain actual transfer
+results and server-side enforcement without exposing internal security bookkeeping.
+
 Development Image belongs inside the established IDE, using the same shared
 header and view navigation as Namespace, not a separate page with a copied menu.
 

@@ -18,15 +18,16 @@ export default function DevelopmentImage() {
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [sendStatus, setSendStatus] = useState("");
-  const [connection, setConnection] = useState(connectionStatus());
+  const [connected, setConnected] = useState(false);
   useEffect(() => {
     let active = true;
     const refresh = async () => {
       try {
         const board = await request<BoardStatus>("/hardware/wukong/status");
-        if (active) setConnection(connectionStatus(board));
-      } catch (cause) {
-        if (active) setConnection(connectionStatus() + " " + (cause as Error).message);
+        if (active) setConnected(!!(board.physical_target?.live &&
+          board.physical_target.device_uid && board.physical_target.session_id));
+      } catch {
+        if (active) setConnected(false);
       }
     };
     void refresh();
@@ -34,6 +35,12 @@ export default function DevelopmentImage() {
     return () => { active = false; window.clearInterval(timer); };
   }, []);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const sendUnavailable = sending ? "Preparing the image. Please wait." :
+    receipt ? "This image has already been submitted." :
+    loading ? "Loading the selected image. Please wait." :
+    !input ? "Select an available development image first." :
+    !sendAllowed(input) ? "This image is for inspection only and cannot be sent." :
+    !connected ? "No live FPGA connection. Sending will be available when the bridge reconnects." : "";
   const [token, setToken] = useState(() => {
     try { return localStorage.getItem("ba_build_token") ?? sessionStorage.getItem("ba_build_token") ?? ""; } catch { return ""; }
   });
@@ -417,10 +424,10 @@ export default function DevelopmentImage() {
       </div>
       <footer className="kiss-send-footer">
         <div><strong>Send the bound build to FPGA</strong><span>Uses the existing Namespace binding; no rebind.</span></div>
-        <button type="button" className="kiss-primary kiss-send-button" disabled={loading || !input || !sendAllowed(input) || sending || !!receipt} title={input && !sendAllowed(input) ? "Inspection only — not approved for installation" : undefined} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
-        {input && !sendAllowed(input) && <p className="kiss-send-status" role="note">Inspection only — this frozen evidence is not approved for installation. Send is disabled.</p>}
-        <p className="kiss-send-status" role="status">{connection}</p>
-        <details><summary>Connection help</summary><p>{reconnectHelp}</p><a href="/fpga" target="_blank" rel="noreferrer">View FPGA connection status</a></details>
+        <span className="kiss-send-hint" tabIndex={sendUnavailable ? 0 : undefined} aria-label={sendUnavailable ? "Send build to FPGA unavailable" : undefined} aria-describedby={sendUnavailable ? "send-unavailable-reason" : undefined}>
+          <button type="button" className="kiss-primary kiss-send-button" disabled={!!sendUnavailable} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
+          {sendUnavailable && <span id="send-unavailable-reason" role="tooltip">{sendUnavailable}</span>}
+        </span>
         {sendStatus && <p className="kiss-send-status" role="status" aria-live="polite">{sendStatus}{receipt && <> <a href="/fpga" target="_blank" rel="noreferrer">View FPGA delivery status</a></>}</p>}
       </footer>
       <p className="kiss-footer"><span>Namespace edits belong in Namespace Table. This view leaves every saved input untouched.</span><span>FPGA transfer only on request</span></p>
