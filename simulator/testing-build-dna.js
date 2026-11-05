@@ -72,7 +72,7 @@
       return { slot: slot, node: nodes.filter(function (n) { return n.slot === slot; })[0] || null };
     });
     var inner = nodes.filter(function (n) { return n.slot !== 0 && n.slot !== 1; });
-    var hh = HDR_TOP + 3 * HDR_LINE + 36;
+    var hh = HDR_TOP + 3 * HDR_LINE + 10;
     var aw = Math.max(1, (width || 800) - 48), ah = Math.max(1, (height || 600) - 48);
     var L = inner.length ? viewportLayout(inner, mode, aw, Math.max(1, ah - hh)) : { pos: {}, order: [], width: 0, height: 0 };
     var cw = Math.max(380, L.width + 2 * HDR_PAD), ch = hh + L.height + 2 * HDR_PAD;
@@ -668,12 +668,31 @@
       var total = objectWordTotal(nodes);
       var revision = g.namespaceRevisionId || (kind === 'namespace' ? id : null);
       if (revision) {
+        var destination = '/simulator/#development-image?namespace=' + encodeURIComponent(revision);
         var link = svg('a', {href: '/simulator/#development-image?namespace=' + encodeURIComponent(revision),
-          target: '_top', class: 'tbd-word-total', 'aria-label': 'Open Memory Glass: ' + total.total + ' object words'});
+          class: 'tbd-word-total', tabindex: '0', 'aria-label': 'Open Memory Glass: ' + total.total + ' object words'});
+        function openGlass(event) {
+          event.preventDefault();
+          var host = dialogHost().defaultView;
+          if (workspace && workspace.open) workspace.close();
+          if (host.DevelopmentImageView && typeof host.DevelopmentImageView.show === 'function') {
+            host.DevelopmentImageView.show(revision);
+          } else {
+            host.location.assign(destination);
+          }
+        }
+        link.addEventListener('click', openGlass);
+        link.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') openGlass(event);
+        });
         var label = total.total.toLocaleString() + ' words' + (total.missing ? ' (partial)' : '') + ' · Memory Glass';
-        var width = 240;
-        link.appendChild(svg('rect', {x: HDR_PAD, y: C.headerHeight-28, width: width, height: 22, rx: 4, fill: '#1b3444', stroke: '#66c8bf'}));
-        var text = svg('text', {x: HDR_PAD+8, y: C.headerHeight-13, fill: '#b6f2e9', 'font-size': 12});
+        var width = Math.min(240, (C.w - 2 * HDR_PAD) * 0.45);
+        var buttonX = C.w - HDR_PAD - width;
+        et.setAttribute('textLength', Math.min(et.textContent.length * 7, buttonX - HDR_PAD - 16));
+        et.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+        link.appendChild(svg('rect', {x: buttonX, y: 3, width: width, height: 22, rx: 4, fill: '#1b3444', stroke: '#66c8bf'}));
+        var text = svg('text', {x: buttonX+8, y: 18, fill: '#b6f2e9', 'font-size': 12,
+          textLength: Math.min(label.length * 7, width - 16), lengthAdjust: 'spacingAndGlyphs'});
         text.textContent = label;
         link.appendChild(text);
         var tip = svg('title', {});

@@ -42,3 +42,11 @@ Namespace, never an unrelated default design.
 **How to apply:** Count each occupied slot once, show RAM versus MMIO in the
 breakdown, and exclude unresolved placeholders. Experimental evidence stays
 read-only when opened in Memory Glass.
+
+Place the Memory Glass button at the far right of the enclosing box's top row,
+not on an extra row.
+**Why:** The user explicitly corrected the extra height. The previous link
+also targeted the outer Replit frame instead of the app.
+**How to apply:** Navigation from DNA must stay in the highest same-origin
+IDE host, close the DNA modal, and preserve the exact Namespace selection;
+never navigate the cross-origin preview shell via `_top`.
