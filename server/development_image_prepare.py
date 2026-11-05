@@ -59,6 +59,25 @@ def build_saved_design(backend, identifier):
                 raise ValueError(f"NS[{row['slot']}] {row['name']}: resident object is unprepared. "
                                  "Complete its saved entry configuration; nothing was sent.")
         prepared = prepare_image(raw)
+        # Resolve against the compact, staged image, never the authoring
+        # projection (whose embedded-source allocations may be larger).
+        trace_rows = {}
+        for row in rows:
+            if row.get("type") != "Inform" or row["slot"] == 1 or row.get("unresolved"):
+                continue
+            base = row["location"] * 4
+            for offset in range(row["limit"] + 1):
+                nia = base + offset * 4
+                if nia + 4 > len(raw):
+                    raise ValueError("Trace region exceeds prepared image.")
+                word = struct.unpack_from("<I", raw, nia)[0]
+                trace_rows[str(nia)] = dict(
+                    pet_name=row["name"], offset=offset,
+                    nia_label=f'{row["name"]}.{offset}',
+                    map_instr_word=word,
+                    disasm=backend._wukong_disassemble_word(word, row["name"]),
+                    source_map="uploaded")
+        prepared["trace_rows"] = trace_rows
         prepared.update(namespace_revision_id=identifier,
                         source_kind="saved-binding-image", namespace_fingerprint=fingerprint,
                         hardware_certified=False, bindings_changed=False)

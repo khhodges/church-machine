@@ -110,6 +110,10 @@ def register(app, backend):
             backend._wukong_run_unlocked = False
             backend._wukong_runtime_identity = None
             backend._wukong_active_lump_info = {}
+            backend._wukong_uploaded_trace_map = dict(
+                rows=prepared.get("trace_rows", {}),
+                artifact_sha256=prepared["artifact_sha256"],
+                session=target["bridge_session"], acknowledged=False)
             backend._wukong_cmd_id += 1
             identity = {key: prepared[key] for key in (
                 "artifact_sha256", "artifact_identity", "namespace_revision_id")}
@@ -118,7 +122,9 @@ def register(app, backend):
             command_id = backend._wukong_cmd_id
             backend._wukong_pending_cmd = dict(
                 cmd="u", id=command_id, data=base64.b64encode(raw).decode("ascii"),
-                reboot=True, **target, **identity)
+                reboot=True, trace_rows=prepared.get("trace_rows", {}),
+                boot_profile=PROFILE,
+                **target, **identity)
             backend._wukong_cmd_delivery = dict(
                 id=command_id, cmd="u", queued_ts=time.time(), consumed_ts=None,
                 write_ok=None, write_error="", write_ts=None, **identity)

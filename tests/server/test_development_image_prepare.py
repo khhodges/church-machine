@@ -1,6 +1,7 @@
 """Offline preparation from real compiler output and saved binding evidence."""
 import hashlib
 import json
+import struct
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,10 @@ def test_exact_saved_bindings_build_without_linker_or_mutation(setup_design, mon
     assert prepared["namespace_revision_id"] == identity(path)
     assert prepared["bindings_changed"] is False
     assert prepared["hardware_certified"] is False
+    assert prepared["trace_rows"]
+    for address, mapped in prepared["trace_rows"].items():
+        assert mapped["map_instr_word"] == struct.unpack_from("<I", raw, int(address))[0]
+        assert mapped["source_map"] == "uploaded"
     assert snapshots(root) == before
     response = client.post("/api/development-image/prepare", json={"id": identity(path)})
     assert response.status_code == 200, response.json

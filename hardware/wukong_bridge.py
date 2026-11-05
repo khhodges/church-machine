@@ -44,6 +44,7 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 
 import argparse
 import base64
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import os
 import queue
@@ -304,7 +305,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 24
+BRIDGE_VERSION    = 25
 # Hold a complete bounded acceptance run while HTTPS catches up. This does
 # not promise unlimited recording; any overflow must be explicitly reported.
 TRACE_BACKLOG_CAPACITY = 8192
@@ -699,8 +700,25 @@ def _standalone_boot_disassemble(offset, entry_pet_name='SelfTest'):
     return None
 
 
+_uploaded_trace_rows = None
+_uploaded_trace_digest = None
+_uploaded_boot_n_init = None
+
+
+def boot_profile_n_init(profile):
+    """Frozen build expectation, not today's boot_rom or board-reported byte.
+
+    Amoeba retry BIT a4acb0ef… has 2463 nonzero initialization words.
+    Evidence: vendor manifest 5ab35bf4… and candidate image 5603d8e1….
+    A match checks the selected profile's sentinel, not bitstream attestation.
+    """
+    return 2463 if profile == "amoeba-retry-25mhz-uart-v1" else None
+
+
 def _trace_location(nia):
     """Resolve the reference-bitstream pet-name/offset and disassembly."""
+    if _uploaded_trace_rows is not None:
+        return _uploaded_trace_rows.get(str(nia))
     if _trace_metadata is not None:
         return _trace_metadata(nia)
     nia = int(nia) & 0xFFFFFFFF
@@ -1405,6 +1423,11 @@ class FaultDeliveryWorker:
         self._wake = threading.Event()
         self.telemetry_overflows = 0
         self.telemetry_delivery_failures = 0
+        # Ordinary trace retries must not occupy the fault/control worker.
+        self._reliable_traces = queue.Queue(maxsize=TRACE_BACKLOG_CAPACITY)
+        self._trace_thread = threading.Thread(
+            target=self._deliver_traces, name='wukong-trace-delivery', daemon=True)
+        self._trace_thread.start()
         self._thread = threading.Thread(
             target=self._run, name='wukong-telemetry', daemon=True)
         self._thread.start()
@@ -1445,9 +1468,12 @@ class FaultDeliveryWorker:
         """
         self._fault_jobs.join()
         self._telemetry_jobs.join()
+        self._reliable_traces.join()
 
     def submit(self, kind, payload, priority=None):
         payload = dict(payload)
+        if kind in ('trace', 'trace_fault') and _uploaded_trace_digest:
+            payload['artifact_sha256'] = _uploaded_trace_digest
         if self.session_id:
             payload['session_id'] = self.session_id
             if kind in (
@@ -1456,6 +1482,17 @@ class FaultDeliveryWorker:
                 payload['bridge_session'] = self.session_id
         if self.device_uid:
             payload['device_uid'] = self.device_uid
+        if kind == 'trace':
+            payload['delivery_id'] = uuid.uuid4().hex
+            try:
+                self._reliable_traces.put_nowait(payload)
+                return True
+            except queue.Full:
+                self.telemetry_overflows += 1
+                print('  [BRIDGE DELIVERY ONLY] Trace backlog full; event rejected. '
+                      'IDE history is incomplete. UART and fault handling remain active.',
+                      flush=True)
+                return False
         critical = kind in (
             'trace_fault', 'snapshot_fault', 'recovery_authorization',
             'skip_fault_completion')
@@ -1514,6 +1551,49 @@ class FaultDeliveryWorker:
                 except queue.Empty:
                     break
         return results
+
+    def _deliver_traces(self):
+        """Ordered bounded backlog, retrying the same ID until acknowledged.
+
+        Only transient failures are retried. Shutdown never issues a board
+        command. Server receipts suppress duplicates after a lost HTTP reply.
+        """
+        while not self._stopped.is_set():
+            try:
+                payload = self._reliable_traces.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            reply = None
+            try:
+                while not self._stopped.is_set():
+                    try:
+                        response = requests.post(
+                            f'{self.ide_base}/hardware/wukong/trace',
+                            json=payload, headers=_bridge_auth_headers(),
+                            timeout=(3, 5), verify=self.verify_tls)
+                        if 400 <= response.status_code < 500:
+                            print(f'  [BRIDGE DELIVERY ONLY] Trace rejected: HTTP '
+                                  f'{response.status_code}; not retried. '
+                                  'IDE history is incomplete.', flush=True)
+                            break
+                        body = response.json()
+                        if 200 <= response.status_code < 300 and body.get('accepted'):
+                            reply = body
+                            break
+                    except Exception:
+                        pass
+                    self.telemetry_delivery_failures += 1
+                    if self.telemetry_delivery_failures == 1:
+                        print('  [BRIDGE DELIVERY ONLY] Trace acknowledgement delayed; '
+                              'retaining ordered backlog and retrying.', flush=True)
+                    self._stopped.wait(1)
+                try:
+                    self._telemetry_results.put_nowait(
+                        dict(kind='trace', payload=payload, reply=reply))
+                except queue.Full:
+                    pass
+            finally:
+                self._reliable_traces.task_done()
 
     def _run(self):
         while not self._stopped.is_set():
@@ -2655,6 +2735,8 @@ def main():
                     i += TRACE_LEN
 
                 elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
+                    if _uploaded_trace_rows is not None:
+                        expected_n_init = _uploaded_boot_n_init
                     # Flush pending ASCII first (arrival-order preservation).
                     _console_flush(ide_base, verify_tls)
                     # Delegate to the shared sentinel parser so the bridge and
@@ -3037,6 +3119,7 @@ def _handle_upload(data, ser, ide_base, verify_tls, session_id=None,
     # ACK byte (e.g. trace packets the board emits as soon as it starts executing
     # the freshly loaded image).  The caller must prepend these back into the
     # main receive buffer so the trace parser can process them normally.
+    global _uploaded_trace_rows, _uploaded_trace_digest, _uploaded_boot_n_init
     leftover = bytearray()
 
     b64_payload = data.get('data', '')
@@ -3053,7 +3136,27 @@ def _handle_upload(data, ser, ide_base, verify_tls, session_id=None,
         _post_upload_ack(data, False, f'base64 decode: {exc}', ide_base,
                          verify_tls, session_id, device_uid)
         return leftover
-    import hashlib
+
+    # Freeze labels from the exact bytes before endian conversion. Never treat
+    # these mapped instruction words as words observed by the hardware.
+    trace_rows = data.get('trace_rows', {})
+    digest = hashlib.sha256(raw).hexdigest()
+    if trace_rows:
+        try:
+            if digest != data.get('artifact_sha256'):
+                raise ValueError("trace image digest mismatch")
+            for address, row in trace_rows.items():
+                nia = int(address)
+                if nia < 0 or nia % 4 or nia + 4 > len(raw):
+                    raise ValueError("trace address outside image")
+                if struct.unpack_from('<I', raw, nia)[0] != row['map_instr_word']:
+                    raise ValueError("trace word differs from upload")
+        except (ValueError, KeyError, TypeError) as exc:
+            _post_upload_ack(data, False, str(exc), ide_base, verify_tls,
+                             session_id, device_uid)
+            return leftover
+    # A failed/partial replacement must not retain the previous image's labels.
+    _uploaded_trace_rows, _uploaded_trace_digest = {}, None
     source_digest = hashlib.sha256(raw).hexdigest()
     has_correlation = any(
         data.get(key) is not None for key in (
@@ -3136,6 +3239,9 @@ def _handle_upload(data, ser, ide_base, verify_tls, session_id=None,
         time.sleep(0.005)
 
     if ack_found:
+        _uploaded_trace_rows = trace_rows
+        _uploaded_trace_digest = digest
+        _uploaded_boot_n_init = boot_profile_n_init(data.get('boot_profile'))
         print('  [upload] board ACK received — upload successful', flush=True)
         # A complete DMEM replacement must restart from the boot ROM so it
         # consumes the newly written Namespace descriptor and Thread.caps[0].

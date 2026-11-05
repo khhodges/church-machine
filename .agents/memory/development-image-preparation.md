@@ -68,6 +68,22 @@ one-button flow never obtained the installer's required fresh stop evidence.
 to the issued command and session, then upload. Timeout, changed target or failed
 STOP aborts the upload; never reset or release a fault as a fallback.
 
+Trace names must follow the exact staged upload allocation, not the saved
+authoring layout.
+**Why:** Source-frame removal during staging can relocate resident LUMPs;
+the authoring projection mapped CapabilityTest addresses to Mint even though
+the reconstructed upload digest matched the acknowledged image.
+**How to apply:** Freeze the map alongside the upload, bind its use to the
+artifact and bridge session, and keep mapped words distinct from observed words.
+
+Boot-sentinel expectations come from the selected frozen BIT build, never
+from the new uploaded Namespace or today's mutable boot sources.
+**Why:** The installed hardware retains its initializer count when runtime
+memory is replaced. Using the observed sentinel as its own expectation or
+importing newer boot sources would make validation circular or incorrect.
+**How to apply:** Verify dependency-free profile constants against retained
+vendor evidence; a sentinel match is not full installed-bitstream attestation.
+
 Development Image belongs inside the established IDE, using the same shared
 header and view navigation as Namespace, not a separate page with a copied menu.
 

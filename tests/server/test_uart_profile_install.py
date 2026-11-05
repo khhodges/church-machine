@@ -225,6 +225,11 @@ def test_bridge_produces_exact_big_endian_uart_words(setup, monkeypatch):
     from hardware import wukong_bridge as bridge
     client, backend, raw, _, _ = setup
     assert client.post("/api/namespace-image/uart-install", json=payload(raw)).status_code == 200
+    for name in ("_uploaded_trace_rows", "_uploaded_trace_digest", "_uploaded_boot_n_init"):
+        monkeypatch.setattr(bridge, name, None)
+    row = dict(map_instr_word=struct.unpack_from("<I", raw, 1024)[0],
+               nia_label="Exact.0", disasm="test map", source_map="uploaded")
+    backend._wukong_pending_cmd["trace_rows"] = {"1024": row}
     writes, replies = [], []
 
     class Serial:
@@ -243,3 +248,7 @@ def test_bridge_produces_exact_big_endian_uart_words(setup, monkeypatch):
     assert struct.unpack(">16384I", writes[0][5:]) == struct.unpack("<16384I", raw)
     assert writes[1:] == [b"f"]  # explicit install reboot, never recovery authorization g
     assert replies[-1]["json"]["ok"]
+    assert bridge._trace_location(1024) == row
+    assert bridge._trace_location(0x600) is None  # no old SelfTest fallback
+    assert bridge._uploaded_trace_digest == hashlib.sha256(raw).hexdigest()
+    assert bridge._uploaded_boot_n_init == 2463

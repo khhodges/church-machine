@@ -547,11 +547,22 @@ def _wukong_disassemble_word(word, pet_name=None):
 # _wukong_trace_metadata_static;
 # for user-compiled lumps this map is the only source of labels.
 _wukong_active_lump_info = {}
+_wukong_uploaded_trace_map = {}
 
 def _wukong_resolve_nia(nia):
     """Resolve a trace NIA: check the dynamic active-lump table first, then
     fall back to the static resident-program + Boot-ROM table from
     wukong_trace_symbols."""
+    if _wukong_uploaded_trace_map:
+        from flask import has_request_context
+        data = (request.get_json(silent=True) or {}) if has_request_context() else {}
+        mapped = _wukong_uploaded_trace_map
+        if (mapped.get('acknowledged') and
+                data.get('artifact_sha256') == mapped.get('artifact_sha256') and
+                data.get('bridge_session') == mapped.get('session')):
+            return mapped['rows'].get(str(nia))
+        # An uploaded address must never borrow the reference image's name.
+        return None
     info = _wukong_active_lump_info
     if (info and
             info.get('base_byte', -1) <= nia < info.get('end_byte', 0) and
@@ -23588,7 +23599,10 @@ def fault_snapshot_delete():
     return jsonify({'ok': True})
 
 
+from server.trace_delivery import reliable_trace
+
 @app.route('/hardware/wukong/trace', methods=['POST'])
+@reliable_trace(lambda: _wukong_control_auth())
 def wukong_trace_post():
     """Bridge posts a decoded 12-byte trace packet here.
 
@@ -24129,6 +24143,14 @@ def wukong_code_get():
     overlapping uploaded lump such as SelfTest.  Every row contains the
     byte-addressed NIA used by trace packets.
     """
+    if _wukong_uploaded_trace_map and not request.args.get('namespace_revision'):
+        mapped = _wukong_uploaded_trace_map
+        rows = []
+        if mapped.get('acknowledged'):
+            rows = [dict(row, nia=int(address), word=row['map_instr_word'])
+                    for address, row in mapped['rows'].items()]
+        return jsonify(ok=True, rows=rows, source_map='uploaded',
+                       artifact_sha256=mapped['artifact_sha256'])
     revision_id = request.args.get('namespace_revision', '')
     if revision_id:
         try:
@@ -25130,6 +25152,9 @@ def wukong_upload_ack_post():
         delivery['write_ok'] = bool(data.get('ok', False))
         delivery['write_error'] = str(data.get('error', '')) if not data.get('ok') else ''
         delivery['write_ts'] = _wk_time.time()
+        if (_wukong_uploaded_trace_map.get('artifact_sha256') == artifact_digest and
+                _wukong_uploaded_trace_map.get('session') == bridge_session):
+            _wukong_uploaded_trace_map['acknowledged'] = bool(data.get('ok'))
     entry = {
         'ok':    bool(data.get('ok', False)),
         'error': str(data.get('error', '')) if not data.get('ok') else '',
