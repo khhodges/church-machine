@@ -37,3 +37,13 @@ through GC."
 Retirement is not slot deletion or permission to reuse that slot. Define GC
 safety and subsequent resolution/loading against the retained slot; do not
 infer a modified-state persistence policy from the reclamation rule.
+
+Lazy lifecycle implementation is hardware-first; a separate simulator
+implementation or passing simulator suite is not a prerequisite milestone.
+
+**Why:** The user rejected the proposed simulator-first milestone and stated
+that testing should be on the hardware.
+
+**How to apply:** Establish acceptance on the physical board with identified
+bitstream and LUMP bytes. Keep cheap build/static checks distinct from functional
+acceptance. This direction alone does not authorize uploading or flashing.
