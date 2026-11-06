@@ -45,6 +45,34 @@ The approved startup sequence is:
 - Release normal USER execution only after the required checks pass. A failed
   check hard-faults rather than silently continuing startup.
 
+### First retirement exercise: SelfTest and WCH
+
+SelfTest and WCH are the first boot objects used to exercise retirement after
+successful initial hardware checks. U.0 retains the test results; once those
+objects have returned and no active continuation needs their bodies,
+U.7 → U.8 reclaims their body memory. Keep their slots, identities and approved
+backing objects. Reclaimed blocks become available to USER allocation only
+after the required safe-release and zeroing steps, not immediately on RETURN.
+
+Before retiring WCH, establish that any continuing SYSTEM communication or
+fault-reporting dependency is available independently. Do not retire a service
+required to fetch either object back or to report a fault.
+
+**Diagnostic reruns after a later hard fault are optional, not automatic.**
+An explicitly requested rerun loads the retained objects through the ordinary
+U.2 → U.3 → U.4 → U.5 path and uses U.6 to execute the original requested use.
+Do not create a separate boot-object reload mechanism.
+
+Initial startup diagnostics remain required. Optional later diagnostic reruns
+do not waive mandatory boot/context validation, fault evidence retention or
+hard-fault behavior, and do not authorize resuming faulted execution. A recovery
+path that performs a full boot must distinguish optional repeated SelfTest/WCH
+diagnostics from mandatory boot validation. The control selecting an optional
+rerun remains to be specified.
+
+This is a Phase 2 lifecycle policy, not authorization to retire current live
+boot objects or change the installed boot image.
+
 Boot/SYSTEM remains the same Thread across these roles; startup validation is
 not repeated on every event. How entry distinguishes startup from later events
 belongs to the event ABI still to be defined.
@@ -517,6 +545,8 @@ is not execution acceptance.
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
 | F.16 | Phase 1 selection | After completion any selected unblocked resident Thread is acceptable; blocked USER is excluded until ready. |
 | F.17 | Repeated SYSTEM activation | Event entry/exit preserves the configured SYSTEM destination and context across successive events; verify the agreed CR13 ABI. |
+| F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
+| F.19 | Optional post-hard-fault diagnostics | No automatic diagnostic reload solely because a later hard fault occurs; explicit rerun uses ordinary U.2–U.6. Mandatory validation and fault handling remain in force in either case. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.

@@ -165,3 +165,16 @@ clarified otherwise; preserve reserved and occupied identities. Serialized
 request acceptance determines allocation order. Body retirement retains its
 slot and does not free it for reassignment. This design decision does not
 authorize resizing the live Namespace or flashing hardware.
+
+SelfTest and WCH are the first Phase 2 retirement candidates after successful
+initial startup checks. Later post-hard-fault diagnostic reruns are optional.
+
+**Why:** The user proposed reclaiming boot-test body memory for USERs and
+explicitly approved optional reruns after subsequent hard faults.
+
+**How to apply:** Retain slots, approved backing objects and results; retire only
+after safe return and dependency checks, especially ongoing WCH communication.
+Use ordinary lazy loading for explicit reruns. Initial diagnostics and mandatory
+boot/context validation remain required; skipping reruns neither resumes faulted
+execution nor changes hard-fault evidence requirements. No live retirement or
+boot-image changes are authorized by the design decision.
