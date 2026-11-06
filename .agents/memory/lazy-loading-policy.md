@@ -118,3 +118,16 @@ to any unblocked resident Thread. Handler completion is not completion of the
 potentially indefinite LUMP request. A later DELIVER is processed in a later
 serialized activation; external data arrival is not nested handler execution.
 Treat this as the proposed architecture, not verified installed-RTL behavior.
+
+For the Phase 2 design, the existing Boot.Thread becomes SYSTEM, leaving
+Thread 1 and Thread 2 for user programs. SYSTEM runs first to validate startup,
+then retains the same Thread identity for serialized runtime event handling.
+
+**Why:** The user approved SYSTEM-first setup/hardware validation and explicitly
+assigned the existing Boot.Thread to SYSTEM rather than adding another Thread.
+
+**How to apply:** Preserve this role mapping without guessing Namespace slots.
+Startup tests span successive completed handlers, not nested events. Release
+normal USER execution only after required startup checks pass. CR13 replacement
+permission and the exact event ABI remain undecided; this is design approval,
+not permission for RTL edits, installation or hardware tests.

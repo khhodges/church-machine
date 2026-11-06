@@ -1,4 +1,4 @@
-# Unified LUMP Lifecycle — Phase 1 Serialized SYSTEM Events
+# Unified LUMP Lifecycle — Phase 2 FPGA Design
 
 ## Status and scope
 
@@ -18,6 +18,42 @@ runs to completion. This document uses that precedent as a design model, not
 as independently verified historical or current-FPGA behavior.
 
 Namespace-type LUMPs remain excluded from lazy loading.
+
+## Agreed startup and Thread roles
+
+The existing **Boot.Thread becomes the SYSTEM Thread** in this Phase 2 design.
+It is not replaced by an additional dedicated SYSTEM Thread. **Thread 1 and
+Thread 2 remain available for user programs.** These are Thread designations,
+not an assignment of Namespace slot numbers.
+
+CR13 designates this Boot/SYSTEM Thread for the proposed event-entry mechanism.
+Its two responsibilities are:
+
+1. **Startup:** run first and validate the setup before normal USER execution.
+2. **Runtime:** handle UNAVAILABLE, delivery and lifecycle events serially,
+   with each handler running to completion.
+
+The approved startup sequence is:
+
+- Minimal boot establishes enough resident SYSTEM context and capabilities
+  for hardware to enter it safely.
+- Boot/SYSTEM checks the setup and performs in-handler hardware checks.
+- It finishes that activation and hands off to a prepared resident test Thread
+  to exercise a real valid-but-unavailable CALL.
+- Subsequent serialized activations test the event, request, completion and
+  original-operation resumption paths. No test interrupts a running handler.
+- Release normal USER execution only after the required checks pass. A failed
+  check hard-faults rather than silently continuing startup.
+
+Boot/SYSTEM remains the same Thread across these roles; startup validation is
+not repeated on every event. How entry distinguishes startup from later events
+belongs to the event ABI still to be defined.
+
+The earlier Phase 1 simplicity rules below are carried into this Phase 2 design:
+no parallel/preemptive handlers and any unblocked resident Thread is an
+acceptable next choice. The existing Phase 1 ISA is not changed by this document.
+Whether SYSTEM may replace CR13 after startup remains undecided; the Thread-role
+mapping does not imply permission to do so.
 
 ## 1. Execution and authority model
 
