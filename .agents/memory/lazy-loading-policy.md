@@ -167,14 +167,17 @@ slot and does not free it for reassignment. This design decision does not
 authorize resizing the live Namespace or flashing hardware.
 
 SelfTest and WCH are the first Phase 2 retirement candidates after successful
-initial startup checks. Later post-hard-fault diagnostic reruns are optional.
+power-on checks. Diagnostics are then deferred indefinitely until a human
+operator performs a power-off/power-on reboot, not merely a software reset.
 
-**Why:** The user proposed reclaiming boot-test body memory for USERs and
-explicitly approved optional reruns after subsequent hard faults.
+**Why:** The user proposed reclaiming boot-test body memory for USERs, then
+superseded optional runtime reruns with power-cycle-only diagnostics under the
+assumption of reliable capability hardware and software containment.
 
 **How to apply:** Retain slots, approved backing objects and results; retire only
 after safe return and dependency checks, especially ongoing WCH communication.
-Use ordinary lazy loading for explicit reruns. Initial diagnostics and mandatory
-boot/context validation remain required; skipping reruns neither resumes faulted
-execution nor changes hard-fault evidence requirements. No live retirement or
-boot-image changes are authorized by the design decision.
+Run startup diagnostics again at the next operator power cycle; do not add a
+runtime diagnostic-rerun control. Mandatory boot/context validation, containment
+and fault evidence remain required. Deferral neither resumes faulted execution
+nor proves hardware reliability. No live retirement or boot-image changes are
+authorized by the design decision.

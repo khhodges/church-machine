@@ -58,17 +58,29 @@ Before retiring WCH, establish that any continuing SYSTEM communication or
 fault-reporting dependency is available independently. Do not retire a service
 required to fetch either object back or to report a fault.
 
-**Diagnostic reruns after a later hard fault are optional, not automatic.**
-An explicitly requested rerun loads the retained objects through the ordinary
-U.2 → U.3 → U.4 → U.5 path and uses U.6 to execute the original requested use.
-Do not create a separate boot-object reload mechanism.
+**After successful power-on diagnostics, diagnostic reruns are deferred
+indefinitely until a human operator performs a power-off/power-on reboot.**
+This supersedes the earlier optional runtime-rerun proposal. A later software
+hard fault does not reload SelfTest/WCH or trigger a hardware diagnostic pass.
+A software reset or Namespace-local reboot is not the operator power cycle.
 
-Initial startup diagnostics remain required. Optional later diagnostic reruns
-do not waive mandatory boot/context validation, fault evidence retention or
-hard-fault behavior, and do not authorize resuming faulted execution. A recovery
-path that performs a full boot must distinguish optional repeated SelfTest/WCH
-diagnostics from mandatory boot validation. The control selecting an optional
-rerun remains to be specified.
+This policy assumes reliable capability enforcement and correctly configured
+authority boundaries. Containment limits the fault's reach; it does not prove
+that all authorized software behavior is correct, nor is it evidence that the
+installed hardware has been qualified. Do not assume containment if the
+enforcement hardware itself is suspect.
+
+Fault containment, hard-fault behavior and evidence capture remain active.
+Unaffected authorized work may continue; diagnostic deferral does not authorize
+resuming faulted execution. Mandatory context/boot validation is distinct from
+the deferred diagnostic suite and remains required where applicable.
+
+At the next operator power cycle, U.0 runs the required startup diagnostics
+again before normal USER release; SelfTest/WCH then become retirement candidates
+again. Preserve their approved backing objects for that startup use. Exact
+cold-start identification and startup availability must be defined without
+depending on reclaimed volatile copies. No separate runtime diagnostic-rerun
+control is required by this policy.
 
 This is a Phase 2 lifecycle policy, not authorization to retire current live
 boot objects or change the installed boot image.
@@ -546,7 +558,7 @@ is not execution acceptance.
 | F.16 | Phase 1 selection | After completion any selected unblocked resident Thread is acceptable; blocked USER is excluded until ready. |
 | F.17 | Repeated SYSTEM activation | Event entry/exit preserves the configured SYSTEM destination and context across successive events; verify the agreed CR13 ABI. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
-| F.19 | Optional post-hard-fault diagnostics | No automatic diagnostic reload solely because a later hard fault occurs; explicit rerun uses ordinary U.2–U.6. Mandatory validation and fault handling remain in force in either case. |
+| F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
