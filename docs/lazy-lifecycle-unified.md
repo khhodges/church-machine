@@ -29,19 +29,27 @@ does not mean invoking another FPGA service.
 
 Every arrow has a reference. All explanatory text is in the comments column,
 with no fifth vertical separator. `U` references replace the earlier per-case
-numbering; the correspondence is listed below.
+numbering; the correspondence is listed below. Lettered substeps expose FPGA
+instruction execution without renumbering existing messages.
 
 ```text
 IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |
- |     <-----|     |     U.1 Use target/reference.
+ |     <-----|     |     U.1 CALL target method.
  |     |     |     |     Valid and resident:
- |     |     |     |     execute normally; no REQUEST.
+ |     |---->|     |     U.1a FPGA dispatches CALL;
+ |     |     |     |     target runs in USER THREAD.
+ |     |     |     |     No CHANGE or REQUEST.
  |     |     |     |
  |     |     |     |     Valid but needs service:
  |     |     |     |     preserve operation/context;
  |     |     |     |     suspend USER.
- |     |---------->|     U.2 Service pending use.
+ |     |     |     |     U.2 Service pending use.
+ |     <-----|     |     U.2a CHANGE to SYSTEM.
+ |     |     |     |     FPGA saves USER context;
+ |     |     |     |     validates SYSTEM Thread GT;
+ |     |---------->|     U.2b FPGA restores SYSTEM.
+ |     |     |     |     Pending CALL stays retained.
  |     |     |     |     Check local binding first.
  |     |     |     |     If locally satisfiable,
  |     |     |     |     proceed directly to U.5.
@@ -58,24 +66,48 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     verify identity/authority.
  |     |     |     |     Resolve local binding.
  |     |     |     |     If body is needed:
- |     |     |     |     obtain FreeQueue block;
+ |     <-----------|     U.4a CALL FreeHandler.FreeN.
+ |     |---------->|     U.4b FPGA dispatches method
+ |     |     |     |     within SYSTEM THREAD.
+ |     <-----------|     U.4c RETURN from FreeHandler.
+ |     |---------->|     U.4d FPGA restores service
+ |     |     |     |     caller in SYSTEM THREAD.
  |     |     |     |     install and verify body.
  |     |     |     |     Publish verified binding.
- |     <-----------|     U.5 Make USER runnable.
+ |     |     |     |     U.5 Mark USER runnable.
  |     |     |     |     When USER is scheduled:
- |     |---->|     |     U.6 Complete original use.
+ |     <-----------|     U.5a CHANGE to USER.
+ |     |     |     |     FPGA saves SYSTEM context;
+ |     |     |     |     validates USER Thread GT;
+ |     |---->|     |     U.5b FPGA restores USER.
+ |     |---->|     |     U.6 Complete pending CALL;
+ |     |     |     |     FPGA dispatches target
+ |     |     |     |     within USER THREAD.
  |     |     |     |
  |     |     |     |     LATER: authorized retirement
- |     |     |---->|     U.7 RETIRE to same service.
+ |     |     |---->|     U.7 Queue RETIRE request.
+ |     <-----|     |     U.7a CHANGE to SYSTEM.
+ |     |---------->|     U.7b FPGA saves USER and
+ |     |     |     |     restores SYSTEM context.
  |     |     |     |     Or service initiates under
  |     |     |     |     an authorized local policy.
  |     |     |     |     Mark Retiring; prevent entry.
  |     |     |     |     Establish safe reclamation;
  |     |     |     |     preserve modified state.
- |     |     |     |     GC passes body to Release.
+ |     <-----------|     U.7c CALL FreeHandler.Release.
+ |     |---------->|     U.7d FPGA dispatches Release
+ |     |     |     |     within SYSTEM THREAD.
+ |     <-----------|     U.7e RETURN from FreeHandler.
+ |     |---------->|     U.7f FPGA restores service
+ |     |     |     |     caller in SYSTEM THREAD.
  |     |     |     |     KEEP slot and identity;
  |     |     |     |     publish body as Absent.
- |     |     <-----|     U.8 Retirement complete.
+ |     |     |     |     U.8 Retirement complete;
+ |     |     |     |     notify waiting requester.
+ |     <-----------|     U.8a CHANGE to USER when
+ |     |     |     |     ready and scheduled.
+ |     |---->|     |     U.8b FPGA saves SYSTEM and
+ |     |     |     |     restores requesting USER.
  |     |     |     |     Later use starts at U.1.
 ```
 
@@ -83,9 +115,43 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
 “forward to FPGA / forward to IDE / deliver to FPGA / deliver to service”
 message sequence.
 
-U.7 and U.8 are logical software request/completion messages, not a claim that
-an inter-Thread call mechanism is already implemented. The retirement caller's
-blocking behavior remains an ABI detail.
+### CALL versus CHANGE: explicit hardware responsibilities
+
+| Action | FPGA behavior | Thread outcome |
+|---|---|---|
+| CALL target method | Validate target authority and dispatch-table selector; establish the method's execution context. | Another abstraction executes in the same USER THREAD. |
+| CHANGE to SYSTEM | Validate the permissionless SYSTEM Thread GT; save outgoing USER context and restore SYSTEM context. | USER stops executing; SYSTEM executes. |
+| CALL FreeHandler method | Perform normal CALL dispatch and caller-frame handling. | FreeHandler executes in SYSTEM, not a third Thread. |
+| RETURN from FreeHandler | Restore the abstraction caller's saved CALL context. | Lifecycle service continues within SYSTEM. |
+| CHANGE to USER | Validate the permissionless USER Thread GT; save outgoing SYSTEM context and restore USER context. | USER resumes its preserved continuation. |
+
+`CHANGE to SYSTEM` and `CHANGE to USER` are diagram labels for **CHANGE CRn**,
+where CRn holds the appropriate permissionless Thread GT. They are not new
+instruction syntax or implicit CALL effects. `FreeN` denotes the selected
+Free64, Free128 or Free256 method, not a new method name.
+
+**Pending-CALL handoff remains a design boundary:** U.2a requires an explicit
+handoff execution path. An unavailable CALL cannot simply execute the next
+user instruction, and ordinary CHANGE normally preserves its own continuation,
+not an earlier unfinished CALL. The mechanism that reaches CHANGE while retaining
+that CALL and restores its completion at U.6 still needs definition and
+installed-RTL verification. The chart shows the required sequence, not an
+assertion that CALL automatically performs CHANGE today.
+
+U.5 is software readiness bookkeeping, **not CHANGE**. U.5a is the actual Thread
+transition, shown from SYSTEM when it is running and selects USER. If another
+Thread is running, scheduling must first provide the appropriate execution
+context; an IDE delivery does not asynchronously execute CHANGE by itself.
+While USER waits, scheduler-directed CHANGE operations may run other Threads.
+
+The chart uses CALL as the concrete pending operation. For a non-CALL reference
+use, retain and complete that original operation instead; do not insert a CALL
+to the target merely because resolution was needed.
+
+U.7 queues a software request; it is not a cross-Thread CALL. The chart shows a
+blocking retirement requester explicitly yielding with CHANGE and later being
+resumed with CHANGE. A retirement initiated within SYSTEM omits those requester
+transitions. The exact service ABI remains proposed.
 
 ## Shared mechanisms
 

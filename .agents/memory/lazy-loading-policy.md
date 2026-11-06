@@ -71,3 +71,13 @@ that the IDE already knows whether the request can be satisfied.
 recipient. Availability changes delivery timing rather than selecting a separate
 fetch protocol. Keep local resolution and body installation within the shared
 service proposal; do not mistake this design direction for RTL authorization.
+
+Lifecycle diagrams must explicitly distinguish FPGA CALL/RETURN actions from
+CHANGE Thread transitions, including the handoff to SYSTEM and resumption of USER.
+
+**Why:** The user identified CALL and CHANGE as the key mechanisms missing from
+the unified charts.
+
+**How to apply:** CALL changes abstraction within a Thread; CHANGE saves/restores
+Thread context. Mark pending-instruction handoff as an unresolved mechanism rather
+than implying ordinary CALL automatically executes CHANGE.
