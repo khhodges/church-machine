@@ -1,4 +1,4 @@
-# Lazy Load, Resolve and Retirement — Message-Flow Specification
+# Lazy Load, Resolve, Retirement and Deferred Delivery — Message-Flow Specification
 
 ## Status and scope
 
@@ -13,7 +13,7 @@ Namespace-type LUMPs are excluded for now.
 - Both Thread lanes execute on the FPGA. The separate columns distinguish
   hardware responsibilities from abstraction-method execution.
 - Arrow direction identifies the sender and receiver. Each message has a
-  stable reference, from 1.1 through 3.8.
+  stable reference, from 1.1 through 4.10.
 - Unnumbered comments describe local work, not additional messages.
 - All descriptions appear in the comments column, without a fifth vertical bar.
 - Loader, Resolver and Retirement are functional roles, not finalized API names.
@@ -63,6 +63,9 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
 
 **Result:** the body is resident and the original CALL completes.
 
+If the LUMP is unready or unavailable, use the REQUEST/DELIVER split in
+Case 4 instead of assuming an immediate response at **1.5**.
+
 ## 2. Lazy Resolve
 
 **Purpose:** establish the authorized local binding of an unresolved reference.
@@ -107,6 +110,9 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
 
 **Result:** a verified local binding exists, any required body is resident, and
 the original operation completes.
+
+An unready or unavailable dependency follows Case 4 while retaining this
+original operation, rather than creating a new user CALL.
 
 ## 3. Lazy Retirement
 
@@ -157,6 +163,91 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
 **Result:** body memory is reclaimed, residency is Absent, and the slot and
 identity remain retained.
 
+## 4. Unready or unavailable LUMP — REQUEST / DELIVER
+
+**Purpose:** separate requesting a LUMP from delivering it, allowing the USER
+THREAD to remain suspended for an indefinite period.
+
+**Entry:** a valid operation requires a LUMP that is not ready or not available.
+This is a waiting condition, not by itself an authority or integrity fault.
+
+```text
+IDE   FPGA  USER  SYSTEM  COMMENTS
+ |     |     |     |
+ |     <-----|     |     4.1 Use required LUMP.
+ |     |     |     |     Retain operation/context;
+ |     |     |     |     suspend USER.
+ |     |---------->|     4.2 REQUEST to service.
+ |     |     |     |     Record pending request
+ |     |     |     |     before forwarding it.
+ |     <-----------|     4.3 Forward REQUEST.
+ <-----|     |     |     4.4 REQUEST to IDE.
+ |     |     |     |     LUMP unready/unavailable.
+ |     |     |     |     REQUEST remains pending.
+ |     |     |     |
+ |     |     |     |     INDEFINITE WAIT
+ |     |     |     |     USER stays suspended.
+ |     |     |     |     SYSTEM serves other work.
+ |     |     |     |     Other runnable Threads run.
+ |     |     |     |     No timeout-driven resume.
+ |     |     |     |
+ |---->|     |     |     4.5 DELIVER bytes/evidence
+ |     |     |     |     for the pending REQUEST.
+ |     |---------->|     4.6 Dispatch DELIVER.
+ |     |     |     |     Match pending request;
+ |     |     |     |     validate identity/authority.
+ |     |     |     |     Obtain suitable free block;
+ |     |     |     |     install and verify body.
+ |     |     |     |     Publish resident binding.
+ |     <-----------|     4.7 Delivery complete;
+ |     |     |     |     make waiting USER runnable.
+ |     |     |     |     When USER is scheduled:
+ |     |---->|     |     4.8 Complete original
+ |     |     |     |     operation and continue.
+ |     <-----------|     4.9 Report delivery status.
+ <-----|     |     |     4.10 IDE status (optional).
+```
+
+### Required behavior
+
+- REQUEST and DELIVER are separate service operations, not a synchronous call
+  held open for the entire wait. Their exact method ABI and transport remain
+  to be defined.
+- Record enough protected pending state to identify the waiting Thread, its
+  original operation and context, and the required LUMP identity and destination.
+  A later delivery must not be confused with another request or a reused Thread
+  or slot. The exact representation remains to be defined.
+- Retain the pending request before a response could arrive. Suspension and
+  completion must not lose a wakeup, even if delivery is immediate.
+- Unavailability leaves the request pending indefinitely. Elapsed time alone
+  neither faults nor resumes the USER THREAD, and does not authorize another
+  revision, substitute LUMP, polling loop or repeated user instruction.
+- The SYSTEM THREAD must not remain blocked on this request. It can service
+  other requests while this USER THREAD waits. Other runnable Threads continue.
+- **4.5** can occur arbitrarily later. If no valid DELIVER occurs, the USER stays
+  suspended. Indefinite waiting does not promise persistence across reset or
+  power loss; that is a separate, undefined contract.
+- DELIVER must match the pending request and pass the usual authority, identity
+  and integrity checks. Receiving bytes alone does not make the USER runnable.
+  Invalid deliveries must not wake the USER; actual validation faults retain
+  the hard-fault rule, with fault ownership still requiring definition.
+- Obtain body storage when delivery can be processed, rather than reserving a
+  body block throughout an unbounded wait. The discussed LUMP FreeQueues are
+  the proposed allocation mechanism. Queue exhaustion is a separate condition;
+  this case does not define its policy or authorize a fallback allocator.
+- **4.7** makes the USER runnable only after successful installation and
+  publication. **4.8** occurs when scheduled, not necessarily immediately.
+- Complete each pending operation at most once. Duplicate or stale DELIVER
+  messages must not reinstall the body or resume a completed request again;
+  their exact rejection/reporting contract remains to be defined.
+- For Case 1, **4.8** completes the pending CALL into its target. For Case 2,
+  it completes the original reference-using operation. Neither creates a
+  new user-level CALL as a substitute.
+- **4.9–4.10** are optional reporting, not prerequisites for resuming execution.
+
+**Result:** either the USER remains suspended with a pending REQUEST, or a
+validated DELIVER makes it runnable to complete its original operation.
+
 ## Common safety and implementation boundaries
 
 - Failed authority or integrity checks hard-fault; they do not trigger retries,
@@ -178,3 +269,6 @@ identity remain retained.
 - Retirement entry restriction, GC roots and synchronization.
 - Modified-state preservation before reclamation and restoration on later use.
 - Installed-bitstream compatibility with the required flows.
+- REQUEST/DELIVER ABI, pending-request capacity and correlation representation.
+- Duplicate/stale delivery handling and validation-fault ownership.
+- FreeQueue exhaustion policy; explicit cancellation and reset semantics.

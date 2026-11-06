@@ -47,3 +47,15 @@ that testing should be on the hardware.
 **How to apply:** Establish acceptance on the physical board with identified
 bitstream and LUMP bytes. Keep cheap build/static checks distinct from functional
 acceptance. This direction alone does not authorize uploading or flashing.
+
+An unready or unavailable LUMP separates REQUEST from DELIVER and suspends the
+USER THREAD for an indefinite period.
+
+**Why:** The user explicitly required this asynchronous split rather than an
+immediate fetch response.
+
+**How to apply:** Preserve the pending operation while the SYSTEM THREAD serves
+other work. Resume only after matching, validated delivery and installation;
+elapsed time alone must not resume or fault the waiting USER. Reset persistence,
+cancellation and resource exhaustion are separate contracts, not implied by
+indefinite waiting.
