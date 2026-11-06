@@ -1802,3 +1802,45 @@ mtime_ms = 1793972931284
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1a08ed5e-5349-4e02-909f-2e1c393ec118/dd3c8287-ee50-45b5-919b-4947176d7863"
 storage_version_token = "1793973276047820"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "vdNdroghw2RNyyI3FQLE0"
+uri = "file://exports/phase1-lump-lifecycle-readable.html"
+type = "html"
+title = "Open the full specification — readable HTML"
+description = "Full document embedded directly, with a Download Markdown button. No external scripts or network requests required."
+logical_id = "3a838b67-4a5d-46ae-86ca-8b98a92e9a70"
+content_hash = "sha256:fe87bf9900ec7d6cabbcba5a588893887e100bc7419a7a0f838753f82d497316"
+size = 56360
+mtime_ms = 1793973338048
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3a838b67-4a5d-46ae-86ca-8b98a92e9a70/86ac01d6-934c-4170-903f-2b64f2a36e1d"
+storage_version_token = "1793973338946992"
+content_type = "text/html"
+
+[[outputs]]
+id = "NLYOjXE08RpChWzbpyfxV"
+uri = "file://exports/phase1-lump-lifecycle-complete.txt"
+type = "text"
+title = "Complete specification — plain text backup"
+description = "The complete Markdown source delivered as a plain-text file."
+logical_id = "453578b7-3402-4c95-9b60-eb82d94b344b"
+content_hash = "sha256:ecf2932d68472d7682ac6ed76b726a5d7256e59e177e1684301a44274eebe7e6"
+size = 21921
+mtime_ms = 1793973337628
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/453578b7-3402-4c95-9b60-eb82d94b344b/833b799d-36b2-4a77-90b0-d705b6d8bc68"
+storage_version_token = "1793973339707731"
+content_type = "text/plain"
+
+[[outputs]]
+id = "Z21-WcIRC5-J6Et6O6_mA"
+uri = "file://exports/phase1-lump-lifecycle-complete.md"
+type = "text"
+title = "Complete specification — fresh Markdown export"
+description = "New export filename containing the full specification."
+logical_id = "2275df01-91e1-4bc3-ba4d-b6a3ab0e315e"
+content_hash = "sha256:ecf2932d68472d7682ac6ed76b726a5d7256e59e177e1684301a44274eebe7e6"
+size = 21921
+mtime_ms = 1793973337232
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2275df01-91e1-4bc3-ba4d-b6a3ab0e315e/96d0903a-36a5-429f-8f62-880e6a0c35a0"
+storage_version_token = "1793973340758073"
+content_type = "text/markdown"
