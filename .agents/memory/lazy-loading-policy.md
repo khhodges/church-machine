@@ -142,3 +142,14 @@ to eliminate a second naming/mapping layer.
 **How to apply:** Keep charts, method contracts and tests aligned. Separate FPGA
 entry from the software method it activates; do not treat U.n as encoded CALL
 selectors or introduce extra methods for lettered hardware substeps.
+
+Phase 2 hardware-to-software API variables pass directly in the Thread's shadow
+machine registers.
+
+**Why:** The user specified this interface transport while reviewing the U.n
+SYSTEM method contracts.
+
+**How to apply:** Define the per-event register contract rather than inventing
+a separate hardware/software message record. Exact register assignments,
+ownership and preservation rules remain to be agreed; this is not proof of
+current RTL support or permission to overwrite pending USER state.
