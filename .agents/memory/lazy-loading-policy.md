@@ -131,3 +131,14 @@ Startup tests span successive completed handlers, not nested events. Release
 normal USER execution only after required startup checks pass. CR13 replacement
 permission and the exact event ABI remain undecided; this is design approval,
 not permission for RTL edits, installation or hardware tests.
+
+Use U.n directly as SYSTEM method identifiers/contracts, with descriptive names
+only as comments. U.0 is startup; U.2/U.3 request handling, U.4/U.5 delivery,
+U.7/U.8 retirement. U.1/U.6 remain USER/FPGA operations; X.n is common exit.
+
+**Why:** The user approved a direct match between message definitions and methods
+to eliminate a second naming/mapping layer.
+
+**How to apply:** Keep charts, method contracts and tests aligned. Separate FPGA
+entry from the software method it activates; do not treat U.n as encoded CALL
+selectors or introduce extra methods for lettered hardware substeps.

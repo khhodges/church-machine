@@ -1844,3 +1844,31 @@ mtime_ms = 1793973337232
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2275df01-91e1-4bc3-ba4d-b6a3ab0e315e/96d0903a-36a5-429f-8f62-880e6a0c35a0"
 storage_version_token = "1793973340758073"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "vS3vEqqtXXkSHjQF7gJ23"
+uri = "file://exports/phase2-system-un-specification.html"
+type = "html"
+title = "Phase 2 SYSTEM — U.n Specification"
+description = "Readable full specification with a Markdown download button. Methods, charts and tests share the same U.n definitions."
+logical_id = "9b1c1423-b5e0-4208-af45-d18b9433093a"
+content_hash = "sha256:e7196f8404118e73d8cc9d938a518ccbca69c1142e4a4373d682673dd37fa56b"
+size = 73653
+mtime_ms = 1793976419722
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/8e3583f7-bfc6-4e2e-8a97-2aa099b11afe"
+storage_version_token = "1793976442070018"
+content_type = "text/html"
+
+[[outputs]]
+id = "oe2LXU40tXpHH3nhJBN57"
+uri = "file://exports/phase2-system-un-specification.md"
+type = "text"
+title = "Phase 2 SYSTEM — Markdown"
+description = "Complete updated specification, including U.0 startup and explicit method/hardware ownership."
+logical_id = "66c8d0c4-10a9-4a83-8af0-c2686bf13fdb"
+content_hash = "sha256:fff428c4db7d4d202650c21ec358c7a4218ad0a69c7895b30c7ae5f907293a9b"
+size = 29130
+mtime_ms = 1793976417545
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/66c8d0c4-10a9-4a83-8af0-c2686bf13fdb/dedb399a-a208-435f-9a1e-7f6fd146b3a8"
+storage_version_token = "1793976442899910"
+content_type = "text/markdown"

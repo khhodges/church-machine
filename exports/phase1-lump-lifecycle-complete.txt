@@ -1,4 +1,4 @@
-# Unified LUMP Lifecycle — Phase 1 Serialized SYSTEM Events
+# Unified LUMP Lifecycle — Phase 2 FPGA Design
 
 ## Status and scope
 
@@ -18,6 +18,76 @@ runs to completion. This document uses that precedent as a design model, not
 as independently verified historical or current-FPGA behavior.
 
 Namespace-type LUMPs remain excluded from lazy loading.
+
+## Agreed startup and Thread roles
+
+The existing **Boot.Thread becomes the SYSTEM Thread** in this Phase 2 design.
+It is not replaced by an additional dedicated SYSTEM Thread. **Thread 1 and
+Thread 2 remain available for user programs.** These are Thread designations,
+not an assignment of Namespace slot numbers.
+
+CR13 designates this Boot/SYSTEM Thread for the proposed event-entry mechanism.
+Its two responsibilities are:
+
+1. **Startup:** run first and validate the setup before normal USER execution.
+2. **Runtime:** handle UNAVAILABLE, delivery and lifecycle events serially,
+   with each handler running to completion.
+
+The approved startup sequence is:
+
+- Minimal boot establishes enough resident SYSTEM context and capabilities
+  for hardware to enter it safely.
+- Boot/SYSTEM checks the setup and performs in-handler hardware checks.
+- It finishes that activation and hands off to a prepared resident test Thread
+  to exercise a real valid-but-unavailable CALL.
+- Subsequent serialized activations test the event, request, completion and
+  original-operation resumption paths. No test interrupts a running handler.
+- Release normal USER execution only after the required checks pass. A failed
+  check hard-faults rather than silently continuing startup.
+
+Boot/SYSTEM remains the same Thread across these roles; startup validation is
+not repeated on every event. How entry distinguishes startup from later events
+belongs to the event ABI still to be defined.
+
+The earlier Phase 1 simplicity rules below are carried into this Phase 2 design:
+no parallel/preemptive handlers and any unblocked resident Thread is an
+acceptable next choice. The existing Phase 1 ISA is not changed by this document.
+Whether SYSTEM may replace CR13 after startup remains undecided; the Thread-role
+mapping does not imply permission to do so.
+
+## U.n method contracts — single naming authority
+
+The U.n definitions are the method identifiers and contracts, not a second
+mapping to separately named Startup/Unavailable/Deliver/Retire methods.
+Descriptive words below are comments only. SYSTEM executes in Boot.Thread;
+Thread 1 and Thread 2 remain USER Threads.
+
+| Identifier | Owner | Contract |
+|---|---|---|
+| **U.0** | SYSTEM method | Startup validation: check setup, coordinate hardware/event tests across serialized activations, release normal USER execution only after success. |
+| **U.1** | USER/FPGA operation, not a SYSTEM method | Original CALL with USER's target GT; dispatch normally if resident, otherwise retain the operation and enter SYSTEM through the UNAVAILABLE mechanism. |
+| **U.2** | SYSTEM method | Consume the protected UNAVAILABLE record; register the suspended USER, pending operation and completion event; resolve locally if possible. |
+| **U.3** | SYSTEM method | Send the registered REQUEST directly to IDE. Do not wait inside the handler for DELIVER. |
+| **U.4** | SYSTEM method | Process an admitted DELIVER: match/validate, resolve and install using FreeHandler when required. |
+| **U.5** | SYSTEM method | Publish readiness and signal the associated USER exactly once. Does not itself switch Threads. |
+| **U.6** | USER/FPGA operation, not a SYSTEM method | Restore/complete the original use under its retained authority when USER is selected. |
+| **U.7** | SYSTEM method | Process authorized retirement; defer unsafe work or reclaim body memory through FreeHandler while retaining slot and identity. |
+| **U.8** | SYSTEM method | Publish retirement completion and signal a registered waiting requester, if any. |
+
+**Method chains, all within SYSTEM:** U.2 → U.3 for a missing dependency;
+U.2 → U.5 for a locally satisfied dependency; U.4 → U.5 for valid delivery;
+U.7 → U.8 for completed retirement. A deferred U.7 does not invoke U.8.
+Each chain finishes through X.1–X.3. Startup U.0 coordinates its tests through
+successive completed activations; it does not wait for a nested handler.
+
+Lettered steps are subordinate actions, not extra SYSTEM methods. FPGA event
+entry precedes U.2 or U.4; it does not execute their software bodies. FreeHandler
+and Signal remain separate abstractions called from the owning U.n method.
+X.1–X.3 remain the common handler-exit/scheduling path, not a renamed U.n method.
+
+U.n are design identifiers, not promised CLOOMC syntax or encoded dispatch-table
+selectors. In particular U.0 does not mean CALL selector zero. The method-entry
+ABI and event-to-method dispatch encoding still require definition.
 
 ## 1. Execution and authority model
 
@@ -66,8 +136,36 @@ the right. All descriptions are in the fifth text column, with no fifth `|`.
 An arrow crossing FPGA does not make FPGA an IDE service recipient.
 The OTHER lane in the handler-exit chart means any eligible resident Thread.
 
-U.1–U.8 retain their major roles; substeps now reflect CR13 event entry.
+U.0–U.8 use the contracts above. U.1b–U.1c explicitly isolate the FPGA
+unavailability detection/entry from SYSTEM method U.2. Other lettered substeps
+expose implementation actions without defining additional methods.
 The former USER `CALL Wait` and `CHANGE to SYSTEM` substeps are superseded.
+
+### Startup — U.0
+
+```text
+IDE   FPGA  USER  SYSTEM  COMMENTS
+ |     |     |     |
+ |     |     |     |     Minimal boot establishes
+ |     |     |     |     resident Boot/SYSTEM context.
+ |     |---------->|     U.0e FPGA activates SYSTEM
+ |     |     |     |     for startup method U.0.
+ |     |     |     |     U.0 Check setup/hardware;
+ |     |     |     |     prepare event-path tests.
+ |     |     |     |     Finish activation via X.n;
+ |     |     |     |     run prepared test Thread.
+ |     |     |     |     Subsequent U.2/U.4 activations
+ |     |     |     |     exercise real event paths.
+ |     |     |     |     U.0v At a later startup
+ |     |     |     |     validation stage, check
+ |     |     |     |     completed test evidence.
+ |     |     |     |     U.0p On success release USERs;
+ |     |     |     |     on failure hard-fault.
+```
+
+U.0's stage/continuation representation remains an ABI detail. No activation
+waits for a second handler to execute inside it. Normal runtime events do not
+restart startup validation.
 
 ### A. Normal CALL or UNAVAILABLE entry
 
@@ -82,13 +180,13 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     No event or REQUEST.
  |     |     |     |
  |     |     |     |     Valid but unavailable:
- |     |     |     |     U.2 FPGA retains CALL,
+ |     |     |     |     U.1b FPGA retains CALL,
  |     |     |     |     target GT, operands/context;
  |     |     |     |     suspends USER execution.
- |     |---------->|     U.2a UNAVAILABLE event entry
+ |     |---------->|     U.1c UNAVAILABLE event entry
  |     |     |     |     activates SYSTEM via CR13.
  |     |     |     |     Not ordinary CHANGE CR13.
- |     |     |     |     U.2b SYSTEM records request,
+ |     |     |     |     U.2 SYSTEM method records request,
  |     |     |     |     associates completion F,
  |     |     |     |     registers suspended USER.
  |     |     |     |     No USER CALL Wait(F).
@@ -98,7 +196,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     IDE knows availability.
  |     |     |     |     Ready: send DELIVER now.
  |     |     |     |     Unready: retain REQUEST.
- |     |     |     |     U.3a SYSTEM handler finishes.
+ |     |     |     |     U.3a REQUEST method finishes.
  |     |     |     |     USER remains blocked.
  |     |     |     |     Handoff follows chart B.
 ```
@@ -136,14 +234,14 @@ are part of the event-entry/exit ABI still to be specified.
 ```text
 IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |
- |---------------->|     U.4 IDE DELIVER to SYSTEM.
+ |---------------->|     U.4m IDE DELIVER for U.4.
  |     |     |     |     Logical message endpoint;
  |     |     |     |     not asynchronous execution.
  |     |     |     |     Prior handler must finish.
  |     |---------->|     U.4e FPGA event entry via CR13
  |     |     |     |     activates delivery handling
  |     |     |     |     at a defined service point.
- |     |     |     |     SYSTEM matches request;
+ |     |     |     |     U.4 SYSTEM method matches request;
  |     |     |     |     verifies target/evidence.
  |     |     |     |     Resolve local binding.
  |     |     |     |     If a body block is needed:
@@ -154,7 +252,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |---------->|     U.4d FPGA restores service
  |     |     |     |     caller within SYSTEM.
  |     |     |     |     Install and verify body.
- |     |     |     |     U.5 SYSTEM publishes READY.
+ |     |     |     |     U.5 SYSTEM method publishes READY.
  |     <-----------|     U.5s SYSTEM CALL Signal(F).
  |     |---------->|     U.5t Signal executes in SYSTEM;
  |     |     |     |     makes waiting USER runnable;
@@ -185,11 +283,11 @@ this path: USER never called Wait.
 ```text
 IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |
- |     |     |---->|     U.7 Authorized RETIRE request.
+ |     |     |---->|     U.7m Authorized request for U.7.
  |     |     |     |     Admission ABI remains open;
  |     |     |     |     no concurrent handler entry.
  |     |     |     |     Or SYSTEM initiates locally.
- |     |     |     |     SYSTEM marks Retiring;
+ |     |     |     |     U.7 SYSTEM method marks Retiring;
  |     |     |     |     prevents new entry;
  |     |     |     |     checks active use/GC roots;
  |     |     |     |     preserves modified state.
@@ -203,7 +301,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |---------->|     U.7f FPGA restores service.
  |     |     |     |     KEEP slot and identity.
  |     |     |     |     Publish body as Absent.
- |     |     |     |     U.8 Publish retirement DONE.
+ |     |     |     |     U.8 SYSTEM method publishes DONE.
  |     <-----------|     U.8s If a waiting requester:
  |     |     |     |     SYSTEM CALL Signal(Fret).
  |     |---------->|     U.8t Signal/RETURN in SYSTEM.
@@ -211,7 +309,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     Later use starts at U.1.
 ```
 
-U.7 is a logical request, not a cross-Thread CALL. Its authorized admission and
+U.7m is a logical request for method U.7, not a cross-Thread CALL. Its authorized admission and
 whether its caller waits are not yet specified. If there is a blocked requester,
 register its completion association explicitly and signal only after safe
 retirement. Do not assume an unavailable-CALL trap for retirement or reinstate
@@ -225,13 +323,15 @@ the superseded USER-side Wait sequence without an agreed admission ABI.
 |---|---|---|
 | U.1 | USER | CALL with original target abstraction GT. |
 | U.1a | FPGA, then USER | Normal CALL dispatch stays in USER. |
-| U.2 | FPGA | Preserve the unfinished operation and suspend USER; no USER-side service code is assumed. |
-| U.2a | FPGA event-entry machinery | Activate SYSTEM designated by CR13 under the proposed event contract. |
-| U.2b | SYSTEM | Record request and register the already-suspended USER against F. |
+| U.0 | SYSTEM | Validate startup before normal USER execution; coordinate tests through successive activations. |
+| U.1b | FPGA | Preserve the unfinished operation and suspend USER; no USER-side service code is assumed. |
+| U.1c | FPGA event-entry machinery | Activate SYSTEM designated by CR13 before dispatching method U.2. |
+| U.2 | SYSTEM | Record request and register the already-suspended USER against F. |
 | U.3 | SYSTEM | Send REQUEST directly to IDE using SYSTEM's service/transport authority. |
 | U.3a / X.1–X.3 | SYSTEM, then FPGA | Finish event and activate any unblocked resident Thread. |
-| U.4 | IDE | Supply a correlated delivery; does not signal USER or interrupt SYSTEM. |
+| U.4m | IDE | Supply a correlated delivery for U.4; does not signal USER or interrupt SYSTEM. |
 | U.4e | FPGA event-entry machinery | Admit a later serialized delivery event and activate SYSTEM. |
+| U.4 | SYSTEM | Match, validate, resolve and install the admitted delivery. |
 | U.4a–U.4d | SYSTEM | CALL/RETURN FreeHandler using SYSTEM's abstraction GTs. |
 | U.5 | SYSTEM | Publish validated usable binding/body. |
 | U.5s–U.5t | SYSTEM | CALL Signal(F); mark the associated USER runnable. Signal's RETURN stays in SYSTEM. |
@@ -308,7 +408,7 @@ contract; it does not justify adding a USER Wait branch to this lifecycle.
 | Case | Shared mechanism |
 |---|---|
 | Resolved and resident | U.1–U.1a normal CALL; no event or request. |
-| Lazy Resolve | SYSTEM checks local binding under U.2b; REQUEST/DELIVER only if evidence/body is needed. No extra rights are granted. |
+| Lazy Resolve | SYSTEM method U.2 checks local binding; U.3/U.4 only if evidence/body is needed; U.5 completes readiness. No extra rights are granted. |
 | Lazy Load | REQUEST/DELIVER supplies the absent body; SYSTEM allocates, installs, signals. |
 | Unready/unavailable | Same REQUEST/DELIVER; only the waiting interval changes. The first handler still finishes promptly. |
 | Retirement | Same serialized SYSTEM service reclaims body memory; slot remains. Later use returns to U.1. |
@@ -347,6 +447,25 @@ a waiting condition. SYSTEM status does not bypass capability checks. Hardware
 never changes version numbers. Delivery-fault ownership remains to be specified.
 
 ## 5. Development and physical acceptance
+
+### Method-level test references
+
+Use the same U.n identifiers for method tests and chart assertions; descriptions
+are not a separate method-name mapping.
+
+| Method | Required test contract |
+|---|---|
+| U.0 | Boot.Thread runs setup validation before normal USER release; event-path tests use successive activations; failures hard-fault. |
+| U.2 | Receives the protected pending-operation record from U.1c; preserves target authority and registers the correct suspended USER. |
+| U.3 | Emits the correctly correlated REQUEST to IDE and completes without waiting for delivery. |
+| U.4 | Accepts only a matching validated delivery; FreeHandler CALL/RETURN stays in SYSTEM; duplicate/stale input cannot complete twice. |
+| U.5 | Publishes usable readiness before Signal; only the associated USER becomes eligible; no implicit Thread switch. |
+| U.7 | Releases only safely reclaimable memory; retains slot/identity; deferred work finishes its activation without invoking U.8. |
+| U.8 | Publishes DONE before signaling a waiting requester; no signal before successful retirement. |
+
+U.1 and U.6 have USER/FPGA integration assertions, not SYSTEM method tests.
+X.n tests cover the common exit. The detailed F.n scenarios below retain their
+test-case IDs; they exercise these same U.n contracts.
 
 These are required scenarios, **not tests run or passed**. Capture the exact
 bitstream and LUMP identities, active Thread identity, event entry/completion,
