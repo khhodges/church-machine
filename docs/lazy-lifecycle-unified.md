@@ -43,9 +43,14 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |
  |     |     |     |     Valid but needs service:
  |     |     |     |     preserve operation/context;
- |     |     |     |     suspend USER.
- |     |     |     |     U.2 Service pending use.
- |     <-----|     |     U.2a CHANGE to SYSTEM.
+ |     |     |     |     U.2 USER handoff publishes
+ |     |     |     |     local request + completion F.
+ |     <-----|     |     U.2w USER CALL Wait(F).
+ |     |---->|     |     U.2x Wait runs within USER.
+ |     |     |     |     Consume signal if present;
+ |     |     |     |     otherwise register waiter.
+ |     <-----|     |     U.2a USER-side wait/scheduler
+ |     |     |     |     executes CHANGE to SYSTEM.
  |     |     |     |     FPGA saves USER context;
  |     |     |     |     validates SYSTEM Thread GT;
  |     |---------->|     U.2b FPGA restores SYSTEM.
@@ -74,19 +79,29 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     caller in SYSTEM THREAD.
  |     |     |     |     install and verify body.
  |     |     |     |     Publish verified binding.
- |     |     |     |     U.5 Mark USER runnable.
+ |     |     |     |     U.5 SYSTEM publishes READY.
+ |     <-----------|     U.5s SYSTEM CALL Signal(F).
+ |     |---------->|     U.5t Signal runs in SYSTEM;
+ |     |     |     |     wake waiter or store signal.
  |     |     |     |     When USER is scheduled:
- |     <-----------|     U.5a CHANGE to USER.
+ |     <-----------|     U.5a SYSTEM-side scheduler
+ |     |     |     |     executes CHANGE to USER.
  |     |     |     |     FPGA saves SYSTEM context;
  |     |     |     |     validates USER Thread GT;
  |     |---->|     |     U.5b FPGA restores USER.
+ |     <-----|     |     U.6w USER RETURN from Wait.
+ |     |---->|     |     U.6x USER handoff continues.
  |     |---->|     |     U.6 Complete pending CALL;
  |     |     |     |     FPGA dispatches target
  |     |     |     |     within USER THREAD.
  |     |     |     |
  |     |     |     |     LATER: authorized retirement
  |     |     |---->|     U.7 Queue RETIRE request.
- |     <-----|     |     U.7a CHANGE to SYSTEM.
+ |     <-----|     |     U.7w USER CALL Wait(Fret).
+ |     |---->|     |     U.7x Wait runs within USER;
+ |     |     |     |     register waiter if needed.
+ |     <-----|     |     U.7a USER-side wait/scheduler
+ |     |     |     |     executes CHANGE to SYSTEM.
  |     |---------->|     U.7b FPGA saves USER and
  |     |     |     |     restores SYSTEM context.
  |     |     |     |     Or service initiates under
@@ -102,12 +117,16 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     caller in SYSTEM THREAD.
  |     |     |     |     KEEP slot and identity;
  |     |     |     |     publish body as Absent.
- |     |     |     |     U.8 Retirement complete;
- |     |     |     |     notify waiting requester.
+ |     |     |     |     U.8 Publish retirement DONE.
+ |     <-----------|     U.8s SYSTEM CALL Signal(Fret).
+ |     |---------->|     U.8t Signal runs in SYSTEM;
+ |     |     |     |     make requester runnable.
  |     <-----------|     U.8a CHANGE to USER when
  |     |     |     |     ready and scheduled.
  |     |---->|     |     U.8b FPGA saves SYSTEM and
  |     |     |     |     restores requesting USER.
+ |     <-----|     |     U.8w USER RETURN from Wait.
+ |     |---->|     |     U.8x USER caller continues.
  |     |     |     |     Later use starts at U.1.
 ```
 
@@ -138,7 +157,10 @@ that CALL and restores its completion at U.6 still needs definition and
 installed-RTL verification. The chart shows the required sequence, not an
 assertion that CALL automatically performs CHANGE today.
 
-U.5 is software readiness bookkeeping, **not CHANGE**. U.5a is the actual Thread
+U.5 publishes completion and U.5s–U.5t signal its event, **not CHANGE**.
+Signal returns normally to its SYSTEM caller before subsequent scheduler work.
+The analogous Signal at U.8s also returns within SYSTEM.
+U.5a is the actual Thread
 transition, shown from SYSTEM when it is running and selects USER. If another
 Thread is running, scheduling must first provide the appropriate execution
 context; an IDE delivery does not asynchronously execute CHANGE by itself.
@@ -154,6 +176,134 @@ resumed with CHANGE. A retirement initiated within SYSTEM omits those requester
 transitions. The exact service ABI remains proposed.
 
 ## Shared mechanisms
+
+### Event flags and exact Thread ownership
+
+Use the documented **DijkstraFlag.Wait / Signal** semantics for completion.
+The flag implements event synchronization; CHANGE implements the context switch.
+Neither is a substitute for the other. The ownership below is the proposed
+development contract, not evidence that the installed hardware already supports
+the missing-CALL handoff.
+
+`F` identifies one pending use's completion event. `Fret` identifies one
+blocking retirement request's completion event. These are symbolic event
+capabilities, not assigned slots or register operands.
+
+| Step | Invoking Thread / actor | Abstraction or role executing | Required effect |
+|---|---|---|---|
+| U.1 | USER | Original caller | Issue the target CALL. A resident target executes in the same Thread. |
+| U.2 | USER, in the proposed pending-operation handoff | Request preparation | Preserve the unfinished operation; associate an initially unsignaled completion event; publish the complete local request. How this handoff is entered remains unresolved. |
+| U.2w–U.2x | USER | DijkstraFlag.Wait(F) | CALL enters Wait within USER. Consume a retained signal, or register USER as blocked on F. |
+| U.2a | USER | Wait/scheduler path | If blocked, execute CHANGE using the SYSTEM Thread GT. Scheduler code is still executing in USER before the transition. |
+| U.2b | FPGA transition | CHANGE microcode | Save outgoing USER context and restore SYSTEM. Only after this transition does SYSTEM execute. |
+| U.3 | SYSTEM | Lifecycle service | Consume the local request, check local availability, and send REQUEST directly to IDE if needed. |
+| U.4 | IDE sends; SYSTEM processes | Delivery handler in lifecycle service | Receive now or later; match the request and validate evidence. Transport arrival alone is not Signal. |
+| U.4a–U.4d | SYSTEM | FreeHandler.Free64/Free128/Free256, then service | CALL and RETURN stay in SYSTEM; allocate only if a body is needed. |
+| U.5 | SYSTEM | Lifecycle service | Finish validation/install/binding and publish the completed result before signaling. |
+| U.5s–U.5t | SYSTEM | DijkstraFlag.Signal(F) | CALL Signal within SYSTEM. Wake the registered USER or retain a signal for its future Wait. RETURN stays in SYSTEM. |
+| U.5a | SYSTEM in this chart | Scheduler path | Select runnable USER and execute CHANGE with its Thread GT. Signal itself does not switch Threads. |
+| U.5b–U.6x | USER after FPGA restore | Suspended Wait/scheduler path, then request handoff | Finish Wait and RETURN within USER to the preserved handoff continuation. |
+| U.6 | USER | Original operation/target | Complete the preserved operation once; a pending CALL enters its target through normal validated dispatch. |
+| U.7, U.7w–U.7b | Requesting USER, then SYSTEM | Request preparation, Wait(Fret), scheduler | Publish the retirement request, wait and switch using the same event mechanism. |
+| U.7c–U.7f | SYSTEM | FreeHandler.Release, then lifecycle service | After GC safety/state checks, release body memory; CALL/RETURN stay in SYSTEM. |
+| U.8–U.8t | SYSTEM | Lifecycle service, then Signal(Fret) | Publish retirement completion before signaling. Keep the Namespace slot and identity. |
+| U.8a–U.8x | SYSTEM scheduler, then restored USER | CHANGE, then Wait return | Resume the requester when scheduled; its Wait returns in USER. |
+
+**CALLing Wait does not run a “flag Thread.”** Wait executes within the calling
+USER THREAD until CHANGE suspends it. Likewise, CALLing Signal or FreeHandler
+does not leave SYSTEM. Scheduler is a software role, not an implied third Thread.
+If a selected implementation uses a separate scheduler Thread, its extra CHANGE
+transitions must be explicitly added rather than silently attributed to SYSTEM.
+
+The chart shows the blocking branch. If Wait consumes a signal already present,
+it returns in USER without U.2a–U.2b. There is no mandatory CHANGE for a completed
+event. A locally satisfied request in SYSTEM still publishes READY and Signals F;
+it skips only the IDE exchange and unnecessary body allocation.
+
+#### Flag semantics and ordering
+
+1. **Associate before publication (USER handoff).** Establish F and the protected
+   association between request, USER continuation, target and destination before
+   exposing the request to SYSTEM. The provisioner/allocator of event objects is
+   not yet selected; USER uses only an authorized event capability.
+2. **Publish then Wait (USER).** Publish the local request before Wait can block.
+   SYSTEM must be able to find that work after the switch. This is not U.3:
+   only SYSTEM sends the external REQUEST to IDE.
+3. **Wait atomically (USER Wait/scheduler path).** Consume an existing signal,
+   or register the waiter and arrange suspension with no lost-wakeup window.
+   Signal must not be overwritten by a subsequent stale “blocked” update.
+   Atomicity is a required contract; its concrete scheduling mechanism is open.
+4. **Publish completion then Signal (SYSTEM).** F means “this pending use has a
+   verified, usable binding/body,” not “bytes arrived.” Fret means retirement has
+   completed safely, not merely “RETIRE was accepted.”
+5. **Consume once (USER).** A completed wait consumes its notification once.
+   Restore the waiting continuation, not an arbitrary caller or newer request.
+   A duplicate DELIVER must not cause another Signal/completion for that request.
+6. **Retain early signals.** If no waiter exists yet, Signal stores the signal
+   for the next Wait. Do not clear it between request publication and Wait.
+7. **No Reset in an active request.** Reset can clear flag state and waiters;
+   it is not a safe preparation step once a request is visible. Reinitialization
+   or reuse requires no remaining waiter, producer or stale completion able to
+   address the old event. Exact lifecycle/generation rules remain to be defined.
+8. **No Test-then-CHANGE substitute.** A nonblocking Test followed by an
+   unsynchronized CHANGE has a race; use the Wait registration contract.
+
+The documented flag wakes one waiter or stores one signal; it is **not a
+counting semaphore** and does not carry request identity. Use an unambiguous
+completion association per pending use; do not use one global flag for unrelated
+requests. Multiple USERs awaiting the same LUMP still need separately tracked
+completion events, or an explicitly designed queue protocol. One Signal is not
+a broadcast and does not implicitly complete every waiter.
+
+While F is unsignaled the USER stays blocked indefinitely. No timeout, periodic
+retry, or busy polling is introduced. SYSTEM and other runnable Threads may run.
+The incoming transport's notification of SYSTEM, and service-queue scheduling,
+are separate from F: IDE does not directly signal USER or invoke CHANGE.
+Their implementation must be specified before physical acceptance.
+
+For SYSTEM-initiated background retirement there is no requesting USER waiting
+on Fret; omit that caller's Wait/Signal/CHANGE round trip. GC safety requirements
+and local FreeHandler CALL/RETURN behavior remain unchanged.
+
+#### Unfinished CALL versus ordinary Wait
+
+Wait's own CALL/RETURN continuation and the original unfinished target CALL
+are distinct. Returning from Wait alone does not manufacture the target's CALL
+frame or re-execute earlier user side effects. The handoff must preserve the
+original operands, method selector, caller context and completion ownership.
+Entering that handoff and returning to the original pending operation remain
+the key unimplemented/unverified boundary. Dijkstra synchronization solves
+notification, not this instruction-continuation problem.
+
+#### Development and hardware-test requirements
+
+These are acceptance scenarios, **not tests executed or passed**. Capture exact
+bitstream/LUMP identities and active Thread identity at the transitions.
+Observe request correlation, flag/waiter state, runnable/blocked state, CALL/RETURN
+and CHANGE sequence, and original-operation completion without exposing private
+authority. A transfer acknowledgement alone proves none of these outcomes.
+
+| Test | Scenario | Required evidence |
+|---|---|---|
+| F.1 | Target already resident | Target CALL remains in USER; no lifecycle Wait, REQUEST or CHANGE. |
+| F.2 | Immediate valid delivery | USER Wait registers correctly; SYSTEM processes delivery, publishes READY and Signals; USER completes once. |
+| F.3 | Signal before Wait | Signal is retained and consumed; Wait returns without a blocking CHANGE. Exercise the event primitive independently if normal single-core request ordering excludes this interleaving. |
+| F.4 | Signal at suspension boundary | Sweep permitted interleavings around waiter registration and CHANGE; no lost signal, stale blocked state or permanently stranded USER. |
+| F.5 | LUMP unavailable for an extended interval | USER remains blocked with preserved context; no timeout-driven fault/resume; SYSTEM and other runnable Threads make progress. Then valid delivery resumes USER. |
+| F.6 | Delivery arrives while SYSTEM is not running | Transport retains/notifies work through the defined ingress mechanism; processing occurs in SYSTEM, never as a direct IDE-triggered USER resume. |
+| F.7 | Invalid or mismatched delivery | No completion Signal and no USER resume; actual validation faults follow the defined hard-fault ownership. |
+| F.8 | Duplicate/stale delivery | No second installation, Signal or completion; no wakeup of a reused event or another request. |
+| F.9 | Concurrent independent requests | Completing one event wakes only its intended waiter; multiple signals are not collapsed into a global one-bit flag. |
+| F.10 | Several USERs need the same LUMP | Each pending use gets its own correct completion; one Signal is not treated as broadcast. |
+| F.11 | FreeHandler invocation | FreeN and Release CALL/RETURN execute in SYSTEM; they create no third Thread and no premature completion signal. |
+| F.12 | Blocking retirement | USER waits on Fret; SYSTEM Signals only after safe reclamation and retained-slot publication; USER resumes through CHANGE and Wait return. |
+| F.13 | USER context restoration | Verify original operands, method selector, CALL frame ownership and continuation; no repeated prior side effects or skipped target instruction. |
+| F.14 | Flag Reset/reuse boundary | No active waiter or retained completion can be erased or redirected by event reuse. |
+
+Production of these observations may require a separately approved test fixture
+and RTL changes. This specification grants neither. The unresolved handoff,
+event atomicity, ingress and reuse contracts must be settled before claiming
+these scenarios pass on the physical board.
 
 ### 1. Pending use and USER suspension
 

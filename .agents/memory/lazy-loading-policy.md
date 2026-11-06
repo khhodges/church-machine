@@ -81,3 +81,15 @@ the unified charts.
 **How to apply:** CALL changes abstraction within a Thread; CHANGE saves/restores
 Thread context. Mark pending-instruction handoff as an unresolved mechanism rather
 than implying ordinary CALL automatically executes CHANGE.
+
+Document event suspension with Dijkstra Wait/Signal and explicit invoking Thread
+ownership: USER calls Wait; SYSTEM signals completion after validation; scheduler
+code executes CHANGE in the outgoing Thread.
+
+**Why:** The user identified flag semantics and the invoking Thread as critical
+development/testing details, and requested their inclusion in the specification.
+
+**How to apply:** Distinguish event readiness from context switching; preserve
+early signals and test the registration/CHANGE race. A one-bit flag neither
+identifies requests nor counts deliveries. Keep original pending-CALL preservation
+separate from Wait's own CALL/RETURN continuation.
