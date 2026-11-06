@@ -143,16 +143,16 @@ to eliminate a second naming/mapping layer.
 entry from the software method it activates; do not treat U.n as encoded CALL
 selectors or introduce extra methods for lettered hardware substeps.
 
-Phase 2 hardware-to-software API variables pass directly in the Thread's shadow
-machine registers.
+Phase 2 uses ordinary SYSTEM registers for hardware/software event parameters,
+not a separate full shadow register bank.
 
-**Why:** The user specified this interface transport while reviewing the U.n
-SYSTEM method contracts.
+**Why:** After questioning whether single-threading needed shadow registers, the
+user approved the KISS reduction; it supersedes the earlier shadow-bank proposal.
 
-**How to apply:** Define the per-event register contract rather than inventing
-a separate hardware/software message record. Exact register assignments,
-ownership and preservation rules remain to be agreed; this is not proof of
-current RTL support or permission to overwrite pending USER state.
+**How to apply:** Save outgoing USER context, restore SYSTEM, then inject event
+parameters. Preserve pending-operation state; small transition latches are not
+a full shadow bank. Register assignment and safe external-context restoration
+remain unimplemented design contracts.
 
 Phase 2 starts with 1,000 slots, mostly empty, assigned on demand first come,
 first served.
@@ -181,3 +181,16 @@ runtime diagnostic-rerun control. Mandatory boot/context validation, containment
 and fault evidence remain required. Deferral neither resumes faulted execution
 nor proves hardware reliability. No live retirement or boot-image changes are
 authorized by the design decision.
+
+Approved KISS scope: one pending saved-object GT per blocked USER; helper C-list
+as SYSTEM-private storage; one TUNNEL envelope; shared internal completion for
+U.5/U.8; explicit retirement only; simple next-eligible-slot allocation.
+
+**Why:** The user explicitly agreed to all proposed reductions rather than
+separate queues/services, automatic eviction or a full shadow register bank.
+
+**How to apply:** Preserve the separate U.n contracts while sharing code.
+IDE custody acknowledgement precedes discarding local saved-body copies.
+Do not remove validation, stale/duplicate checks, original CALL authority,
+or the no-runnable-USER delivery path. External backing and helpers remain
+GT-authorized; exact saved-object GT type and serialization still need definition.

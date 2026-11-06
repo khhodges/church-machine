@@ -131,6 +131,45 @@ ABI and event-to-method dispatch encoding still require definition.
 
 ## 1. Execution and authority model
 
+### Approved KISS reductions
+
+These are design decisions, not executable changes. Keep the U.n contracts,
+but share implementation where behavior is identical:
+
+| Reduction | Required design |
+|---|---|
+| Shared completion | U.5 and U.8 use one internal complete-and-signal operation after their distinct readiness conditions succeed. Keep both U.n contracts and tests. |
+| One pending use per blocked USER | Retain one saved-object GT for the blocking lifecycle operation. A suspended Thread cannot issue another operation; no per-Thread request queue is needed for this path. Other Threads may each have their own pending use. |
+| Private pending storage | Keep the helper C-list as SYSTEM-private storage, not a separately callable Pending service unless a specific authority boundary justifies it. Do not duplicate full saved objects in a second request table. |
+| One TUNNEL envelope | Use one GT-associated object envelope with an operation/type field for requests, saved contexts and returns. Retain identity, integrity, custody acknowledgement and stale-return checks. Transport IDs do not confer authority. |
+| Explicit retirement only | Initially retire explicitly selected safe objects, beginning with SelfTest/WCH. No automatic eviction, working-set replacement or speculative prefetch policy. Preserve modified state and active-use checks. |
+| Simple slot allocation | Process accepted requests serially and take the next eligible empty slot. No balancing, compaction or speculative allocation. Preserve the 1,000-slot capacity, reservations and retained identities. |
+| No full shadow register bank | Save outgoing context, activate SYSTEM, then supply event parameters through designated ordinary SYSTEM registers. Small internal transition latches may still be necessary; do not introduce a second full bank merely for this API. |
+
+The register ordering is mandatory: save USER before writing SYSTEM parameters,
+and supply the parameters after SYSTEM restoration so that restoration cannot
+overwrite them. Exact registers and transition mechanics remain to be defined.
+This supersedes the earlier shadow-bank assumption, not the requirement to
+preserve suspended Thread state.
+
+Long-lived request/context bodies may be held by the IDE behind retained GTs.
+The GT references the saved object; it is not itself the saved bytes. Confirm
+durable IDE custody before discarding the local body copy. Process acceptance
+through a later serialized activation if necessary; do not block SYSTEM waiting
+for it. Custody acknowledgement is not USER completion.
+
+Returning an object must validate it against the retained GT/association before
+restoring any execution state. The exact saved-object type (Outform versus
+Abstract), serialization and restoration contract remain open. SYSTEM, TUNNEL,
+helper storage and required retrieval capabilities must remain available without
+depending on retrieval of the same absent object.
+
+The following are not removed by KISS: returned-object validation, custody
+confirmation, original CALL authority/continuation preservation, consume-once
+completion, stale/duplicate protection, and a defined service path when no USER
+Thread is runnable. One pending GT does not mean that required Thread status,
+event association or Namespace descriptors disappear.
+
 ### Three distinct GT roles
 
 | GT | Purpose | Must not be confused with |
@@ -229,10 +268,16 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     U.2 SYSTEM method records request,
  |     |     |     |     associates completion F,
  |     |     |     |     registers suspended USER.
+ |     |     |     |     One pending saved-object GT
+ |     |     |     |     per blocked USER.
  |     |     |     |     No USER CALL Wait(F).
  |     |     |     |     Check local binding.
  |     |     |     |     If ready, use U.5 directly.
  <-----------------|     U.3 SYSTEM REQUEST to IDE.
+ |     |     |     |     Common TUNNEL object envelope.
+ |     |     |     |     Retain local body until
+ |     |     |     |     durable custody confirmed;
+ |     |     |     |     never wait inside handler.
  |     |     |     |     IDE knows availability.
  |     |     |     |     Ready: send DELIVER now.
  |     |     |     |     Unready: retain REQUEST.
@@ -293,6 +338,8 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     caller within SYSTEM.
  |     |     |     |     Install and verify body.
  |     |     |     |     U.5 SYSTEM method publishes READY.
+ |     |     |     |     Shared completion operation,
+ |     |     |     |     also used by U.8.
  |     <-----------|     U.5s SYSTEM CALL Signal(F).
  |     |---------->|     U.5t Signal executes in SYSTEM;
  |     |     |     |     makes waiting USER runnable;
@@ -342,6 +389,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     KEEP slot and identity.
  |     |     |     |     Publish body as Absent.
  |     |     |     |     U.8 SYSTEM method publishes DONE.
+ |     |     |     |     Use shared completion operation.
  |     <-----------|     U.8s If a waiting requester:
  |     |     |     |     SYSTEM CALL Signal(Fret).
  |     |---------->|     U.8t Signal/RETURN in SYSTEM.
@@ -429,8 +477,12 @@ contract; it does not justify adding a USER Wait branch to this lifecycle.
 
 ### Pending state and event lifetime
 
+- One pending saved-object GT per blocked USER lifecycle operation, retained
+  in SYSTEM-private helper storage; no per-Thread queue for this blocking path.
 - Retain the original target GT, method selector/operands, caller continuation,
-  Thread identity and destination association until completion.
+  Thread identity and destination association until completion, either in
+  protected local state or in the validated saved object under confirmed IDE
+  custody. Do not discard required state merely because its packet was sent.
 - A one-bit flag neither counts deliveries nor identifies requests. Give each
   pending use an unambiguous completion association.
 - Several USERs awaiting the same LUMP still have separate pending uses; one
@@ -559,6 +611,11 @@ is not execution acceptance.
 | F.17 | Repeated SYSTEM activation | Event entry/exit preserves the configured SYSTEM destination and context across successive events; verify the agreed CR13 ABI. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
+| F.20 | One pending GT per USER | A blocked USER has one outstanding lifecycle association; a later request cannot overwrite it. Different Threads remain independent. |
+| F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
+| F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
+| F.23 | Ordinary-register event API | USER state is saved before parameter writes; SYSTEM restoration precedes parameter injection; no full shadow bank is assumed. |
+| F.24 | Explicit retirement and simple allocation | No unrequested eviction or compaction; allocation skips reserved/retained slots and does not silently exceed 1,000 slots. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
