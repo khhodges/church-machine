@@ -206,3 +206,14 @@ service/yield point between bounded steps so delivery can be processed. Reclaim
 only explicitly selected safe objects; do not introduce automatic eviction.
 Idle-only maintenance may starve while USER remains runnable; it does not
 guarantee free-block availability or settle the exhaustion policy.
+
+An unavailable valid CALL suspends before committing CALL effects. Restore its
+original location after delivery and execute it normally, rather than saving a
+partially completed CALL pipeline.
+
+**Why:** The user explicitly selected suspend-before-commit as the KISS boundary.
+
+**How to apply:** Preserve target GT, selector/operands and caller context; do not
+push a callee frame, install callee context or advance past CALL before suspension.
+Reapply normal checks on resumption. This is not hard-fault recovery, a retry
+loop, or permission to repeat earlier USER instructions.

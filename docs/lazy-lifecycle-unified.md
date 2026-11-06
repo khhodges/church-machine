@@ -172,6 +172,18 @@ event association or Namespace descriptors disappear.
 
 ### Three distinct GT roles
 
+**Agreed CALL suspension boundary:** when a valid target is unavailable, suspend
+before committing any CALL effects. Retain the original CALL location, target
+GT, selector, operands and caller context. Do not push a callee frame, install
+the callee execution context or advance past the CALL. Event-entry context
+preservation remains separate from those uncommitted CALL effects.
+
+After validated delivery and USER selection, restore the original CALL location
+and execute that CALL normally, including its checks. No earlier USER instruction
+is repeated and the target method has not executed before suspension. Do not
+save/resume a partially completed CALL pipeline. This completes a deliberately
+suspended valid operation; it is not a hard-fault retry or a timer retry loop.
+
 | GT | Purpose | Must not be confused with |
 |---|---|---|
 | Original target abstraction GT | Authorizes USER's CALL to the user-programmed target and method. Retained with the pending operation. | SYSTEM's execution authority. |
@@ -259,7 +271,8 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     No event or REQUEST.
  |     |     |     |
  |     |     |     |     Valid but unavailable:
- |     |     |     |     U.1b FPGA retains CALL,
+ |     |     |     |     U.1b Suspend before CALL commit;
+ |     |     |     |     retain original CALL location,
  |     |     |     |     target GT, operands/context;
  |     |     |     |     suspends USER execution.
  |     |---------->|     U.1c UNAVAILABLE event entry
@@ -349,7 +362,9 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     <-----------|     U.5a SYSTEM requests handoff;
  |     |     |     |     use event-exit contract X.2.
  |     |---->|     |     U.5b FPGA restores USER.
- |     |---->|     |     U.6 Complete original CALL
+ |     |---->|     |     U.6 Execute original CALL
+ |     |     |     |     from its saved location,
+ |     |     |     |     with normal checks,
  |     |     |     |     with retained target GT;
  |     |     |     |     target executes in USER.
 ```
@@ -604,7 +619,7 @@ is not execution acceptance.
 | F.10 | Several USERs need one LUMP | Each pending use completes correctly; one flag signal is not assumed to broadcast. |
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
 | F.12 | Retirement | Only safe reclamation produces DONE/Signal; retain the slot and modified-state obligations. Deferred retirement does not hold SYSTEM indefinitely. |
-| F.13 | Original CALL restoration | Target GT, selector, operands and caller continuation remain correct; no skipped work, repeated prior side effects or fabricated USER Wait return. |
+| F.13 | Pre-commit CALL suspension/restoration | Before suspension no callee frame/context or CALL advance is committed. Restore the original CALL location, GT, selector and operands; normal execution checks and dispatch occur once after delivery. No earlier USER instruction repeats and no partially executed pipeline state is resumed. |
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
 | F.16 | Phase 1 selection | After completion any selected unblocked resident Thread is acceptable; blocked USER is excluded until ready. |
