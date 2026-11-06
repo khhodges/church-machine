@@ -153,3 +153,15 @@ SYSTEM method contracts.
 a separate hardware/software message record. Exact register assignments,
 ownership and preservation rules remain to be agreed; this is not proof of
 current RTL support or permission to overwrite pending USER state.
+
+Phase 2 starts with 1,000 slots, mostly empty, assigned on demand first come,
+first served.
+
+**Why:** The user selected this initial capacity to support many GT-addressable
+objects without allocating a resident body for every object.
+
+**How to apply:** Treat 1,000 as total capacity including reservations unless
+clarified otherwise; preserve reserved and occupied identities. Serialized
+request acceptance determines allocation order. Body retirement retains its
+slot and does not free it for reassignment. This design decision does not
+authorize resizing the live Namespace or flashing hardware.

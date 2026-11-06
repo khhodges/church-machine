@@ -418,6 +418,31 @@ execution transitions, not an extra request/response service layer.
 REQUEST and DELIVER are separated in time; this **does not mean asynchronous
 interrupt-driven handler execution**.
 
+### Initial slot capacity and assignment
+
+Start the Phase 2 design with **1,000 Namespace slots**, mostly empty.
+The working interpretation is 1,000 total slots, including reserved/system
+entries, not 1,000 additional user slots. Preserve required existing reservations;
+do not reinterpret Thread 1/2 as Namespace slot assignments.
+
+- Assign eligible empty slots **on demand, first come, first served**, in the
+  order accepted by the serialized SYSTEM service.
+- Do not preallocate a resident LUMP body for each empty slot. Slot/descriptor
+  capacity and physical body-memory capacity are separate resources.
+- Assignment must preserve the existing authority and identity checks; an empty
+  slot is not an implicit capability grant.
+- Body retirement leaves its slot occupied by the retained identity. An absent
+  body does not make that slot free for another object.
+- Skip reserved and occupied slots. Never evict an identity or silently enlarge
+  the table when no eligible slot remains. The explicit exhaustion outcome and
+  any separately authorized slot-release/reuse policy remain to be defined.
+- First come, first served defines request order, not the numerical slot scan
+  order or a change to GT format.
+
+This is the initial design capacity, not a live Namespace resize. Descriptor
+footprint, table bounds/alignment and compatibility with the Phase 2 hardware
+must be checked before building or installing the image.
+
 ### FreeQueues and identity
 
 Use FreeHandler's Free64, Free128 or Free256 for an appropriate body block,
