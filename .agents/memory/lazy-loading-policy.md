@@ -82,17 +82,19 @@ the unified charts.
 Thread context. Mark pending-instruction handoff as an unresolved mechanism rather
 than implying ordinary CALL automatically executes CHANGE.
 
-Document event suspension with Dijkstra Wait/Signal and explicit invoking Thread
-ownership: USER calls Wait; SYSTEM signals completion after validation; scheduler
-code executes CHANGE in the outgoing Thread.
+Document event suspension with explicit invoking Thread ownership. The CR13
+event-entry proposal supersedes the earlier USER-calls-Wait assumption:
+hardware suspends USER; SYSTEM registers that suspended USER and signals after
+validation. Ordinary caller-blocking Wait in SYSTEM would block the wrong Thread.
 
 **Why:** The user identified flag semantics and the invoking Thread as critical
 development/testing details, and requested their inclusion in the specification.
 
-**How to apply:** Distinguish event readiness from context switching; preserve
-early signals and test the registration/CHANGE race. A one-bit flag neither
-identifies requests nor counts deliveries. Keep original pending-CALL preservation
-separate from Wait's own CALL/RETURN continuation.
+**How to apply:** Distinguish event readiness from context switching. A one-bit
+flag neither identifies requests nor counts deliveries. Verify sequential
+registration before later delivery handling, not a concurrent-handler race.
+The suspended-Thread registration API and CR13 event-entry/exit ABI remain
+proposed, not implemented or verified installed-FPGA behavior.
 
 For Phase 1, after SYSTEM finishes servicing an UNAVAILABLE event, any other
 unblocked resident Thread is an acceptable next execution choice.
