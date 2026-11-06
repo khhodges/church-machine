@@ -93,3 +93,13 @@ development/testing details, and requested their inclusion in the specification.
 early signals and test the registration/CHANGE race. A one-bit flag neither
 identifies requests nor counts deliveries. Keep original pending-CALL preservation
 separate from Wait's own CALL/RETURN continuation.
+
+For Phase 1, after SYSTEM finishes servicing an UNAVAILABLE event, any other
+unblocked resident Thread is an acceptable next execution choice.
+
+**Why:** The user explicitly simplified the scheduling requirement to “any other
+unblocked resident thread will do, for Phase 1.”
+
+**How to apply:** Do not require priority or fairness policy for this handoff.
+Keep the requesting USER blocked until its completion condition is satisfied.
+This selection rule does not authorize CR13 changes or define the event-entry ABI.
