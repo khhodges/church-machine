@@ -194,3 +194,15 @@ IDE custody acknowledgement precedes discarding local saved-body copies.
 Do not remove validation, stale/duplicate checks, original CALL authority,
 or the no-runnable-USER delivery path. External backing and helpers remain
 GT-authorized; exact saved-object GT type and serialization still need definition.
+
+Include a resident BACKGROUND Thread for bounded maintenance when all USER
+Threads are blocked, with USER work preferred when it becomes runnable.
+
+**Why:** The user proposed idle-only background GC and accepted the role before
+asking whether Phase 2 was functionally complete.
+
+**How to apply:** Execute sequentially, not in parallel. Reach the defined
+service/yield point between bounded steps so delivery can be processed. Reclaim
+only explicitly selected safe objects; do not introduce automatic eviction.
+Idle-only maintenance may starve while USER remains runnable; it does not
+guarantee free-block availability or settle the exhaustion policy.
