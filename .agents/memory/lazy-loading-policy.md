@@ -103,3 +103,16 @@ unblocked resident thread will do, for Phase 1.”
 **How to apply:** Do not require priority or fairness policy for this handoff.
 Keep the requesting USER blocked until its completion condition is satisfied.
 This selection rule does not authorize CR13 changes or define the event-entry ABI.
+
+Phase 1 SYSTEM event handling is serialized and runs to completion: no
+asynchronous interruption or parallel event-handler execution.
+
+**Why:** The user explicitly clarified that a second event cannot execute until
+the first finishes; earlier discussion introduced unnecessary concurrent-handler
+assumptions.
+
+**How to apply:** Finish registering the pending USER/request before handing off
+to any unblocked resident Thread. Handler completion is not completion of the
+potentially indefinite LUMP request. A later DELIVER is processed in a later
+serialized activation; external data arrival is not nested handler execution.
+Treat this as the proposed architecture, not verified installed-RTL behavior.
