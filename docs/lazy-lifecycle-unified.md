@@ -27,6 +27,13 @@ Thread 2 remain available for user programs.** These are Thread designations,
 not an assignment of Namespace slot numbers.
 
 CR13 designates this Boot/SYSTEM Thread for the proposed event-entry mechanism.
+**Approved preservation rule:** event entry and exit leave CR13 unchanged.
+Save the outgoing Thread context separately; do not swap its Thread GT into
+CR13. Activate the configured SYSTEM context, then supply event parameters.
+Selecting another Thread after handler completion also preserves the configured
+SYSTEM destination. No matching swap-back is required. This does not authorize
+CR13 reconfiguration or settle the exit instruction or scheduling authority.
+
 Its two responsibilities are:
 
 1. **Startup:** run first and validate the setup before normal USER execution.
@@ -277,6 +284,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     suspends USER execution.
  |     |---------->|     U.1c UNAVAILABLE event entry
  |     |     |     |     activates SYSTEM via CR13.
+ |     |     |     |     CR13 unchanged; no GT swap.
  |     |     |     |     Not ordinary CHANGE CR13.
  |     |     |     |     U.2 SYSTEM method records request,
  |     |     |     |     associates completion F,
@@ -317,15 +325,16 @@ IDE   FPGA  OTHER SYSTEM  COMMENTS
  |     |     |     |     exact event-exit ABI open.
  |     |---->|     |     X.3 FPGA activates selected
  |     |     |     |     Thread's saved context.
+ |     |     |     |     CR13 remains SYSTEM destination.
  |     |     |     |     Only then other work runs.
 ```
 
 X.2 explicitly identifies the required Thread transition. Whether event exit
 uses ordinary `CHANGE CRn` or a separately defined event-exit operation is not
-yet decided. Do not assume a hidden CR12/CR13 swap, matching swap-back, new
-opcode or direct return to the interrupted USER. SYSTEM must remain available
-for subsequent serialized events. The exact CR13 preservation/rearming rules
-are part of the event-entry/exit ABI still to be specified.
+yet decided. Entry and exit preserve CR13 without a hidden CR12/CR13 swap or
+matching swap-back. Do not assume a new opcode or direct return to the
+interrupted USER. SYSTEM must remain available for subsequent serialized
+events; the exact exit mechanism and context validation remain to be specified.
 
 ### C. DELIVER and resume the original operation
 
@@ -623,7 +632,7 @@ is not execution acceptance.
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
 | F.16 | Phase 1 selection | After completion any selected unblocked resident Thread is acceptable; blocked USER is excluded until ready. |
-| F.17 | Repeated SYSTEM activation | Event entry/exit preserves the configured SYSTEM destination and context across successive events; verify the agreed CR13 ABI. |
+| F.17 | Repeated SYSTEM activation | CR13 retains the configured SYSTEM Thread GT through entry, exit and selection of another Thread. Outgoing context is saved separately; no USER GT swap into CR13 or matching swap-back occurs. Verify successive SYSTEM activations. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
 | F.20 | One pending GT per USER | A blocked USER has one outstanding lifecycle association; a later request cannot overwrite it. Different Threads remain independent. |

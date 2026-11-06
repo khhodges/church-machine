@@ -217,3 +217,14 @@ partially completed CALL pipeline.
 push a callee frame, install callee context or advance past CALL before suspension.
 Reapply normal checks on resumption. This is not hard-fault recovery, a retry
 loop, or permission to repeat earlier USER instructions.
+
+Phase 2 event entry, exit and subsequent Thread selection leave CR13 unchanged
+as the configured Boot/SYSTEM destination. Save outgoing context separately;
+never swap the outgoing USER Thread GT into CR13.
+
+**Why:** The user explicitly approved preservation to avoid a paired swap-back
+mechanism and keep SYSTEM available for subsequent events.
+
+**How to apply:** Preserve this rule while defining the remaining ABI. It does
+not approve CR13 reconfiguration, an exit instruction, cross-Thread scheduling
+authority, or changes to the current Phase 1 ISA or installed hardware.
