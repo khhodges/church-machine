@@ -1774,3 +1774,17 @@ mtime_ms = 1793723238391
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/40e31671-8661-4d3a-b097-4ced7ae96b77/0e22a0c7-adbb-4996-b025-b53d9e3c5b8d"
 storage_version_token = "1793723264253963"
 content_type = "text/plain"
+
+[[outputs]]
+id = "gNl2Rhfn8GF0vEy-iH1BI"
+uri = "file://docs/lazy-lifecycle-message-flows.md"
+type = "text"
+title = "Lazy Lifecycle — Message-Flow Specification"
+description = "Combined Lazy Load, Resolve and Retirement specification, with numbered messages and no fifth vertical separator."
+logical_id = "ff0e57bf-ad77-4451-9edd-4f32d49fef5c"
+content_hash = "sha256:aa71b51f44d1fa2878cc8deea0b0c38dfa04a6a95e8d24101bedd09c3f23d08b"
+size = 8261
+mtime_ms = 1793965616204
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ff0e57bf-ad77-4451-9edd-4f32d49fef5c/f0ea8df0-69ce-4454-bf8a-9255bffb675f"
+storage_version_token = "1793965633523705"
+content_type = "text/markdown"
