@@ -1,5 +1,10 @@
 # Lazy Load, Resolve, Retirement and Deferred Delivery — Message-Flow Specification
 
+> Historical four-case discussion. The current consolidated proposal is
+> [Unified LUMP Lifecycle — REQUEST, DELIVER and RETIRE](lazy-lifecycle-unified.md).
+> In that proposal SYSTEM communicates directly with IDE; FPGA is not an
+> intermediate service recipient.
+
 ## Status and scope
 
 Proposed hardware-first design for review. These flows do not claim that

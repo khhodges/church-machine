@@ -1788,3 +1788,17 @@ mtime_ms = 1793966553792
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ff0e57bf-ad77-4451-9edd-4f32d49fef5c/e3b261b6-f78e-46c5-a83e-81d99588a206"
 storage_version_token = "1793966569092114"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Kef9X9d1AqHmQj7tCd0zv"
+uri = "file://docs/lazy-lifecycle-unified.md"
+type = "text"
+title = "Unified LUMP Lifecycle — REQUEST / DELIVER / RETIRE"
+description = "One shared mechanism for resolution, immediate or deferred loading, and retirement. Direct SYSTEM–IDE messages and numbered flow U.1–U.8."
+logical_id = "1a08ed5e-5349-4e02-909f-2e1c393ec118"
+content_hash = "sha256:5b22bd51c2493897611776201f20665fcdf73460c2f781035bc962473c005201"
+size = 9850
+mtime_ms = 1793967582051
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1a08ed5e-5349-4e02-909f-2e1c393ec118/ab51c8c6-e31e-41d7-b34e-bc5ca179292a"
+storage_version_token = "1793967613601352"
+content_type = "text/markdown"

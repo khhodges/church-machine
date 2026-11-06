@@ -59,3 +59,15 @@ other work. Resume only after matching, validated delivery and installation;
 elapsed time alone must not resume or fault the waiting USER. Reset persistence,
 cancellation and resource exhaustion are separate contracts, not implied by
 indefinite waiting.
+
+Use one lifecycle mechanism across Load, Resolve, unavailable-body waiting and
+Retirement. REQUEST goes logically from the SYSTEM THREAD service directly to
+the IDE; DELIVER returns directly to that service.
+
+**Why:** The user rejected the redundant FPGA forwarding messages and stated
+that the IDE already knows whether the request can be satisfied.
+
+**How to apply:** Treat the FPGA connection as transport, not another service
+recipient. Availability changes delivery timing rather than selecting a separate
+fetch protocol. Keep local resolution and body installation within the shared
+service proposal; do not mistake this design direction for RTL authorization.
