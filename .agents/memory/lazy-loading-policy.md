@@ -104,8 +104,10 @@ round robin".
 
 **How to apply:** Rotate eligible resident USERs in cyclic order, skipping blocked
 Threads; completion restores eligibility rather than forcing immediate execution.
-Keep SYSTEM handlers serialized and BACKGROUND idle-only. Turn-ending triggers
-and cursor details remain open; do not infer timer preemption. The proposed
+Keep SYSTEM handlers serialized and BACKGROUND idle-only. USER turns end on
+explicit yield or blocking, as separately approved by the user; there is no
+timer-driven preemption. A non-yielding, non-blocking USER can retain execution
+indefinitely. Yield-interface and cursor details remain open. The proposed
 event-scoped scheduling-authority mechanism was not approved by this correction.
 
 Phase 1 SYSTEM event handling is serialized and runs to completion: no

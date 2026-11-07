@@ -231,9 +231,12 @@ When all USERs are blocked, the approved resident BACKGROUND Thread performs
 bounded maintenance and yields at service points; runnable USER work takes
 precedence over BACKGROUND work.
 
-Round robin defines selection order, not the turn-ending trigger. The USER
-yield/quantum mechanism, delivery service point and idle behavior when no
-maintenance work exists remain open. No timer preemption is implied.
+**Approved turn boundary:** a USER's turn ends on explicit yield or blocking.
+Scheduling is cooperative; no fixed time slice or timer-driven USER preemption
+is introduced. A USER that neither yields nor blocks can hold execution
+indefinitely; round robin alone does not guarantee bounded waiting.
+The exact yield interface, delivery service point and idle behavior when no
+maintenance work exists remain open.
 This selection decision does not approve the proposed event-scoped scheduling
 authority mechanism; registration authority remains an unresolved contract.
 
@@ -643,7 +646,7 @@ is not execution acceptance.
 | F.13 | Pre-commit CALL suspension/restoration | Before suspension no callee frame/context or CALL advance is committed. Restore the original CALL location, GT, selector and operands; normal execution checks and dispatch occur once after delivery. No earlier USER instruction repeats and no partially executed pipeline state is resumed. |
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
-| F.16 | Round-robin USER selection | Eligible resident USERs run in cyclic order; skip blocked USERs. Completion restores eligibility, not an immediate turn. SYSTEM handlers finish before handoff; all USERs blocked selects BACKGROUND, with USER work preferred once runnable. |
+| F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. SYSTEM handlers finish before handoff; all USERs blocked selects BACKGROUND, with USER work preferred once runnable. |
 | F.17 | Repeated SYSTEM activation | CR13 retains the configured SYSTEM Thread GT through entry, exit and selection of another Thread. Outgoing context is saved separately; no USER GT swap into CR13 or matching swap-back occurs. Verify successive SYSTEM activations. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
@@ -669,7 +672,7 @@ The following are not settled by the design discussion:
 - Non-preemptive service point for delivery admission and input retention.
 - SYSTEM's authorized registration of an already-suspended USER on an event.
 - Request ABI, capacity, correlation, event lifetime, cancellation and reset.
-- USER turn-ending trigger and round-robin cursor rules; BACKGROUND service/yield
+- Exact explicit-yield interface and round-robin cursor rules; BACKGROUND service/yield
   points and idle behavior when no USER is eligible and no maintenance is needed.
 - FreeQueue exhaustion, retirement admission/deferred-work scheduling,
   modified-state preservation and GC safety.
