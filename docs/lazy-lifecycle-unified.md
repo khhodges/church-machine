@@ -96,9 +96,9 @@ Boot/SYSTEM remains the same Thread across these roles; startup validation is
 not repeated on every event. How entry distinguishes startup from later events
 belongs to the event ABI still to be defined.
 
-The earlier Phase 1 simplicity rules below are carried into this Phase 2 design:
-no parallel/preemptive handlers and any unblocked resident Thread is an
-acceptable next choice. The existing Phase 1 ISA is not changed by this document.
+The no-parallel/preemptive-handler rule carries into this Phase 2 design.
+USER Threads run round robin, superseding the earlier arbitrary eligible-Thread
+selection rule. The existing Phase 1 ISA is not changed by this document.
 Whether SYSTEM may replace CR13 after startup remains undecided; the Thread-role
 mapping does not imply permission to do so.
 
@@ -222,17 +222,28 @@ a system-service GT into the original CALL.
 records the request, sends REQUEST if needed, and finishes without waiting for
 the LUMP. A later DELIVER handler installs and signals completion.
 
-After a handler finishes, **any other unblocked resident Thread will do for
-Phase 1**. No priority or fairness policy is required. The original USER stays
-blocked until its completion condition is satisfied. Behavior when no eligible
-Thread exists remains to be defined; do not silently resume a blocked USER.
+**USER Threads run round robin.** At a scheduling handoff, select the next
+eligible resident USER in cyclic order, skipping blocked USERs. Completion
+makes a USER eligible for its turn; it does not immediately select that USER.
+The original USER stays blocked until its completion condition is satisfied.
+SYSTEM handlers still run serially to completion, outside the USER rotation.
+When all USERs are blocked, the approved resident BACKGROUND Thread performs
+bounded maintenance and yields at service points; runnable USER work takes
+precedence over BACKGROUND work.
+
+Round robin defines selection order, not the turn-ending trigger. The USER
+yield/quantum mechanism, delivery service point and idle behavior when no
+maintenance work exists remain open. No timer preemption is implied.
+This selection decision does not approve the proposed event-scoped scheduling
+authority mechanism; registration authority remains an unresolved contract.
 
 ## 2. Unified numbered charts
 
 IDE remains left, FPGA in the middle, and USER/SYSTEM abstraction execution on
 the right. All descriptions are in the fifth text column, with no fifth `|`.
 An arrow crossing FPGA does not make FPGA an IDE service recipient.
-The OTHER lane in the handler-exit chart means any eligible resident Thread.
+The OTHER lane means the next eligible USER in round-robin order, or BACKGROUND
+when all USERs are blocked.
 
 U.0–U.8 use the contracts above. U.1b–U.1c explicitly isolate the FPGA
 unavailability detection/entry from SYSTEM method U.2. Other lettered substeps
@@ -317,8 +328,9 @@ inventing a target CALL.
 IDE   FPGA  OTHER SYSTEM  COMMENTS
  |     |     |     |
  |     |     |     |     X.1 SYSTEM finishes handler.
- |     |     |     |     Select any unblocked
- |     |     |     |     resident Thread.
+ |     |     |     |     Select next eligible USER
+ |     |     |     |     in round-robin order;
+ |     |     |     |     all blocked: BACKGROUND.
  |     <-----------|     X.2 SYSTEM requests handoff
  |     |     |     |     to selected Thread.
  |     |     |     |     CHANGE/context transition:
@@ -440,7 +452,7 @@ the superseded USER-side Wait sequence without an agreed admission ABI.
 | U.1c | FPGA event-entry machinery | Activate SYSTEM designated by CR13 before dispatching method U.2. |
 | U.2 | SYSTEM | Record request and register the already-suspended USER against F. |
 | U.3 | SYSTEM | Send REQUEST directly to IDE using SYSTEM's service/transport authority. |
-| U.3a / X.1–X.3 | SYSTEM, then FPGA | Finish event and activate any unblocked resident Thread. |
+| U.3a / X.1–X.3 | SYSTEM, then FPGA | Finish event and activate the next eligible USER in round-robin order; all USERs blocked: BACKGROUND. |
 | U.4m | IDE | Supply a correlated delivery for U.4; does not signal USER or interrupt SYSTEM. |
 | U.4e | FPGA event-entry machinery | Admit a later serialized delivery event and activate SYSTEM. |
 | U.4 | SYSTEM | Match, validate, resolve and install the admitted delivery. |
@@ -631,7 +643,7 @@ is not execution acceptance.
 | F.13 | Pre-commit CALL suspension/restoration | Before suspension no callee frame/context or CALL advance is committed. Restore the original CALL location, GT, selector and operands; normal execution checks and dispatch occur once after delivery. No earlier USER instruction repeats and no partially executed pipeline state is resumed. |
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
-| F.16 | Phase 1 selection | After completion any selected unblocked resident Thread is acceptable; blocked USER is excluded until ready. |
+| F.16 | Round-robin USER selection | Eligible resident USERs run in cyclic order; skip blocked USERs. Completion restores eligibility, not an immediate turn. SYSTEM handlers finish before handoff; all USERs blocked selects BACKGROUND, with USER work preferred once runnable. |
 | F.17 | Repeated SYSTEM activation | CR13 retains the configured SYSTEM Thread GT through entry, exit and selection of another Thread. Outgoing context is saved separately; no USER GT swap into CR13 or matching swap-back occurs. Verify successive SYSTEM activations. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
@@ -657,7 +669,8 @@ The following are not settled by the design discussion:
 - Non-preemptive service point for delivery admission and input retention.
 - SYSTEM's authorized registration of an already-suspended USER on an event.
 - Request ABI, capacity, correlation, event lifetime, cancellation and reset.
-- No-eligible-Thread behavior; priority/fairness is not required for Phase 1.
+- USER turn-ending trigger and round-robin cursor rules; BACKGROUND service/yield
+  points and idle behavior when no USER is eligible and no maintenance is needed.
 - FreeQueue exhaustion, retirement admission/deferred-work scheduling,
   modified-state preservation and GC safety.
 

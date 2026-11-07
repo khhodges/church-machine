@@ -96,15 +96,17 @@ registration before later delivery handling, not a concurrent-handler race.
 The suspended-Thread registration API and CR13 event-entry/exit ABI remain
 proposed, not implemented or verified installed-FPGA behavior.
 
-For Phase 1, after SYSTEM finishes servicing an UNAVAILABLE event, any other
+Phase 2 USER Threads run round robin, superseding the earlier rule that any
 unblocked resident Thread is an acceptable next execution choice.
 
-**Why:** The user explicitly simplified the scheduling requirement to “any other
-unblocked resident thread will do, for Phase 1.”
+**Why:** The user corrected the scheduling discussion: "No USER Thread work
+round robin".
 
-**How to apply:** Do not require priority or fairness policy for this handoff.
-Keep the requesting USER blocked until its completion condition is satisfied.
-This selection rule does not authorize CR13 changes or define the event-entry ABI.
+**How to apply:** Rotate eligible resident USERs in cyclic order, skipping blocked
+Threads; completion restores eligibility rather than forcing immediate execution.
+Keep SYSTEM handlers serialized and BACKGROUND idle-only. Turn-ending triggers
+and cursor details remain open; do not infer timer preemption. The proposed
+event-scoped scheduling-authority mechanism was not approved by this correction.
 
 Phase 1 SYSTEM event handling is serialized and runs to completion: no
 asynchronous interruption or parallel event-handler execution.
