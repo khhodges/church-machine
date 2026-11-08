@@ -17,8 +17,9 @@ it does not prove that any core/memory consumer implements it.
 
 The [Phase 2 hardware-address map](hardware-address-map-and-diagnostic-mmio.md)
 records `0xFFFFFF18` as the approved specification address for WDT control.
-The possible full-range diagnostic MMIO interface remains a proposal.
-Address approval does not authorize provisioning or integration.
+Ordinary Church capability-controlled access is the approved full-range
+diagnostic direction; its detailed interface remains unresolved.
+Neither approval authorizes provisioning or integration.
 
 Remaining integration obligations:
 

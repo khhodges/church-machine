@@ -9,7 +9,7 @@ authorization to install an image or program hardware.
   first-proof selection, unresolved-contract gates and later objectives.
 - **[Hardware-address map and diagnostic MMIO](hardware-address-map-and-diagnostic-mmio.md)** —
   full declared range, approved WDT address `0xFFFFFF18`, current decoder differences,
-  and the PP250-style full-range diagnostic access proposal.
+  and the approved Church capability-controlled diagnostic direction.
 
 ## Current agreed FPGA boundary
 

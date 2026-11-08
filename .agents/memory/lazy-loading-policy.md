@@ -755,9 +755,12 @@ the approach used for PP250.
 **Why:** Diagnostic addressability is a stated investigation goal, not approval
 to expose every control register or implement a second watchdog authority path.
 
-**How to apply:** Treat the PP250 comparison as user-reported precedent; keep
-the diagnostic access model a proposal until approved.
-Preserve SecurityRegulator's exclusive raw watchdog-control custody.
+**How to apply:** Treat the PP250 comparison as user-reported precedent.
+The user subsequently selected ordinary Church capability-controlled diagnostic
+access, not a separate host/debug MMIO window, as the design direction only.
+Exercise real runtime permission checks and preserve SecurityRegulator's
+exclusive raw watchdog-control custody through authorized methods. This does
+not authorize implementation, provisioning or physical operations.
 
 The user approved `0xFFFFFF18` as the WDT control address in the specification only.
 

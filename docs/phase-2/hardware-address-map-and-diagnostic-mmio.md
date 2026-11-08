@@ -1,17 +1,17 @@
-# Hardware-address map and proposed diagnostic MMIO
+# Hardware-address map and capability-controlled diagnostic MMIO
 
 ## Status and scope
 
 This Phase 2 reference records the declared Church hardware-address range,
-the approved WDT control address `0xFFFFFF18`, and a possible full-range
-diagnostic MMIO interface. The user approved the WDT address in the specification
-only. This is not approval of capability provisioning, RTL integration,
+the approved WDT control address `0xFFFFFF18`, and the approved diagnostic
+direction: ordinary Church capability-controlled access. These are specification
+and design-direction approvals only, not approval of capability provisioning, RTL integration,
 image installation or physical-board operation.
 
 The user suggested diagnostic access to the full range, citing the MMIO
 approach used for PP250. That is a design precedent reported by the user,
-not evidence that the current FPGA has an equivalent interface. The diagnostic
-interface below remains a proposal.
+not evidence that the current FPGA has an equivalent interface. The access
+model is selected; the detailed interface and implementation remain unresolved.
 
 ## Complete declared range
 
@@ -157,7 +157,7 @@ This decoder neither establishes the full Church range nor proves that all
 declared Church devices exist. Reusing its truncated selector for the full
 range would alias distinct ports. No relocation or replacement is approved here.
 
-## Proposed PP250-style diagnostic MMIO
+## PP250-style diagnostic MMIO: approved access direction
 
 The useful objective is **full-range test addressability**, not unrestricted
 read/write authority over every port. A diagnostic test should be able to
@@ -185,13 +185,17 @@ Proposed requirements for review, not an implemented ABI:
 6. Establish local simulation/RTL evidence before exact-build FPGA qualification.
    Physical tests require separate authorization; documentation grants none.
 
-### First unresolved decision
+### Approved access model
 
-Choose the access model before designing register transport or provisioning:
-should diagnostics exercise the ordinary Church capability-mediated access
-path, or is a separate host/debug MMIO window intended? The former tests the
-actual runtime protection path. The latter needs an explicit authority and
-side-effect contract and cannot be assumed equivalent.
+Diagnostics exercise the ordinary Church capability-mediated access path,
+testing the real runtime permission checks as well as address decoding.
+A separate host/debug MMIO window is not selected by this decision.
+WDT control remains private to SecurityRegulator; diagnostics use its explicitly
+authorized methods rather than acquiring raw watchdog-control authority.
+
+This approval selects the design direction only. It does not authorize
+implementation or physical operations, grant a full-range capability, or settle
+per-port access semantics, address units/translation, provisioning or method ABI.
 
 No diagnostic Namespace slot, raw full-range capability, API method signature,
 host bus address or new fault code is assigned by this document.
