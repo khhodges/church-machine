@@ -1900,3 +1900,17 @@ mtime_ms = 1794148254151
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b2ad50ab-5b85-42e3-84c5-b41943138833/431ae3d7-3666-4ba4-9573-a594bdd8b66e"
 storage_version_token = "1794148294769670"
 content_type = "text/html"
+
+[[outputs]]
+id = "4aqwBCioY7djpW9w1zZ3l"
+uri = "file://generated-artifacts/phase2-rtl-readiness/readiness.html"
+type = "html"
+title = "Phase 2 RTL Readiness — Baseline Results"
+description = "142 existing cases: 124 passed, 18 failed. Includes the DR0 ABI conflict, legacy entry path, watchdog gap, suite breakdown and recommended next steps."
+logical_id = "4ce7c099-218b-4612-87e0-4e89cbb29835"
+content_hash = "sha256:7863d9e066415b9913716d026c607b4bfacd48b1a6726ca2e5d8952220ca91ec"
+size = 21416
+mtime_ms = 1794149248390
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/4ce7c099-218b-4612-87e0-4e89cbb29835/e365b1b0-a8a8-42a1-b666-16344e0f587f"
+storage_version_token = "1794149249421285"
+content_type = "text/html"

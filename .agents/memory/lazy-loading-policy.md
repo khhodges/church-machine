@@ -687,3 +687,15 @@ than inheriting USER's remaining time.
 or pause the timer. Complete strictly before the existing deadline; expiry wins
 at equality under unchanged fault precedence. Preserve Debug/Trace exemptions.
 Do not infer implementation or hardware qualification from this design approval.
+
+Validate proposed event-register assignments against architectural register
+invariants before treating an approved interface as implementable.
+
+**Why:** The Phase 2 review assigned metadata to DR0, but subsequent RTL readiness
+inspection exposed the conflict with the ISA's hardwired-zero register. The
+earlier cross-document audit missed that interaction.
+
+**How to apply:** Use nonzero payload probes and actual register write/read
+semantics; a zero-valued fixture can conceal the conflict. Seek explicit approval
+for an ABI remap rather than silently making DR0 writable or changing the agreed
+wire payload. Architectural agreement and available RTL are separate evidence.
