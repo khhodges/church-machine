@@ -35,3 +35,14 @@ display requiring a board reset.
 details or interrupting working Threads. Successful CHANGE alone does not clear
 the flag. A new fault relatches it and wins over a simultaneous clear. Keep the
 protected control interface separate from this behavioral approval.
+
+Keep local LED integration opt-in until the protected monitor-clear interface
+and release selection are settled.
+
+**Why:** Authorization for a local RTL trial is not authorization to change the
+default physical build or expose a new software control.
+
+**How to apply:** Distinguish a simulated authorized-clear input from a real
+software access path. Full-wrapper RTL tests must budget for serialized trace
+output, rather than treating a short timeout as a core freeze or bypassing
+trace backpressure to make a test pass.

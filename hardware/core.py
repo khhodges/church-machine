@@ -195,6 +195,9 @@ class ChurchCore(Elaboratable):
         self.thread_switch_busy = Signal()
         self.thread_switch_complete = Signal()
         self.thread_switch_fault = Signal()
+        # Observation only: decoded CHANGE committed, including boot CHANGE.
+        # Excludes SWITCH, internal LLR and external scheduler requests.
+        self.change_instruction_complete = Signal()
         self.active_thread_slot = Signal(16, init=1)
         # Byte address of the active Thread context body. CR12 remains the
         # system Thread root and is intentionally not overloaded with this.
@@ -2082,6 +2085,19 @@ class ChurchCore(Elaboratable):
 
         if not self.iot_profile:
             thread_switch_start_sig = Signal()
+            change_instruction_inflight = Signal()
+            with m.If(clear_all):
+                m.d.sync += change_instruction_inflight.eq(0)
+            with m.Elif(change_start_sig):
+                m.d.sync += change_instruction_inflight.eq(
+                    ~thread_switch_start_sig & ~u_switch.handoff_start &
+                    ~u_call.lazy_load_irq & cond_exec_enable & is_church_op &
+                    (church_op == ChurchOpcode.CHANGE))
+            with m.Elif(u_change.change_complete | u_change.change_fault):
+                m.d.sync += change_instruction_inflight.eq(0)
+            m.d.comb += self.change_instruction_complete.eq(
+                change_instruction_inflight & u_change.change_complete &
+                ~u_change.change_fault & ~self.fault_valid & ~clear_all)
             m.d.comb += thread_switch_start_sig.eq(
                 self.thread_switch_req & self.boot_complete & ~any_unit_busy)
             m.d.comb += change_start_sig.eq(~reset_marker.fault & (

@@ -199,9 +199,10 @@ The counter represents actual CHANGE completions, not a slowed or divided count;
 fast execution may not be individually visible. A static `11` count is not a
 fault indication: the repeated blink distinguishes the fault state.
 
-An isolated RTL status unit now has
+The status unit and opt-in Wukong candidate wiring now have
 [bounded local test results](thread-status-led-rtl-results.md).
-Wrapper/monitor integration and physical behavior remain unverified.
+Protected monitor software access, general fault-containment liveness and
+physical behavior remain unverified.
 It replaces the intended normal LED/fault display for this profile, not the
 current installed bitstream. No build, installation or flashing is authorized
 by this specification.

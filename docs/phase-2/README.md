@@ -8,8 +8,9 @@ authorization to install an image or program hardware.
 - **[All Phase 2 tests](test-checklist.md)** — consolidated acceptance inventory,
   first-proof selection, unresolved-contract gates and later objectives.
 - **[Thread status LED local RTL result](thread-status-led-rtl-results.md)** —
-  isolated CHANGE counter, Hard Fault blink and monitor-clear input tests;
-  not wrapper integration or general Thread-fault recovery acceptance.
+  CHANGE counter and Hard Fault blink tested with real core events and candidate
+  wrapper pins; protected monitor software access and general Thread-fault
+  recovery acceptance remain separate.
 - **[Hardware-address map and diagnostic MMIO](hardware-address-map-and-diagnostic-mmio.md)** —
   full declared range, approved WDT address `0xFFFFFF18`, current decoder differences,
   and decomposed, Church capability-controlled Diagnostic Abstractions with

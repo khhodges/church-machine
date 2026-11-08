@@ -465,7 +465,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                  button_debounce_cycles=None, sim_dmem_init=True,
                  upload_watchdog_limit=None, sim_upload_only=False,
                  expected_boot_guard=None, sim_boot_image_words=None, runtime_image_words=None,
-                 clock_mode="direct"):
+                 clock_mode="direct", phase2_status_leds=False):
         if clock_mode not in ("direct", "mmcm-25mhz"):
             raise ValueError("Unsupported board clock mode")
         if clock_mode == "mmcm-25mhz" and (clk_freq != 25_000_000 or sim_upload_only):
@@ -473,6 +473,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         if not sim_mode and clock_mode == "direct" and clk_freq != 50_000_000:
             raise ValueError("Direct board clock is physically 50 MHz")
         self.clock_mode = clock_mode
+        self.phase2_status_leds = phase2_status_leds
+        # Local RTL stimulus only, never a board port or software clear grant.
+        self.sim_status_monitor_clear = Signal()
         self.clk_freq = clk_freq
         self.baud     = baud
         self.sim_mode = sim_mode
@@ -583,6 +586,17 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── ChurchCore ─────────────────────────────────────────────────────────
         core = m.submodules.core = ChurchCore(expected_boot_guard=self.expected_boot_guard)
+        if self.phase2_status_leds:
+            from hardware.thread_status_leds import ThreadStatusLEDs
+            status_leds = m.submodules.status_leds = ThreadStatusLEDs(
+                clock_hz=self.clk_freq)
+            status_leds.connect_core(m, core)
+            # Domain reset initializes it. CM reboot/skip/Thread recovery must
+            # not clear the indicator. Real protected monitor ABI is pending.
+            m.d.comb += status_leds.monitor_clear.eq(
+                self.sim_status_monitor_clear if self.sim_mode else 0)
+            if self.sim_mode:
+                self.sim_status_leds = status_leds
         if self.sim_mode:
             self.sim_core = core  # Observation only; no board port or reset override.
 
@@ -1942,7 +1956,13 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Before boot_triggered: led0 solid ON (booting), led1 heartbeat blink.
         # After  boot_triggered: led0 CM-controlled via MMIO reg 0 (inverted for
         #   active-LOW), led1 solid ON (no fault) or OFF if fault latched.
-        with m.If(~boot_triggered):
+        with m.If(Const(self.phase2_status_leds)):
+            if self.phase2_status_leds:
+                m.d.comb += [
+                    self.led[0].eq(status_leds.led_pins[0]),
+                    self.led[1].eq(status_leds.led_pins[1]),
+                ]
+        with m.Elif(~boot_triggered):
             m.d.comb += [
                 self.led[0].eq(0),           # LOW → LED ON  (booting indicator)
                 self.led[1].eq(hb_blink),    # blink: LOW=ON / HIGH=OFF at 1 Hz

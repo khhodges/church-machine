@@ -3,7 +3,8 @@
 Inputs must be synchronous: one pulse per successful CHANGE, every Hard Fault,
 and an already-authorized security-monitor clear. No MMIO ABI is assigned.
 This unit has no execution, scheduler, fault-record or reset-request outputs.
-It is not yet connected to the installed Wukong wrapper.
+The Wukong wrapper offers this as an opt-in local candidate, not an installed
+bitstream. Monitor clear has no software access path yet.
 """
 from amaranth import Elaboratable, Module, Signal
 
@@ -22,6 +23,13 @@ class ThreadStatusLEDs(Elaboratable):
         self.fault_pending = Signal()
         self.led_on = Signal(2)
         self.led_pins = Signal(2)  # active-low physical outputs
+
+    def connect_core(self, m, core):
+        """Passive wiring; never feed status back into core execution controls."""
+        m.d.comb += [
+            self.change_complete.eq(core.change_instruction_complete),
+            self.hard_fault.eq(core.fault_valid),
+        ]
 
     def elaborate(self, platform):
         m = Module()
