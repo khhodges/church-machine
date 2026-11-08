@@ -9,8 +9,8 @@ export const modules: ModuleMap = {
   "./components/mockups/church-ide/PolishContentFirst.tsx": () => import("../components/mockups/church-ide/PolishContentFirst.tsx"),
   "./components/mockups/church-ide/PolishStructured.tsx": () => import("../components/mockups/church-ide/PolishStructured.tsx"),
   "./components/mockups/church-ide/TerminalFirst.tsx": () => import("../components/mockups/church-ide/TerminalFirst.tsx"),
+  "./components/mockups/church-next/Workbench.tsx": () => import("../components/mockups/church-next/Workbench.tsx"),
   "./components/mockups/development-image/Current.tsx": () => import("../components/mockups/development-image/Current.tsx"),
   "./components/mockups/development-image/KISS.tsx": () => import("../components/mockups/development-image/KISS.tsx"),
-  "./components/mockups/church-next/Workbench.tsx": () => import("../components/mockups/church-next/Workbench.tsx"),
   "./components/mockups/hw-formats/HardwareFormats.tsx": () => import("../components/mockups/hw-formats/HardwareFormats.tsx")
 };
