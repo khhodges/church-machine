@@ -615,3 +615,15 @@ All-held means SYSTEM is already active; a non-yielding/non-blocking USER can
 delay processing indefinitely. Retain unread data within bounded capacity;
 capacity and full-buffer behavior remain open, with no silent loss. Do not claim
 the existing transport is verified or introduce a delivery activation path.
+
+LLR waiting/ready status belongs to SYSTEM software; no new FPGA per-Thread
+blocked bit or hardware wait-list is required.
+
+**Why:** The user approved the simpler boundary, explicitly including the
+consequence that ordinary CHANGE does not enforce software LLR waiting state.
+
+**How to apply:** SYSTEM leaves waiting USERs unscheduled until completion,
+preventing duplicate requests rather than suppressing them after premature
+execution. FPGA performs normal GT/version/context checks only; do not promise
+rejection of an otherwise valid CHANGE solely because an LLR is outstanding.
+This does not grant DR5 protected-state authority or change ordinary validation.

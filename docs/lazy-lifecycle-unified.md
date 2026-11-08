@@ -405,6 +405,20 @@ This reservation covers request bookkeeping, not LUMP bodies or transport
 buffers. Exact record layout and transport backpressure handling remain open;
 this is not unbounded buffering.
 
+**Approved waiting-state boundary — no FPGA LLR-blocked bit:** SYSTEM software
+retains pending/ready state and selects only eligible USERs. Do not introduce a
+new per-Thread hardware blocked bit or hardware wait-list. The FPGA saves/restores
+Thread context and performs normal GT, version and context checks.
+
+The no-duplicate rule is enforced by leaving a waiting USER unscheduled, not by
+periodically executing its CALL and suppressing requests afterward. Ordinary
+CHANGE does not independently reject an otherwise valid Thread GT merely
+because its Thread has an outstanding LLR. SYSTEM must not select that USER
+until completion; hardware does not enforce this software scheduling restriction.
+This does not waive normal authority checks or give DR5 permission to modify
+protected Thread storage. Software association/provisioning details remain
+separate from this settled FPGA boundary.
+
 **No duplicate request for an LLR in progress:** the same pending USER operation
 must not trigger a second LLR event, queue entry, request identifier or logical
 IDE request while its existing LLR is queued or awaiting completion. Keep USER
@@ -1174,6 +1188,14 @@ No bounded response time is promised for a USER that never yields or blocks.
 Capacity/full-buffer acceptance awaits the separate transport contract. This
 is an acceptance requirement, not an executed test.
 
+**F.34 — software-owned LLR waiting state:** verify that SYSTEM leaves a USER
+with an outstanding LLR unscheduled while running other eligible work, then
+selects it only after validated completion. FPGA CHANGE validation must not
+depend on a new LLR-blocked bit or hardware wait-list: an otherwise valid CHANGE
+is not rejected solely due to outstanding software LLR state. Normal GT/version
+and context failures still HardFault. This is a design acceptance requirement,
+not an executed test or permission to issue a premature live CHANGE.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1213,7 +1235,12 @@ The following are not settled by the design discussion:
   register injection or Z entry signal. Retain unread input without silent loss.
 - SYSTEM's authorized registration of an already-suspended USER on an event.
   **Settled Phase 2 owner input:** outgoing CR12 Thread GT as ordinary data in
-  SYSTEM DR5; protected pending association and registration authority remain open.
+  SYSTEM DR5. **Settled FPGA boundary:** pending/ready state is SYSTEM software
+  bookkeeping; no new FPGA LLR-blocked bit or hardware wait-list. SYSTEM prevents
+  duplicate requests by not selecting waiting USERs. Ordinary CHANGE does not
+  reject an otherwise valid Thread solely for outstanding software LLR state.
+  Software association and authority provisioning remain software work; this is
+  not an unresolved hardware blocked-state mechanism.
   **Settled USER reset:** invalidate only that USER's old LLR before making
   its reset context eligible; remove queued work, invalidate sent completion
   ownership, retain its reserved record for a new request number. Shared session,
