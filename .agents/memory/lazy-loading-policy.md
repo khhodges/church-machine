@@ -379,5 +379,17 @@ confirming execution of the resumed CALL.
 
 **How to apply:** Never overwrite queued or awaiting-completion records.
 Completion means ready/eligible, not target-method execution. Reject stale
-replies against the replacement request using the yet-to-be-defined correlation
-contract; retaining a completed record alone does not solve stale correlation.
+replies against the replacement request using the approved envelope request
+identifier; its encoding/lifetime remain open. Retaining a completed record
+alone does not solve stale correlation.
+
+SYSTEM assigns each accepted LLR a distinct request identifier in the message
+envelope; IDE echoes it in DELIVER.
+
+**Why:** The user approved identifiers to distinguish equal-target requests
+and protect reused per-USER records from delayed old replies.
+
+**How to apply:** Retain the identifier in the pending record and match it plus
+the expected target before installation/completion. It grants no authority.
+Keep the target payload at 20 bytes; identifier width, generation, reset scope,
+wrap and duplicate disposition remain undecided.

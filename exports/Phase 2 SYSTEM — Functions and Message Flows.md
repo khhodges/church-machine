@@ -51,8 +51,8 @@ The fixed payload makes the remaining handoff and wire details concrete:
 the initialization/test/reset instructions for the service-loop Z entry flag,
 how DR0–DR4 are
 consumed before reuse, and how the five
-words are serialized. The payload contains no explicit USER/request identifier;
-existing protected pending state and transport correlation must supply that
+words are serialized. The target payload contains no USER/request identifier;
+DR5 supplies internal USER identity and an approved envelope request identifier supplies that
 association rather than treating Namespace/slot as a unique pending use.
 Section 6 identifies these open details. No extra payload word, new opcode,
 metadata redesign or hardware implementation is approved by this revision.
@@ -198,8 +198,8 @@ Thread 1 and Thread 2 remain USER Threads.
 | **U.0** | SYSTEM method | Startup validation: check setup, reserve one SYSTEM-private pending record per configured USER before releasing it, coordinate hardware/event tests across serialized activations, release normal USER execution only after success. |
 | **U.1** | USER/FPGA operation, not a SYSTEM method | Original CALL with USER's target GT; dispatch normally if resident, otherwise retain the operation and enter SYSTEM through the UNAVAILABLE mechanism. |
 | **U.2** | SYSTEM method | Consume the protected UNAVAILABLE record; register the suspended USER, pending operation and completion event; resolve locally if possible, otherwise queue the LLR under SYSTEM ownership. |
-| **U.3** | SYSTEM method | Send registered queued LLRs directly to IDE in SYSTEM acceptance order (FIFO). Do not wait inside the handler for DELIVER. |
-| **U.4** | SYSTEM method | Process an admitted DELIVER: match/validate, resolve and install using FreeHandler when required. |
+| **U.3** | SYSTEM method | Send registered queued LLRs directly to IDE in SYSTEM acceptance order (FIFO), including each request identifier in the envelope. Do not wait inside the handler for DELIVER. |
+| **U.4** | SYSTEM method | Process an admitted DELIVER: match its echoed request identifier and expected target, validate, resolve and install using FreeHandler when required. |
 | **U.5** | SYSTEM method | Publish readiness and signal the associated USER exactly once. Does not itself switch Threads. |
 | **U.6** | USER/FPGA operation, not a SYSTEM method | Restore/complete the original use under its retained authority when USER is selected. |
 | **U.7** | SYSTEM method | Process authorized retirement; defer unsafe work or reclaim body memory through FreeHandler while retaining slot and identity. |
@@ -321,7 +321,20 @@ Never overwrite a queued or awaiting-completion record. Completed means that
 the target is ready and USER is eligible, not that the target method has run
 or returned. No additional USER-executed-CALL acknowledgement is required.
 Request correlation must prevent a delayed reply for the old use from completing
-the replacement use; its binary mechanism remains to be defined.
+the replacement use, using the envelope identifier described below.
+
+**Approved request correlation:** SYSTEM assigns each accepted LLR a distinct
+request identifier, retains it in the pending record and includes it in the
+REQUEST envelope. IDE echoes that identifier in DELIVER. Before installation
+or completion, SYSTEM matches both the identifier and the expected target
+against the pending record. A delayed reply for an old request must not complete
+a replacement request, including one for the same target and USER.
+
+The identifier is correlation data, not authority; all required LUMP identity,
+integrity and runtime authority checks remain. It is outside the unchanged
+20-byte target payload. Identifier width, generation, scope/reset lifetime,
+wrap behavior and duplicate/stale-message disposition remain to be settled.
+The complete wire envelope size is not yet fixed.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -488,6 +501,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     Otherwise SYSTEM queues LLR;
  |     |     |     |     dispatches in acceptance order.
  <-----------------|     U.3 SYSTEM REQUEST to IDE.
+ |     |     |     |     Envelope carries request ID.
  |     |     |     |     20-byte payload in TUNNEL envelope.
  |     |     |     |     Retain local body until
  |     |     |     |     durable custody confirmed;
@@ -545,6 +559,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     activates delivery handling
  |     |     |     |     at a defined service point.
  |     |     |     |     U.4 SYSTEM method matches request;
+ |     |     |     |     match echoed ID and target,
  |     |     |     |     verifies target/evidence.
  |     |     |     |     Resolve local binding.
  |     |     |     |     If a body block is needed:
@@ -840,7 +855,7 @@ is not execution acceptance.
 | F.5 | Indefinite unavailability | Request remains pending; handler finishes; another unblocked resident Thread runs; no timeout-driven fault or resume. |
 | F.6 | Delivery admission | Incoming data is handled at the defined service point with no asynchronous preemption; previous handler has finished. |
 | F.7 | Invalid/mismatched delivery | No completion signal or USER resume; validation-fault ownership follows its agreed contract. |
-| F.8 | Duplicate/stale delivery | No second install, signal or completion and no wakeup of a reused identity. |
+| F.8 | Duplicate/stale delivery | IDE echoes the SYSTEM-assigned envelope request identifier. Match it and expected target before installation/completion. An old reply cannot complete a replacement use, even for the same USER and target; no second install, signal or wakeup. Exact duplicate/stale disposition and reset lifetime remain open. |
 | F.9 | Multiple outstanding requests | Handlers execute serially; dispatch requests from distinct blocked USERs in FIFO acceptance order without waiting for earlier delivery. Delay the first target and deliver a later one: only its associated USER becomes eligible. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. One pending use per USER remains enforced. |
 | F.10 | Several USERs need one LUMP | Each pending use completes correctly; one flag signal is not assumed to broadcast. |
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
@@ -852,7 +867,7 @@ is not execution acceptance.
 | F.17 | Repeated SYSTEM activation | Wired slot-2 GT selects SYSTEM; restore its saved service-loop executable/NIA and registers, then inject event parameters before execution. CR12 identifies the active Thread. Runtime entry saves USER first; no startup diagnostic rerun or forced fixed-handler jump. All USERs held: stay in the loop. CR13 remains reserved; no swap or replay of reset-only admission. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
-| F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Never overwrite queued or awaiting-completion records. After validated installation and successful readiness signaling mark completed; retain until the same USER's next LLR replaces it, without a USER-executed-CALL acknowledgement. A stale old reply must not complete the replacement use. Record byte layout/correlation remain open. |
+| F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Never overwrite queued or awaiting-completion records. After validated installation and successful readiness signaling mark completed; retain until the same USER's next LLR replaces it, without a USER-executed-CALL acknowledgement. A stale old reply must not complete the replacement use. Record byte layout and identifier encoding/lifetime remain open. |
 | F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
 | F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
@@ -892,14 +907,17 @@ The following are not settled by the design discussion:
   blocked USER and serial handlers. Reserve one pending record per configured
   USER before release; FIFO holds record references. After validated installation
   and successful readiness signaling, mark completed and retain until the same
-  USER's next LLR. Record layout, correlation and transport buffering/backpressure
+  USER's next LLR. Record layout, identifier encoding/lifetime and transport buffering/backpressure
   remain open; no executed-CALL acknowledgement is required for record reuse.
   **Newly explicit:** define exact wire serialization and how the IDE associates
   current raw metadata with the requesting Namespace. Verify that mapping for
   the first proof without requiring metadata improvements. Multiple USERs can
   request the same Namespace/slot, so this payload alone cannot select which
-  pending USER a reply completes; retain the existing correlation requirement
-  outside the five-word target description. No added payload field is assumed.
+  pending USER a reply completes. **Settled correlation:** SYSTEM assigns an
+  identifier per accepted LLR in the envelope; IDE echoes it in DELIVER.
+  Match identifier and expected target before installation/completion. Width,
+  generation, reset scope, wrap behavior and duplicate/stale disposition remain
+  open. No added target-payload word is assumed.
 - Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
   mechanism when no USER is eligible and no service work is available.
   SYSTEM remaining active when all USERs are on hold is settled; maintenance
