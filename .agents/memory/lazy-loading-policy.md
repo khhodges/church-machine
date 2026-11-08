@@ -664,7 +664,7 @@ exposed the conflict with unconditional indefinite execution claims.
 execution requiring timely renewal. SYSTEM must also satisfy the timer when
 all USERs wait. Do not introduce an LLR timeout, preemptive scheduling or
 watchdog recovery. SYSTEM's renewal uses ordinary self-CHANGE as approved below;
-internal-LLR transition renewal semantics still require a separate decision.
+internal-LLR renewal is now approved only at successful completion, as below.
 
 SYSTEM renews the watchdog through ordinary self-CHANGE (`CHANGE CR12`) while
 no USER is eligible, completing before the deadline.
@@ -675,4 +675,15 @@ than adding a refresh register, new instruction or exemption.
 **How to apply:** Continue after CHANGE with normal saved/restored context; no
 startup rerun, new LLR or waiting-USER activation. Failed/skipped CHANGE does
 not renew, and expiry keeps its existing precedence. Software must bound work
-between renewals. This does not settle internal-LLR transition timer behavior.
+between renewals. Internal-LLR transition renewal follows the separate rule below.
+
+Internal USER-to-SYSTEM LLR entry renews the selected watchdog interval only
+after successful USER save, SYSTEM restore and event-register/flag injection.
+
+**Why:** The user approved a full SYSTEM interval on successful entry rather
+than inheriting USER's remaining time.
+
+**How to apply:** Detection, partial entry and failed transitions do not renew
+or pause the timer. Complete strictly before the existing deadline; expiry wins
+at equality under unchanged fault precedence. Preserve Debug/Trace exemptions.
+Do not infer implementation or hardware qualification from this design approval.

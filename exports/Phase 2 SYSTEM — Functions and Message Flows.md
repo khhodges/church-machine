@@ -722,9 +722,17 @@ Expiry retains its existing precedence, so completion must precede the deadline.
 The service-loop implementation remains software work, not authorization to
 change Boot bytes or hardware.
 
-Watchdog-renewal semantics of the internal USER-to-SYSTEM LLR transition still
-require a separate decision. Reusing context-save machinery alone does not
-settle that internal transition's timer behavior.
+**Approved internal LLR renewal:** renew the selected watchdog interval only
+when the USER-to-SYSTEM LLR transition successfully completes: USER saved,
+SYSTEM restored, and event registers/flags supplied. SYSTEM begins execution
+with a full selected interval rather than USER's remaining interval.
+
+LLR detection alone and failed transitions do not renew the timer. The existing
+deadline remains effective throughout the transition; completion must occur
+strictly before expiry, and expiry wins at equality. Existing fault precedence
+and Debug/Trace exemptions remain unchanged. This explicitly gives the internal
+Thread transition the successful-completion renewal boundary of ordinary CHANGE;
+it is not an early renewal or a timer pause during context transfer.
 
 ## 2. Unified numbered charts
 
@@ -1271,8 +1279,8 @@ executing USER and SYSTEM must obey the selected watchdog interval and existing
 renewal/expiry rules, including when all USERs are held. A loop or CALL/RETURN
 alone must not renew the timer. Expiry HardFaults, not schedules or retries.
 Verify no LLR request timeout or SYSTEM exemption is introduced. SYSTEM's
-renewal uses the approved ordinary self-CHANGE; internal-LLR timer behavior
-awaits its separate decision.
+renewal uses the approved ordinary self-CHANGE; successful internal LLR entry
+renews only at completed USER save, SYSTEM restore and event injection.
 This is an acceptance requirement, not an executed test.
 
 **F.37 — SYSTEM self-CHANGE renewal:** with no USER eligible, execute ordinary
@@ -1281,6 +1289,14 @@ under the existing rule, continuation after CHANGE and preservation of SYSTEM
 identity/context, without startup rerun, new LLR or waiting-USER activation.
 Failed/skipped CHANGE must not renew, and deadline equality must retain existing
 expiry precedence. This is an acceptance requirement, not an executed test.
+
+**F.38 — internal LLR completion renewal:** complete USER save, SYSTEM restoration
+and DR0–DR5/Z injection strictly before the active watchdog deadline and verify
+that SYSTEM starts with a full selected interval. LLR detection alone, partial
+entry and failed transitions must not renew or pause the timer. At deadline
+equality or expiry before completion, preserve existing expiry/fault precedence;
+no successful-entry renewal is permitted. Debug/Trace exemptions remain
+unchanged. This is an acceptance requirement, not an executed test.
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
@@ -1292,11 +1308,11 @@ their separate authorization.
 
 The following are not settled by the design discussion:
 
-- Watchdog-renewal semantics of the internal LLR transition.
-  **Settled policy:** retain existing watchdog rules and Debug/Trace exemptions;
-  no new SYSTEM exemption or LLR request timeout. **Settled SYSTEM renewal:**
-  ordinary self-CHANGE (`CHANGE CR12`) before the deadline while no USER is
-  eligible, with existing validation and expiry precedence.
+- Implementing and verifying watchdog integration remains outstanding, not
+  its policy. **Settled:** existing rules and Debug/Trace exemptions, no new
+  SYSTEM exemption or LLR timeout; ordinary self-CHANGE for SYSTEM renewal when
+  no USER is eligible; internal LLR renewal only after successful save, restore
+  and event injection, strictly before expiry with existing precedence.
 - Implementing and verifying the approved runtime entry against the current
   ISA and installed bitstream remains outstanding.
   **Settled admission:** a valid-but-unavailable running USER CALL directly
