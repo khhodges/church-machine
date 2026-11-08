@@ -69,6 +69,22 @@ racing entry, and verify that a subsequent fault in Boot.Thread enters the
 catastrophic loop. The existing heartbeat continues toggling LED[1] there
 with UART RX idle; no useful-work continuation is claimed for that outcome.
 
+### Fault-reference lifetime limit
+
+The user selected **immediate handoff only** on 2026-11-08; see
+[the lifecycle decision](../phase-1/boot-fault-engineering-resolution.md#lifecycle-decision--immediate-handoff-only).
+The tests above establish the original pair at fault-entry activation and
+subsequent healthy-work progress, not preservation of foreign-root association
+after Boot suspension/restoration. They do not establish retirement enforcement.
+GT-only homes cannot supply that association; matching slot numbers in Boot's
+Namespace must not be mistaken for the original fault references.
+
+No later-lifecycle storage or restoration extension is authorized. Before a
+hardware release, review the selected handler against the immediate-only
+lifetime, including how it finishes using and retires the pair before leaving.
+The existing test totals below are historical RTL results, not new evidence
+for that handler obligation or a resumable-reference contract.
+
 Local netlist elaboration checks the whole wrapper for combinational cycles.
 In particular, scheduler acceptance must not feed its aggregate fault decision
 back through shared operand reads or instruction-valid gating. Registered

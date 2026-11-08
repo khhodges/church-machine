@@ -217,7 +217,11 @@ async function main() {
         await page.locator('#toolBreakBtn').click();
         await page.locator('#btnRunSim').click();
         await expect.poll(async () => (await snapshot(page)).boot, {timeout:15000}).toBe(true);
-        await expect.poll(async () => (await snapshot(page)).steps).toBeGreaterThan(10);
+        // Progress polling needs only the counter, not a full memory transfer.
+        // Use the boot allowance on shared validation workers; retain the
+        // execution threshold and the fault assertion below.
+        await expect.poll(() => page.evaluate(() => sim.stepCount),
+            {timeout:15000}).toBeGreaterThan(10);
         if (await page.locator('#btnStopSim').isVisible()) await page.locator('#btnStopSim').click();
         assert.deepEqual((await snapshot(page)).faults, []);
         await page.locator('button[onclick="resetSim()"]').click();

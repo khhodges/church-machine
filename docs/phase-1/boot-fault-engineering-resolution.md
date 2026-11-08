@@ -136,6 +136,32 @@ foreign references is not solved by these two GT homes. Application code must
 not assume ordinary CHANGE can restore their root association; any extension
 of that lifecycle needs a separate capability-storage contract.
 
+### Lifecycle decision — immediate handoff only
+
+On 2026-11-08 the user selected **“Immediate handoff only”**, rather than
+preserving usable fault references across Boot suspension. This closes the
+lifecycle decision without authorizing a resumable foreign-reference format.
+
+- The machine-supplied CR1/CR2 pair is supported for the immediate, uninterrupted
+  Boot handler activation described above.
+- The handler must finish using and retire the foreign references before
+  suspension. A later Boot activation must not treat restored GT homes as the
+  original pair, even if the numeric GTs match.
+- Retained raw GT diagnostics are evidence, not authority to reconstruct the
+  pair. This decision adds no diagnostic retention or power-loss guarantee.
+- Ordinary CHANGE/SWITCH retains its existing home format and resolution rules.
+  No cached-authority serialization, foreign-root lookup under Boot, hidden
+  root registry, version refresh or new restoration bypass is approved.
+
+**Enforcement boundary:** this is a lifecycle/scope decision, not a claim that
+the existing RTL enforces retirement. In `hardware/ordinary_change.py`,
+`SAVE_HOMES` writes only the low 32 GT bits; generic incoming home resolution
+uses the selected Namespace. Colliding slots can therefore resolve to Boot's
+objects rather than necessarily fault. Do not advertise such restoration as
+safe or supported. The exact handler's retirement sequence and any enforcement
+rule still require review before hardware release; this decision does not
+authorize an automatic clear, suspension prohibition or new fault path.
+
 ## 4. Required implementation evidence
 
 - Actual-port completion versus initialization/upload contention; high-address
