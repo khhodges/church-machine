@@ -297,8 +297,8 @@ the event payload, not automatic transmission or queue policy.
 
 **How to apply:** Keep the queue SYSTEM-private and retain per-USER pending
 associations. Do not confuse serial handler execution with a one-outstanding-
-request limit; capacity and in-flight limits remain undecided. FIFO order was
-subsequently approved as described below.
+request limit; multiple outstanding requests were subsequently approved.
+Storage capacity remains undecided. FIFO order was approved as described below.
 Review flow/message decisions one at a time rather than presenting newly found
 issues as the complete unresolved list.
 
@@ -346,4 +346,16 @@ without priorities or reordering.
 
 **How to apply:** Preserve each request's USER association even for equal
 targets. FIFO governs dispatch, not delivery or completion order, and does
-not imply a single request in flight. Capacity and in-flight limit remain open.
+not imply a single request in flight. Multiple outstanding requests were
+subsequently approved; storage capacity remains open.
+
+Allow multiple dispatched LLRs from different blocked USERs to await delivery
+at once, retaining one pending use per USER.
+
+**Why:** The user approved this to avoid an indefinitely unavailable first
+target blocking dispatch of later requests whose targets may be ready.
+
+**How to apply:** Dispatch FIFO without waiting for an earlier delivery; keep
+handlers and sends serialized. Match out-of-order deliveries to their own
+pending USER. This does not authorize unbounded storage or parallel execution;
+capacity and transport backpressure remain separate contracts.

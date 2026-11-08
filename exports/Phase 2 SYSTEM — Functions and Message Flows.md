@@ -299,8 +299,12 @@ several USERs request the same target. FIFO governs dispatch, not delivery
 arrival or completion order. Queued and sent-awaiting-delivery are
 distinct states; neither makes USER runnable. One pending use per blocked USER
 is compatible with a SYSTEM queue containing requests from several USERs.
-Queue capacity and the number of sent requests allowed to await delivery
-remain open; FIFO does not impose a single outstanding wire request.
+**Multiple dispatched LLRs may await delivery at once.** SYSTEM may send the
+next queued request without waiting for an earlier delivery. Each blocked USER
+still has only one pending use; SYSTEM handlers and transmissions remain
+sequential, not parallel. An unavailable earlier target must not by itself
+prevent a later queued request from being sent. Queue/storage capacity and
+transport backpressure handling remain open; this is not unbounded buffering.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -820,7 +824,7 @@ is not execution acceptance.
 | F.6 | Delivery admission | Incoming data is handled at the defined service point with no asynchronous preemption; previous handler has finished. |
 | F.7 | Invalid/mismatched delivery | No completion signal or USER resume; validation-fault ownership follows its agreed contract. |
 | F.8 | Duplicate/stale delivery | No second install, signal or completion and no wakeup of a reused identity. |
-| F.9 | Multiple pending requests | Handlers execute serially; queued requests dispatch in SYSTEM acceptance order without priorities. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. Completion affects only the associated USER. Test the permitted sent-awaiting-delivery count once that limit is agreed. |
+| F.9 | Multiple outstanding requests | Handlers execute serially; dispatch requests from distinct blocked USERs in FIFO acceptance order without waiting for earlier delivery. Delay the first target and deliver a later one: only its associated USER becomes eligible. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. One pending use per USER remains enforced. |
 | F.10 | Several USERs need one LUMP | Each pending use completes correctly; one flag signal is not assumed to broadcast. |
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
 | F.12 | Retirement | Only safe reclamation produces DONE/Signal; retain the slot and modified-state obligations. Deferred retirement does not hold SYSTEM indefinitely. |
@@ -866,8 +870,10 @@ The following are not settled by the design discussion:
 - Request framing/byte order, capacity, correlation, event lifetime, cancellation
   and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.
   **Settled ownership and order:** SYSTEM decides and queues LLRs; FIFO dispatch
-  follows SYSTEM acceptance order without priorities or reordering. Capacity
-  and the sent-awaiting-delivery limit remain to be decided one at a time.
+  follows SYSTEM acceptance order without priorities or reordering. Multiple
+  dispatched LLRs may await delivery concurrently, with one pending use per
+  blocked USER and serial handlers. Storage capacity and transport backpressure
+  handling remain to be decided one at a time.
   **Newly explicit:** define exact wire serialization and how the IDE associates
   current raw metadata with the requesting Namespace. Verify that mapping for
   the first proof without requiring metadata improvements. Multiple USERs can
