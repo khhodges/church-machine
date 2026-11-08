@@ -18,16 +18,16 @@ Conceptual sequence, not assigned assembler syntax:
 ```text
 Security monitor executes the trusted GT-construction sequence
   -> authorized DWRITE to the construction port
-  -> explicitly set the source port capability's GT.M = true
+  -> explicitly set GTMint's dedicated GT.M = true
   -> authorized LOAD through the construction port
   -> validated capability in the destination CR
-     and consumption of source GT.M and the pending result
+     and consumption of GTMint's GT.M and the pending result
 ```
 
 The user clarified that this low-level code belongs to the security monitor
-that controls M. “Set GT.M” above denotes an authorized use of the existing
-M-control mechanism, not a new SET M opcode or an ordinary caller's ability
-to elevate itself. Preserve SecurityRegulator's M-control custody; this does
+that controls M. “Set GT.M” above denotes an authorized control operation whose
+exact mapping remains undecided, not a new SET M opcode or an ordinary caller's
+ability to elevate itself. Preserve SecurityRegulator's M-control custody; this does
 not grant raw M-control to ordinary Mint callers. The exact service boundary
 and calling ABI are not assigned by this example.
 
@@ -38,7 +38,7 @@ publish a new object. Hardware does not invent or change GT versions.
 
 The approved GTMint hardware address is **`0xFFFFFF14`**, a specification-only
 assignment. Bus-address translation and exact implementation remain
-unresolved. The approved permission contract uses W plus the existing
+unresolved. The approved permission contract uses W plus GTMint's dedicated
 GT.M, as specified below. No Namespace slot, instruction encoding, mixed-permission token
 format or software method ABI is assigned here. No existing Mint path has
 been removed or replaced. Core integration and physical operations have not
@@ -46,7 +46,7 @@ been performed.
 
 ## Authority boundary
 
-The port capability together with its GT.M authority permits DATA
+The port capability together with GTMint's dedicated GT.M authority permits DATA
 to become a capability and constitutes the manufacturing grant.
 Ordinary descriptor/version/type/bounds validation
 does not establish that the writer was entitled to manufacture an otherwise
@@ -66,7 +66,7 @@ The existing [Phase 1 result-materialization contract](../reviews/mint-phase1/mi
 uses separate private RW and L views and prohibits a mixed-domain RW+L token.
 The new port is a Phase 2 replacement direction, not a retroactive claim that
 the previous contract already supports it. The approved replacement uses W and
-the existing GT.M, not a mixed-domain W+L token.
+GTMint's dedicated GT.M, not a mixed-domain W+L token.
 Existing admission/publication obligations are not waived by this proposal;
 the port alone cannot prove publication-bound result delivery.
 
@@ -74,22 +74,31 @@ the port alone cannot prove publication-bound result delivery.
 
 - Mint holds a W capability scoped to GTMint at `0xFFFFFF14`; W permits the
   DATA write to the port.
-- The port capability's existing **GT.M** authorizes capability LOAD through
-  the port. Use GT.M terminology: this is the M authority of the source GT
-  held in a CR, not the destination GT's M or a global privilege.
-- No new M bit, GT permission bit or GT format is introduced. Do not attempt
+- **GT.M is a dedicated seventeenth M bit belonging to GTMint's hardware
+  register**, separate from the sixteen CR-associated M bits. It authorizes
+  capability LOAD through this port; neither source nor destination CR.M is
+  substituted for it.
+- This supersedes the earlier proposal to reuse the source CR-associated M.
+  A dedicated hardware-state bit is introduced, not a new permission bit in the
+  32-bit GT encoding or a new GT format. Do not attempt
   to encode W and L together in the existing mutually exclusive permission domains.
 - This is a GTMint-specific DATA-to-capability path, not a general writable
   DATA/capability alias for ordinary memory. Normal applicable validation and
   the approved pending-result lifetime remain required.
 
-**Successful validated LOAD consumes both the source port GT.M (clears M)
+**Successful validated LOAD consumes both GTMint's dedicated GT.M (clears M)
 and the pending result.** GT.M is therefore single-use for this materialization;
 it is not automatically re-granted by a later DATA write. Consumption occurs
 with successful LOAD completion, not merely when a LOAD is requested.
 Provisioning and exact LOAD integration still
 need specification; this approval does not claim that current LOAD hardware
 already supports the port.
+
+The control mapping of this seventeenth M bit remains unresolved. In particular,
+approval does not assign bit 16 of the M-control word at `0xFFFFFF1C`.
+Its initialization and handoff/fault/reset behavior must be specified separately;
+the existing pending-result clearing rules do not by themselves define every
+transition of this newly distinguished authority bit.
 
 ## Approved pending-result lifetime
 
@@ -128,6 +137,7 @@ With pending-result lifetime settled, review remaining issues one at a time:
   approved address `0xFFFFFF14`.
 - Provisioning and integration of the approved W/GT.M
   contract without a general mixed-domain permission bypass or unintended aliases.
+- Dedicated GT.M control mapping, initialization and handoff/fault/reset lifetime.
 - LOAD validation and unavailable-target behavior, including interaction with
   Phase 2 LLR. An interrupted materialization must not silently resume with a
   different or stale result.

@@ -58,18 +58,22 @@ blanket grant. Preserve Mint's private construction authority and separate
 SecurityRegulator WDT custody; do not invent the remaining abstraction inventory
 or provisioning from this architectural clarification.
 
-The user requires **GT.M** terminology for GTMint: W on the private port
-capability permits DWRITE; that source capability's GT.M authorizes LOAD.
-Successful validated LOAD consumes GT.M as well as the pending result.
+The user approved **GT.M as a dedicated seventeenth M bit belonging to GTMint**,
+separate from the sixteen CR-associated M bits. W on the private port capability
+permits DWRITE; dedicated GT.M authorizes LOAD. Successful validated LOAD
+consumes this GT.M and the pending result, not an existing CR-associated M.
 
 **Why:** Existing GT encoding separates DATA and capability permission domains.
-Reuse existing GT.M rather than inventing a new bit or mixed W+L token.
-The user explicitly corrected “CR.M” to “GT.M” and directed consumption.
+The user explicitly corrected “CR.M” to “GT.M”, directed consumption, and
+confirmed that this is a seventeenth hardware-state bit. This supersedes the
+earlier source-CR.M reuse proposal; it does not alter the 32-bit GT format.
 
 **How to apply:** Keep this DATA-to-capability path specific to GTMint, with
 normal validation and transient-result rules. Do not imply that existing LOAD
 hardware already implements it. Use GT.M in subsequent design discussion;
 consume it on successful LOAD rather than treating it as a reusable grant.
+The control mapping (including any use of bit 16 at the M-control port) and
+dedicated-bit initialization/handoff/fault/reset behavior remain undecided.
 
 The user clarified that the low-level GT-construction code belongs to the
 security monitor that controls M; show an explicit GT.M = true step before LOAD.

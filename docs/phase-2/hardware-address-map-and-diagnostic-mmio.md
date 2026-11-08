@@ -61,6 +61,10 @@ The M-bit word's bits 0–15 correspond to CR0.M–CR15.M. Writing each bit sets
 or clears that M state; bits 16–31 are reserved. This object is separate from
 the watchdog control word. Its declaration is not a grant of diagnostic access.
 
+Phase 2 separately approves GTMint's dedicated GT.M as a seventeenth M bit.
+Its control mapping is still undecided: this does not assign bit 16 here or
+change the declared CR0–CR15 mapping.
+
 ### Device area: `20–EE`
 
 | Offset | Declared port |
@@ -227,9 +231,10 @@ The approved [Mint-private GT-construction port direction](gt-construction-port.
 adds a separate manufacturing-authority requirement. Full-range diagnostic
 addressability does not grant access to it. Its approved specification address
 is `0xFFFFFF14`. The approved access contract uses a W port capability for
-DWRITE and the source port capability's existing **GT.M** for capability
-LOAD—no new bit or mixed-domain W+L token. Successful validated LOAD consumes
-both GT.M and the pending result. Bus translation and integration remain
+DWRITE and **GT.M**, a dedicated seventeenth M bit belonging to GTMint, for
+capability LOAD. It does not reuse a CR-associated M bit or alter the 32-bit
+GT format. Successful validated LOAD consumes this GT.M and the pending result.
+GT.M control mapping, bus translation and integration remain
 unresolved. This does not authorize hardware changes or restart outdated Mint testing.
 
 ## Sources and authority
