@@ -27,6 +27,13 @@ Thread 2 remain available for user programs.** These are Thread designations,
 not an assignment of Namespace slot numbers.
 
 CR13 designates this Boot/SYSTEM Thread for the proposed event-entry mechanism.
+**Approved preservation rule:** event entry and exit leave CR13 unchanged.
+Save the outgoing Thread context separately; do not swap its Thread GT into
+CR13. Activate the configured SYSTEM context, then supply event parameters.
+Selecting another Thread after handler completion also preserves the configured
+SYSTEM destination. No matching swap-back is required. This does not authorize
+CR13 reconfiguration or settle the exit instruction or scheduling authority.
+
 Its two responsibilities are:
 
 1. **Startup:** run first and validate the setup before normal USER execution.
@@ -89,9 +96,9 @@ Boot/SYSTEM remains the same Thread across these roles; startup validation is
 not repeated on every event. How entry distinguishes startup from later events
 belongs to the event ABI still to be defined.
 
-The earlier Phase 1 simplicity rules below are carried into this Phase 2 design:
-no parallel/preemptive handlers and any unblocked resident Thread is an
-acceptable next choice. The existing Phase 1 ISA is not changed by this document.
+The no-parallel/preemptive-handler rule carries into this Phase 2 design.
+USER Threads run round robin, superseding the earlier arbitrary eligible-Thread
+selection rule. The existing Phase 1 ISA is not changed by this document.
 Whether SYSTEM may replace CR13 after startup remains undecided; the Thread-role
 mapping does not imply permission to do so.
 
@@ -172,6 +179,18 @@ event association or Namespace descriptors disappear.
 
 ### Three distinct GT roles
 
+**Agreed CALL suspension boundary:** when a valid target is unavailable, suspend
+before committing any CALL effects. Retain the original CALL location, target
+GT, selector, operands and caller context. Do not push a callee frame, install
+the callee execution context or advance past the CALL. Event-entry context
+preservation remains separate from those uncommitted CALL effects.
+
+After validated delivery and USER selection, restore the original CALL location
+and execute that CALL normally, including its checks. No earlier USER instruction
+is repeated and the target method has not executed before suspension. Do not
+save/resume a partially completed CALL pipeline. This completes a deliberately
+suspended valid operation; it is not a hard-fault retry or a timer retry loop.
+
 | GT | Purpose | Must not be confused with |
 |---|---|---|
 | Original target abstraction GT | Authorizes USER's CALL to the user-programmed target and method. Retained with the pending operation. | SYSTEM's execution authority. |
@@ -203,17 +222,34 @@ a system-service GT into the original CALL.
 records the request, sends REQUEST if needed, and finishes without waiting for
 the LUMP. A later DELIVER handler installs and signals completion.
 
-After a handler finishes, **any other unblocked resident Thread will do for
-Phase 1**. No priority or fairness policy is required. The original USER stays
-blocked until its completion condition is satisfied. Behavior when no eligible
-Thread exists remains to be defined; do not silently resume a blocked USER.
+**USER Threads run round robin.** At a scheduling handoff, select the next
+eligible resident USER in cyclic order, skipping blocked USERs. Completion
+makes a USER eligible for its turn; it does not immediately select that USER.
+The original USER stays blocked until its completion condition is satisfied.
+SYSTEM handlers still run serially to completion, outside the USER rotation.
+When all USERs are blocked, the approved resident BACKGROUND Thread performs
+bounded maintenance and yields at service points; runnable USER work takes
+precedence over BACKGROUND work.
+
+**Approved turn boundary:** a USER's turn ends on explicit yield or blocking.
+Scheduling is cooperative; no fixed time slice or timer-driven USER preemption
+is introduced. A USER that neither yields nor blocks can hold execution
+indefinitely; round robin alone does not guarantee bounded waiting.
+The exact yield interface, delivery service point and idle behavior when no
+maintenance work exists remain open.
+**Scope freeze:** keep simple cooperative round robin for now; scheduling
+improvements are deferred. The proposed queued-delivery checks at cooperative
+handoff points have not been approved and are not part of this decision.
+This selection decision does not approve the proposed event-scoped scheduling
+authority mechanism; registration authority remains an unresolved contract.
 
 ## 2. Unified numbered charts
 
 IDE remains left, FPGA in the middle, and USER/SYSTEM abstraction execution on
 the right. All descriptions are in the fifth text column, with no fifth `|`.
 An arrow crossing FPGA does not make FPGA an IDE service recipient.
-The OTHER lane in the handler-exit chart means any eligible resident Thread.
+The OTHER lane means the next eligible USER in round-robin order, or BACKGROUND
+when all USERs are blocked.
 
 U.0–U.8 use the contracts above. U.1b–U.1c explicitly isolate the FPGA
 unavailability detection/entry from SYSTEM method U.2. Other lettered substeps
@@ -259,11 +295,13 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     No event or REQUEST.
  |     |     |     |
  |     |     |     |     Valid but unavailable:
- |     |     |     |     U.1b FPGA retains CALL,
+ |     |     |     |     U.1b Suspend before CALL commit;
+ |     |     |     |     retain original CALL location,
  |     |     |     |     target GT, operands/context;
  |     |     |     |     suspends USER execution.
  |     |---------->|     U.1c UNAVAILABLE event entry
  |     |     |     |     activates SYSTEM via CR13.
+ |     |     |     |     CR13 unchanged; no GT swap.
  |     |     |     |     Not ordinary CHANGE CR13.
  |     |     |     |     U.2 SYSTEM method records request,
  |     |     |     |     associates completion F,
@@ -296,23 +334,25 @@ inventing a target CALL.
 IDE   FPGA  OTHER SYSTEM  COMMENTS
  |     |     |     |
  |     |     |     |     X.1 SYSTEM finishes handler.
- |     |     |     |     Select any unblocked
- |     |     |     |     resident Thread.
+ |     |     |     |     Select next eligible USER
+ |     |     |     |     in round-robin order;
+ |     |     |     |     all blocked: BACKGROUND.
  |     <-----------|     X.2 SYSTEM requests handoff
  |     |     |     |     to selected Thread.
  |     |     |     |     CHANGE/context transition:
  |     |     |     |     exact event-exit ABI open.
  |     |---->|     |     X.3 FPGA activates selected
  |     |     |     |     Thread's saved context.
+ |     |     |     |     CR13 remains SYSTEM destination.
  |     |     |     |     Only then other work runs.
 ```
 
 X.2 explicitly identifies the required Thread transition. Whether event exit
 uses ordinary `CHANGE CRn` or a separately defined event-exit operation is not
-yet decided. Do not assume a hidden CR12/CR13 swap, matching swap-back, new
-opcode or direct return to the interrupted USER. SYSTEM must remain available
-for subsequent serialized events. The exact CR13 preservation/rearming rules
-are part of the event-entry/exit ABI still to be specified.
+yet decided. Entry and exit preserve CR13 without a hidden CR12/CR13 swap or
+matching swap-back. Do not assume a new opcode or direct return to the
+interrupted USER. SYSTEM must remain available for subsequent serialized
+events; the exact exit mechanism and context validation remain to be specified.
 
 ### C. DELIVER and resume the original operation
 
@@ -349,7 +389,9 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     <-----------|     U.5a SYSTEM requests handoff;
  |     |     |     |     use event-exit contract X.2.
  |     |---->|     |     U.5b FPGA restores USER.
- |     |---->|     |     U.6 Complete original CALL
+ |     |---->|     |     U.6 Execute original CALL
+ |     |     |     |     from its saved location,
+ |     |     |     |     with normal checks,
  |     |     |     |     with retained target GT;
  |     |     |     |     target executes in USER.
 ```
@@ -416,7 +458,7 @@ the superseded USER-side Wait sequence without an agreed admission ABI.
 | U.1c | FPGA event-entry machinery | Activate SYSTEM designated by CR13 before dispatching method U.2. |
 | U.2 | SYSTEM | Record request and register the already-suspended USER against F. |
 | U.3 | SYSTEM | Send REQUEST directly to IDE using SYSTEM's service/transport authority. |
-| U.3a / X.1–X.3 | SYSTEM, then FPGA | Finish event and activate any unblocked resident Thread. |
+| U.3a / X.1–X.3 | SYSTEM, then FPGA | Finish event and activate the next eligible USER in round-robin order; all USERs blocked: BACKGROUND. |
 | U.4m | IDE | Supply a correlated delivery for U.4; does not signal USER or interrupt SYSTEM. |
 | U.4e | FPGA event-entry machinery | Admit a later serialized delivery event and activate SYSTEM. |
 | U.4 | SYSTEM | Match, validate, resolve and install the admitted delivery. |
@@ -565,6 +607,25 @@ never changes version numbers. Delivery-fault ownership remains to be specified.
 
 ## 5. Development and physical acceptance
 
+### First priority: prove lazy loading
+
+The first proof milestone is an end-to-end lazy load on physical hardware:
+a USER CALL targets a valid approved LUMP whose body is absent; hardware
+suspends before CALL commit; SYSTEM requests the body from IDE; validated
+delivery installs it and makes USER eligible; on its round-robin turn USER
+executes the original CALL normally and the target method completes once.
+Capture the exact bitstream/LUMP identities and the transition evidence,
+including unchanged CR13 and preservation of the original CALL authority.
+Use a delayed delivery to demonstrate that USER remains blocked while other
+eligible USER work can proceed, without SYSTEM waiting inside its handler.
+
+Resolve only the entry/exit, registration, delivery and restoration contracts
+needed to make this proof safe and meaningful as prerequisites to this
+milestone. Do not make completion of the entire lifecycle design, retirement,
+or scheduling improvements a prerequisite. Existing validation and authority
+requirements remain mandatory. This priority does not authorize RTL changes,
+uploading or flashing, and is not a claim that the proof has been run.
+
 ### Method-level test references
 
 Use the same U.n identifiers for method tests and chart assertions; descriptions
@@ -604,11 +665,11 @@ is not execution acceptance.
 | F.10 | Several USERs need one LUMP | Each pending use completes correctly; one flag signal is not assumed to broadcast. |
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
 | F.12 | Retirement | Only safe reclamation produces DONE/Signal; retain the slot and modified-state obligations. Deferred retirement does not hold SYSTEM indefinitely. |
-| F.13 | Original CALL restoration | Target GT, selector, operands and caller continuation remain correct; no skipped work, repeated prior side effects or fabricated USER Wait return. |
+| F.13 | Pre-commit CALL suspension/restoration | Before suspension no callee frame/context or CALL advance is committed. Restore the original CALL location, GT, selector and operands; normal execution checks and dispatch occur once after delivery. No earlier USER instruction repeats and no partially executed pipeline state is resumed. |
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
-| F.16 | Phase 1 selection | After completion any selected unblocked resident Thread is acceptable; blocked USER is excluded until ready. |
-| F.17 | Repeated SYSTEM activation | Event entry/exit preserves the configured SYSTEM destination and context across successive events; verify the agreed CR13 ABI. |
+| F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. SYSTEM handlers finish before handoff; all USERs blocked selects BACKGROUND, with USER work preferred once runnable. |
+| F.17 | Repeated SYSTEM activation | CR13 retains the configured SYSTEM Thread GT through entry, exit and selection of another Thread. Outgoing context is saved separately; no USER GT swap into CR13 or matching swap-back occurs. Verify successive SYSTEM activations. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
 | F.20 | One pending GT per USER | A blocked USER has one outstanding lifecycle association; a later request cannot overwrite it. Different Threads remain independent. |
@@ -633,7 +694,8 @@ The following are not settled by the design discussion:
 - Non-preemptive service point for delivery admission and input retention.
 - SYSTEM's authorized registration of an already-suspended USER on an event.
 - Request ABI, capacity, correlation, event lifetime, cancellation and reset.
-- No-eligible-Thread behavior; priority/fairness is not required for Phase 1.
+- Exact explicit-yield interface and round-robin cursor rules; BACKGROUND service/yield
+  points and idle behavior when no USER is eligible and no maintenance is needed.
 - FreeQueue exhaustion, retirement admission/deferred-work scheduling,
   modified-state preservation and GC safety.
 

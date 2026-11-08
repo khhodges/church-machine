@@ -1849,14 +1849,14 @@ content_type = "text/markdown"
 id = "vS3vEqqtXXkSHjQF7gJ23"
 uri = "file://exports/phase2-system-un-specification.html"
 type = "html"
-title = "Phase 2 SYSTEM — Approved KISS Design"
-description = "Updated specification with all seven simplifications, preserved U.n contracts, and a complete Markdown download."
+title = "Phase 2 SYSTEM — Latest Specification"
+description = "Complete U.n function contracts and message-flow charts, including CR13 preservation, cooperative round robin and lazy-load-first hardware proof. Includes a Markdown download."
 logical_id = "9b1c1423-b5e0-4208-af45-d18b9433093a"
-content_hash = "sha256:5f840d7318dfbfd081557fd261d98bbbe9c2340e57304e221f5169cbac859238"
-size = 95490
-mtime_ms = 1793979641759
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/93d2dff2-062b-434a-919c-8d033f6d5fb1"
-storage_version_token = "1793979656270107"
+content_hash = "sha256:623b6b7d84ca56025ce57d5706ac81cc83f9cb5cad2f2fc0ebf14209cc9c6f8b"
+size = 106217
+mtime_ms = 1794130956720
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/dce19e5b-6f3c-42f8-82c6-50d033d8d91e"
+storage_version_token = "1794130957989367"
 content_type = "text/html"
 
 [[outputs]]
