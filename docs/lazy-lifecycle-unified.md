@@ -128,6 +128,25 @@ software; it does not establish that existing Boot executable bytes already
 provide that loop, authorize replacing them, or permit replay of the reset-only
 activation marker.
 
+### Approved USER suspension: normal protected Thread save
+
+On an eligible unavailable CALL, microcode reuses CHANGE's outgoing context-save
+machinery and the USER's existing protected Thread storage. Do not create a
+separate LLR execution-context block or hidden register bank. Save the original
+registers and condition flags before supplying SYSTEM's event parameters.
+
+Unlike an executed CHANGE instruction, the saved continuation points to the
+original uncommitted CALL, not the following instruction. No callee frame has
+been pushed and no callee context installed. The original target GT and operands
+remain in the saved USER context for normal execution after restoration.
+
+Captured Namespace metadata, target slot and outgoing USER GT are temporary
+handoff data, not a second saved USER context. SYSTEM's private pending-request
+association remains separate from this protected execution state. If validation
+of the protected save fails, HardFault; do not enter SYSTEM with an incomplete
+USER save. This is an internal microcode transition, not a CHANGE instruction
+inserted into the USER program. Runtime admission remains a separate contract.
+
 ### Approved SYSTEM exit: ordinary CHANGE
 
 When SYSTEM selects a ready USER, it executes ordinary CHANGE using that USER's
@@ -1007,7 +1026,7 @@ are not a separate method-name mapping.
 | Method | Required test contract |
 |---|---|
 | U.0 | Boot.Thread runs setup validation before normal USER release; event-path tests use successive activations; failures hard-fault. |
-| U.2 | Receives the protected pending-operation record from U.1c; preserves target authority and registers the correct suspended USER. |
+| U.2 | Receives event data identifying the suspended USER; associates it with that USER's normal protected saved Thread context. Original target authority stays in the saved context, not a duplicate LLR context block. |
 | U.3 | Emits correctly correlated REQUESTs to IDE in FIFO acceptance order, without priority reordering or waiting inside a handler for delivery. |
 | U.4 | Accepts only a matching validated delivery; FreeHandler CALL/RETURN stays in SYSTEM; duplicate/stale input cannot complete twice. |
 | U.5 | Publishes usable readiness before Signal; only the associated USER becomes eligible; no implicit Thread switch. |
@@ -1073,6 +1092,14 @@ USER executes its original uncommitted CALL under normal checks. A stale GT or
 invalid saved context must HardFault without repair. Delivery/readiness alone
 must not switch Threads. This is an acceptance requirement, not an executed test.
 
+**F.30 — normal protected USER save:** trigger an eligible unavailable CALL and
+verify reuse of the normal outgoing Thread-save machinery and protected storage.
+The saved continuation identifies the original CALL; original registers,
+operands, target GT and flags survive SYSTEM parameter injection and restoration.
+No callee frame or duplicate LLR execution-context block is created. Invalid
+protected-save state must HardFault without entering SYSTEM with a partial save.
+This is an acceptance requirement, not a claim of an executed test.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1090,7 +1117,11 @@ The following are not settled by the design discussion:
   discriminator (Z=1 new LLR, Z=0 none); initialization/test/reset instructions
   and software continuation placement remain open. The Thread GT is not a
   method selector.
-- Exact event entry and protected pending-operation storage remain open.
+- Exact event-entry admission and transition details remain open.
+  **Settled USER save:** reuse ordinary outgoing Thread-save machinery and
+  existing protected Thread storage, preserving the original uncommitted CALL
+  as the continuation. No separate LLR execution-context block is required.
+  Protected-save validation failure HardFaults rather than entering SYSTEM.
   **Settled exit:** ordinary CHANGE to the selected ready USER using its full
   Thread GT, saving SYSTEM's continuation and restoring USER's context under
   normal validation. No special event-exit instruction or swap-back is required.

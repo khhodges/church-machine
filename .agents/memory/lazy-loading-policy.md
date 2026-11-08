@@ -565,3 +565,15 @@ context/flags and resume the uncommitted CALL with normal checks. Stale GTs and
 invalid contexts HardFault; never repair or upgrade them. Readiness alone does
 not switch Threads. Selection remains software, and all-held means SYSTEM stays
 active. No CR13 swap-back or new exit opcode.
+
+LLR suspension reuses normal outgoing CHANGE save machinery and the USER's
+existing protected Thread storage, with continuation at the original CALL.
+
+**Why:** The user approved normal protected Thread save rather than a separate
+LLR context or hidden register bank.
+
+**How to apply:** Save original registers/flags before SYSTEM parameter writes,
+without committing CALL or pushing a callee frame. Temporary event data and
+software pending associations are not duplicate execution contexts. A failed
+protected-save validation HardFaults; do not enter SYSTEM with a partial save.
+No CHANGE instruction is inserted into USER code; runtime admission stays separate.
