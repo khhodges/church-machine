@@ -58,13 +58,15 @@ blanket grant. Preserve Mint's private construction authority and separate
 SecurityRegulator WDT custody; do not invent the remaining abstraction inventory
 or provisioning from this architectural clarification.
 
-The user approved using the existing CR.M for GTMint: W on the private port
-capability permits DWRITE; M on the CR holding that capability authorizes LOAD.
+The user requires **GT.M** terminology for GTMint: W on the private port
+capability permits DWRITE; that source capability's GT.M authorizes LOAD.
+Successful validated LOAD consumes GT.M as well as the pending result.
 
 **Why:** Existing GT encoding separates DATA and capability permission domains.
-Reuse register-scoped M rather than inventing a new bit or mixed W+L token.
+Reuse existing GT.M rather than inventing a new bit or mixed W+L token.
+The user explicitly corrected “CR.M” to “GT.M” and directed consumption.
 
 **How to apply:** Keep this DATA-to-capability path specific to GTMint, with
 normal validation and transient-result rules. Do not imply that existing LOAD
-hardware already implements it. Source-M consumption is still undecided;
-approved pending-result consumption does not settle M consumption.
+hardware already implements it. Use GT.M in subsequent design discussion;
+consume it on successful LOAD rather than treating it as a reusable grant.

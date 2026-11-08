@@ -227,8 +227,9 @@ The approved [Mint-private GT-construction port direction](gt-construction-port.
 adds a separate manufacturing-authority requirement. Full-range diagnostic
 addressability does not grant access to it. Its approved specification address
 is `0xFFFFFF14`. The approved access contract uses a W port capability for
-DWRITE and the existing M bit on its source CR for capability LOAD—no new bit
-or mixed-domain W+L token. Source-M consumption and bus translation remain
+DWRITE and the source port capability's existing **GT.M** for capability
+LOAD—no new bit or mixed-domain W+L token. Successful validated LOAD consumes
+both GT.M and the pending result. Bus translation and integration remain
 unresolved. This does not authorize hardware changes or restart outdated Mint testing.
 
 ## Sources and authority
