@@ -164,6 +164,30 @@ This decoder neither establishes the full Church range nor proves that all
 declared Church devices exist. Reusing its truncated selector for the full
 range would alias distinct ports. No relocation or replacement is approved here.
 
+## Wukong LED feedback
+
+Selected behavior: use the two physical user LEDs as a two-bit counter of
+successfully completed CHANGE instructions, modulo four. LED0 is the low bit;
+LED1 is the high bit. In logical illuminated states the sequence is
+`00 → 01 → 10 → 11 → 00`. Failed CHANGE attempts do not increment it.
+Account for active-low pin polarity; do not count execution cycles or stalls.
+
+Any Hard Fault overrides the counter display. The chosen visual indication is
+both LEDs blinking together at 2 Hz, latched so subsequent successful execution
+cannot hide the event. Initialize the count to zero and clear this indication
+on an explicit board reset; a Thread/Namespace fault recovery must not silently
+clear it. This is an indicator only, not a change to fault containment or recovery.
+Its blink clock must continue independently of instruction retirement.
+
+The counter represents actual CHANGE completions, not a slowed or divided count;
+fast execution may not be individually visible. A static `11` count is not a
+fault indication: the repeated blink distinguishes the fault state.
+
+This is a design specification, not implemented or physically verified behavior.
+It replaces the intended normal LED/fault display for this profile, not the
+current installed bitstream. No build, installation or flashing is authorized
+by this specification.
+
 ## PP250-style diagnostic MMIO: approved access direction
 
 The useful objective is **full-range test addressability**, not unrestricted
