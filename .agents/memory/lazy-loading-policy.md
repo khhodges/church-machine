@@ -326,3 +326,14 @@ The user subsequently approved Z=1 for a new LLR and Z=0 for no new event.
 Microcode preserves restored N/C/V while setting SYSTEM Z; ordinary instruction
 flag semantics remain unchanged. Exact initialization/test/reset sequences
 remain open. The wire payload stays 20 bytes.
+
+For Phase 2, microcode passes the suspended USER's unchanged 32-bit Thread GT
+from outgoing CR12 as ordinary data in SYSTEM DR5 after restoration.
+
+**Why:** The user approved this owner-identification proposal with "OK for
+Phase 2"; the target Namespace/slot alone cannot distinguish multiple USERs.
+
+**How to apply:** Capture before the switch, preserve USER's original DR5, and
+inject SYSTEM DR5 alongside DR0–DR4 before Z=1. This is not the target E-GT,
+not an event code and not an authority grant. Keep DR5 out of the 20-byte IDE
+target payload; protected association and registration authority remain open.
