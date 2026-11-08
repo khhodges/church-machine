@@ -179,3 +179,57 @@ edits were left untouched.
 This removes ambiguity about the baseline blocker; it does **not** establish
 passing Thread validation/activation, Phase 2 readiness, matching bitstream
 behavior, or physical-board acceptance.
+
+## Subsequent bounded Namespace-test audit (2026-11-08)
+
+The adjacent `tests/hardware/test_core_namespace_admission.py` has now been
+corrected and executed separately. This does not change the original 18-case
+baseline or claim that those Thread tests have been corrected.
+
+No replacement Thread fixture was available in this checkout: both Thread
+modules still loaded the historical candidate. Rather than duplicate their
+fixture correction, the Namespace suite uses a separately authored synthetic
+metadata/self prefix, with 64 slots, a 255-word-index self limit, Namespace
+version 302 and independently pinned Thread guard version 419. It is not a
+bootable candidate: memory responses stop at Namespace admission, before any
+Thread descriptor is consumed. A future shared Thread fixture may replace this
+prefix only while retaining these Namespace-stage observation boundaries.
+
+Current-format controls now establish:
+
+| Control | First result |
+|---|---|
+| Valid self descriptor, including an independently changed unread Thread word | Namespace admitted; CR15 caches the exact current-format authority |
+| Resealed version-bit-21 change (also with unread Thread corruption) | VERSION, slot 1 |
+| Self seal corruption | SEAL, slot 1 |
+| Metadata reserved word | BOUNDS, slot 0 |
+| Resealed wrong self limit, high limit bit 17, or nonzero base; nonzero self reserved word | BOUNDS, slot 1 |
+| Wrong version plus bad seal | SEAL, slot 1, before version comparison |
+| Wrong geometry plus bad seal | BOUNDS, slot 1, before seal comparison |
+| Exact hash-pinned historical candidate with its original guard | BOUNDS, slot 1; no admission or Thread reads |
+
+Every first result requires reads of only the eight metadata/self words,
+no memory/Namespace/c-list writes, no Thread validation or activation, no boot
+completion, no CR12 activation and unchanged CR13. Failure controls require
+zero CR15 and a held first fault without further memory reads. Positive
+controls additionally reboot against a resealed current-format version change
+and require VERSION at slot 1 with cleared admission and CR15.
+
+Verification (local Amaranth simulation only):
+
+```sh
+python3 -m pytest tests/hardware/test_core_namespace_admission.py \
+  tests/hardware/test_ascending_namespace_bootstrap.py \
+  tests/hardware/test_guarded_new_layout.py::test_historical_guarded_bytes_are_rejected_by_current_rtl \
+  tests/hardware/test_boot_pair_guard.py -q -p no:cacheprovider
+# 46 passed, including 13 Namespace core controls.
+
+python3 -m pytest tests/hardware/test_core_reset_marker_gate.py \
+  -q -p no:cacheprovider
+# 2 passed: separate unguarded bootstrap/marker controls.
+```
+
+The unguarded controls instantiate `ChurchCore()` and demonstrate that ordinary
+bootstrap completion does not grant guarded marker admission. They are not
+counted as guarded Namespace successes. No RTL, archived inputs, live images,
+board state, or Thread-test fixtures were changed.
