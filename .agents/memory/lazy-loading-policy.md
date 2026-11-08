@@ -253,3 +253,13 @@ mechanism and keep SYSTEM available for subsequent events.
 **How to apply:** Preserve this rule while defining the remaining ABI. It does
 not approve CR13 reconfiguration, an exit instruction, cross-Thread scheduling
 authority, or changes to the current Phase 1 ISA or installed hardware.
+
+The Phase 2 boot objective is to keep the Boot image the same but load CR13
+instead of CR12.
+
+**Why:** The user explicitly stated this objective rather than approving a new
+boot image or a general CR13 provisioning mechanism.
+
+**How to apply:** Treat this as the requested architectural delta, not verified
+binary compatibility. Resolve active-Thread identity and save/restore semantics
+before assuming a destination-register change alone is sufficient.

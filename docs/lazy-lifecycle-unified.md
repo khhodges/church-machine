@@ -27,6 +27,11 @@ Thread 2 remain available for user programs.** These are Thread designations,
 not an assignment of Namespace slot numbers.
 
 CR13 designates this Boot/SYSTEM Thread for the proposed event-entry mechanism.
+**Boot objective:** retain the same Boot image, but load the Boot/SYSTEM Thread
+GT into CR13 instead of CR12. This is a requested Phase 2 architectural change,
+not a claim that current reset hardware supports it. The relationship between
+the fixed SYSTEM designation in CR13 and active-Thread identity/context saving
+currently defined through CR12 still needs explicit reconciliation.
 **Approved preservation rule:** event entry and exit leave CR13 unchanged.
 Save the outgoing Thread context separately; do not swap its Thread GT into
 CR13. Activate the configured SYSTEM context, then supply event parameters.
