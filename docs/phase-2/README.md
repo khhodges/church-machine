@@ -12,8 +12,8 @@ authorization to install an image or program hardware.
   and decomposed, Church capability-controlled Diagnostic Abstractions with
   separately scoped GTs; GTMint is the first example.
 - **[Mint-private GT-construction port](gt-construction-port.md)** —
-  approved address `0xFFFFFF14`, DATA-write/capability-load direction and transient-result
-  lifetime; exact access interface remains to be settled.
+  approved address `0xFFFFFF14`, W plus existing source CR.M access, and
+  transient-result lifetime; M consumption and exact integration remain open.
 
 ## Current agreed FPGA boundary
 
