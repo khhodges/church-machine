@@ -43,6 +43,9 @@ class ChurchCall(Elaboratable):
         self.mload_index = Signal(16)
         self.mload_direct = Signal()
         self.mload_direct_gt = Signal(32)
+        # Resolve privately until body/method admission succeeds. In particular
+        # an unavailable CALL must leave the issuing Thread's CR6/CR14 intact.
+        self.mload_resolved_cap = Signal(CAP_REG_LAYOUT)
         self.mload_m_elevated = Signal()
 
         self.mload_done = Signal()
@@ -118,9 +121,9 @@ class ChurchCall(Elaboratable):
         # authorises the M-window writeback.  Formerly named mgt_ns_seals.
         self.mgt_cache_token32 = Signal(32)
 
-        # Lazy-load IRQ outputs (Task #1523): pulsed when FETCH_LUMP detects cw=0
-        # (CODE_NOT_RESIDENT).  No stack frame has been pushed at this point in
-        # the CALL pipeline.  Core uses these to trigger ChurchIRQDispatch.
+        # Internal LLR admission pulse (historical signal name retained).
+        # cw=0 is detected before descriptor publication or frame construction.
+        # The non-IoT core routes this to protected Thread entry, not an IRQ.
         self.lazy_load_irq     = Signal()     # 1-cycle pulse: evicted lump detected
         self.lazy_load_ns_slot = Signal(16)   # NS slot of the evicted lump
 
@@ -577,14 +580,12 @@ class ChurchCall(Elaboratable):
                 )
 
             with m.State("PHASE1_DONE"):
-                # Combinatorially read back CR6 — Phase 1 mLoad has just deposited
-                # the callee's cap entry there.  Latch word0_gt (pre-SET_CR6_LIMIT,
-                # original perms from cload.py Phase 1) for STACK_WRITE_EGT.
-                # cr6_adjusted changes cache geometry, not the Enter token.
-                m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
+                # mLoad resolves without publishing. Keep the exact Enter
+                # identity and descriptor private until method admission.
                 m.d.sync += callee_egt_latched.eq(
-                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value()
+                    View(CAP_REG_LAYOUT, self.mload_resolved_cap).word0_gt.as_value()
                 )
+                m.d.sync += cr6_latched.eq(self.mload_resolved_cap)
                 m.d.sync += [phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
                 m.d.sync += sub_start_reg.eq(1)
                 m.next = "PHASE2"
@@ -604,9 +605,8 @@ class ChurchCall(Elaboratable):
                 )
 
             with m.State("SET_M_READ"):
-                # Read CR14 so we can assert M=1 (PERM_X) on the code capability
-                m.d.comb += local_cr_rd_addr.eq(CR14_CODE)
-                m.d.sync += cr14_latched.eq(self.cr_rd_data)
+                # Capture the second private resolution, not live caller CR14.
+                m.d.sync += cr14_latched.eq(self.mload_resolved_cap)
                 m.next = "SET_M_WRITE"
 
             with m.State("SET_M_WRITE"):
@@ -691,8 +691,6 @@ class ChurchCall(Elaboratable):
                     ]
                     m.next = "CLEAR_B"
                 with m.Else():
-                    m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
-                    m.d.sync += cr6_latched.eq(self.cr_rd_data)
                     m.next = "SET_CR6_LIMIT"
 
             with m.State("SET_CR6_LIMIT"):
@@ -874,8 +872,8 @@ class ChurchCall(Elaboratable):
             with m.State("LAZY_LOAD_ABORT"):
                 # cw=0 detected in FETCH_LUMP: lump is CODE_NOT_RESIDENT.
                 # No stack frame has been pushed at this point in the pipeline.
-                # Abort the CALL silently; core dispatches to Scheduler.IRQ
-                # via ChurchIRQDispatch (Task #1523, IRQ_REASON_LAZY_LOAD).
+                # No architectural capability was published. The core starts
+                # protected USER-to-SYSTEM entry, without retiring this CALL.
                 m.next = "IDLE"
 
         m.d.comb += [

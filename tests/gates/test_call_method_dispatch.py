@@ -148,9 +148,11 @@ def _run_dispatch(call_imm_val, method_entry_word=0,
                 mload_ack_pending = False
                 if not phase1_done:
                     ctx.set(dut.cr_rd_data.as_value(), CALLEE_EGT)
+                    ctx.set(dut.mload_resolved_cap.as_value(), CALLEE_EGT)
                     phase1_done = True
                 else:
                     ctx.set(dut.cr_rd_data.as_value(), code_cap)
+                    ctx.set(dut.mload_resolved_cap.as_value(), code_cap)
 
             if ml_start:
                 ctx.set(dut.mload_done, 1)

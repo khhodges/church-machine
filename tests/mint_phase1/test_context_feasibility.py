@@ -94,10 +94,10 @@ def run_call(caller, callee, pc, sto):
             mload_pending = bool(ctx.get(dut.mload_start))
             if mload_pending:
                 dst = ctx.get(dut.mload_cr_dst)
-                regs[dst] = cap(
+                ctx.set(dut.mload_resolved_cap.as_value(), cap(
                     callee if dst == 6 else (N(callee) & ~0x78000000) | 0x40000000,
                     CODE, 63,
-                )
+                ))
             ctx.set(dut.mem_rd_valid, 0)
             if pending is not None:
                 assert ctx.get(dut.mem_rd_en)

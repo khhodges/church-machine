@@ -67,6 +67,8 @@ def test_call_rejects_malformed_header(header):
     async def bench(ctx):
         ctx.set(dut.cr_rd_data.as_value(),
                 make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2) | (255 << 64))
+        ctx.set(dut.mload_resolved_cap.as_value(),
+                make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2) | (255 << 64))
         ctx.set(dut.call_start, 1)
         await ctx.tick()
         ctx.set(dut.call_start, 0)

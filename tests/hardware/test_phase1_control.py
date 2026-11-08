@@ -87,7 +87,8 @@ def test_h05_method_selection_before_frame_boundary(method, entry):
             pending = ctx.get(dut.mload_start)
             if pending:
                 assert ctx.get(dut.mload_direct_gt) == 0x4a000002
-                crs[ctx.get(dut.mload_cr_dst)] = 0x4a000002 | 0x2000 << 32 | 63 << 64
+                ctx.set(dut.mload_resolved_cap.as_value(),
+                        0x4a000002 | 0x2000 << 32 | 63 << 64)
             request, addr = ctx.get(dut.mem_rd_en), ctx.get(dut.mem_rd_addr)
             # CR6 final reconstruction precedes stack construction and is
             # independently observable without selecting a frame oracle.

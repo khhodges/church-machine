@@ -23,6 +23,7 @@ class OrdinaryChange(Elaboratable):
         "mem_rd_data", "mem_rd_valid", "mem_wr_done", "dr_rd_data",
         "flags_in", "nia_current", "code_base",
         "namespace_handoff", "incoming_namespace", "cr6_m",
+        "llr_entry", "llr_target",
     )
     OUTPUTS = (
         "change_busy", "change_complete", "change_fault", "fault_type",
@@ -36,6 +37,7 @@ class OrdinaryChange(Elaboratable):
 
     def __init__(self, ports, *, resident_word_locations=False):
         self.resident_word_locations = resident_word_locations
+        self.system_thread_gt = ports.system_thread_gt
         self.change_start = Signal()
         for name in self.INPUTS + self.OUTPUTS:
             setattr(self, name, Signal.like(getattr(ports, name), name="ordinary_" + name))
@@ -96,6 +98,11 @@ class OrdinaryChange(Elaboratable):
         out_base, out_egt = Signal(32), Signal(32)
         owned, self_target = Signal(), Signal()
         handoff, root_entry = Signal(), Signal()
+        llr, owner_pending = Signal(), Signal()
+        owner = Signal(CAP_REG_LAYOUT)
+        owner_view = View(CAP_REG_LAYOUT, owner)
+        metadata = Array(Signal(32, name=f"llr_metadata_{i}") for i in range(4))
+        target_slot = Signal(16)
         flags, nia = Signal(4), Signal(15)
         row = Signal(8)
         phase = Signal(2)  # target Thread, incoming homes, frame E-GT, C-List
@@ -174,17 +181,23 @@ class OrdinaryChange(Elaboratable):
                         namespace.eq(Mux(self.namespace_handoff,
                                          self.incoming_namespace, self.cr15_namespace)),
                         handoff.eq(self.namespace_handoff), root_entry.eq(0),
-                        gt.eq(Mux(self.namespace_handoff, 0x02000002,
-                                  self.cr_rd_data.as_value()[:32])),
+                        llr.eq(self.llr_entry), owner_pending.eq(self.llr_entry),
+                        owner.eq(self.cr12_thread), target_slot.eq(self.llr_target),
+                        gt.eq(Mux(self.llr_entry, self.cr12_thread.as_value()[:32],
+                                  Mux(self.namespace_handoff, 0x02000002,
+                                      self.cr_rd_data.as_value()[:32]))),
                         owned.eq(self.active_thread_owned),
                         # CR12 is the architectural Thread identity. The
                         # scheduler's backing-address hint is not authority.
                         out_base.eq(View(CAP_REG_LAYOUT, self.cr12_thread).word1_location),
                         flags.eq(self.flags_in),
-                        nia.eq(((self.nia_current - self.code_base) >> 2) + 1),
+                        nia.eq(((self.nia_current - self.code_base) >> 2) +
+                               Mux(self.llr_entry, 0, 1)),
                         phase.eq(0), row.eq(0), armed.eq(0), code.eq(0),
                     ]
-                    with m.If(~self.namespace_handoff &
+                    with m.If(self.llr_entry):
+                        m.next = "LLR_OWNER"
+                    with m.Elif(~self.namespace_handoff &
                               (~indexed_form & ((self.cr_dst != 0) | (self.index != 0) |
                                (self.cr_src == 13)))):
                         m.d.sync += code.eq(FaultType.INVALID_OP)
@@ -193,6 +206,14 @@ class OrdinaryChange(Elaboratable):
                         m.next = "LOOKUP_CHECK"
                     with m.Else():
                         m.next = "CHECK"
+            with m.State("LLR_OWNER"):
+                # Internal admission is not an elevated or programmer-supplied
+                # CHANGE operand. Validate the complete active identity first.
+                with m.If(~owned | (gv.gt_type != GT_TYPE_INFORM) |
+                          (gv.perm != 0) | (gv.dom != 0)):
+                    fail(FaultType.THREAD_CONTEXT)
+                with m.Else():
+                    m.next = "CHECK"
             with m.State("LOOKUP_CHECK"):
                 # This is a bounded C-list read, never elevated Namespace
                 # authority and never a temporary architectural CR write.
@@ -260,6 +281,18 @@ class OrdinaryChange(Elaboratable):
                 with m.Elif(gate.ns_gate_done):
                     with m.If(invalid_descriptor | rw.f_flag | (resolved_base[:2] != 0)):
                         fail(FaultType.BOUNDS)
+                    with m.Elif(owner_pending):
+                        with m.If((resolved_base != owner_view.word1_location) |
+                                  (resolved_authority != owner_view.word2_w2)):
+                            fail(FaultType.THREAD_CONTEXT)
+                        with m.Elif(gv.slot_id == 2):
+                            m.d.sync += code.eq(FaultType.ABSENT_OUTFORM)
+                            m.next = "FAULT"
+                        with m.Else():
+                            # Fixed profile identity, never adopt a version
+                            # from the mutable destination descriptor.
+                            m.d.sync += [owner_pending.eq(0), gt.eq(self.system_thread_gt)]
+                            m.next = "CHECK"
                     with m.Elif(lookup_pending):
                         with m.If((lookup_address < resolved_base) |
                                   (lookup_address > resolved_base + (rw.limit_offset << 2))):
@@ -273,7 +306,10 @@ class OrdinaryChange(Elaboratable):
                             thread.eq(resolved), armed.eq(0),
                             self_target.eq(~handoff & owned & (resolved_base == out_base)),
                         ]
-                        m.next = "HEADER"
+                        with m.If(llr):
+                            m.next = "LLR_METADATA"
+                        with m.Else():
+                            m.next = "HEADER"
                     with m.Elif(phase == 1):
                         m.d.sync += homes[row].eq(resolved)
                         m.next = "HOME_NEXT"
@@ -282,6 +318,20 @@ class OrdinaryChange(Elaboratable):
                         m.next = "ENTRY_HEADER"
                     with m.Else():
                         m.next = "CLIST_NEXT"
+            with m.State("LLR_METADATA"):
+                ns_base = View(CAP_REG_LAYOUT, namespace).word1_location
+                with m.If((nw.limit_offset < 3) | (ns_base[:2] != 0) |
+                          (ns_base > 0xFFFFFFF0)):
+                    fail(FaultType.BOUNDS)
+                with m.Else():
+                    read(ns_base + (row << 2))
+                    with m.If(armed & self.mem_rd_valid):
+                        m.d.sync += [metadata[row].eq(self.mem_rd_data), armed.eq(0)]
+                        with m.If(row == 3):
+                            m.d.sync += row.eq(0)
+                            m.next = "HEADER"
+                        with m.Else():
+                            m.d.sync += row.eq(row + 1)
             with m.State("HEADER"):
                 read(tv.word1_location)
                 with m.If(armed & self.mem_rd_valid):
@@ -434,7 +484,9 @@ class OrdinaryChange(Elaboratable):
                     m.d.sync += [out_header.eq(self.mem_rd_data), armed.eq(0)]
                     m.next = "OUT_HEADER_CHECK"
             with m.State("OUT_HEADER_CHECK"):
-                with m.If(~valid_header(out_header, out_size)):
+                with m.If(~valid_header(out_header, out_size) |
+                          (llr & ((View(WORD2_LAYOUT, owner_view.word2_w2).limit_offset != out_size - 1) |
+                                  (out_base + ((out_size - 1) << 2) > 0xFFFFFFFF)))):
                     fail(FaultType.BOUNDS)
                 with m.Else():
                     m.next = "OUT_INDICATOR"
@@ -552,10 +604,34 @@ class OrdinaryChange(Elaboratable):
                         (ev.word0_gt.as_value() & 0x87FFFFFF) | 0x18000000,
                         (ev.word1_location + ((entry_size - entry_header[:8]) << 2))[:32],
                         clist_w2)),
-                    self.nia_restore_en.eq(1),
+                    self.nia_restore_en.eq(~llr),
                     self.nia_restore_val.eq(ev.word1_location + 4 +
                                            Mux(root_entry, 0, frame[13:28] << 2)),
-                    self.flags_restore_en.eq(1), self.flags_restore_data.eq(frame[28:32]),
+                    self.flags_restore_en.eq(~llr), self.flags_restore_data.eq(frame[28:32]),
+                ]
+                with m.If(llr):
+                    m.d.sync += row.eq(1)
+                    m.next = "LLR_INJECT"
+                with m.Else():
+                    m.next = "DONE"
+            with m.State("LLR_INJECT"):
+                m.d.comb += [
+                    self.dr_wr_en.eq(1), self.dr_wr_addr.eq(row),
+                    self.dr_wr_data.eq(Mux(row <= 4, metadata[row - 1],
+                                          Mux(row == 5, target_slot,
+                                              owner_view.word0_gt.as_value()))),
+                ]
+                with m.If(row == 6):
+                    m.next = "LLR_COMMIT"
+                with m.Else():
+                    m.d.sync += row.eq(row + 1)
+            with m.State("LLR_COMMIT"):
+                m.d.comb += [
+                    self.nia_restore_en.eq(1),
+                    self.nia_restore_val.eq(ev.word1_location + 4 + (frame[13:28] << 2)),
+                    self.flags_restore_en.eq(1),
+                    # COND_FLAGS_LAYOUT is N,Z,C,V. Only the entry Z changes.
+                    self.flags_restore_data.eq(frame[28:32] | 2),
                 ]
                 m.next = "DONE"
             with m.State("DONE"):

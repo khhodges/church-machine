@@ -155,9 +155,11 @@ def _run_scenario(initial_sto, expect_fault=None):
                 mload_ack_pending = False
                 if not phase1_done:
                     ctx.set(dut.cr_rd_data.as_value(), cr6_cap)
+                    ctx.set(dut.mload_resolved_cap.as_value(), cr6_cap)
                     phase1_done = True
                 else:
                     ctx.set(dut.cr_rd_data.as_value(), code_cap)
+                    ctx.set(dut.mload_resolved_cap.as_value(), code_cap)
 
             if ml_start:
                 ctx.set(dut.mload_done, 1)
@@ -360,9 +362,11 @@ def test_sw_parametrized():
                         mload_ack = False
                         if not phase1_done:
                             ctx.set(dut2.cr_rd_data.as_value(), CALLEE_EGT)
+                            ctx.set(dut2.mload_resolved_cap.as_value(), CALLEE_EGT)
                             phase1_done = True
                         else:
                             ctx.set(dut2.cr_rd_data.as_value(), code_cap)
+                            ctx.set(dut2.mload_resolved_cap.as_value(), code_cap)
 
                     if ml_start:
                         ctx.set(dut2.mload_done, 1)

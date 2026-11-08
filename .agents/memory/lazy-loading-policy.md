@@ -710,3 +710,17 @@ payload at five words/20 bytes and the owner GT internal.
 not RTL changes or baseline-failure repairs. Keep Z/N/C/V semantics unchanged,
 preserve original USER registers before injection, and test nonzero metadata
 to expose accidental use of DR0.
+
+The user approved local RTL implementation and testing of USER-to-SYSTEM LLR
+entry, including the agreed parameter injection, but not watchdog work or
+physical operations.
+
+**Why:** The user selected “Approve local implementation” for this bounded
+handoff after requesting one issue at a time.
+
+**How to apply:** Treat local RTL evidence separately from transport integration,
+watchdog completion and exact-build FPGA acceptance. No live image change,
+application restart, board contact, upload, reset or flash follows from this
+approval. Preserve the originally issuing CALL context before any callee
+capability publication; detecting absence before a stack push alone is
+insufficient if mLoad already overwrote caller CR6/CR14.

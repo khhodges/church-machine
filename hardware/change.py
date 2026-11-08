@@ -19,13 +19,16 @@ from .thread_design import (
 
 
 class ChurchChange(Elaboratable):
-    def __init__(self, *, resident_word_locations=False):
+    def __init__(self, *, resident_word_locations=False, system_thread_gt=0x02000002):
         self.resident_word_locations = resident_word_locations
+        self.system_thread_gt = system_thread_gt
         self.change_start = Signal()
         # Explicit decoded programmatic operation; not a scheduler request.
         self.ordinary = Signal()
         self.cr6_m = Signal()
         self.namespace_handoff = Signal()
+        self.llr_entry = Signal()
+        self.llr_target = Signal(16)
         self.incoming_namespace = Signal(CAP_REG_LAYOUT)
         self.cr_src = Signal(4)
         self.index = Signal(16)

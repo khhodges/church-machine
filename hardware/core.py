@@ -338,7 +338,9 @@ class ChurchCore(Elaboratable):
             u_gc = ChurchGCUnit()
             u_lambda = ChurchLambda()
             u_change = ChurchChange(
-                resident_word_locations=self.expected_boot_guard is not None)
+                resident_word_locations=self.expected_boot_guard is not None,
+                system_thread_gt=(0x02000002 |
+                    (((self.expected_boot_guard or 0) & 0x1FF) << 16)))
             u_switch = ChurchSwitch()
             u_eloadcall = ChurchELoadCall()
             u_xloadlambda = ChurchXLoadLambda()
@@ -712,6 +714,7 @@ class ChurchCore(Elaboratable):
         xloadlambda_start_sig = Signal()
         scheduler_inflight = Signal()
         decoded_thread_change_inflight = Signal()
+        llr_inflight = Signal()
 
         if not self.iot_profile:
             cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
@@ -2085,13 +2088,15 @@ class ChurchCore(Elaboratable):
                 (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) &
                  (self.imem_data != RESET_MARKER_WORD) &
                  ~any_unit_busy) |
-                thread_switch_start_sig | u_switch.handoff_start
+                thread_switch_start_sig | u_switch.handoff_start | u_call.lazy_load_irq
             ))
             m.d.comb += [
                 u_change.change_start.eq(change_start_sig),
                 u_change.cr6_m.eq(u_regs.m_bit_device_state[CR_CLIST]),
-                u_change.ordinary.eq(u_switch.handoff_start |
+                u_change.ordinary.eq(u_call.lazy_load_irq | u_switch.handoff_start |
                                     (~thread_switch_start_sig & ~boot_microcode_active)),
+                u_change.llr_entry.eq(u_call.lazy_load_irq),
+                u_change.llr_target.eq(u_call.lazy_load_ns_slot),
                 u_change.namespace_handoff.eq(u_switch.handoff_start),
                 u_change.incoming_namespace.eq(u_switch.incoming_namespace),
                 u_change.cr_src.eq(Mux(thread_switch_start_sig, 15, cr_src)),
@@ -2131,6 +2136,12 @@ class ChurchCore(Elaboratable):
                 ]
             with m.If(clear_all):
                 m.d.sync += decoded_thread_change_inflight.eq(0)
+            with m.If(clear_all):
+                m.d.sync += llr_inflight.eq(0)
+            with m.Elif(u_call.lazy_load_irq):
+                m.d.sync += llr_inflight.eq(1)
+            with m.Elif(u_change.change_complete | u_change.change_fault):
+                m.d.sync += llr_inflight.eq(0)
             with m.Elif(u_change.change_complete | u_change.change_fault):
                 m.d.sync += decoded_thread_change_inflight.eq(0)
             with m.If(clear_all):
@@ -2289,9 +2300,10 @@ class ChurchCore(Elaboratable):
                                                  u_xloadlambda.lazy_resolve_slot)))
                 ),
                 irq_dispatch_start.eq(
-                    (self.timer_alarm | u_call.lazy_load_irq |
+                    (self.timer_alarm |
                      u_eloadcall.lazy_resolve_irq | u_xloadlambda.lazy_resolve_irq)
                     & irq_armed_reg
+                    & ~u_call.lazy_load_irq & ~llr_inflight
                     & ~u_irq_dispatch.busy
                 ),
                 u_irq_dispatch.start.eq(irq_dispatch_start),
@@ -3208,7 +3220,7 @@ class ChurchCore(Elaboratable):
         change_retire = Const(0)
         if not self.iot_profile:
             change_retire = (
-                u_change.change_complete & ~scheduler_inflight)
+                u_change.change_complete & ~scheduler_inflight & ~llr_inflight)
             retire_conds = (
                 retire_conds_base |
                 change_retire |
@@ -3283,7 +3295,8 @@ class ChurchCore(Elaboratable):
                 u_shared_mload.sub_direct.eq(u_call.mload_direct),
                 u_shared_mload.sub_direct_gt.eq(u_call.mload_direct_gt),
                 u_shared_mload.sub_m_elevated.eq(u_call.mload_m_elevated),
-                u_shared_mload.sub_validate_only.eq(0),
+                u_shared_mload.sub_validate_only.eq(1),
+                u_call.mload_resolved_cap.eq(u_shared_mload.resolved_cap),
             ]
         with m.Elif(u_return.busy):
             m.d.comb += [

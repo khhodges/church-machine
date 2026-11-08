@@ -190,6 +190,8 @@ def test_call_cleanup_never_touches_cr5(mask):
         ctx.set(call.mask, mask)
         ctx.set(call.cr_rd_data.as_value(),
                 make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2) | (255 << 64))
+        ctx.set(call.mload_resolved_cap.as_value(),
+                make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2) | (255 << 64))
         ctx.set(call.call_start, 1)
         await ctx.tick()
         ctx.set(call.call_start, 0)
