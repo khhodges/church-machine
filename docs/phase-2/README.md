@@ -10,6 +10,9 @@ authorization to install an image or program hardware.
 - **[Hardware-address map and diagnostic MMIO](hardware-address-map-and-diagnostic-mmio.md)** —
   full declared range, approved WDT address `0xFFFFFF18`, current decoder differences,
   and the approved Church capability-controlled diagnostic direction.
+- **[Mint-private GT-construction port](gt-construction-port.md)** —
+  approved dedicated DATA-write/capability-load direction; pending-result
+  lifetime and exact interface remain to be settled.
 
 ## Current agreed FPGA boundary
 

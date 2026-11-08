@@ -153,3 +153,4 @@
 - [Bridge pairing restarts](bridge-pairing-restarts.md) — private installation-local grants; unchanged expiry; notify before active server restarts.
 - [TypeScript test transpilation](typescript-test-transpilation.md) — the TypeScript CLI may work without the legacy JS compiler API; use esbuild for isolated helper tests.
 - [Lazy loading policy](lazy-loading-policy.md) — approved fetches by default; plus-marked later-version tests use new slots; include Resolve and Retirement.
+- [GT-construction port](gt-construction-port.md) — Mint-private DATA-write/capability-load direction; diagnostic addressability does not grant minting authority.

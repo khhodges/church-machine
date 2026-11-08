@@ -200,6 +200,13 @@ per-port access semantics, address units/translation, provisioning or method ABI
 No diagnostic Namespace slot, raw full-range capability, API method signature,
 host bus address or new fault code is assigned by this document.
 
+### Dedicated GT construction
+
+The approved [Mint-private GT-construction port direction](gt-construction-port.md)
+adds a separate manufacturing-authority requirement. Full-range diagnostic
+addressability does not grant access to it. Its address is not yet assigned,
+so the unassigned ranges above remain unchanged.
+
 ## Sources and authority
 
 - [Declared hardware constants](../../hardware/hw_types.py):
