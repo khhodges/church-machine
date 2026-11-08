@@ -485,3 +485,15 @@ Thread. Keep the record reserved for that USER's next LLR with a new number.
 Preserve other USERs, shared session and counter. No IDE cancellation message
 is required by this decision; reset authority/notification and late-reply
 disposition remain open.
+
+Do not add a special late-LUMP discard mechanism merely because its requesting
+USER reset; the user wants ordinary slot/GT/GC control considered first.
+
+**Why:** The user challenged the proposed discard path as extra code and
+suggested the requesting Thread's version as the reset-specific test.
+
+**How to apply:** Separate returned-target admission from eligibility of the
+original requester. Version-based reset invalidation requires an explicit rule
+that authorized software changes the Thread version; hardware never changes
+versions. This direction does not waive normal target validation or request
+correlation, nor establish a new reset-version rule by itself.
