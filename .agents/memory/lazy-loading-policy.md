@@ -268,3 +268,14 @@ existing mapping removes the need to transmit the GT or resolve a name on FPGA.
 original E-GT with the pending USER CALL and validate returned identity; slot
 number is a lookup key, not authority. Parameter register and message correlation
 remain to be defined. Do not treat the earlier E-GT-register proposal as settled.
+
+The Namespace is itself a LUMP, with its own `dot.net` name in slot-0 metadata,
+as stated by the user. Use that existing identity when discussing the Namespace
+component of a lazy-load request rather than inventing a separate Namespace ID.
+
+**Why:** The user clarified where the Namespace's name already resides after
+the request was scoped to Namespace identity plus target slot.
+
+**How to apply:** Distinguish the Namespace's metadata name from the target
+slot's dot.name. Exact name encoding and parameter-transfer mechanics remain
+open; do not assume a complete name fits in one data register.
