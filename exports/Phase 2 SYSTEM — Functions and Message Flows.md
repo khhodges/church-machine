@@ -332,9 +332,19 @@ a replacement request, including one for the same target and USER.
 
 The identifier is correlation data, not authority; all required LUMP identity,
 integrity and runtime authority checks remain. It is outside the unchanged
-20-byte target payload. Identifier width, generation, scope/reset lifetime,
+20-byte target payload. Identifier width, generation, binary session encoding,
 wrap behavior and duplicate/stale-message disposition remain to be settled.
 The complete wire envelope size is not yet fixed.
+
+**Approved reset lifetime:** a reset that reinitializes SYSTEM's pending
+records starts a fresh request session. Pre-reset requests do not survive
+that reinitialization; delayed replies from the old session must not install
+a body or wake a USER in the new session. Post-reset execution establishes
+new requests as needed rather than restoring old pending requests.
+A transport disconnect alone does not reset this session, and indefinite
+waiting does not expire a request. This rule does not change the power-cycle-only
+diagnostic policy or authorize resuming faulted execution. The binary mechanism
+that distinguishes sessions remains to be specified.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -729,7 +739,9 @@ contract; it does not justify adding a USER Wait branch to this lifecycle.
   stale producers/waiters; exact lifetime/identity rules remain to be specified.
 - USER may wait indefinitely; elapsed time alone does not resume or fault it.
   No busy polling, request retry loop or alternate target is introduced.
-- Persistent survival across reset/power loss is not implied.
+- Requests do not survive a reset that reinitializes SYSTEM's pending records;
+  start a fresh request session and exclude old replies from installation or
+  completion. A transport disconnect alone does not reset pending requests.
 
 ## 4. One lifecycle for all cases
 
@@ -855,13 +867,13 @@ is not execution acceptance.
 | F.5 | Indefinite unavailability | Request remains pending; handler finishes; another unblocked resident Thread runs; no timeout-driven fault or resume. |
 | F.6 | Delivery admission | Incoming data is handled at the defined service point with no asynchronous preemption; previous handler has finished. |
 | F.7 | Invalid/mismatched delivery | No completion signal or USER resume; validation-fault ownership follows its agreed contract. |
-| F.8 | Duplicate/stale delivery | IDE echoes the SYSTEM-assigned envelope request identifier. Match it and expected target before installation/completion. An old reply cannot complete a replacement use, even for the same USER and target; no second install, signal or wakeup. Exact duplicate/stale disposition and reset lifetime remain open. |
+| F.8 | Duplicate/stale delivery | IDE echoes the SYSTEM-assigned envelope request identifier. Match it and expected target before installation/completion. An old reply cannot complete a replacement use, even for the same USER and target; no second install, signal or wakeup. Pre-reset replies cannot install or wake in a fresh session. Exact duplicate/stale disposition and binary session encoding remain open. |
 | F.9 | Multiple outstanding requests | Handlers execute serially; dispatch requests from distinct blocked USERs in FIFO acceptance order without waiting for earlier delivery. Delay the first target and deliver a later one: only its associated USER becomes eligible. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. One pending use per USER remains enforced. |
 | F.10 | Several USERs need one LUMP | Each pending use completes correctly; one flag signal is not assumed to broadcast. |
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
 | F.12 | Retirement | Only safe reclamation produces DONE/Signal; retain the slot and modified-state obligations. Deferred retirement does not hold SYSTEM indefinitely. |
 | F.13 | Pre-commit CALL suspension/restoration | Before suspension no callee frame/context or CALL advance is committed. Restore the original CALL location, GT, selector and operands; normal execution checks and dispatch occur once after delivery. No earlier USER instruction repeats and no partially executed pipeline state is resumed. |
-| F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
+| F.14 | Event/session lifetime | Event Reset/reuse must not erase an active association during a session. SYSTEM pending-state reinitialization starts a fresh session and abandons pre-reset requests; old replies cannot install or wake a new USER. A transport disconnect alone retains the session, and indefinite waiting does not expire requests. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
 | F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. If all USERs are on hold, SYSTEM stays active with no X.2/X.3 handoff, BACKGROUND selection or blocked-USER resume. Handler completion precedes selection when USER work becomes eligible. |
 | F.17 | Repeated SYSTEM activation | Wired slot-2 GT selects SYSTEM; restore its saved service-loop executable/NIA and registers, then inject event parameters before execution. CR12 identifies the active Thread. Runtime entry saves USER first; no startup diagnostic rerun or forced fixed-handler jump. All USERs held: stay in the loop. CR13 remains reserved; no swap or replay of reset-only admission. |
@@ -916,8 +928,11 @@ The following are not settled by the design discussion:
   pending USER a reply completes. **Settled correlation:** SYSTEM assigns an
   identifier per accepted LLR in the envelope; IDE echoes it in DELIVER.
   Match identifier and expected target before installation/completion. Width,
-  generation, reset scope, wrap behavior and duplicate/stale disposition remain
-  open. No added target-payload word is assumed.
+  generation, binary session encoding, wrap behavior and duplicate/stale
+  disposition remain open. **Settled lifetime:** pending-state reinitialization
+  starts a fresh session; pre-reset requests do not survive, and their replies
+  cannot install or wake in the new session. Disconnect alone is not reset.
+  No added target-payload word is assumed.
 - Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
   mechanism when no USER is eligible and no service work is available.
   SYSTEM remaining active when all USERs are on hold is settled; maintenance

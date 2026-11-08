@@ -391,5 +391,17 @@ and protect reused per-USER records from delayed old replies.
 
 **How to apply:** Retain the identifier in the pending record and match it plus
 the expected target before installation/completion. It grants no authority.
-Keep the target payload at 20 bytes; identifier width, generation, reset scope,
-wrap and duplicate disposition remain undecided.
+Keep the target payload at 20 bytes; identifier width, generation, binary session
+encoding, wrap and duplicate disposition remain undecided.
+
+A reset that reinitializes SYSTEM's pending records starts a fresh request
+session; pre-reset requests do not survive it.
+
+**Why:** The user explicitly approved a fresh session after reset instead of
+persistent pending requests.
+
+**How to apply:** Old-session replies cannot install a body or wake a USER in
+the new session. Post-reset execution establishes new requests as needed.
+Disconnect alone does not reset the session; indefinite waits do not expire.
+This does not change diagnostic policy or authorize faulted execution recovery.
+Binary session identity remains to be defined.
