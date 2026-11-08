@@ -30,6 +30,10 @@ authorization to install an image or program hardware.
   SYSTEM uses self-CHANGE before the deadline when no USER is eligible.
   Successful internal LLR entry renews only after save, restore and injection
   complete; no early renewal/pause, and expiry wins at equality.
+- SecurityRegulator privately holds the watchdog-control capability. SYSTEM
+  may CALL explicitly authorized methods without receiving raw control authority.
+  Hardware retains automatic transition renewal and expiry enforcement;
+  no general software kick or SYSTEM exemption is added.
 - Authorized software increments Thread version on USER reset, without wrap;
   hardware compares only. SecurityRegulator must supply the increment method;
   its exact ABI remains open.

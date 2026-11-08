@@ -724,3 +724,16 @@ application restart, board contact, upload, reset or flash follows from this
 approval. Preserve the originally issuing CALL context before any callee
 capability publication; detecting absence before a stack push alone is
 insufficient if mLoad already overwrote caller CR6/CR14.
+
+SecurityRegulator alone privately holds direct watchdog-control authority;
+SYSTEM may CALL explicitly authorized SecurityRegulator methods.
+
+**Why:** The user agreed after clarifying that SYSTEM is a Thread and
+SecurityRegulator is an abstraction that may execute inside it. Exclusive
+capability custody must not become a prohibition on SYSTEM using the service.
+
+**How to apply:** Keep raw MMIO control private, with capability checks rather
+than name/Thread privilege. Hardware retains transition-based renewal and
+expiry enforcement; SYSTEM self-CHANGE needs no service CALL. Add no general
+software kick, SYSTEM exemption or remaining-time read. Approval settles
+ownership only, not watchdog implementation or physical operations.

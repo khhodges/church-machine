@@ -723,6 +723,25 @@ The existing selected interval is 0.25, 0.5, 1 or 2 seconds, initially 1 second;
 successful CHANGE/SWITCH renews it, while ordinary loops and CALL/RETURN do not.
 Existing expiry precedence and exemption rules remain unchanged.
 
+**Approved watchdog control ownership:** SecurityRegulator alone holds the
+privately provisioned watchdog MMIO control capability. It may read the control
+word and configure the timeout and permitted exemption under the existing
+write rules. USER code and SYSTEM's service-loop code do not receive that raw
+capability.
+
+SYSTEM may CALL explicitly authorized SecurityRegulator methods. SecurityRegulator
+is an abstraction, not a separate Thread: it can execute within SYSTEM using
+its own private authority. Hardware checks capabilities, not the abstraction's
+name or a SYSTEM Thread privilege. Exclusive custody of control authority
+does not prohibit SYSTEM from accessing the authorized service.
+
+Hardware independently owns timing, successful CHANGE/SWITCH and completed-LLR
+renewal, and expiry enforcement. SYSTEM self-CHANGE needs no SecurityRegulator
+CALL. No general-purpose software kick/reset is added, and SYSTEM receives no
+automatic exemption. The defined read returns configuration, not elapsed or
+remaining time. This ownership approval does not itself approve watchdog RTL
+implementation, method encodings, MMIO address assignment or physical operations.
+
 A suspended USER may wait indefinitely for its LLR: waiting does not itself
 create a request timeout. This is distinct from indefinite execution of SYSTEM
 or another USER without renewal. Watchdog expiry remains a HardFault, not a

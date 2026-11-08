@@ -119,6 +119,16 @@ These expand coverage of existing agreements; they do not introduce new behavior
 | A7 | Local lazy resolution completes without unnecessary IDE request or extra authority; non-CALL use preserves its own operation, not an invented CALL. | G6 non-CALL entry |
 | A8 | SYSTEM starts once with resident required dependencies, validates before USER release and initializes saved Z=0; startup failure blocks release, runtime does not rerun diagnostics. | G3 fixture; cold-start distinction |
 
+**A5 ownership subcases:** verify SecurityRegulator's private custody of the
+watchdog-control capability; no raw capability is exposed to USER code or
+SYSTEM's service loop. Exercise authorized SYSTEM CALLs to SecurityRegulator
+and rejection without the required method authority. The service may execute
+within SYSTEM; no Thread-name or abstraction-name privilege substitutes for
+capability checks. Verify configuration reads, no general software kick, no
+automatic SYSTEM exemption, and hardware renewal independent of a service
+CALL. Remaining-time reads are not part of the agreed control interface.
+These are required assertions, not implementation or passing-test claims.
+
 ## Transport, correlation and software reset support
 
 These are integration tests needed around the FPGA contract, not transport
