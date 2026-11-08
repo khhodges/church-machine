@@ -1,5 +1,12 @@
 # Minimal Mint machine interfaces — proposal for review
 
+**Current testing scope supersedes the historical schedule below:** The user
+has deferred Mint testing to Phase 2 and directed that current effort not be
+spent qualifying this outdated path. Retain this contract and its evidence as
+history/reference. Future qualification targets the
+[revised GT-construction design](../../phase-2/gt-construction-port.md);
+historical isolated implementation approval is not a current testing mandate.
+
 **Status: APPROVED FOR ISOLATED SIMULATOR IMPLEMENTATION, 2026-10-17.**
 The user explicitly approved the protected interfaces and `ide.*` candidate
 identities, retaining slots and display labels. Live installation and hardware

@@ -16,6 +16,12 @@ authorization to install an image or program hardware.
 
 ## Current agreed FPGA boundary
 
+**Mint testing scope:** Do not spend current effort testing or qualifying the
+outdated Mint path. Mint testing is deferred to Phase 2 and should target the
+revised GT-construction design, not revive the superseded result-alias path.
+Existing code, tests and evidence remain historical/reference material; this
+deferral neither deletes tests nor claims Mint acceptance.
+
 - Boot.Thread at Namespace slot 2 is SYSTEM; CR12 holds active Thread identity;
   CR13 remains reserved. Full GTs preserve version; slots are Namespace-scoped.
 - A valid unavailable USER CALL enters SYSTEM internally, saving the original

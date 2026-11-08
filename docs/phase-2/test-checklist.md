@@ -29,6 +29,13 @@ original DR1–DR6 were saved before injection. T1 transmits only DR1–DR5
 
 ## Execution order and gates
 
+**Mint deferral:** The user directed that testing the outdated Mint implementation
+must not consume current work. Mint qualification belongs to Phase 2 against the
+[revised GT-construction design](gt-construction-port.md), after its remaining
+interface decisions and implementation are settled. Do not schedule legacy
+Mint qualification as a prerequisite for the current work. Preserve historical
+tests/evidence without treating them as acceptance of the replacement design.
+
 1. **First milestone:** exact hardware absent-body USER CALL → SYSTEM request →
    delayed validated delivery → original CALL executes once. Demonstrate another
    USER progressing while the requester waits, then repeat with all USERs held

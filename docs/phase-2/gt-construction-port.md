@@ -76,6 +76,12 @@ rules before integration. No partially validated LOAD may publish a CR value.
 
 ## Remaining interface and verification work
 
+**Testing scope — user direction:** Defer Mint testing to Phase 2. Do not spend
+current effort qualifying the outdated Mint implementation or its result-alias
+path. Future Mint qualification should exercise the revised design below once
+the outstanding contract and implementation are ready. Retain old tests and
+evidence as reference, not as proof of the new port or a current prerequisite.
+
 With pending-result lifetime settled, review remaining issues one at a time:
 
 - Exact port address and address units, width/alignment and decode.

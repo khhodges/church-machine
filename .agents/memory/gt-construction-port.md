@@ -26,3 +26,14 @@ only after LOAD does not prevent cross-context consumption.
 interrupted write/load pair. Mint must complete the pair without a context
 handoff. Exact fault code and remaining operation/ordering details are not
 settled by this approval.
+
+The user directed: “We should not spend time on testing the outdated Mint and
+push that to phase 2.”
+
+**Why:** Qualifying the superseded Mint path would spend effort on a design being
+replaced rather than the intended GT-construction mechanism.
+
+**How to apply:** Defer Mint qualification to Phase 2 against the revised design.
+Do not proactively run, repair or expand outdated Mint-specific qualification,
+or make it a prerequisite for current work. Retain historical code/tests/evidence;
+this is not permission to delete tests or claim acceptance.
