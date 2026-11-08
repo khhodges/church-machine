@@ -96,3 +96,12 @@ outdated result-alias/credential implementation as the design authority.
 historical executable evidence, and distinguish approval from missing machine
 interfaces. Do not strip live authorization checks or invent runnable opcodes
 to simulate an unimplemented GTMint/Pass Bit path.
+
+General Pass Bit and indirect-CALL authorization work has subsequently been
+deferred; Genesis directed unchecked Passcodes for Phase 2.
+
+**Why:** The general mechanism must not block delivery or be rushed.
+
+**How to apply:** Keep dedicated GTMint GT.M work distinct from that deferral.
+Do not require a general Pass Bit design before continuing the GTMint contract,
+and do not represent unchecked Passcodes as authentication.

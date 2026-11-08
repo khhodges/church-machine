@@ -73,6 +73,16 @@ specified separately from the pending result.
 
 ## Passcodes, Pass Bit and identity
 
+**Current Genesis decision:** Leave Passcodes unchecked for Phase 2. Do not
+make a general Pass Bit, a new proof-verification scheme or specialized-regulator
+indirect-CALL authorization a prerequisite for Mint work. The user explicitly
+deferred this redesign to avoid rushing an unsafe general mechanism.
+
+This is not authentication: do not label an unchecked Passcode or a supplied
+identity as verified. Existing capability/permission, bounds, version,
+instruction and object-lifecycle validation remain applicable. The dedicated
+GTMint GT.M contract is separate and remains approved.
+
 The approved simplification addresses proliferation of slots and C-list
 entries in general internal Passcode machinery. It must not force additional
 Passcode objects and proof-forwarding abstractions into the revised design
@@ -81,18 +91,16 @@ merely to reproduce the older implementation.
 Programs remain free to use passcodes privately in exceptional circumstances.
 Passcodes are not prohibited or inherently unworkable.
 
-The Pass Bit direction and Namespace-qualified identity tracing are part of
-this revision, but Genesis approval does not supply unspecified bit scope,
-grant/consumption semantics or storage layout. Do not silently equate a
-general Pass Bit with the dedicated GTMint GT.M, or assume recording identity
-alone authorizes an operation. A complete replacement for the old runtime
-authorization path depends on these missing details.
+The earlier proposal to resolve general Pass Bit mechanics as part of this
+revision is deferred. Do not silently equate a general Pass Bit with the
+dedicated GTMint GT.M, or assume recording identity alone authorizes an operation.
 
 Audit must retain the Namespace-qualified identity associated with the actual
 authorization and the operation outcome. Existing non-conflicting transaction
-and Home IDE audit requirements are not removed. Originator propagation and
-its relation to the previous Passcode audit association require reconciliation,
-not substitution of a service's identity for its caller without a decision.
+and Home IDE audit requirements are not removed. Do not claim verified Passcode
+attribution while Passcodes are unchecked. The general originator/proof
+redesign is deferred; do not substitute a service's identity for its caller
+or invent a verified association to fill the gap.
 
 ## Changes required for the executable abstraction
 
@@ -100,7 +108,7 @@ not substitution of a service's identity for its caller without a decision.
 |---|---|
 | Private writable result memory and capability-load alias | Dedicated GTMint port with transient result |
 | Reuse of source CR.M suggested during discussion | Dedicated GTMint GT.M, explicitly set and consumed |
-| General Passcode/proof machinery as the default internal approach | Approved simpler authorization direction, with Pass Bit details still required |
+| General Passcode/proof redesign | Passcodes unchecked in Phase 2; general Pass Bit and indirect-CALL redesign deferred |
 | Identity represented by a local E-GT alone | Namespace ID plus full caller E-GT |
 | One broadly privileged diagnostic view | Decomposed abstractions with separately scoped GTs |
 
@@ -116,7 +124,9 @@ saved evidence; do not present old test results as evidence for this contract.
    Duplicate-write replacement was recommended after withdrawing the earlier
    hard-fault recommendation; it has not been independently settled.
 3. Protected Namespace-qualified caller capture/storage and monitor call ABI.
-4. Pass Bit placement, scope, lifetime and its relationship to the audit record.
+
+General Pass Bit placement/scope/lifetime and proof-based caller propagation
+are deferred and are not inputs required for the Phase 2 GTMint update.
 
 These are the outstanding inputs for a runnable update, not reasons to reopen
 the decisions Genesis has approved. Continue one issue at a time.

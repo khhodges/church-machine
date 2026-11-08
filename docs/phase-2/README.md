@@ -23,8 +23,10 @@ authorization to install an image or program hardware.
 **[Pass Bit and caller identity discussion](pass-bit-and-caller-identity.md):**
 avoid general Passcode slot/C-list proliferation without prohibiting private
 program use; recorded caller E-GT identity must include the Namespace ID.
-Genesis has approved incorporating these decisions into Mint; exact Pass Bit
-mechanics remain to be specified in the revised abstraction contract.
+**Current Genesis decision: Passcodes remain unchecked for Phase 2.** Defer
+general Pass Bit and indirect-CALL authorization redesign; neither gates
+Phase 2 delivery. Unchecked Passcodes do not authenticate a caller.
+The approved dedicated GTMint GT.M and ordinary capability checks remain separate.
 
 **Mint testing scope:** Do not spend current effort testing or qualifying the
 outdated Mint path. Mint testing is deferred to Phase 2 and should target the

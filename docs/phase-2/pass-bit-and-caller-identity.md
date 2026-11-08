@@ -2,10 +2,18 @@
 
 ## Status
 
-Genesis approved incorporating the simpler authorization direction and the
-clarifications below into the [revised Mint abstraction](mint-abstraction.md).
-Exact Pass Bit mechanics remain unspecified; this does not assign a bit,
-provide a complete executable replacement or claim implementation.
+**Current Genesis scope decision:** Leave Passcodes unchecked for Phase 2,
+as requested by the user. Defer the general Pass Bit and specialized-regulator
+indirect-CALL authorization redesign; neither is a Phase 2 delivery gate.
+This supersedes the earlier direction to work out that replacement now.
+
+Unchecked Passcodes provide no Passcode authentication or verified-originator
+guarantee. Ordinary capability, instruction, object and memory checks remain
+required. This scope decision does not remove existing runtime checks or claim
+that every historical executable already behaves this way.
+
+The discussion below is retained for later review. The separately approved
+dedicated GTMint GT.M mechanism is not the deferred general Pass Bit.
 
 ## Passcodes remain available to programs
 
@@ -29,8 +37,8 @@ identity record, not a decision to enlarge or repack the 32-bit GT itself.
 The Namespace ID representation and protected capture/storage mechanism remain
 to be specified.
 
-Capturing caller identity alongside authorization is the direction being
-discussed. Pass Bit scope, lifetime and consumption, immediate caller versus
-originator propagation, and the relationship to existing audit requirements
-remain separate decisions. No new Namespace slots or C-list entries are
-assigned by this note.
+The Namespace-qualified identity requirement remains valid whenever caller
+identity is recorded; an unchecked Passcode must not be represented as verified
+identity. General Pass Bit scope, lifetime and consumption, originator propagation
+and the associated authorization redesign are deferred, not current prerequisites.
+No new Namespace slots or C-list entries are assigned by this note.
