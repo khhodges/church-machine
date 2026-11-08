@@ -436,5 +436,16 @@ counter for Phase 2 correlation.
 
 **How to apply:** Session plus request number is 12 envelope bytes, separate
 from the 20-byte target payload. Do not call this the complete packet size or
-treat width as proof of freshness. Byte order, allocation/non-reuse and setup
-reply protection remain open.
+treat width as proof of freshness. Allocation follows the persistent-counter
+rule below; byte order and setup-reply protection remain open.
+
+IDE allocates session IDs with a persistent increasing unsigned 64-bit counter
+starting at 1, durably reserving each value before transmission and never reissuing it.
+
+**Why:** The user approved deterministic non-reuse through persistent IDE state.
+
+**How to apply:** Gaps are harmless; serialize reservations. Stop issuance if
+exhausted or trusted state is unavailable; no wrap, guessing or restart at 1.
+An older restored state needs non-reuse verification before issuance. Storage
+mechanics and delayed-setup-reply binding remain open; do not claim counter
+uniqueness alone makes an old setup response fresh.

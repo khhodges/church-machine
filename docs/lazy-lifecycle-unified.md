@@ -366,7 +366,7 @@ Establishment requires an explicit session-setup exchange, not yet defined
 or implemented. LLRs may queue before setup completes but cannot dispatch
 under an unestablished session. Temporary disconnection preserves the
 established session; it does not automatically request a replacement.
-Freshness/non-reuse guarantees, setup messages and protection
+Allocation/non-reuse follows the persistent-counter rule below; setup messages and protection
 against delayed setup replies remain open. The REQUEST/DELIVER pair alone is
 therefore not the complete session-establishment protocol.
 
@@ -377,6 +377,18 @@ occupies 12 bytes in the envelope. The target payload remains 20 bytes; message
 type, length and other framing are separate, so this does not fix total packet
 size. Word/byte order remains to be specified. Field width alone does not
 guarantee freshness or non-reuse.
+
+**Approved session allocation:** IDE uses a persistent unsigned 64-bit
+increasing counter starting at 1. Durably reserve each session ID before
+transmitting it; never issue that ID again. Gaps after reservation are harmless.
+Allocation must be serialized so two issuances cannot reserve the same value.
+If the counter is exhausted or its trusted state is unavailable, stop issuing
+sessions: do not wrap, guess, or restart at 1. A restored older allocation
+state is not safe for resumed issuance without establishing non-reuse.
+This is an IDE storage requirement, not FPGA persistent state. Storage choice,
+rollback/non-reuse verification and failure reporting still need specification.
+Non-reused IDs alone do not protect against a delayed setup reply; that binding
+remains a separate open contract.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -975,6 +987,11 @@ The following are not settled by the design discussion:
   unestablished and is not issuable. Session ID plus request number occupies
   12 envelope bytes, outside the 20-byte target payload; byte/word order and
   full framing remain open.
+  **Settled allocation:** IDE persistently increments from 1, reserves durably
+  before transmission, and never reissues an ID. Stop issuance on exhaustion
+  or untrusted/unavailable allocation state; never wrap or restart at 1.
+  Older restored state requires non-reuse verification before issuance.
+  Storage mechanics and binding setup replies to current initialization remain open.
   No added target-payload word is assumed.
 - Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
   mechanism when no USER is eligible and no service work is available.
