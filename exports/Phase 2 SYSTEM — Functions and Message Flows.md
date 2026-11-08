@@ -381,6 +381,18 @@ This reservation covers request bookkeeping, not LUMP bodies or transport
 buffers. Exact record layout and transport backpressure handling remain open;
 this is not unbounded buffering.
 
+**No duplicate request for an LLR in progress:** the same pending USER operation
+must not trigger a second LLR event, queue entry, request identifier or logical
+IDE request while its existing LLR is queued or awaiting completion. Keep USER
+suspended at its saved original CALL; do not periodically resume that CALL to
+rediscover the absent body. Other Thread activity, SYSTEM activations and
+continued absence of the body do not retrigger that pending use.
+Resume only through the approved completion/eligibility path; reset invalidates
+the old association under the separate reset rules. This constraint does not
+approve the broader proposed runtime-entry admission mechanism or prescribe a
+new hardware pending bit. It also does not settle coalescing independent USER
+requests for the same target; their owner associations remain distinct.
+
 **Approved record reuse:** after validated installation and successful readiness
 signaling, mark the USER's record completed. Retain it until that same USER
 issues its next LLR; only then replace its contents with the new pending use.
@@ -1099,6 +1111,14 @@ operands, target GT and flags survive SYSTEM parameter injection and restoration
 No callee frame or duplicate LLR execution-context block is created. Invalid
 protected-save state must HardFault without entering SYSTEM with a partial save.
 This is an acceptance requirement, not a claim of an executed test.
+
+**F.31 — no duplicate in-progress LLR:** hold one USER's LLR queued and, in a
+separate case, sent awaiting delivery. Run other eligible Threads and repeated
+SYSTEM service activations while the body remains absent. Require one pending
+use and no second event, queue entry, request number or logical IDE request for
+that use. The suspended CALL must not execute as a polling retry. Complete
+through the existing validated completion path, or invalidate under the reset
+rules. This is an acceptance requirement, not an executed test.
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.

@@ -577,3 +577,15 @@ without committing CALL or pushing a callee frame. Temporary event data and
 software pending associations are not duplicate execution contexts. A failed
 protected-save validation HardFaults; do not enter SYSTEM with a partial save.
 No CHANGE instruction is inserted into USER code; runtime admission stays separate.
+
+An LLR already in progress must not trigger a second request for the same
+pending USER operation.
+
+**Why:** The user corrected the proposed runtime-entry rule to require no second
+request for LLRs in process.
+
+**How to apply:** Keep that USER suspended, not periodically executing its saved
+CALL to rediscover absence. Preserve the existing pending association through
+other Thread/SYSTEM activity; no duplicate event, queue entry or request ID.
+This does not approve the full runtime-entry proposal, introduce a pending bit,
+or decide coalescing across independent USER requests for the same target.
