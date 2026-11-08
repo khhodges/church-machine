@@ -257,13 +257,14 @@ the current ISA admits that marker only once per reset, and runtime entry must
 first preserve the suspended USER at its uncommitted CALL. Runtime admission
 and event parameters remain to be defined; this is not hardware authorization.
 
-Microcode must pass the unavailable CALL's lazy-load E-GT into SYSTEM context.
+The user states that IDE knows the dot.name of each Namespace slot. The current
+simplification under discussion is passing the unavailable target's slot number
+as request data, instead of loading its E-GT into SYSTEM capability context.
 
-**Why:** The user explicitly identified this parameter transfer as another
-difference between startup activation and runtime lazy-load entry.
+**Why:** Loading the unavailable E-GT could trigger another LazyLoad; the IDE's
+existing mapping removes the need to transmit the GT or resolve a name on FPGA.
 
-**How to apply:** Preserve the original target E-GT across USER save and SYSTEM
-restoration, then supply it as a SYSTEM parameter without changing its authority.
-Keep it distinct from the wired slot-2 Thread GT used to activate SYSTEM.
-The destination register remains undecided; do not overwrite restored parameters
-or lose the original CALL state needed for USER resumption.
+**How to apply:** Scope slot lookup to the requesting Namespace. Preserve the
+original E-GT with the pending USER CALL and validate returned identity; slot
+number is a lookup key, not authority. Parameter register and message correlation
+remain to be defined. Do not treat the earlier E-GT-register proposal as settled.
