@@ -79,8 +79,8 @@ startup. CR12 continues to identify the active Thread, including SYSTEM.
 CR13 remains reserved and untouched; no swap or swap-back is involved.
 Runtime entry first preserves USER at the uncommitted CALL, unlike startup,
 which has no outgoing USER. Reusing activation machinery does not authorize
-replaying the current reset-only marker outside reset. Runtime admission and
-the exact exit mechanism remain to be defined.
+replaying the current reset-only marker outside reset. Runtime admission remains
+to be defined; exit to a selected USER uses ordinary CHANGE as approved below.
 
 ### Approved Thread identity and SYSTEM recognition
 
@@ -127,6 +127,22 @@ distinct uses of the Thread machinery. This contract requires service-loop
 software; it does not establish that existing Boot executable bytes already
 provide that loop, authorize replacing them, or permit replay of the reset-only
 activation marker.
+
+### Approved SYSTEM exit: ordinary CHANGE
+
+When SYSTEM selects a ready USER, it executes ordinary CHANGE using that USER's
+full, permissionless Thread GT through the existing operand mechanism. CHANGE
+saves SYSTEM's service-loop continuation and restores USER's protected context,
+including original registers and condition flags. For a USER suspended on an
+unavailable CALL, restoration resumes that original uncommitted CALL, which
+executes with normal capability and version checks.
+
+A stale Thread GT or invalid saved context causes HardFault; hardware must not
+repair the context or upgrade the GT. Delivery/readiness signaling alone does
+not switch Threads. No special return-from-LLR instruction, CR13 swap-back or
+automatic return to the most recently suspended USER is introduced. USER
+selection stays in SYSTEM software; the FPGA performs normal validated CHANGE.
+If all USERs remain held, SYSTEM stays active without a CHANGE.
 
 ### Approved event recognition: existing Indicator condition flag
 
@@ -683,20 +699,20 @@ IDE   FPGA  OTHER SYSTEM  COMMENTS
  |     |     |     |     Otherwise:
  |     <-----------|     X.2 SYSTEM requests handoff
  |     |     |     |     to selected Thread.
- |     |     |     |     CHANGE/context transition:
- |     |     |     |     exact event-exit ABI open.
+ |     |     |     |     ordinary CHANGE using the
+ |     |     |     |     selected USER's full Thread GT.
  |     |---->|     |     X.3 FPGA activates selected
  |     |     |     |     Thread's saved context.
  |     |     |     |     CR12 identifies selected Thread.
  |     |     |     |     Only then other work runs.
 ```
 
-X.2 explicitly identifies the required Thread transition. Whether event exit
-uses ordinary `CHANGE CRn` or a separately defined event-exit operation is not
-yet decided. Entry and exit preserve CR13 without a hidden CR12/CR13 swap or
-matching swap-back. Do not assume a new opcode or direct return to the
-interrupted USER. SYSTEM must remain available for subsequent serialized
-events; the exact exit mechanism and context validation remain to be specified.
+X.2 uses ordinary CHANGE through the existing operand mechanism, not a separate
+event-exit operation. Entry and exit preserve CR13 without a hidden CR12/CR13
+swap or matching swap-back. Do not assume direct return to the interrupted USER:
+SYSTEM selects an eligible USER under the agreed round-robin policy.
+Normal CHANGE validation applies, and SYSTEM's saved continuation remains
+available for subsequent serialized events.
 
 ### C. DELIVER and resume the original operation
 
@@ -1050,6 +1066,13 @@ entry for that dependency. Separately confirm that SYSTEM can serve a USER's
 LLR normally using resident dependencies. This is an acceptance requirement,
 not a claim of an executed test.
 
+**F.29 — ordinary CHANGE exit:** select a ready USER and exit SYSTEM through
+ordinary CHANGE using its full permissionless Thread GT. Verify SYSTEM's saved
+service-loop continuation and USER's restored registers/flags; the suspended
+USER executes its original uncommitted CALL under normal checks. A stale GT or
+invalid saved context must HardFault without repair. Delivery/readiness alone
+must not switch Threads. This is an acceptance requirement, not an executed test.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1067,8 +1090,10 @@ The following are not settled by the design discussion:
   discriminator (Z=1 new LLR, Z=0 none); initialization/test/reset instructions
   and software continuation placement remain open. The Thread GT is not a
   method selector.
-- Exact event entry, protected pending-operation storage, event exit and
-  CHANGE relationship; no unapproved swap-back or opcode is assumed.
+- Exact event entry and protected pending-operation storage remain open.
+  **Settled exit:** ordinary CHANGE to the selected ready USER using its full
+  Thread GT, saving SYSTEM's continuation and restoring USER's context under
+  normal validation. No special event-exit instruction or swap-back is required.
   **Five-word handoff detail:** define capture/transition latches and when
   SYSTEM consumes or retains DR0–DR5 before calls or later activations can
   overwrite them. The register assignment and save/restore ordering are settled.

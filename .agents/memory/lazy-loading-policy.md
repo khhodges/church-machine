@@ -554,3 +554,14 @@ associations; never reduce stale-owner checks to slot equality. Recognize SYSTEM
 from the validated active Thread in the applicable Namespace, not a permanently
 fixed complete GT. CALL does not change Thread classification. USER Thread 1/2
 are role labels, not reserved Namespace slots. Do not add a mode bit or CR13 role.
+
+SYSTEM exits to a selected ready USER through ordinary CHANGE with that USER's
+full permissionless Thread GT, not a special return-from-LLR operation.
+
+**Why:** The user explicitly approved reuse of ordinary CHANGE for SYSTEM exit.
+
+**How to apply:** Save SYSTEM's service-loop continuation, restore USER's original
+context/flags and resume the uncommitted CALL with normal checks. Stale GTs and
+invalid contexts HardFault; never repair or upgrade them. Readiness alone does
+not switch Threads. Selection remains software, and all-held means SYSTEM stays
+active. No CR13 swap-back or new exit opcode.
