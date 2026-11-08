@@ -301,16 +301,20 @@ eligible resident USER in cyclic order, skipping blocked USERs. Completion
 makes a USER eligible for its turn; it does not immediately select that USER.
 The original USER stays blocked until its completion condition is satisfied.
 SYSTEM handlers still run serially to completion, outside the USER rotation.
-When all USERs are blocked, the approved resident BACKGROUND Thread performs
-bounded maintenance and yields at service points; runnable USER work takes
-precedence over BACKGROUND work.
+**When all USER Threads are on hold, SYSTEM stays active.** Do not hand off
+automatically to BACKGROUND or resume a blocked USER. SYSTEM remains available
+to manage its LLR queue and handle admitted deliveries, one handler at a time.
+Handler completion does not require leaving SYSTEM when no USER is eligible.
+After a handler completes and USER work is eligible, resume cooperative
+round-robin selection. This supersedes the earlier all-blocked BACKGROUND
+handoff; maintenance scheduling is deferred.
 
 **Approved turn boundary:** a USER's turn ends on explicit yield or blocking.
 Scheduling is cooperative; no fixed time slice or timer-driven USER preemption
 is introduced. A USER that neither yields nor blocks can hold execution
 indefinitely; round robin alone does not guarantee bounded waiting.
-The exact yield interface, delivery service point and idle behavior when no
-maintenance work exists remain open.
+The exact yield interface, delivery service point and SYSTEM idle behavior
+when no service work is available remain open.
 **Scope freeze:** keep simple cooperative round robin for now; scheduling
 improvements are deferred. The proposed queued-delivery checks at cooperative
 handoff points have not been approved and are not part of this decision.
@@ -322,8 +326,8 @@ authority mechanism; registration authority remains an unresolved contract.
 IDE remains left, FPGA in the middle, and USER/SYSTEM abstraction execution on
 the right. All descriptions are in the fifth text column, with no fifth `|`.
 An arrow crossing FPGA does not make FPGA an IDE service recipient.
-The OTHER lane means the next eligible USER in round-robin order, or BACKGROUND
-when all USERs are blocked.
+The OTHER lane means the next eligible USER in round-robin order. If all USERs
+are on hold, SYSTEM stays active and no OTHER transition occurs.
 
 U.0–U.8 use the contracts above. U.1b–U.1c explicitly isolate the FPGA
 unavailability detection/entry from SYSTEM method U.2. Other lettered substeps
@@ -413,7 +417,9 @@ IDE   FPGA  OTHER SYSTEM  COMMENTS
  |     |     |     |     X.1 SYSTEM finishes handler.
  |     |     |     |     Select next eligible USER
  |     |     |     |     in round-robin order;
- |     |     |     |     all blocked: BACKGROUND.
+ |     |     |     |     All blocked: stay in SYSTEM;
+ |     |     |     |     no X.2/X.3 handoff.
+ |     |     |     |     Otherwise:
  |     <-----------|     X.2 SYSTEM requests handoff
  |     |     |     |     to selected Thread.
  |     |     |     |     CHANGE/context transition:
@@ -535,7 +541,7 @@ the superseded USER-side Wait sequence without an agreed admission ABI.
 | U.1c | FPGA event-entry machinery | Activate slot-2 SYSTEM with CR12 active identity; inject the five-word request into DR0–DR4 after restoration, before U.2. |
 | U.2 | SYSTEM | Record request and register the already-suspended USER against F. |
 | U.3 | SYSTEM | Send REQUEST directly to IDE using SYSTEM's service/transport authority. |
-| U.3a / X.1–X.3 | SYSTEM, then FPGA | Finish event and activate the next eligible USER in round-robin order; all USERs blocked: BACKGROUND. |
+| U.3a / X.1–X.3 | SYSTEM, then FPGA if handing off | Finish event; activate the next eligible USER in round-robin order, or stay in SYSTEM if all USERs are on hold. |
 | U.4m | IDE | Supply a correlated delivery for U.4; does not signal USER or interrupt SYSTEM. |
 | U.4e | FPGA event-entry machinery | Admit a later serialized delivery event and activate SYSTEM. |
 | U.4 | SYSTEM | Match, validate, resolve and install the admitted delivery. |
@@ -747,7 +753,7 @@ is not execution acceptance.
 | F.13 | Pre-commit CALL suspension/restoration | Before suspension no callee frame/context or CALL advance is committed. Restore the original CALL location, GT, selector and operands; normal execution checks and dispatch occur once after delivery. No earlier USER instruction repeats and no partially executed pipeline state is resumed. |
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
-| F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. SYSTEM handlers finish before handoff; all USERs blocked selects BACKGROUND, with USER work preferred once runnable. |
+| F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. If all USERs are on hold, SYSTEM stays active with no X.2/X.3 handoff, BACKGROUND selection or blocked-USER resume. Handler completion precedes selection when USER work becomes eligible. |
 | F.17 | Repeated SYSTEM activation | Wired slot-2 GT activates SYSTEM using incoming CHANGE machinery; CR12 identifies the active Thread throughout successive selections. Runtime entry saves USER first. CR13 remains reserved; no swap or replay of reset-only admission. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
@@ -789,8 +795,10 @@ The following are not settled by the design discussion:
   request the same Namespace/slot, so this payload alone cannot select which
   pending USER a reply completes; retain the existing correlation requirement
   outside the five-word target description. No added payload field is assumed.
-- Exact explicit-yield interface and round-robin cursor rules; BACKGROUND service/yield
-  points and idle behavior when no USER is eligible and no maintenance is needed.
+- Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
+  mechanism when no USER is eligible and no service work is available.
+  SYSTEM remaining active when all USERs are on hold is settled; maintenance
+  scheduling and other scheduler improvements remain deferred.
 - FreeQueue exhaustion, retirement admission/deferred-work scheduling,
   modified-state preservation and GC safety.
 

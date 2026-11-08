@@ -115,7 +115,7 @@ round robin".
 
 **How to apply:** Rotate eligible resident USERs in cyclic order, skipping blocked
 Threads; completion restores eligibility rather than forcing immediate execution.
-Keep SYSTEM handlers serialized and BACKGROUND idle-only. USER turns end on
+Keep SYSTEM handlers serialized; SYSTEM stays active if all USERs are on hold. USER turns end on
 explicit yield or blocking, as separately approved by the user; there is no
 timer-driven preemption. A non-yielding, non-blocking USER can retain execution
 indefinitely. Yield-interface and cursor details remain open. The proposed
@@ -220,17 +220,17 @@ Do not remove validation, stale/duplicate checks, original CALL authority,
 or the no-runnable-USER delivery path. External backing and helpers remain
 GT-authorized; exact saved-object GT type and serialization still need definition.
 
-Include a resident BACKGROUND Thread for bounded maintenance when all USER
-Threads are blocked, with USER work preferred when it becomes runnable.
+If all USER Threads are on hold, SYSTEM stays active. This supersedes the
+earlier automatic BACKGROUND handoff for that condition.
 
-**Why:** The user proposed idle-only background GC and accepted the role before
-asking whether Phase 2 was functionally complete.
+**Why:** The user explicitly clarified "If all threads are on hold SYSTEM
+stays active".
 
-**How to apply:** Execute sequentially, not in parallel. Reach the defined
-service/yield point between bounded steps so delivery can be processed. Reclaim
-only explicitly selected safe objects; do not introduce automatic eviction.
-Idle-only maintenance may starve while USER remains runnable; it does not
-guarantee free-block availability or settle the exhaustion policy.
+**How to apply:** Finish individual handlers without requiring a Thread switch;
+keep LLR decisions and admitted deliveries serialized within SYSTEM. Resume
+round-robin USER selection after handler completion when a USER is eligible.
+Do not infer busy polling, interrupts or a new idle instruction; the precise
+idle mechanism and maintenance scheduling remain undecided.
 
 An unavailable valid CALL suspends before committing CALL effects. Restore its
 original location after delivery and execute it normally, rather than saving a
