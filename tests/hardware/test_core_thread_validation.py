@@ -1,12 +1,11 @@
 """Slot-2 structural validation through the actual guarded core memory path."""
-import json
-from pathlib import Path
-import struct
 import pytest
 from amaranth.sim import Simulator
 from hardware.core import ChurchCore
 from hardware.hw_types import FaultType
 from hardware.integrity32 import integrity32
+from current_guarded_thread_fixture import (
+    current_guarded_thread_fixture, LIMIT_MASK, VERSION_SHIFT)
 
 
 @pytest.mark.parametrize("mutation,expected", [
@@ -24,18 +23,16 @@ from hardware.integrity32 import integrity32
     ("cr0", FaultType.STACK_CORRUPT),
 ])
 def test_slot_two_validation_never_activates_on_success_or_failure(mutation, expected):
-    folder = Path(__file__).resolve().parents[2] / "docs/phase-1/reload-evidence/new-layout-guarded"
-    config = json.loads((folder / "guard.json").read_text())
-    words = list(struct.unpack("<16384I", (folder / "candidate-le.bin").read_bytes()))
+    words, config = current_guarded_thread_fixture()
     base = words[8]
     if mutation == "version":
-        words[9] ^= 1 << 17
+        words[9] ^= 1 << VERSION_SHIFT
     elif mutation == "seal":
         words[10] ^= 1
     elif mutation == "base":
         words[8] = 16384
     elif mutation == "limit":
-        words[9] = (words[9] & ~0x1ffff) | 254
+        words[9] = (words[9] & ~LIMIT_MASK) | 254
     elif mutation == "type":
         words[base] &= ~(3 << 8)
     elif mutation == "size":
@@ -47,7 +44,9 @@ def test_slot_two_validation_never_activates_on_success_or_failure(mutation, exp
     elif mutation == "root_gt":
         words[base + 242] = 0
     elif mutation == "root_frame":
-        words[base + 243] ^= 1 << 13
+        # Keep PC=0x7fff (root), corrupt its required frame indicator.
+        # Flipping PC bit 13 instead selects a valid resumed continuation.
+        words[base + 243] ^= 1 << 12
     elif mutation == "cr0":
         words[base + 244] ^= 1
     if mutation in ("version", "base", "limit"):
@@ -69,7 +68,8 @@ def test_slot_two_validation_never_activates_on_success_or_failure(mutation, exp
             assert ctx.get(core.dbg_cr12_gt) == 0
             if ctx.get(core.fault_valid) or ctx.get(core.boot_thread_validated):
                 assert ctx.get(core.boot_namespace_admitted)
-                assert ctx.get(core.debug_cr_words[15][0]) == 0x1a2e0001
+                assert ctx.get(core.debug_cr_words[15][0]) == (
+                    0x1a000001 | (config["namespaceVersion"] << 16))
                 assert bool(ctx.get(core.boot_thread_validated)) == (expected is None)
                 assert bool(ctx.get(core.fault_valid)) == (expected is not None)
                 if expected is not None:
@@ -95,7 +95,7 @@ def test_slot_two_validation_never_activates_on_success_or_failure(mutation, exp
         if expected is None:
             # A completed structural check must not survive a new reset with
             # different slot-2 bytes, even when their descriptor seal is valid.
-            words[9] ^= 1 << 17
+            words[9] ^= 1 << VERSION_SHIFT
             words[10] = integrity32(words[8], words[9])
             ctx.set(core.reboot_req, 1)
             await ctx.tick()

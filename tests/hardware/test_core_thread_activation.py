@@ -1,11 +1,9 @@
-"""Real-core incoming-only activation, using exact retained bytes by default."""
-import json
-from pathlib import Path
-import struct
+"""Real-core incoming-only activation with a current-format synthetic fixture."""
 import pytest
 from amaranth.sim import Simulator
 from hardware.core import ChurchCore
 from hardware.hw_types import FaultType
+from current_guarded_thread_fixture import current_guarded_thread_fixture
 
 
 @pytest.mark.parametrize("case,fault", [
@@ -14,9 +12,7 @@ from hardware.hw_types import FaultType
     ("outform", FaultType.OUTFORM_UNAUTH), ("slot_zero", FaultType.BOUNDS),
 ])
 def test_marker_activation_buffers_state_and_consumes_admission(case, fault):
-    folder = Path(__file__).resolve().parents[2] / "docs/phase-1/reload-evidence/new-layout-guarded"
-    config = json.loads((folder / "guard.json").read_text())
-    words = list(struct.unpack("<16384I", (folder / "candidate-le.bin").read_bytes()))
+    words, config = current_guarded_thread_fixture()
     base, cap_start = words[8], 244
     if case == "restore_values":
         # Synthetic state exercise; never written to the retained image.
@@ -59,6 +55,7 @@ def test_marker_activation_buffers_state_and_consumes_admission(case, fault):
             await tick()
         else:
             pytest.fail("structural validation timed out")
+        assert ctx.get(core.boot_namespace_admitted)
         assert ctx.get(core.imem_addr) == 4
         # Deliberate test-only sentinels: detect partial restore and CR13 clears.
         for register, data in [(0, 0xdeadbeef), (13, 0xcafebabe)]:
@@ -68,6 +65,8 @@ def test_marker_activation_buffers_state_and_consumes_admission(case, fault):
             await tick()
         ctx.set(core.dbg_cr_wr_en, 0)
         before = [[ctx.get(w) for w in cr] for cr in core.debug_cr_words]
+        dr_before = [ctx.get(w) for w in core.debug_dr_words]
+        flags_before = ctx.get(core.flags.as_value())
         m_before = ctx.get(core.dbg_m_bit_state)
         assert before[13][0] == 0xcafebabe
         assert ctx.get(core.boot_marker_available)
@@ -91,6 +90,8 @@ def test_marker_activation_buffers_state_and_consumes_admission(case, fault):
             assert ctx.get(core.fault) == fault
             assert not ctx.get(core.boot_thread_activated)
             assert [[ctx.get(w) for w in cr] for cr in core.debug_cr_words] == before
+            assert [ctx.get(w) for w in core.debug_dr_words] == dr_before
+            assert ctx.get(core.flags.as_value()) == flags_before
             # Software-controlled M state is not a way to re-arm the accepted
             # marker after a later capability-validation failure.
             ctx.set(core.dbg_m_bit_wr_en, 1)
@@ -109,7 +110,7 @@ def test_marker_activation_buffers_state_and_consumes_admission(case, fault):
             words[base + cap_start], words[80] * 4, words[81]]
         assert [ctx.get(w) for w in core.debug_cr_words[12]] == [
             0x02000002 | (config["threadVersion"] << 16), base * 4,
-            255 | (config["threadVersion"] << 21)]
+            words[9]]
         assert [ctx.get(w) for w in core.debug_cr_words[5]] == [
             0x32000002 | (config["threadVersion"] << 16), (base + 18) * 4,
             193 | (config["threadVersion"] << 21)]
