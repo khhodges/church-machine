@@ -8,6 +8,10 @@
 
 ## Software review scope
 
+Phase 2 extensions are indexed separately in [Phase 2 objectives](../phase-2/README.md)
+and its [test checklist](../phase-2/test-checklist.md). They do not change the
+Phase 1 baseline or retroactively qualify existing hardware.
+
 - **[SecurityRegulator operation review](security-regulator-operation-review.md)** —
   pure machine mechanism, proposed M-operation matrix, SaveM worked case,
   ISA constraints and open conformance decisions; not an implementation claim.

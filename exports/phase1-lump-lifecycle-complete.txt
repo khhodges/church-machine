@@ -1,5 +1,10 @@
 # Unified LUMP Lifecycle — Phase 2 FPGA Design
 
+> **SUPERSEDED HISTORICAL EXPORT — DO NOT IMPLEMENT.**
+> Preserved review history; its CR13 SYSTEM and delivery-entry proposals are
+> obsolete. Use exports/phase2-system-un-specification.txt and
+> docs/phase-2/test-checklist.md.
+
 ## Status and scope
 
 This document records the current design direction: a preconfigured SYSTEM

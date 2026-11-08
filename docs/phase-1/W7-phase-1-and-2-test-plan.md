@@ -239,12 +239,21 @@ contract, exposure and statistical interpretation, not “ran once without fault
 
 ## 7. Phase 2 adversarial campaign
 
+**Current campaign ordering:** first prove the approved end-to-end hardware
+[lazy-load lifecycle](../lazy-lifecycle-unified.md). The
+[Phase 2 checklist](../phase-2/test-checklist.md) collects all F.1–F.38 tests,
+supporting boundary tests and later Block/storage/network objectives.
+The networking campaign below is a later Phase 2 extension, not a prerequisite
+for that first proof. Its N01–N09 IDs and contract gates remain intact.
+Use the current slot-2 SYSTEM, transport-only delivery, ordinary CHANGE and
+watchdog contracts; historical CR13 or delivery-event entry is not authorized.
+
 Related Phase 2 objective:
 [named SD-card storage abstraction](../phase-2/sd-storage-abstraction.md).
 Its capability-controlled block interface and backing-store boundary are
 documented separately; no implementation or hardware qualification is implied.
 
-Start with two Namespaces on one FPGA as scoped. Keep same-FPGA shared resources
+For this later networking campaign, start with two Namespaces on one FPGA as scoped. Keep same-FPGA shared resources
 visible in the threat model; this is not proof of isolation between physical
 machines. A later multi-device campaign requires separate topology approval.
 

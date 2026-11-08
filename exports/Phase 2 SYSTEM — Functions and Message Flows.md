@@ -2,6 +2,11 @@
 
 ## Status and scope
 
+Current Phase 2 navigation: [objectives and agreement summary](phase-2/README.md)
+and [consolidated acceptance checklist](phase-2/test-checklist.md).
+This document owns the lifecycle contracts and F.1–F.38 scenarios. Later Block,
+SD-storage and networking objectives do not gate the first hardware lazy-load proof.
+
 **Current review scope — FPGA rules only:** settle architectural and microcode
 behavior and its software-visible interface. Previously recorded SYSTEM/IDE
 queue, session and persistence decisions remain software context, not FPGA
@@ -32,7 +37,7 @@ Namespace-type LUMPs remain excluded from lazy loading.
 
 ## Latest revision — 8 November 2026
 
-### Changed in this case
+### Review summary
 
 - **SYSTEM is Boot.Thread at Namespace slot 2, not a CR13-designated Thread.**
   Reuse the wired Thread GT and incoming startup CHANGE machinery; CR12 remains
@@ -284,8 +289,10 @@ boot objects or change the installed boot image.
 
 Boot/SYSTEM remains the same Thread across these roles; startup validation is
 not repeated on every event. Startup follows its initial path; runtime resumes
-the saved service loop. Lazy-load entry uses an existing condition flag;
-its exact encoding and recognition of other event types remain open.
+the saved service loop. Lazy-load entry uses Z=1, ordinary resumption uses saved
+Z=0, and DELIVER is transport input rather than another microcode entry.
+Exact service-loop instructions remain implementation work, not an undecided
+flag encoding.
 
 The no-parallel/preemptive-handler rule carries into this Phase 2 design.
 USER Threads run round robin, superseding the earlier arbitrary eligible-Thread
@@ -466,7 +473,7 @@ a replacement request, including one for the same target and USER.
 
 The identifier is correlation data, not authority; all required LUMP identity,
 integrity and runtime authority checks remain. It is outside the unchanged
-20-byte target payload. Binary session encoding/establishment and
+20-byte target payload. Session wire ordering/establishment and
 duplicate/stale-message disposition remain to be settled.
 The complete wire envelope size is not yet fixed.
 
@@ -537,8 +544,8 @@ a body or wake a USER in the new session. Post-reset execution establishes
 new requests as needed rather than restoring old pending requests.
 A transport disconnect alone does not reset this session, and indefinite
 waiting does not expire a request. This rule does not change the power-cycle-only
-diagnostic policy or authorize resuming faulted execution. The binary mechanism
-that distinguishes sessions remains to be specified.
+diagnostic policy or authorize resuming faulted execution. The u64 session ID
+below distinguishes sessions; wire framing/setup remains to be specified.
 
 **Approved session issuer:** IDE issues the fresh session identifier when
 SYSTEM initializes a new request session. SYSTEM retains it and includes it
@@ -652,7 +659,7 @@ current transport already supplies these guarantees.
 
 - Only one event handler executes at a time.
 - There is no asynchronous handler preemption, nested event handling or parallel
-  Thread/handler execution in this Phase 1 model.
+  Thread/handler execution in this Phase 2 model.
 - A second event cannot begin handling until the first handler has finished.
 - External bytes may arrive meanwhile. Arrival is not handler execution and
   must not cause re-entry. SYSTEM uses transport receive/status; buffer capacity
@@ -690,10 +697,10 @@ Thread GT. SYSTEM idle behavior when no service work is available remains open.
 Delivery is handled through transport receive/status
 while SYSTEM runs, without a delivery-triggered Thread transition.
 **Scope freeze:** keep simple cooperative round robin for now; scheduling
-improvements are deferred. The proposed queued-delivery checks at cooperative
-handoff points have not been approved and are not part of this decision.
-This selection decision does not approve the proposed event-scoped scheduling
-authority mechanism; registration authority remains an unresolved contract.
+improvements are deferred. SYSTEM consumes transport input while active after
+the prior handler; its detailed software loop/cursor remains to be implemented.
+Pending/ready state is software-owned, not a new hardware blocked bit or
+event-scoped scheduling-authority mechanism.
 
 ### Approved Phase 2 watchdog policy: retain existing rules
 
@@ -1014,7 +1021,7 @@ Within a later DELIVER handler, SYSTEM:
 No DELIVER handler can execute halfway through the registration sequence.
 An immediate IDE response remains for later handling; it does not interrupt the
 first handler. Thus the former concurrent-handler registration/CHANGE race is
-not part of this Phase 1 design. Correct ordering and request correlation still
+not part of this Phase 2 design. Correct ordering and request correlation still
 matter, but no preemptive locking scheme is introduced.
 
 The ordinary flag's retained-signal behavior remains useful as a primitive
@@ -1177,10 +1184,10 @@ is not execution acceptance.
 | F.2 | Unavailable CALL | FPGA retains original operation; slot-2 event entry activates SYSTEM into CR12, without USER CALL Wait or GT substitution. |
 | F.3 | Registration ownership | DR5 equals the outgoing USER's captured CR12 Thread GT, not restored SYSTEM CR12 or the target E-GT. Associate the LLR with that suspended USER even when two USERs request the same target. SYSTEM itself never blocks on F; original USER DR5 remains saved. |
 | F.4 | Immediate IDE response | First handler completes registration and REQUEST before any DELIVER handler runs; arrival does not re-enter SYSTEM. |
-| F.5 | Indefinite unavailability | Request remains pending; handler finishes; another unblocked resident Thread runs; no timeout-driven fault or resume. |
+| F.5 | Indefinite unavailability | Request remains pending; handler finishes; another eligible USER runs, or SYSTEM stays active. No request-timeout fault or resume; executing Threads still satisfy the watchdog. |
 | F.6 | Delivery admission | SYSTEM consumes ordinary transport receive/status input while active after the previous handler finishes. Arrival causes no Thread switch, DR0–DR5 injection, Z entry signal or asynchronous preemption. |
 | F.7 | Invalid/mismatched delivery | No completion signal or USER resume; validation-fault ownership follows its agreed contract. |
-| F.8 | Duplicate/stale delivery | IDE echoes the SYSTEM-assigned envelope request identifier. Match it and expected target before installation/completion. An old reply cannot complete a replacement use, even for the same USER and target; no second install, signal or wakeup. Pre-reset replies cannot install or wake in a fresh session. Exact duplicate/stale disposition and binary session encoding remain open. |
+| F.8 | Duplicate/stale delivery | IDE echoes the SYSTEM-assigned envelope request identifier. Match it and expected target before installation/completion. An old reply cannot complete a replacement use, even for the same USER and target; no second install, signal or wakeup. Pre-reset replies cannot install or wake in a fresh session. Widths/lifetimes are settled; exact duplicate/stale disposition and wire framing/ordering remain open. |
 | F.9 | Multiple outstanding requests | Handlers execute serially; dispatch requests from distinct blocked USERs in FIFO acceptance order without waiting for earlier delivery. Delay the first target and deliver a later one: only its associated USER becomes eligible. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. One pending use per USER remains enforced. |
 | F.10 | Several USERs need one LUMP | Each pending use completes correctly; one flag signal is not assumed to broadcast. |
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
@@ -1192,7 +1199,7 @@ is not execution acceptance.
 | F.17 | Repeated SYSTEM activation | Wired slot-2 GT selects SYSTEM; restore its saved service-loop executable/NIA and registers, then inject event parameters before execution. CR12 identifies the active Thread. Runtime entry saves USER first; no startup diagnostic rerun or forced fixed-handler jump. All USERs held: stay in the loop. CR13 remains reserved; no swap or replay of reset-only admission. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
-| F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Never overwrite queued or awaiting-completion records. After validated installation and successful readiness signaling mark completed; retain until the same USER's next LLR replaces it, without a USER-executed-CALL acknowledgement. A stale old reply must not complete the replacement use. Record byte layout and identifier encoding/lifetime remain open. |
+| F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Never overwrite queued or awaiting-completion records. After validated installation and successful readiness signaling mark completed; retain until the same USER's next LLR replaces it, without a USER-executed-CALL acknowledgement. A stale old reply must not complete the replacement use. Record byte layout and wire ordering remain open; identifier widths/lifetimes are settled. |
 | F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
 | F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
@@ -1369,7 +1376,7 @@ The following are not settled by the design discussion:
   blocked USER and serial handlers. Reserve one pending record per configured
   USER before release; FIFO holds record references. After validated installation
   and successful readiness signaling, mark completed and retain until the same
-  USER's next LLR. Record layout, identifier encoding/lifetime and transport buffering/backpressure
+  USER's next LLR. Record layout, wire ordering and transport buffering/backpressure
   remain open; no executed-CALL acknowledgement is required for record reuse.
   **Newly explicit:** define exact wire serialization and how the IDE associates
   current raw metadata with the requesting Namespace. Verify that mapping for
@@ -1380,8 +1387,8 @@ The following are not settled by the design discussion:
   Match session identity, request number and expected target before installation/completion.
   **Settled request numbering:** one unsigned 32-bit SYSTEM counter per session,
   shared across USERs, starts at 1; 0 invalid; no reuse; allocation after
-  0xFFFFFFFF hard-faults without wrap or silent reset. Binary session
-  encoding/establishment, the exhaustion diagnostic and duplicate/stale
+  0xFFFFFFFF hard-faults without wrap or silent reset. Session wire
+  ordering/establishment, the exhaustion diagnostic and duplicate/stale
   disposition remain open. **Settled lifetime:** pending-state reinitialization
   starts a fresh session; pre-reset requests do not survive, and their replies
   cannot install or wake in the new session. Disconnect alone is not reset.
@@ -1412,6 +1419,12 @@ The following are not settled by the design discussion:
   scheduling and other scheduler improvements remain deferred.
 - FreeQueue exhaustion, retirement admission/deferred-work scheduling,
   modified-state preservation and GC safety.
+
+Identifier widths and lifetimes stated above are settled; references here to
+open encoding mean byte/word ordering and message framing, not a new width or
+lifetime decision. Registration/completion is SYSTEM software bookkeeping,
+not a hardware blocked-state mechanism. Software details do not reopen the
+approved FPGA entry, exit, delivery or watchdog contracts.
 
 These are implementation details to define and verify, not reasons to reintroduce
 concurrent handlers, USER-side Wait on unavailable CALL, or a second fetch

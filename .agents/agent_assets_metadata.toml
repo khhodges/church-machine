@@ -1849,14 +1849,14 @@ content_type = "text/markdown"
 id = "vS3vEqqtXXkSHjQF7gJ23"
 uri = "file://exports/phase2-system-un-specification.html"
 type = "html"
-title = "Phase 2 SYSTEM — Readable Full Document"
-description = "Full-text HTML fallback with embedded Markdown download and a latest-revision summary."
+title = "Phase 2 — Aligned Lifecycle Specification"
+description = "Current agreements including ordinary CHANGE, transport-only delivery, software waiting state and watchdog renewal. Includes a Markdown download."
 logical_id = "9b1c1423-b5e0-4208-af45-d18b9433093a"
-content_hash = "sha256:4d23849e1cdc58451a403b471837eb1897e9ca93c8e38fc9b6b900e751bf6ae7"
-size = 117998
-mtime_ms = 1794135799194
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/7899e063-9264-420d-a2e5-eea7758d5585"
-storage_version_token = "1794135799529829"
+content_hash = "sha256:ca54f8cbb138a311b551299b9409a3b9c4e372ddf190166560ab85e5c6ada6e3"
+size = 224699
+mtime_ms = 1794148254063
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/0a6aa66e-8ada-46fc-9d8b-94869030e704"
+storage_version_token = "1794148295587825"
 content_type = "text/html"
 
 [[outputs]]
@@ -1886,3 +1886,17 @@ mtime_ms = 1794135797026
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/56453212-699a-47f4-a408-b8a03294f5c8/9a5b4908-b470-44e5-afa1-5095da9cbe85"
 storage_version_token = "1794135798497517"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "dLCNwhtpyzdbJ0InWRh8A"
+uri = "file://exports/phase2-test-checklist.html"
+type = "html"
+title = "Phase 2 — Complete Test Checklist"
+description = "89 test groups with expected results, unresolved-contract gates and execution order. Includes a Markdown download; no test is claimed passed."
+logical_id = "b2ad50ab-5b85-42e3-84c5-b41943138833"
+content_hash = "sha256:f1fc6365afd37912e1d63f402cec30b5bf7a1504167a3a7cc931c84f4c22174f"
+size = 55076
+mtime_ms = 1794148254151
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b2ad50ab-5b85-42e3-84c5-b41943138833/431ae3d7-3666-4ba4-9573-a594bdd8b66e"
+storage_version_token = "1794148294769670"
+content_type = "text/html"

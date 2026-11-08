@@ -5,6 +5,11 @@
 > In that proposal SYSTEM communicates directly with IDE; FPGA is not an
 > intermediate service recipient.
 
+> **Superseded, not an implementation contract.** Use the current specification
+> and [Phase 2 test checklist](phase-2/test-checklist.md): slot-2 SYSTEM/CR12,
+> CR13 reserved, ordinary CHANGE, transport-only DELIVER and the retained
+> watchdog. Diagrams below are preserved as review history only.
+
 ## Status and scope
 
 Proposed hardware-first design for review. These flows do not claim that

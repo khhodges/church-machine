@@ -6,6 +6,13 @@ Threads is implemented or qualified. Implementation remains paused for review.
 
 ## Agreed model
 
+**Phase 2 cross-reference:** the [unified lifecycle](../lazy-lifecycle-unified.md)
+now defines slot-2 Boot/SYSTEM, USER roles, ordinary CHANGE, software waiting
+state, transport-only delivery and watchdog behavior. This earlier resident-role
+description does not impose a different Phase 2 slot assignment or authorize
+lazy restoration of mutable Thread bodies without the separate custody contract.
+See [Phase 2 tests](../phase-2/test-checklist.md) for later transaction coverage.
+
 Maintain **three resident boot/test/startup Threads**, with additional
 transaction Threads **as resources permit**. A transaction can have its own
 Thread—for example, **one per order or one per telephone call**, using the

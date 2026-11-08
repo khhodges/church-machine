@@ -1,5 +1,9 @@
 # SecurityRegulator — machine-operation review
 
+Phase 2 lifecycle authority is the [unified specification](../lazy-lifecycle-unified.md);
+its [test checklist](../phase-2/test-checklist.md) separates the agreed
+version-increment requirement from the still-open method ABI and provisioning.
+
 **Phase 2 addition — version increment:** the user requires the SecurityRegulator
 (alongside its B-bit methods) to expose a method that increments the version
 associated with a supplied GT. Record this as a software-method requirement,

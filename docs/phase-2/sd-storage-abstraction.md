@@ -5,6 +5,13 @@ Not implemented or hardware-qualified by this document.
 
 ## Objective
 
+**Phase 2 alignment:** this is a later objective, not a prerequisite for the
+[first lazy-load proof](../lazy-lifecycle-unified.md). See the
+[consolidated tests](test-checklist.md). Storage latency does not exempt active
+SYSTEM from the watchdog, create a new delivery interrupt, or permit SYSTEM
+to lazy-load its own required dependencies. The exact SD completion/driver
+contract must respect the approved resident, serialized SYSTEM boundary.
+
 Expose each SD card through a named abstraction, using the user's **`ide.SD#`**
 notation. Multiple named cards may share one driver code abstraction while
 retaining separate device bindings and state.

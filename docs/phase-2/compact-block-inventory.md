@@ -6,6 +6,13 @@ saved-artifact replacement or hardware programming.
 
 ## Objective and Phase 1 boundary
 
+**Phase 2 alignment:** use the [current lifecycle](../lazy-lifecycle-unified.md)
+and [consolidated tests](test-checklist.md). This is later than the first
+hardware lazy-load proof. Boot.Thread below is slot-2 SYSTEM; the shared
+startup's ordinary CHANGE is a voluntary yield, not an LLR event or automatic
+Thread recycling. It restores saved SYSTEM Z=0 without event injection.
+Current watchdog, software-owned waiting state and authority checks still apply.
+
 Prove compact placement, explicit capability handoff and expansion without
 disturbing existing Blocks. Demonstrate B1 and B2 before scaling to ten Blocks.
 This is Phase 2 direction, not a new Phase 1 completion gate. Complete the
