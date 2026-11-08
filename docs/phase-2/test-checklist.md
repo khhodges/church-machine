@@ -29,12 +29,11 @@ original DR1–DR6 were saved before injection. T1 transmits only DR1–DR5
 
 ## Execution order and gates
 
-**Mint deferral:** The user directed that testing the outdated Mint implementation
-must not consume current work. Mint qualification belongs to Phase 2 against the
-[revised GT-construction design](gt-construction-port.md), after its remaining
-interface decisions and implementation are settled. Do not schedule legacy
-Mint qualification as a prerequisite for the current work. Preserve historical
-tests/evidence without treating them as acceptance of the replacement design.
+**Mint scope update:** The user selected the existing CREATE/DESTROY lifecycle
+as the shortest testable route without Passcode authentication, a bounded
+exception to the earlier deferral. See the separate
+[local RTL result](mint-existing-lifecycle-results.md); it is not a passing
+result for the full checklist or the proposed GTMint replacement.
 
 1. **First milestone:** exact hardware absent-body USER CALL → SYSTEM request →
    delayed validated delivery → original CALL executes once. Demonstrate another

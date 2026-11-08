@@ -63,12 +63,18 @@ for (const [name, body] of Object.entries({
             HALT
         }
     }`);
-    // Bootstrap selector zero enters word one directly, not a method table.
-    // Caller has no branches; only the disposable harness omits its table.
-    // Service dispatch tables and all service instructions remain unchanged.
-    callers[name] = [caller[0], ...caller.slice(2)];
+    // Every CALL, including bootstrap, uses the compiler's method table.
+    callers[name] = caller;
 }
 console.log(JSON.stringify({
     mint: file('mint'), cleaner: file('mint_cleaner'),
-    verify: file('pkverify'), callers,
+    // Authentication is explicitly outside this disposable lifecycle test.
+    // Do not modify the production verifier or bypass machine checks.
+    verify: compile(`abstraction test.UncheckedVerifier {
+        capabilities { SELF E }
+        method Verify {
+            IADD DR1, DR0, #1
+            RETURNAL #412
+        }
+    }`), callers,
 }));

@@ -42,10 +42,13 @@ push that to phase 2.”
 **Why:** Qualifying the superseded Mint path would spend effort on a design being
 replaced rather than the intended GT-construction mechanism.
 
-**How to apply:** Defer Mint qualification to Phase 2 against the revised design.
-Do not proactively run, repair or expand outdated Mint-specific qualification,
-or make it a prerequisite for current work. Retain historical code/tests/evidence;
-this is not permission to delete tests or claim acceptance.
+**How to apply:** This broad deferral has a subsequent explicit exception:
+the user selected the existing CREATE/DESTROY lifecycle, excluding Passcodes,
+as the shortest bounded testable route. Permit that local demonstration without
+treating it as broad legacy qualification, private-view containment, live
+installation approval or acceptance of the new GTMint port.
+Keep passcode exclusion explicit in disposable fixtures; do not weaken a
+production verifier to match historical always-approve test assumptions.
 
 Diagnostic MMIO is decomposed into several Diagnostic Abstractions with
 separately scoped GTs; the user identifies GTMint as the first example.

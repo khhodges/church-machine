@@ -10,7 +10,10 @@ It supersedes conflicting older design descriptions, not historical evidence.
 The executable Phase 1 source and saved artifacts are not implementations of
 this contract. Missing machine interfaces must be specified before a runnable
 rewrite; do not replace authorization checks with unconditional success or
-invent instructions. Old Mint qualification is deferred, not a prerequisite.
+invent instructions. The user subsequently selected a bounded existing-lifecycle
+demonstration, excluding Passcodes, as the shortest testable route. Its
+[local RTL results](mint-existing-lifecycle-results.md) do not implement or
+qualify this proposed GTMint replacement.
 No live installation, board operation or bitstream change is authorized here.
 
 ## Responsibilities

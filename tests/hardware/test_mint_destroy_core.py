@@ -64,7 +64,9 @@ def provision(images, scenario):
     descriptor(2, THREAD, 255)
     assert program(9, MINT, images["mint"], [
         gt(9, 32), gt(43, 3), gt(47, 8), gt(44, 3),
-        gt(15, 32), gt(45, 3), gt(21, 32)]) * 4 <= CLEANER - MINT
+        # Row 7 is the current source's reference input. Its value is not
+        # authentication evidence: this fixture's verifier is unchecked.
+        gt(15, 32), gt(45, 3), gt(21, 32), gt(43, 1)]) * 4 <= CLEANER - MINT
     program(21, CLEANER, images["cleaner"],
             [gt(21, 32), gt(46, 3), gt(44, 3)])
     program(15, VERIFY, images["verify"], [gt(15, 32)])

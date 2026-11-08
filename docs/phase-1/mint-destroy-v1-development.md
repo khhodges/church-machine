@@ -1,5 +1,12 @@
 # Mint DESTROY and cleaner — isolated V1 development
 
+**Current bounded rerun:** The user selected this existing lifecycle, excluding
+Passcode authentication. See the
+[Phase 2 local RTL report](../phase-2/mint-existing-lifecycle-results.md).
+The harness now retains the caller method table and uses an explicit test-only
+unchecked verifier; the production verifier is no longer the historical
+always-approve implementation described below.
+
 This is editable-source development with **isolated RTL lifecycle evidence,
 not an approved live Mint service**. No saved LUMPs, live Namespace bindings,
 FPGA image or board were changed.

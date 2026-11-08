@@ -28,11 +28,12 @@ general Pass Bit and indirect-CALL authorization redesign; neither gates
 Phase 2 delivery. Unchecked Passcodes do not authenticate a caller.
 The approved dedicated GTMint GT.M and ordinary capability checks remain separate.
 
-**Mint testing scope:** Do not spend current effort testing or qualifying the
-outdated Mint path. Mint testing is deferred to Phase 2 and should target the
-revised GT-construction design, not revive the superseded result-alias path.
-Existing code, tests and evidence remain historical/reference material; this
-deferral neither deletes tests nor claims Mint acceptance.
+**Mint testing scope:** The user subsequently selected the existing lifecycle
+as the shortest testable route, excluding Passcodes. This is a bounded exception
+to the earlier deferral, not broad legacy qualification.
+[Local RTL results](mint-existing-lifecycle-results.md) establish CREATE/DESTROY,
+read/write, clean reuse and stale-GT rejection. They do not establish private-view
+containment, live installation or the new GTMint hardware.
 
 - Boot.Thread at Namespace slot 2 is SYSTEM; CR12 holds active Thread identity;
   CR13 remains reserved. Full GTs preserve version; slots are Namespace-scoped.

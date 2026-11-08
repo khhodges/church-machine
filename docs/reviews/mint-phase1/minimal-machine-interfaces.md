@@ -1,11 +1,12 @@
 # Minimal Mint machine interfaces — proposal for review
 
 **Current testing scope supersedes the historical schedule below:** The user
-has deferred Mint testing to Phase 2 and directed that current effort not be
-spent qualifying this outdated path. Retain this contract and its evidence as
-history/reference. Future qualification targets the
-[revised GT-construction design](../../phase-2/gt-construction-port.md);
-historical isolated implementation approval is not a current testing mandate.
+subsequently selected the existing CREATE/DESTROY lifecycle as the shortest
+bounded testable route without Passcode authentication, an explicit exception
+to the earlier testing deferral. See
+[current local RTL results](../../phase-2/mint-existing-lifecycle-results.md).
+This does not authorize broad qualification or establish the
+[proposed GTMint replacement](../../phase-2/gt-construction-port.md).
 
 **Status: APPROVED FOR ISOLATED SIMULATOR IMPLEMENTATION, 2026-10-17.**
 The user explicitly approved the protected interfaces and `ide.*` candidate
