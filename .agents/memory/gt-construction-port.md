@@ -12,8 +12,17 @@ authority, not ordinary diagnostic access.
 
 **How to apply:** Preserve ordinary memory's DATA/capability separation and
 SecurityRegulator's separate WDT custody. Do not treat this as approval of
-general mixed-domain tokens, a port address or physical operations.
+general mixed-domain tokens or physical operations.
 Resolve remaining interface details one at a time.
+
+The user approved `0xFFFFFF14` as the GTMint hardware address in the Phase 2
+specification.
+
+**Why:** This settles the port location without assigning bus translation,
+access-permission encoding or provisioning.
+
+**How to apply:** Use this address in subsequent design work; do not interpret
+it as approval of hardware changes or restarting outdated Mint testing.
 
 The user approved one transient result: successful validated LOAD consumes it;
 successful CHANGE/SWITCH/completed internal LLR handoff (including self-transfers),

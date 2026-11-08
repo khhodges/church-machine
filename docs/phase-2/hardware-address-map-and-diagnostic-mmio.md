@@ -3,7 +3,8 @@
 ## Status and scope
 
 This Phase 2 reference records the declared Church hardware-address range,
-the approved WDT control address `0xFFFFFF18`, and the approved diagnostic
+the approved GTMint address `0xFFFFFF14`, WDT control address `0xFFFFFF18`,
+and the approved diagnostic
 direction: ordinary Church capability-controlled access. These are specification
 and design-direction approvals only, not approval of capability provisioning, RTL integration,
 image installation or physical-board operation.
@@ -48,7 +49,9 @@ CHANGE/SWITCH operations targeting CR13 hard-fault with INVALID_OP; stale
 
 | Offset | Assignment | Status |
 |---|---|---|
-| `10–17` | Unassigned | No function established by the inspected map |
+| `10–13` | Unassigned | No function established by the inspected map |
+| `14` | GTMint | Approved specification address; not implemented |
+| `15–17` | Unassigned | No function established by the inspected map |
 | `18` | WDT control | Approved specification address; not wired to the local RTL unit |
 | `19–1B` | Unassigned | No WDT countdown/status ports proposed |
 | `1C` | M-bit control | Declared single 32-bit M-bit object |
@@ -222,8 +225,9 @@ host bus address or new fault code is assigned by this document.
 
 The approved [Mint-private GT-construction port direction](gt-construction-port.md)
 adds a separate manufacturing-authority requirement. Full-range diagnostic
-addressability does not grant access to it. Its address is not yet assigned,
-so the unassigned ranges above remain unchanged.
+addressability does not grant access to it. Its approved specification address
+is `0xFFFFFF14`; this does not settle bus translation or access-permission
+encoding, authorize hardware changes, or restart outdated Mint testing.
 
 ## Sources and authority
 

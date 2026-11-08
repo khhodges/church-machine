@@ -27,7 +27,9 @@ for result materialization. It does not by itself allocate a Namespace slot,
 initialize an object descriptor, increment a version, authorize a request or
 publish a new object. Hardware does not invent or change GT versions.
 
-No port address, Namespace slot, instruction encoding, mixed-permission token
+The approved GTMint hardware address is **`0xFFFFFF14`**, a specification-only
+assignment. Bus-address translation and access-permission encoding remain
+unresolved. No Namespace slot, instruction encoding, mixed-permission token
 format or software method ABI is assigned here. No existing Mint path has
 been removed or replaced. Core integration and physical operations have not
 been performed.
@@ -90,7 +92,8 @@ evidence as reference, not as proof of the new port or a current prerequisite.
 
 With pending-result lifetime settled, review remaining issues one at a time:
 
-- Exact port address and address units, width/alignment and decode.
+- Address units, width/alignment, bus translation and exact decode for the
+  approved address `0xFFFFFF14`.
 - W/L access representation and provisioning without a general mixed-domain
   permission bypass or unintended aliases.
 - LOAD validation and unavailable-target behavior, including interaction with
