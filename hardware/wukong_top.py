@@ -1,5 +1,5 @@
 """hardware/wukong_top.py — QMTECH Wukong XC7A100T minimal Church Machine top-level
-## ==================================================================================
+## Wukong top-level
 
 Minimal top-level for the QMTECH Wukong Board V3 (Artix-7 XC7A100T-2FGG676C).
 LED blink only — no Ethernet, no UART bridge.
@@ -274,6 +274,8 @@ class FaultRecoveryControl(Elaboratable):
 
     def __init__(self):
         self.fault_halt = Signal()
+        self.local_entry = Signal()
+        self.local_entry_done = Signal()
         self.snapshot_complete = Signal()
         self.snapshot_reason = Signal(2)
         self.manual_reboot_cmd = Signal()
@@ -324,14 +326,14 @@ class FaultRecoveryControl(Elaboratable):
         with m.If(self.manual_reboot_cmd):
             m.d.sync += self.manual_reboot_pending.eq(1)
 
-        with m.If(self.authorize_recovery_cmd &
+        with m.If(self.authorize_recovery_cmd & ~self.local_entry &
                   self.fault_pending & self.snapshot_drained):
             m.d.sync += self.authorized_reboot_pending.eq(1)
 
         # Reject pre-snapshot requests. This is deliberately stricter than
         # merely deferring them: an operator must act on the correlated,
         # complete fault snapshot, never a speculative fault indication.
-        with m.If(self.skip_fault_cmd & self.fault_pending &
+        with m.If(self.skip_fault_cmd & ~self.local_entry & self.fault_pending &
                   self.snapshot_drained):
             m.d.sync += self.skip_fault_pending.eq(1)
 
@@ -344,6 +346,11 @@ class FaultRecoveryControl(Elaboratable):
 
         # Keep this assignment last: an explicit reboot intentionally overrides
         # a same-cycle fault hold once the shared UART boundary is safe.
+        with m.If(self.local_entry_done):
+            m.d.sync += [
+                self.fault_pending.eq(0), self.authorized_reboot_pending.eq(0),
+                self.skip_fault_pending.eq(0),
+            ]
         with m.If(self.reboot_pulse):
             m.d.sync += [
                 self.fault_pending.eq(0),
@@ -465,7 +472,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                  button_debounce_cycles=None, sim_dmem_init=True,
                  upload_watchdog_limit=None, sim_upload_only=False,
                  expected_boot_guard=None, sim_boot_image_words=None, runtime_image_words=None,
-                 clock_mode="direct", phase2_status_leds=False):
+                 clock_mode="direct", phase2_status_leds=False, fault_boot_binding=None):
         if clock_mode not in ("direct", "mmcm-25mhz"):
             raise ValueError("Unsupported board clock mode")
         if clock_mode == "mmcm-25mhz" and (clk_freq != 25_000_000 or sim_upload_only):
@@ -483,6 +490,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         self.upload_watchdog_limit = upload_watchdog_limit
         self.sim_upload_only = sim_upload_only
         self.expected_boot_guard = expected_boot_guard
+        self.fault_boot_binding = fault_boot_binding
         if runtime_image_words is not None:
             if sim_boot_image_words is not None or sim_upload_only:
                 raise ValueError("Production runtime image cannot be mixed with simulation overrides")
@@ -498,6 +506,15 @@ class ChurchWukongXC7A100T(Elaboratable):
                         for word in sim_boot_image_words)):
                 raise ValueError("simulation boot image must contain exactly 16384 uint32 words")
         self.sim_boot_image_words = sim_boot_image_words
+        if fault_boot_binding is not None:
+            import hashlib
+            import struct
+            selected = runtime_image_words if runtime_image_words is not None else sim_boot_image_words
+            if selected is None or fault_boot_binding.boot_guard != expected_boot_guard:
+                raise ValueError("Fault entry requires an explicit matching image and Boot guard")
+            digest = hashlib.sha256(b"".join(struct.pack("<I", w) for w in selected)).hexdigest()
+            if digest != fault_boot_binding.image_sha256:
+                raise ValueError("Fault entry is not bound to this exact image")
         self.button_debounce_cycles = (
             button_debounce_cycles if button_debounce_cycles is not None
             else (4 if sim_mode else clk_freq // 1000))
@@ -587,7 +604,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ── ChurchCore ─────────────────────────────────────────────────────────
         core = m.submodules.core = ChurchCore(
             expected_boot_guard=self.expected_boot_guard,
-            monitor_clear_enabled=self.phase2_status_leds)
+            monitor_clear_enabled=self.phase2_status_leds,
+            fault_boot_binding=self.fault_boot_binding)
+        self.model_core = core
         if self.phase2_status_leds:
             from hardware.thread_status_leds import ThreadStatusLEDs
             status_leds = m.submodules.status_leds = ThreadStatusLEDs(
@@ -764,6 +783,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         # F3 = IO_L5N_T0_34, bank 34, LVCMOS33 — complementary to TX on E3.
         # Two-stage synchroniser is built into UartRx (rx_sync register).
         uart_rx = m.submodules.uart_rx = UartRx(clk_freq=self.clk_freq, baud=self.baud)
+        if self.sim_mode:
+            self.sim_uart_rx = uart_rx  # observation only, including command-edge races
         m.d.comb += uart_rx.rx.eq(self.uart_rx_pin)
 
         # ── Trace TX arbitration signals ───────────────────────────────────────
@@ -1129,15 +1150,26 @@ class ChurchWukongXC7A100T(Elaboratable):
             m.d.comb += [
                 dmem_wr.addr.eq(mem_addr),
                 dmem_wr.data.eq(cpu_wr_data),
-                dmem_wr.en.eq(cpu_wr_en),
+                dmem_wr.en.eq(cpu_wr_en & (
+                    ~core.fault_entry_active |
+                    ((core.dmem_addr[:2] == 0) & (core.dmem_addr < 65536)))),
             ]
+        m.d.comb += [
+            core.fault_memory_safe.eq(hw_init_done & (self.dbg_upload_state == 0)),
+            core.dmem_write_granted.eq(
+                core.dmem_wr_en & (core.dmem_addr[:2] == 0) &
+                (core.dmem_addr < 65536) & ~hw_init_wr_en & ~upload_wr_en &
+                (~core.fault_entry_active | core.fault_memory_safe) &
+                dmem_wr.en & (dmem_wr.addr == core.dmem_addr[2:16]) &
+                (dmem_wr.data == core.dmem_wr_data)),
+        ]
 
         # ── Core control signals ───────────────────────────────────────────────
         fault_latched = Signal()
         cm_reboot     = Signal()   # 1-cycle serialized reboot pulse from 'f' or authorized 'g'
         fault_skip_pulse = Signal()
         m.d.sync += fault_latched.eq(
-            ~(cm_reboot | fault_skip_pulse) &
+            ~(cm_reboot | fault_skip_pulse | core.fault_entry_done) &
             (fault_latched | core.fault_valid))
         m.d.comb += [
             core.reboot_req.eq(cm_reboot),
@@ -1196,13 +1228,17 @@ class ChurchWukongXC7A100T(Elaboratable):
                 Mux(core.active_thread_slot >= (9 + configured_thread_count),
                     1, core.active_thread_slot + 1)))
         thread_switch_pending = Signal()
-        with m.If(cm_reboot | core.thread_switch_complete | core.thread_switch_fault):
+        # A queued click is not authority to transfer ownership after a fault.
+        # Cancel it on the fault edge, including a click arriving that same
+        # cycle. The core independently excludes same-cycle fault acceptance.
+        with m.If(cm_reboot | core.fault_valid |
+                  core.thread_switch_complete | core.thread_switch_fault):
             m.d.sync += thread_switch_pending.eq(0)
         with m.Elif(m6_click & core.boot_complete & ~fault_latched &
                     (configured_thread_count > 1) & ~thread_switch_pending):
             m.d.sync += thread_switch_pending.eq(1)
         m.d.comb += [
-            core.thread_switch_req.eq(thread_switch_pending),
+            core.thread_switch_req.eq(thread_switch_pending & ~fault_latched),
             core.thread_switch_index.eq(next_thread_slot),
             self.dbg_active_thread_slot.eq(core.active_thread_slot),
             self.dbg_thread_count.eq(configured_thread_count),
@@ -1258,6 +1294,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         recovery = m.submodules.fault_recovery = FaultRecoveryControl()
         m.d.comb += [
             recovery.fault_halt.eq(fault_halt),
+            recovery.local_entry.eq(self.fault_boot_binding is not None),
+            recovery.local_entry_done.eq(core.fault_entry_done),
             recovery.snapshot_complete.eq(snapshot_complete),
             recovery.snapshot_reason.eq(snapshot_complete_reason),
             recovery.manual_reboot_cmd.eq(manual_reboot_cmd),
@@ -1282,7 +1320,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         )
 
         # Breakpoint hit or fault → force step_mode + halt; takes highest priority.
-        with m.If(bp_hit | fault_halt):
+        with m.If(bp_hit | (fault_halt & Const(self.fault_boot_binding is None))):
             m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
         with m.Elif(step_grant & step_mode):
             # step_grant clears halt for one retire (re-set on next retire_valid)
@@ -1295,7 +1333,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         with m.If(stop_retire):
             m.d.sync += [
                 snapshot_pending.eq(1),
-                snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
+                snapshot_reason.eq(Mux(fault_halt, 2, Mux(bp_hit, 1, 0))),
             ]
         # Skip advances NIA while fetch is still held. Emit a fresh reason-3
         # snapshot from that post-skip boundary so the bridge can prove board
@@ -1331,7 +1369,9 @@ class ChurchWukongXC7A100T(Elaboratable):
             # tells the bridge/IDE which build has actually restarted.
             core.imem_valid.eq(
                 ~step_halted & ~trace_stall & imem_settled &
-                ~sentinel_req & ~recovery_hold & ~core.thread_switch_busy),
+                ~sentinel_req & ~recovery_hold & ~thread_switch_pending &
+                ~core.thread_switch_active &
+                ~core.fault_entry_active),
             core.halt_req.eq(step_halted | trace_stall | recovery_hold),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
@@ -1410,9 +1450,11 @@ class ChurchWukongXC7A100T(Elaboratable):
                         step_mode.eq(1),
                         step_halted.eq(1),
                         step_pause_pending.eq(0),
-                        snapshot_pending.eq(1),
-                        snapshot_reason.eq(3),
                     ]
+                    # A debug stop must not replace the pending fault evidence
+                    # request while local entry is waiting for its capture.
+                    with m.If(~core.fault_entry_active & ~fault_halt):
+                        m.d.sync += [snapshot_pending.eq(1), snapshot_reason.eq(3)]
                 with m.Elif(uart_rx.valid):
                     with m.Switch(uart_rx.data):
                         with m.Case(0x73):  # 's'
@@ -1436,7 +1478,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                                     step_pause_pending.eq(0),
                                 ]
                         with m.Case(0x68):  # 'h'
-                            with m.If(~recovery_hold):
+                            with m.If(~recovery_hold | core.fault_entry_active):
                                 m.d.sync += [
                                     halt_cmd_wait_nonce.eq(1),
                                     halt_nonce_wait_cycles.eq(0),
@@ -1457,7 +1499,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                             # Halt the CM immediately; it stays halted until
                             # UPLOAD_ACK sends the 0x06 completion byte and the
                             # bridge then issues 'r' to re-enable free-run.
-                            with m.If(~recovery_hold):
+                            with m.If(~recovery_hold & ~core.fault_entry_active & ~fault_halt):
                                 m.d.sync += [
                                     step_mode.eq(1), step_halted.eq(1),
                                     up_len_cnt.eq(0),
@@ -1805,7 +1847,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         ]
         with m.FSM(name="snapshot_unit"):
             with m.State("IDLE"):
-                with m.If(snapshot_pending & ~trace_stall):
+                with m.If(snapshot_pending &
+                          Mux((snapshot_reason == 2) &
+                              Const(self.fault_boot_binding is not None),
+                              core.fault_evidence_ready, ~trace_stall)):
                     m.d.sync += [
                         snapshot_pending.eq(0),
                         snapshot_busy.eq(1),
@@ -1858,6 +1903,8 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.next = "WAIT_THREAD_M"
             with m.State("WAIT_THREAD_M"):
                 m.d.sync += snap_thread_mflag.eq(snapshot_mem_rd.data)
+                m.d.comb += core.fault_evidence_captured.eq(
+                    (snap_reason == 2) & core.fault_evidence_ready)
                 m.next = "SEND"
 
             with m.State("SEND"):
@@ -1898,6 +1945,13 @@ class ChurchWukongXC7A100T(Elaboratable):
                         m.next = "IDLE"
                     with m.Else():
                         m.d.sync += snap_bidx.eq(snap_bidx + 1)
+
+        # Highest snapshot-request priority, after command and snapshot FSM
+        # assignments. The initial fault edge precedes fault_entry_active;
+        # neither a breakpoint, command nonce nor same-edge capture may replace
+        # or consume the request that authorizes post-stash evidence capture.
+        with m.If(fault_halt):
+            m.d.sync += [snapshot_pending.eq(1), snapshot_reason.eq(2)]
 
         # ── Heartbeat (1 Hz blink on led[1] during boot) ──────────────────────
         hb_ctr   = Signal(range(self.clk_freq))
@@ -1963,7 +2017,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Before boot_triggered: led0 solid ON (booting), led1 heartbeat blink.
         # After  boot_triggered: led0 CM-controlled via MMIO reg 0 (inverted for
         #   active-LOW), led1 solid ON (no fault) or OFF if fault latched.
-        with m.If(Const(self.phase2_status_leds)):
+        with m.If(core.fault_catastrophic):
+            m.d.comb += [self.led[0].eq(1), self.led[1].eq(~hb_blink)]
+        with m.Elif(Const(self.phase2_status_leds)):
             if self.phase2_status_leds:
                 m.d.comb += [
                     self.led[0].eq(status_leds.led_pins[0]),

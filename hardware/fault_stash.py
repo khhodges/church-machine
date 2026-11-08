@@ -2,7 +2,7 @@
 
 This is a sequencer, not an event capture bank. The caller MUST hold the
 issuer, CR12 and CR15 inputs from start through done/catastrophic, and own the
-final memory port. This unit is not yet wired into ChurchCore.
+final memory port. FaultEntry supplies that ownership in ChurchCore.
 
 Each write is offered for one edge. write_granted denotes actual final-port
 selection at that edge; the following read request has a one-edge response.

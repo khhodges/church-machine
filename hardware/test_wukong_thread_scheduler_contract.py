@@ -105,7 +105,8 @@ def test_m6_contract_has_synchronizer_debounce_and_fetch_quiesce():
     assert 'm6_stable_pressed' in source
     assert 'm6_click.eq(1)' in source
     assert 'thread_switch_pending' in source
-    assert '~core.thread_switch_busy' in source
+    assert '~thread_switch_pending' in source
+    assert '~core.thread_switch_active' in source
     assert 'snap_thread_base.eq(core.active_thread_base)' in source
     assert 'Mux(thread_switch_start_sig, nia_reg - 4, nia_reg)' in core_source
 
@@ -870,6 +871,66 @@ def test_full_core_signed_overflow_branches_follow_live_arithmetic(
 
     assert branch_flags["VS"] & 0b1000
     assert not (branch_flags["VC"] & 0b1000)
+@pytest.mark.parametrize("hold", ["fault", "debug"])
+def test_pending_scheduler_request_cannot_cross_fault_or_debug_hold(hold):
+    """A retained M6 request cannot bypass the execution ownership barrier."""
+    dmem, source_first, *_ = _thread_switch_core_image(False)
+    if hold == "fault":
+        # Exact synthetic source word; no catalog/live artifact is selected.
+        dmem[source_first // 4] = 0xF7000000
+    dut = BootRomHarness(dmem)
+
+    async def bench(ctx):
+        ctx.set(dut.core.defer_fault_reset, 1)
+        ctx.set(dut.core.thread_switch_index, 11)
+        for _ in range(800):
+            if ctx.get(dut.core.nia) == source_first:
+                break
+            await ctx.tick()
+        else:
+            raise AssertionError("source program was not entered")
+
+        if hold == "fault":
+            # Allow synchronous fetch to settle, then race the request with
+            # the actual fault edge, not an earlier clean instruction boundary.
+            for _ in range(20):
+                if ctx.get(dut.core.fault_valid):
+                    break
+                await ctx.tick()
+            else:
+                raise AssertionError("authored HARDFAULT did not fault")
+        else:
+            ctx.set(dut.halt_req, 1)
+
+        source_base = ctx.get(dut.core.active_thread_base)
+        source_slot = ctx.get(dut.core.active_thread_slot)
+        source_crs = tuple(tuple(ctx.get(w) for w in cr)
+                           for cr in dut.core.debug_cr_words)
+        ctx.set(dut.core.thread_switch_req, 1)
+        await ctx.delay(1e-9)
+        assert not ctx.get(dut.core.thread_switch_busy)
+        for _ in range(12):
+            assert not ctx.get(dut.core.thread_switch_busy)
+            assert not ctx.get(dut.core.thread_switch_complete)
+            assert not ctx.get(dut.core.dmem_wr_en)
+            assert ctx.get(dut.core.active_thread_base) == source_base
+            assert ctx.get(dut.core.active_thread_slot) == source_slot
+            assert ctx.get(dut.core.nia) == source_first
+            assert tuple(tuple(ctx.get(w) for w in cr)
+                         for cr in dut.core.debug_cr_words) == source_crs
+            await ctx.tick()
+        if hold == "debug":
+            # This is a hold, not permanent cancellation of healthy scheduling.
+            ctx.set(dut.halt_req, 0)
+            await ctx.delay(1e-9)
+            assert ctx.get(dut.core.thread_switch_busy)
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+
+
 def test_full_core_failed_thread_switch_preserves_source_context():
     """A rejected target frame cannot partially serialize the running Thread."""
     (dmem, source_first, _source_next, _target_first, _target_instr,

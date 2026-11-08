@@ -1,7 +1,51 @@
 # Wukong fault hold: investigation and approval boundary
 
-Status: investigation complete; catastrophic-loop exception retained by user
-decision. No RTL changes or claim of repaired execution.
+Status: historical investigation and partial-change record. The subsequent
+[local RTL integration results](boot-fault-local-rtl-results.md) now document
+machine-owned Boot entry and full-wrapper healthy-work continuation for exact
+disposable fixtures. No live binding, vendor build or physical acceptance is
+claimed. The catastrophic-loop exception remains unchanged.
+
+## Earlier partial implementation: pending scheduler exclusion
+
+The core now excludes external Thread-switch acceptance while `halt_req` or
+`fault_valid` is asserted, including a request racing the fault edge. The
+wrapper cancels its pending M6 request on `core.fault_valid`, with priority over
+a new click, and masks the request while the historical fault latch is set.
+This does not clear the historical latch or release any execution hold.
+
+The scheduler contract tests exercise the actual core with an authored
+`0xF7000000` fault and a concurrent switch request, and separately with an
+external debug hold. Both preserve the active owner, NIA and capability
+registers without outgoing writes. Releasing the debug hold permits the
+healthy request again. These are core-level exclusion tests, **not** the
+full-wrapper continuation acceptance described below.
+
+At this partial-change checkpoint, remaining work was: exact isolated Boot bindings, integrated direct
+stash and source stability, real-port completion/readback, one outgoing save,
+post-stash original-root reference staging, checked shared activation,
+retained diagnostic transport, selective hold release, catastrophic indication,
+and the complete local acceptance matrix. See the integration results for
+the subsequent implementation and tests. No live image selection, vendor
+build, physical operation, reset workaround or fault-skip recovery was added.
+
+Local partial-change validation:
+
+```sh
+python3 -m pytest hardware/test_wukong_thread_scheduler_contract.py \
+  hardware/test_boot_rom_no_false_halt.py \
+  tests/hardware/test_wukong_snapshot_protocol.py -q --disable-warnings
+# 89 passed, 10 failed
+```
+
+All 53 scheduler tests and all 21 snapshot-protocol tests passed. The 10
+failures are in `test_boot_rom_no_false_halt.py`: consecutive SWITCH issuer,
+successful SWITCH retirement, delayed CALL/SWITCH/CHANGE faults, arithmetic
+register/immediate forms, nested CALL/RETURN, both saved-PC-three cases, and
+root RETURN underflow. Loading the unmodified HEAD versions of the core and
+that test module in memory reproduced the same 10 failures (15 passed).
+They are not new failures from this exclusion change. They remain unresolved;
+the combined command is **not** a passing Boot-entry acceptance result.
 
 ## Confirmed execution and ownership paths
 
@@ -27,8 +71,9 @@ indication cannot repair these execution gates.
 The M6 scheduler is button-driven, not an autonomous scheduler. It chooses from
 configured slots using `active_thread_slot`, retains a pending request, and
 passes it to the core. A request already pending at the fault is an additional
-race to test: the core's external switch acceptance checks boot completion and
-unit busy state, not `halt_req`. Thus fetch hold alone is not a complete
+race to test: at investigation time the core's external switch acceptance
+checked boot completion and unit busy state, not `halt_req`. The partial
+implementation above closes that acceptance gap. Fetch hold alone is not a complete
 ownership barrier for machine-controlled transitions.
 
 In `hardware/core.py`, a deferred fault holds NIA. Without deferral a completed
@@ -110,8 +155,8 @@ faults through approved Boot entry; retain catastrophic stop when that entry
 cannot be established. A stronger guarantee for those catastrophic cases would
 require a separately approved containment design, not weakening fault checks.
 
-Implementation and full-wrapper continuation acceptance remain subsequent work.
-The current hold is still present in RTL. The existing engineering resolution
+At investigation time, implementation and full-wrapper continuation acceptance
+remained subsequent work and the hold was still present in RTL. The engineering resolution
 (`../phase-1/boot-fault-engineering-resolution.md`) supplies the local-memory
 write-edge/readback and post-stash foreign-reference staging design; do not
 reopen those decisions or replace them with an invented timeout or event bank.

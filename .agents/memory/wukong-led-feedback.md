@@ -48,13 +48,15 @@ grants are test evidence, not approval to provision saved images, run vendor
 builds or operate the board. Indicator clearing and the separate fault-hold
 recovery work must not be conflated.
 
-Keep local LED integration opt-in until the protected monitor-clear interface
-and release selection are settled.
+Keep local LED integration opt-in until release selection is approved. The
+protected write-only monitor-clear contract is approved and has a real DWRITE
+path; it is no longer an unsettled interface or simulation-only proposal.
 
 **Why:** Authorization for a local RTL trial is not authorization to change the
 default physical build or expose a new software control.
 
-**How to apply:** Distinguish a simulated authorized-clear input from a real
-software access path. Full-wrapper RTL tests must budget for serialized trace
+**How to apply:** Preserve the real protected DWRITE path alongside the separate
+simulation stimulus. Neither local tests nor that implementation authorize
+provisioning a saved grant or changing the physical release. Full-wrapper RTL tests must budget for serialized trace
 output, rather than treating a short timeout as a core freeze or bypassing
 trace backpressure to make a test pass.

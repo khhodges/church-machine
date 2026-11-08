@@ -205,6 +205,7 @@ class BootRomHarness(Elaboratable):
 
         self.boot_complete      = Signal()
         self.fault_halt         = Signal()  # combinatorial: retire_valid & retire_fault_valid
+        self.halt_req           = Signal()  # optional external debug/installation hold
         self._dmem_init         = dmem_init
         # Fault injection for stack-validation simulations, not production IO.
         self._write_overrides = write_overrides or {}
@@ -294,8 +295,8 @@ class BootRomHarness(Elaboratable):
         m.d.comb += [
             # Instruction fetch is valid as soon as boot is complete AND the
             # BRAM read data corresponds to the current fetch address.
-            core.imem_valid.eq(core.boot_complete & imem_settled),
-            core.halt_req.eq(0),
+            core.imem_valid.eq(core.boot_complete & imem_settled & ~self.halt_req),
+            core.halt_req.eq(self.halt_req),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
             core.gc_start.eq(0),

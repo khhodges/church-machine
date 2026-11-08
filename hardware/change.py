@@ -27,6 +27,10 @@ class ChurchChange(Elaboratable):
         self.ordinary = Signal()
         self.cr6_m = Signal()
         self.namespace_handoff = Signal()
+        # Machine-only, post-stash activation; never selected by an instruction.
+        self.fault_entry = Signal()
+        self.fault_thread = Signal(CAP_REG_LAYOUT)
+        self.fault_handler = Signal(CAP_REG_LAYOUT)
         self.llr_entry = Signal()
         self.llr_target = Signal(16)
         self.incoming_namespace = Signal(CAP_REG_LAYOUT)
@@ -102,6 +106,7 @@ class ChurchChange(Elaboratable):
         m = Module()
         m.submodules.ordinary = ordinary = OrdinaryChange(
             self, resident_word_locations=self.resident_word_locations)
+        self.model_ordinary = ordinary
         ordinary_selected = Signal()
         with m.If(self.change_start & ~self.change_busy):
             m.d.sync += ordinary_selected.eq(self.ordinary)

@@ -24,6 +24,7 @@ class OrdinaryChange(Elaboratable):
         "flags_in", "nia_current", "code_base",
         "namespace_handoff", "incoming_namespace", "cr6_m",
         "llr_entry", "llr_target",
+        "fault_entry", "fault_thread", "fault_handler",
     )
     OUTPUTS = (
         "change_busy", "change_complete", "change_fault", "fault_type",
@@ -98,6 +99,8 @@ class OrdinaryChange(Elaboratable):
         out_base, out_egt = Signal(32), Signal(32)
         owned, self_target = Signal(), Signal()
         handoff, root_entry = Signal(), Signal()
+        fault_entry = Signal()
+        pair_stage = Signal(2)
         llr, owner_pending = Signal(), Signal()
         owner = Signal(CAP_REG_LAYOUT)
         owner_view = View(CAP_REG_LAYOUT, owner)
@@ -169,6 +172,7 @@ class OrdinaryChange(Elaboratable):
                     (h[10:23] < allocation - 30))
 
         with m.FSM() as fsm:
+            self.model_fsm = fsm
             with m.State("IDLE"):
                 with m.If(self.change_start):
                     m.d.comb += self.cr_rd_addr.eq(self.cr_src)
@@ -178,7 +182,7 @@ class OrdinaryChange(Elaboratable):
                         lookup_row.eq(self.index[:15]),
                         lookup_m.eq(self.cr6_m),
                         lookup_pending.eq(0),
-                        namespace.eq(Mux(self.namespace_handoff,
+                         namespace.eq(Mux(self.namespace_handoff & ~self.fault_entry,
                                          self.incoming_namespace, self.cr15_namespace)),
                         handoff.eq(self.namespace_handoff), root_entry.eq(0),
                         llr.eq(self.llr_entry), owner_pending.eq(self.llr_entry),
@@ -194,8 +198,22 @@ class OrdinaryChange(Elaboratable):
                         nia.eq(((self.nia_current - self.code_base) >> 2) +
                                Mux(self.llr_entry, 0, 1)),
                         phase.eq(0), row.eq(0), armed.eq(0), code.eq(0),
+                         fault_entry.eq(self.fault_entry),
+                         pair_stage.eq(Mux(self.fault_entry, 1, 0)),
                     ]
-                    with m.If(self.llr_entry):
+                    with m.If(self.fault_entry):
+                        # Staging occurs only AFTER Boot homes and save status
+                        # exist. These are existing incoming working slots.
+                        m.d.sync += [
+                            homes[1].eq(self.cr12_thread),
+                            homes[2].eq(self.cr15_namespace),
+                            gt.eq(self.cr15_namespace.as_value()[:32]),
+                        ]
+                        with m.If(~self.namespace_handoff | ~self.active_thread_owned):
+                            fail(FaultType.THREAD_CONTEXT)
+                        with m.Else():
+                            m.next = "CHECK"
+                    with m.Elif(self.llr_entry):
                         m.next = "LLR_OWNER"
                     with m.Elif(~self.namespace_handoff &
                               (~indexed_form & ((self.cr_dst != 0) | (self.index != 0) |
@@ -243,7 +261,7 @@ class OrdinaryChange(Elaboratable):
             with m.State("CHECK"):
                 with m.If(gv.gt_type != GT_TYPE_INFORM):
                     fail(FaultType.NULL_CAP)
-                with m.Elif((phase == 0) & (gv.perm != 0)):
+                with m.Elif((phase == 0) & (pair_stage != 1) & (gv.perm != 0)):
                     m.d.sync += code.eq(FaultType.THREAD_PERMISSIONS)
                     m.next = "FAULT"
                 with m.Elif((phase == 2) & (~gv.dom | (gv.perm != 4))):
@@ -281,6 +299,21 @@ class OrdinaryChange(Elaboratable):
                 with m.Elif(gate.ns_gate_done):
                     with m.If(invalid_descriptor | rw.f_flag | (resolved_base[:2] != 0)):
                         fail(FaultType.BOUNDS)
+                    with m.Elif(pair_stage != 0):
+                        # Resolve the held original pair ONLY in its original
+                        # Namespace, including seals, versions and cached bounds.
+                        expected = Mux(pair_stage == 1, homes[2], homes[1])
+                        with m.If(resolved != expected):
+                            fail(FaultType.THREAD_CONTEXT)
+                        with m.Elif(pair_stage == 1):
+                            m.d.sync += [pair_stage.eq(2), gt.eq(homes[1][:32])]
+                            m.next = "CHECK"
+                        with m.Else():
+                            m.d.sync += [
+                                pair_stage.eq(0), namespace.eq(self.incoming_namespace),
+                                gt.eq(self.fault_thread.as_value()[:32]),
+                            ]
+                            m.next = "CHECK"
                     with m.Elif(owner_pending):
                         with m.If((resolved_base != owner_view.word1_location) |
                                   (resolved_authority != owner_view.word2_w2)):
@@ -306,7 +339,9 @@ class OrdinaryChange(Elaboratable):
                             thread.eq(resolved), armed.eq(0),
                             self_target.eq(~handoff & owned & (resolved_base == out_base)),
                         ]
-                        with m.If(llr):
+                        with m.If(fault_entry & (resolved != self.fault_thread.as_value())):
+                            fail(FaultType.THREAD_CONTEXT)
+                        with m.Elif(llr):
                             m.next = "LLR_METADATA"
                         with m.Else():
                             m.next = "HEADER"
@@ -315,7 +350,10 @@ class OrdinaryChange(Elaboratable):
                         m.next = "HOME_NEXT"
                     with m.Elif(phase == 2):
                         m.d.sync += entry.eq(resolved)
-                        m.next = "ENTRY_HEADER"
+                        with m.If(fault_entry & (resolved != self.fault_handler.as_value())):
+                            fail(FaultType.THREAD_CONTEXT)
+                        with m.Else():
+                            m.next = "ENTRY_HEADER"
                     with m.Else():
                         m.next = "CLIST_NEXT"
             with m.State("LLR_METADATA"):
@@ -446,7 +484,12 @@ class OrdinaryChange(Elaboratable):
                         m.next = "CHECK"
                 with m.Elif(armed & self.mem_rd_valid):
                     m.d.sync += [gt.eq(self.mem_rd_data), armed.eq(0)]
-                    with m.If(root_entry & (row == 0) &
+                    with m.If(fault_entry & ((row == 1) | (row == 2))):
+                        with m.If(self.mem_rd_data != homes[row][:32]):
+                            fail(FaultType.THREAD_CONTEXT)
+                        with m.Else():
+                            m.next = "HOME_NEXT"
+                    with m.Elif(root_entry & (row == 0) &
                               (self.mem_rd_data != ev.word0_gt.as_value())):
                         fail(FaultType.STACK_CORRUPT)
                     with m.Elif((self.mem_rd_data[25:27] == 0) |
@@ -472,7 +515,7 @@ class OrdinaryChange(Elaboratable):
                     ]
                     with m.If(row == 15):
                         m.d.sync += row.eq(0)
-                        with m.If(owned):
+                        with m.If(owned & ~fault_entry):
                             m.next = "OUT_HEADER"
                         with m.Else():
                             m.next = "NAMESPACE"
@@ -607,7 +650,8 @@ class OrdinaryChange(Elaboratable):
                     self.nia_restore_en.eq(~llr),
                     self.nia_restore_val.eq(ev.word1_location + 4 +
                                            Mux(root_entry, 0, frame[13:28] << 2)),
-                    self.flags_restore_en.eq(~llr), self.flags_restore_data.eq(frame[28:32]),
+                    self.flags_restore_en.eq(~llr),
+                    self.flags_restore_data.eq(Mux(fault_entry, 0, frame[28:32])),
                 ]
                 with m.If(llr):
                     m.d.sync += row.eq(1)
