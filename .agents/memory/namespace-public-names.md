@@ -9,6 +9,9 @@ substitute internal keys or aliases such as NewLayout or Legacy Namespace.
 The user requires Namespace Table and Development Image to always show the
 same selected item, including development and testing views.
 
+The Namespace's name is the name defined when the user creates it. The user
+confirmed this is existing expected behavior, not a new naming proposal.
+
 **Why:** Conflicting names and independent selections obscure which Namespace
 is being developed or tested.
 
@@ -16,6 +19,8 @@ is being developed or tested.
 independent pickers. Keep design identity distinct from exact built/tested
 revision evidence; synchronizing selection must not imply installation,
 discard drafts or rewrite immutable images.
+Use the creation-defined name throughout; development/testing status, layout,
+build labels and revision identifiers must not replace that name.
 
 For runtime-image reload verification, the user explicitly selected **New
 Layout**, the design that runs in the Simulator, rather than a legacy Wukong
