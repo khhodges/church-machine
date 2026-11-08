@@ -243,23 +243,16 @@ push a callee frame, install callee context or advance past CALL before suspensi
 Reapply normal checks on resumption. This is not hard-fault recovery, a retry
 loop, or permission to repeat earlier USER instructions.
 
-Phase 2 event entry, exit and subsequent Thread selection leave CR13 unchanged
-as the configured Boot/SYSTEM destination. Save outgoing context separately;
-never swap the outgoing USER Thread GT into CR13.
+The revised Phase 2 direction identifies Boot/SYSTEM using the same wired
+Thread GT for Namespace slot 2 and CHANGE activation used at startup, rather
+than a separate CR13 designation. This supersedes the earlier CR13-loading
+objective; keep the Boot image unchanged as the objective.
 
-**Why:** The user explicitly approved preservation to avoid a paired swap-back
-mechanism and keep SYSTEM available for subsequent events.
+**Why:** After questioning whether CR13 was needed at all, the user specified
+reuse of the wired slot-2 GT and startup CHANGE to locate SYSTEM.
 
-**How to apply:** Preserve this rule while defining the remaining ABI. It does
-not approve CR13 reconfiguration, an exit instruction, cross-Thread scheduling
-authority, or changes to the current Phase 1 ISA or installed hardware.
-
-The Phase 2 boot objective is to keep the Boot image the same but load CR13
-instead of CR12.
-
-**Why:** The user explicitly stated this objective rather than approving a new
-boot image or a general CR13 provisioning mechanism.
-
-**How to apply:** Treat this as the requested architectural delta, not verified
-binary compatibility. Resolve active-Thread identity and save/restore semantics
-before assuming a destination-register change alone is sufficient.
+**How to apply:** Keep CR12 as the active-Thread model in this discussion.
+Distinguish shared activation machinery from replaying the reset-only marker:
+the current ISA admits that marker only once per reset, and runtime entry must
+first preserve the suspended USER at its uncommitted CALL. Runtime admission
+and event parameters remain to be defined; this is not hardware authorization.
