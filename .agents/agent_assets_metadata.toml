@@ -1849,14 +1849,14 @@ content_type = "text/markdown"
 id = "vS3vEqqtXXkSHjQF7gJ23"
 uri = "file://exports/phase2-system-un-specification.html"
 type = "html"
-title = "Phase 2 SYSTEM — Latest Specification"
-description = "Complete U.n function contracts and message-flow charts, including CR13 preservation, cooperative round robin and lazy-load-first hardware proof. Includes a Markdown download."
+title = "Phase 2 SYSTEM — Readable Full Document"
+description = "Full-text HTML fallback with embedded Markdown download and a latest-revision summary."
 logical_id = "9b1c1423-b5e0-4208-af45-d18b9433093a"
-content_hash = "sha256:623b6b7d84ca56025ce57d5706ac81cc83f9cb5cad2f2fc0ebf14209cc9c6f8b"
-size = 106217
-mtime_ms = 1794130956720
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/dce19e5b-6f3c-42f8-82c6-50d033d8d91e"
-storage_version_token = "1794130957989367"
+content_hash = "sha256:4d23849e1cdc58451a403b471837eb1897e9ca93c8e38fc9b6b900e751bf6ae7"
+size = 117998
+mtime_ms = 1794135799194
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/7899e063-9264-420d-a2e5-eea7758d5585"
+storage_version_token = "1794135799529829"
 content_type = "text/html"
 
 [[outputs]]
@@ -1871,4 +1871,18 @@ size = 29130
 mtime_ms = 1793976417545
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/66c8d0c4-10a9-4a83-8af0-c2686bf13fdb/dedb399a-a208-435f-9a1e-7f6fd146b3a8"
 storage_version_token = "1793976442899910"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "hcMghdDC-KW2pQFAVIN27"
+uri = "file://exports/Phase%202%20SYSTEM%20%E2%80%94%20Functions%20and%20Message%20Flows.md"
+type = "text"
+title = "Phase 2 SYSTEM — Functions and Message Flows"
+description = "Updated Markdown: slot-2 SYSTEM activation, DR0–DR4 20-byte payload using current metadata, revised charts and newly identified open details in Section 6."
+logical_id = "56453212-699a-47f4-a408-b8a03294f5c8"
+content_hash = "sha256:1309e237355360f951a35e4ae448925e540ac78ab1049be5663780633cfcc711"
+size = 47804
+mtime_ms = 1794135797026
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/56453212-699a-47f4-a408-b8a03294f5c8/9a5b4908-b470-44e5-afa1-5095da9cbe85"
+storage_version_token = "1794135798497517"
 content_type = "text/markdown"

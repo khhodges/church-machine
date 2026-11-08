@@ -21,6 +21,38 @@ as independently verified historical or current-FPGA behavior.
 
 Namespace-type LUMPs remain excluded from lazy loading.
 
+## Latest revision — 8 November 2026
+
+### Changed in this case
+
+- **SYSTEM is Boot.Thread at Namespace slot 2, not a CR13-designated Thread.**
+  Reuse the wired Thread GT and incoming startup CHANGE machinery; CR12 remains
+  the active-Thread identity. CR13 stays reserved. Runtime admission is still
+  distinct from the one-shot reset marker.
+- **Pass data, not the unavailable E-GT, into SYSTEM.** Microcode captures the
+  requesting Namespace's four existing slot-0 metadata words plus the target
+  slot number. After saving USER and restoring SYSTEM, inject them into
+  DR0–DR4, in that order.
+- **The lazy-load request payload is 20 bytes.** SYSTEM sends it through resident
+  transport dependencies; microcode need not implement transport sending.
+  Preserve the original E-GT with USER's pending CALL.
+- **Use today's metadata as-is.** Do not block the first proof on a new name or
+  Namespace-ID format. The IDE uses its existing Namespace/slot mapping.
+- Charts A/B/C and acceptance scenarios F.2, F.17 and F.23 now reflect this
+  interface. Cooperative round robin and lazy-load-first hardware acceptance
+  remain unchanged.
+
+### Newly exposed details, not additional approved features
+
+The fixed payload makes the remaining handoff and wire details concrete:
+which SYSTEM instruction receives the event, how it distinguishes runtime
+entry from startup, how DR0–DR4 are consumed before reuse, and how the five
+words are serialized. The payload contains no explicit USER/request identifier;
+existing protected pending state and transport correlation must supply that
+association rather than treating Namespace/slot as a unique pending use.
+Section 6 identifies these open details. No extra payload word, new opcode,
+metadata redesign or hardware implementation is approved by this revision.
+
 ## Agreed startup and Thread roles
 
 The existing **Boot.Thread becomes the SYSTEM Thread** in this Phase 2 design.
@@ -725,11 +757,24 @@ The following are not settled by the design discussion:
 
 - Runtime admission to the wired slot-2 SYSTEM activation path and reconciliation
   with reset-only startup admission; CR13 provisioning is no longer required.
+  **Newly explicit:** identify the SYSTEM handler entry/continuation and how
+  startup versus runtime entry is distinguished without treating the same
+  Thread GT as a method selector.
 - Exact event entry, protected pending-operation storage, event exit and
   CHANGE relationship; no unapproved swap-back or opcode is assumed.
+  **Five-word handoff detail:** define capture/transition latches and when
+  SYSTEM consumes or retains DR0–DR4 before calls or later activations can
+  overwrite them. The register assignment and save/restore ordering are settled.
 - Non-preemptive service point for delivery admission and input retention.
 - SYSTEM's authorized registration of an already-suspended USER on an event.
-- Request ABI, capacity, correlation, event lifetime, cancellation and reset.
+- Request framing/byte order, capacity, correlation, event lifetime, cancellation
+  and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.
+  **Newly explicit:** define exact wire serialization and how the IDE associates
+  current raw metadata with the requesting Namespace. Verify that mapping for
+  the first proof without requiring metadata improvements. Multiple USERs can
+  request the same Namespace/slot, so this payload alone cannot select which
+  pending USER a reply completes; retain the existing correlation requirement
+  outside the five-word target description. No added payload field is assumed.
 - Exact explicit-yield interface and round-robin cursor rules; BACKGROUND service/yield
   points and idle behavior when no USER is eligible and no maintenance is needed.
 - FreeQueue exhaustion, retirement admission/deferred-work scheduling,
