@@ -17,6 +17,11 @@ authorization to install an image or program hardware.
 
 ## Current agreed FPGA boundary
 
+**[Pass Bit and caller identity discussion](pass-bit-and-caller-identity.md):**
+avoid general Passcode slot/C-list proliferation without prohibiting private
+program use; recorded caller E-GT identity must include the Namespace ID.
+The complete Pass Bit mechanism remains under discussion.
+
 **Mint testing scope:** Do not spend current effort testing or qualifying the
 outdated Mint path. Mint testing is deferred to Phase 2 and should target the
 revised GT-construction design, not revive the superseded result-alias path.

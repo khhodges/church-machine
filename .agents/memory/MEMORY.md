@@ -154,3 +154,4 @@
 - [TypeScript test transpilation](typescript-test-transpilation.md) — the TypeScript CLI may work without the legacy JS compiler API; use esbuild for isolated helper tests.
 - [Lazy loading policy](lazy-loading-policy.md) — approved fetches by default; plus-marked later-version tests use new slots; include Resolve and Retirement.
 - [GT-construction port](gt-construction-port.md) — Mint-private DATA-write/capability-load direction; diagnostic addressability does not grant minting authority.
+- [Pass Bit and caller identity](pass-bit-caller-identity.md) — private passcodes remain valid; recorded caller E-GT identity must include Namespace ID.
