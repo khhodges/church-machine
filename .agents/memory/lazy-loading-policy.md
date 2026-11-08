@@ -300,3 +300,15 @@ associations. Do not confuse serial handler execution with a one-outstanding-
 request limit; queue order, capacity and in-flight limits remain undecided.
 Review flow/message decisions one at a time rather than presenting newly found
 issues as the complete unresolved list.
+
+SYSTEM runtime entry restores a saved service-loop continuation, not a fixed
+handler jump or a rerun of startup.
+
+**Why:** The user explicitly approved the saved-continuation proposal after
+reviewing startup-only activation versus ordinary protected frame restoration.
+
+**How to apply:** Startup enters the resident loop once; SYSTEM handoff saves
+a continuation into that loop. Runtime entry preserves USER, restores SYSTEM,
+then injects event parameters before execution. When all USERs are held,
+SYSTEM stays in the loop. Event recognition remains open. Do not claim the
+current Boot executable already contains this software or replay reset admission.

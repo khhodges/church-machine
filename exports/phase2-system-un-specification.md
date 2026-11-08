@@ -45,8 +45,8 @@ Namespace-type LUMPs remain excluded from lazy loading.
 ### Newly exposed details, not additional approved features
 
 The fixed payload makes the remaining handoff and wire details concrete:
-which SYSTEM instruction receives the event, how it distinguishes runtime
-entry from startup, how DR0–DR4 are consumed before reuse, and how the five
+how the resumed SYSTEM service loop recognizes an event, how DR0–DR4 are
+consumed before reuse, and how the five
 words are serialized. The payload contains no explicit USER/request identifier;
 existing protected pending state and transport correlation must supply that
 association rather than treating Namespace/slot as a unique pending use.
@@ -66,8 +66,29 @@ startup. CR12 continues to identify the active Thread, including SYSTEM.
 CR13 remains reserved and untouched; no swap or swap-back is involved.
 Runtime entry first preserves USER at the uncommitted CALL, unlike startup,
 which has no outgoing USER. Reusing activation machinery does not authorize
-replaying the current reset-only marker outside reset. Runtime admission,
-handler entry and exit remain to be defined.
+replaying the current reset-only marker outside reset. Runtime admission and
+the exact exit mechanism remain to be defined.
+
+### Approved SYSTEM runtime entry: saved service-loop continuation
+
+Boot/SYSTEM executes startup once, then enters a resident service loop.
+Whenever it hands execution to USER, its saved continuation leads back into
+that loop. Runtime event entry selects SYSTEM using the wired slot-2 Thread
+GT and restores its protected saved executable/NIA frame and register context.
+For an unavailable CALL, microcode first saves USER at the uncommitted CALL,
+then restores SYSTEM, then injects DR0–DR4 before SYSTEM executes.
+
+SYSTEM resumes the saved service-loop continuation; it does not restart boot
+diagnostics, jump to a new fixed handler address, or treat its Thread GT as a
+method selector. Event recognition and the pending-USER association still need
+definition. When all USERs are on hold, SYSTEM stays in its service loop without
+a Thread switch; handlers remain serialized.
+
+Startup's incoming-only activation and runtime continuation restoration are
+distinct uses of the Thread machinery. This contract requires service-loop
+software; it does not establish that existing Boot executable bytes already
+provide that loop, authorize replacing them, or permit replay of the reset-only
+activation marker.
 
 Its two responsibilities are:
 
@@ -128,8 +149,9 @@ This is a Phase 2 lifecycle policy, not authorization to retire current live
 boot objects or change the installed boot image.
 
 Boot/SYSTEM remains the same Thread across these roles; startup validation is
-not repeated on every event. How entry distinguishes startup from later events
-belongs to the event ABI still to be defined.
+not repeated on every event. Startup follows its initial path; runtime resumes
+the saved service loop. How that loop recognizes each incoming event remains
+part of the event ABI still to be defined.
 
 The no-parallel/preemptive-handler rule carries into this Phase 2 design.
 USER Threads run round robin, superseding the earlier arbitrary eligible-Thread
@@ -380,6 +402,8 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |---------->|     U.1c UNAVAILABLE event entry
  |     |     |     |     activates slot-2 SYSTEM;
  |     |     |     |     CR12 identifies SYSTEM.
+ |     |     |     |     Restore saved service-loop
+ |     |     |     |     continuation, not startup.
  |     |     |     |     After restore: DR0–DR3 metadata,
  |     |     |     |     DR4 target slot; no E-GT load.
  |     |     |     |     U.2 SYSTEM method records request,
@@ -754,7 +778,7 @@ is not execution acceptance.
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
 | F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. If all USERs are on hold, SYSTEM stays active with no X.2/X.3 handoff, BACKGROUND selection or blocked-USER resume. Handler completion precedes selection when USER work becomes eligible. |
-| F.17 | Repeated SYSTEM activation | Wired slot-2 GT activates SYSTEM using incoming CHANGE machinery; CR12 identifies the active Thread throughout successive selections. Runtime entry saves USER first. CR13 remains reserved; no swap or replay of reset-only admission. |
+| F.17 | Repeated SYSTEM activation | Wired slot-2 GT selects SYSTEM; restore its saved service-loop executable/NIA and registers, then inject event parameters before execution. CR12 identifies the active Thread. Runtime entry saves USER first; no startup diagnostic rerun or forced fixed-handler jump. All USERs held: stay in the loop. CR13 remains reserved; no swap or replay of reset-only admission. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
 | F.20 | One pending GT per USER | A blocked USER has one outstanding lifecycle association; a later request cannot overwrite it. Different Threads remain independent. |
@@ -775,9 +799,9 @@ The following are not settled by the design discussion:
 
 - Runtime admission to the wired slot-2 SYSTEM activation path and reconciliation
   with reset-only startup admission; CR13 provisioning is no longer required.
-  **Newly explicit:** identify the SYSTEM handler entry/continuation and how
-  startup versus runtime entry is distinguished without treating the same
-  Thread GT as a method selector.
+  **Settled runtime entry:** restore SYSTEM's saved service-loop continuation,
+  not startup. The loop's event discriminator and exact software continuation
+  placement remain open; the Thread GT is not a method selector.
 - Exact event entry, protected pending-operation storage, event exit and
   CHANGE relationship; no unapproved swap-back or opcode is assumed.
   **Five-word handoff detail:** define capture/transition latches and when
