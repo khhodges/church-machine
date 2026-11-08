@@ -3,9 +3,10 @@
 ## Status and scope
 
 This Phase 2 reference records the declared Church hardware-address range,
-the proposed WDT address, and a possible full-range diagnostic MMIO interface.
-It is not approval of an address binding, capability provisioning, RTL
-integration, image installation or physical-board operation.
+the approved WDT control address `0xFFFFFF18`, and a possible full-range
+diagnostic MMIO interface. The user approved the WDT address in the specification
+only. This is not approval of capability provisioning, RTL integration,
+image installation or physical-board operation.
 
 The user suggested diagnostic access to the full range, citing the MMIO
 approach used for PP250. That is a design precedent reported by the user,
@@ -48,7 +49,7 @@ CHANGE/SWITCH operations targeting CR13 hard-fault with INVALID_OP; stale
 | Offset | Assignment | Status |
 |---|---|---|
 | `10–17` | Unassigned | No function established by the inspected map |
-| `18` | WDT control | Proposed address; not assigned to the local RTL unit |
+| `18` | WDT control | Approved specification address; not wired to the local RTL unit |
 | `19–1B` | Unassigned | No WDT countdown/status ports proposed |
 | `1C` | M-bit control | Declared single 32-bit M-bit object |
 | `1D–1F` | Unassigned | No function established by the inspected map |
@@ -97,9 +98,10 @@ No assignment is established by the inspected current hardware map.
 Historical references to `0xFFFFFFFE` and `0xFFFFFFFF` as passkeys in an
 Abstract Address Space must not be imported as hardware-port assignments.
 
-## WDT control at proposed offset `18`
+## WDT control at approved offset `18`
 
-The control-word semantics are agreed; the address and provisioning are not.
+The control-word semantics and address `0xFFFFFF18` are approved. Capability
+provisioning and the implemented access path remain unresolved.
 
 | Bits | Meaning |
 |---|---|

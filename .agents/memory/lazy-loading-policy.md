@@ -746,7 +746,7 @@ images, restarts, vendor builds, uploads, resets and flashing.
 
 **How to apply:** Implement settled logic independently, but do not treat unit
 ports as software authority or timer expiry as proof of memory-write containment.
-Keep address/provisioning, actual completion bounds and integrated recovery
+Keep provisioning, actual completion bounds and integrated recovery
 evidence explicit before claiming a working execution watchdog.
 
 The user suggested full hardware-range diagnostic MMIO for Phase 2, citing
@@ -756,5 +756,13 @@ the approach used for PP250.
 to expose every control register or implement a second watchdog authority path.
 
 **How to apply:** Treat the PP250 comparison as user-reported precedent; keep
-the diagnostic access model and WDT address binding proposals until approved.
+the diagnostic access model a proposal until approved.
 Preserve SecurityRegulator's exclusive raw watchdog-control custody.
+
+The user approved `0xFFFFFF18` as the WDT control address in the specification only.
+
+**Why:** This settles the address without extending approval to capability
+provisioning, integrated RTL, diagnostic MMIO implementation or physical changes.
+
+**How to apply:** Use this address in subsequent design work; do not reopen the
+address choice or mistake specification approval for an implemented access path.

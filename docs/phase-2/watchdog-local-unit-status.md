@@ -9,19 +9,21 @@ atomic accepted updates, delayed selector effect, exemption exit, successful
 transition renewal input, latched expiry and expiry-before-renewal precedence.
 Configuration initializes to 5; readback is configuration, not remaining time.
 
-The unit intentionally has **no assigned MMIO address, Namespace slot or
+The unit has **no wired MMIO decoder, provisioned Namespace slot or
 software-visible bypass**. Its control-write and transition inputs are internal
 integration ports, not evidence of SecurityRegulator provisioning or validated
 instruction completion. Its block-program-writes output requests containment;
 it does not prove that any core/memory consumer implements it.
 
 The [Phase 2 hardware-address map](hardware-address-map-and-diagnostic-mmio.md)
-records `0xFFFFFF18` as the proposed WDT address and a possible full-range
-diagnostic MMIO interface. Neither is an approved or implemented binding.
+records `0xFFFFFF18` as the approved specification address for WDT control.
+The possible full-range diagnostic MMIO interface remains a proposal.
+Address approval does not authorize provisioning or integration.
 
 Remaining integration obligations:
 
-- Agree the exact watchdog control-register address and capability binding.
+- Agree capability provisioning and the exact access path for the approved
+  watchdog control-register address `0xFFFFFF18`.
   SecurityRegulator alone privately owns direct control; SYSTEM may use
   explicitly authorized methods. No Thread-name privilege.
 - Wire real execution-start and successful CHANGE/SWITCH/LLR completion events

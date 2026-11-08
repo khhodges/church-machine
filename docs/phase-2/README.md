@@ -8,7 +8,7 @@ authorization to install an image or program hardware.
 - **[All Phase 2 tests](test-checklist.md)** — consolidated acceptance inventory,
   first-proof selection, unresolved-contract gates and later objectives.
 - **[Hardware-address map and diagnostic MMIO](hardware-address-map-and-diagnostic-mmio.md)** —
-  full declared range, proposed WDT at `0xFFFFFF18`, current decoder differences,
+  full declared range, approved WDT address `0xFFFFFF18`, current decoder differences,
   and the PP250-style full-range diagnostic access proposal.
 
 ## Current agreed FPGA boundary
