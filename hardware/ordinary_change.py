@@ -24,7 +24,7 @@ class OrdinaryChange(Elaboratable):
         "flags_in", "nia_current", "code_base",
         "namespace_handoff", "incoming_namespace", "cr6_m",
         "llr_entry", "llr_target",
-        "fault_entry", "fault_thread", "fault_handler",
+        "fault_entry", "fault_thread",
     )
     OUTPUTS = (
         "change_busy", "change_complete", "change_fault", "fault_type",
@@ -350,10 +350,9 @@ class OrdinaryChange(Elaboratable):
                         m.next = "HOME_NEXT"
                     with m.Elif(phase == 2):
                         m.d.sync += entry.eq(resolved)
-                        with m.If(fault_entry & (resolved != self.fault_handler.as_value())):
-                            fail(FaultType.THREAD_CONTEXT)
-                        with m.Else():
-                            m.next = "ENTRY_HEADER"
+                        # The retained frame selects the executable, exactly
+                        # as for ordinary CHANGE; no external handler override.
+                        m.next = "ENTRY_HEADER"
                     with m.Else():
                         m.next = "CLIST_NEXT"
             with m.State("LLR_METADATA"):
@@ -651,7 +650,7 @@ class OrdinaryChange(Elaboratable):
                     self.nia_restore_val.eq(ev.word1_location + 4 +
                                            Mux(root_entry, 0, frame[13:28] << 2)),
                     self.flags_restore_en.eq(~llr),
-                    self.flags_restore_data.eq(Mux(fault_entry, 0, frame[28:32])),
+                    self.flags_restore_data.eq(frame[28:32]),
                 ]
                 with m.If(llr):
                     m.d.sync += row.eq(1)

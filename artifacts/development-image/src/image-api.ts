@@ -1,4 +1,6 @@
+export type LumpGeometry = {sizeWords: number; sizeBytes: number; codeWords: number; codeBytes: number; clistRows: number};
 export type Slot = {
+  geometry?: LumpGeometry | null;
   slot: number; name: string; kind: string; type?: string;
   location: number | null; limit?: number | string; allocationWords: number | null;
   policy?: string; load_policy?: string; resident?: boolean; token?: string;
@@ -15,6 +17,7 @@ export type PreparedImage = {
     artifact_sha256: string; namespace_revision_id: string; size: number;
     address_unit: "byte";
     regions: Array<{slot: number; name: string; kind: string; type: string;
+      geometry?: LumpGeometry | null;
       byteAddress: number | null; byteLength: number; resident: boolean;
       policy?: string; sequence?: number; boot?: boolean}>;
   };

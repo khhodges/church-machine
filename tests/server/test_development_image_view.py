@@ -25,7 +25,7 @@ def backend(tmp_path):
     ]}))
     snapshots = tmp_path / "snapshots"
     store = RevisionStore(str(snapshots / "revisions"))
-    return SimpleNamespace(NS_STATE_PATH=str(state), _BUILD_SNAPSHOTS_DIR=str(snapshots),
+    return SimpleNamespace(NS_STATE_PATH=str(state), LUMPS_DIR=str(state.parent), _BUILD_SNAPSHOTS_DIR=str(snapshots),
                            _artifact_revision_store=lambda: store,
                            _namespace_commit_guard=nullcontext, __file__=str(tmp_path / "server/app.py"))
 
@@ -88,7 +88,7 @@ def test_supported_saved_design_uses_shared_read_only_layout(backend):
     before = {p: p.read_bytes() for p in folder.parent.rglob("*") if p.is_file()}
     result = inspect(backend, "design:" + hashlib.sha256(raw).hexdigest())
     expected = normalize_rows(project(document, folder.parent)["rows"])
-    assert result["layoutRows"] == expected
+    assert [{k: v for k, v in row.items() if k != "geometry"} for row in result["layoutRows"]] == expected
     assert result["layoutSource"] == "saved-design-layout"
     assert next(r for r in result["layoutRows"] if r["kind"] == "namespace")["allocationWords"] == 256
     thread = next(r for r in result["layoutRows"] if r["name"] == "Boot.Thread")

@@ -12,6 +12,23 @@ CONTINUATION_NAME = "factory-continuation-25mhz-v1"
 CONTINUATION_SHA256 = "e8ba3755a56fa69308de1154e442529b6cadef6a8a98e10b6976a09137fe9102"
 
 
+def bind_prepared_boot(kwargs, record):
+    """Carry the exact selected image's Boot identity into RTL preparation.
+
+    This performs no publication, build or hardware operation and never
+    consults the catalog. Call only after the stopped-image preparation
+    boundary has supplied its exact image and guard.
+    """
+    from .fault_entry import FaultBootBinding
+    binding = FaultBootBinding.from_prepared_image(
+        kwargs["runtime_image_words"], image_sha256=record["imageSha256"],
+        boot_guard=kwargs["expected_boot_guard"])
+    return dict(kwargs, fault_boot_binding=binding), dict(
+        record, faultEntry="boot-thread-continuation",
+        bootNamespace=f"{binding.namespace:024x}",
+        bootThread=f"{binding.thread:024x}")
+
+
 def validate_words(words, guard):
     words = tuple(words)
     if guard == 0 and len(words) == 16384:
@@ -48,11 +65,11 @@ def build_inputs(profile=None):
         kwargs.update(clk_freq=25_000_000, clock_mode="mmcm-25mhz",
                       expected_boot_guard=0,
                       runtime_image_words=validate_words(struct.unpack("<16384I", raw), 0))
-        return kwargs, dict(
+        return bind_prepared_boot(kwargs, dict(
             profile=profile, imageSha256=CONTINUATION_SHA256, imageBytes=len(raw),
             part="xc7a100tfgg676-2", top="church_wukong_xc7a100t",
             clockHz=25_000_000, inputClockHz=50_000_000, clockMode="mmcm-25mhz",
-            uartBaud=57600, expectedBootGuard=0)
+            uartBaud=57600, expectedBootGuard=0))
     if profile not in (NAME, NAME_25):
         raise ValueError("Unknown Wukong production profile")
     reduced = profile == NAME_25
@@ -75,8 +92,8 @@ def build_inputs(profile=None):
         raise ValueError("Frozen production image changed")
     kwargs.update(expected_boot_guard=23971,
                   runtime_image_words=validate_words(struct.unpack("<16384I", raw), 23971))
-    return kwargs, dict(profile=profile, imageSha256=IMAGE_SHA256, imageBytes=len(raw),
+    return bind_prepared_boot(kwargs, dict(profile=profile, imageSha256=IMAGE_SHA256, imageBytes=len(raw),
                         configSha256=hashlib.sha256(path.read_bytes()).hexdigest(),
                         part=config["part"], top=config["top"],
                         clockHz=config["clockHz"], uartBaud=config["uartBaud"],
-                        expectedBootGuard=23971)
+                        expectedBootGuard=23971))

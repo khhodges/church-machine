@@ -30,7 +30,6 @@ class ChurchChange(Elaboratable):
         # Machine-only, post-stash activation; never selected by an instruction.
         self.fault_entry = Signal()
         self.fault_thread = Signal(CAP_REG_LAYOUT)
-        self.fault_handler = Signal(CAP_REG_LAYOUT)
         self.llr_entry = Signal()
         self.llr_target = Signal(16)
         self.incoming_namespace = Signal(CAP_REG_LAYOUT)

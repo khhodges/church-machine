@@ -423,6 +423,9 @@ export default function DevelopmentImage() {
                       <span className="kiss-device-location">Word address {displayLocation(selected.location)} · byte address {displayLocation(selected.location == null ? null : selected.location * 4)}</span>
                     </> : selectedIsLump ? <dl className="kiss-inline-details">
                       <dt>Artifact</dt><dd>{selected.selection?.filename ?? selected.filename ?? "Not recorded"}</dd>
+                      <dt>Size</dt><dd>{selected.geometry ? `${selected.geometry.sizeWords.toLocaleString()} words / ${selected.geometry.sizeBytes.toLocaleString()} bytes` : "Not available"}</dd>
+                      <dt>Code size</dt><dd>{selected.geometry ? `${selected.geometry.codeWords.toLocaleString()} words / ${selected.geometry.codeBytes.toLocaleString()} bytes` : "Not available"}</dd>
+                      <dt>C-list rows</dt><dd>{selected.geometry?.clistRows ?? "Not available"}</dd>
                       <dt>Revision</dt><dd>{selected.selection?.revision ?? selected.lump_version ?? "Not recorded"}</dd>
                       <dt>Token</dt><dd>{selected.selection?.token ?? selected.token ?? "Not recorded"}</dd>
                       <dt>Policy</dt><dd>{selected.policy ?? selected.load_policy ?? "Not recorded"}</dd>

@@ -6,6 +6,7 @@ hardware revisions can be handed to the existing authenticated UART installer.
 import hashlib
 import json
 import re
+import struct
 from pathlib import Path
 
 from flask import jsonify, request, send_from_directory, redirect
@@ -45,6 +46,42 @@ def normalize_rows(rows):
                        "Resident" if row.get("resident") is True else None)))
         normalized.append(row)
     return normalized
+
+
+def lump_geometry(data, byte_order=">"):
+    """Read counts from exact binary bytes, not mutable sidecar metadata."""
+    if len(data) < 4 or len(data) % 4:
+        return None
+    header = struct.unpack(byte_order + "I", data[:4])[0]
+    size, code, count = 64 << ((header >> 23) & 15), (header >> 10) & 8191, header & 255
+    if header >> 27 != 31 or (header >> 8) & 3 or len(data) != size * 4 or 1 + code + count > size:
+        return None
+    return dict(sizeWords=size, sizeBytes=len(data), codeWords=code,
+                codeBytes=code * 4, clistRows=count)
+
+
+def add_lump_geometry(rows, lumps_dir, image=None):
+    from server.namespace_inspector import _artifact
+    for row in rows:
+        if row["kind"] != "lump":
+            continue
+        geometry = None
+        if image is not None:
+            start, words = row.get("location"), row.get("allocationWords")
+            if type(start) is int and type(words) is int and start >= 0 and words > 0:
+                geometry = lump_geometry(image[start * 4:(start + words) * 4], "<")
+        else:
+            reference = row.get("selection") or row
+            evidence = _artifact(reference, lumps_dir)
+            expected = reference.get("binaryHash") or reference.get("binary_hash")
+            if evidence.get("structurallyValid") and (not expected or evidence.get("verified")):
+                g = evidence["geometry"]
+                if g["type"] == 0:
+                    geometry = dict(sizeWords=g["allocatedWords"], sizeBytes=evidence["byteSize"],
+                                    codeWords=g["codeWords"], codeBytes=g["codeWords"] * 4,
+                                    clistRows=g["capabilityWords"])
+        row["geometry"] = geometry
+    return rows
 
 
 def retained_document(backend, identifier, record):
@@ -137,6 +174,9 @@ def inspect(backend, identifier):
         if row["kind"] != "mmio" and start is not None and words is not None:
             if start < 0 or start + words > (capacity or 16384):
                 warnings.append(f"Slot {row['slot']} ({row.get('name')}): saved allocation is outside the displayed address space.")
+    add_lump_geometry(rows, backend.LUMPS_DIR, image)
+    if layout_rows is not rows:
+        add_lump_geometry(layout_rows, backend.LUMPS_DIR, image)
     return dict(ok=True, id=identifier, name=entry["name"], rows=rows,
                 layoutRows=layout_rows, layoutSource=layout_source,
                 fingerprint=entry["revision_id"], capacityWords=capacity or 16384,
@@ -164,6 +204,7 @@ def inspect_frozen(backend, identifier):
                  policy="Hardware" if n["kind"] == "Hardware" else "Resident",
                  binary_hash=n.get("binaryHash"))
             for n in evidence["nodes"] if n.get("availability") != "not-in-image"]
+    add_lump_geometry(rows, backend.LUMPS_DIR, raw)
     return dict(ok=True, id=identifier, name="Inspected Namespace", rows=rows,
                 layoutRows=rows, layoutSource="frozen-image", fingerprint=evidence["imageHash"],
                 capacityWords=len(raw)//4, capacitySource="Exact inspected image",

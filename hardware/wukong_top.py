@@ -515,6 +515,14 @@ class ChurchWukongXC7A100T(Elaboratable):
             digest = hashlib.sha256(b"".join(struct.pack("<I", w) for w in selected)).hexdigest()
             if digest != fault_boot_binding.image_sha256:
                 raise ValueError("Fault entry is not bound to this exact image")
+            from .fault_entry import FaultBootBinding
+            checked = FaultBootBinding.from_image(
+                selected, namespace=fault_boot_binding.namespace,
+                thread_gt=fault_boot_binding.thread & 0xffffffff,
+                image_sha256=digest, resident_words=fault_boot_binding.resident_words,
+                boot_guard=expected_boot_guard)
+            if checked != fault_boot_binding:
+                raise ValueError("Fault entry binding differs from the prepared image")
         self.button_debounce_cycles = (
             button_debounce_cycles if button_debounce_cycles is not None
             else (4 if sim_mode else clk_freq // 1000))

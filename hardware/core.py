@@ -2184,8 +2184,6 @@ class ChurchCore(Elaboratable):
                     u_switch.incoming_namespace)),
                 u_change.fault_thread.eq(
                     Const(self.fault_boot_binding.thread if self.fault_boot_binding else 0, 96)),
-                u_change.fault_handler.eq(
-                    Const(self.fault_boot_binding.handler if self.fault_boot_binding else 0, 96)),
                 u_change.cr_src.eq(Mux(thread_switch_start_sig, 15, cr_src)),
                 u_change.cr_dst.eq(Mux(thread_switch_start_sig, 14, cr_dst)),
                 u_change.m_elevated.eq(

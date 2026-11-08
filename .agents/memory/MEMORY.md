@@ -55,7 +55,7 @@
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
 - [Fault telemetry constraints](fault-telemetry-index.md) — startup/stop proof, command correlation, UART ownership, retained incidents, and recovery boundaries.
-- [Fault recovery boot precedence](fault-boot-selftest-order.md) — boot wins after faults; three Boot steps enter the prepared lightning-bolt target, not an implicit SelfTest
+- [Boot fault continuation](fault-boot-selftest-order.md) — Hard Fault resumes Boot.Thread; do not replace its continuation with a fresh handler or duplicate IDE configuration.
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only
 - [Top-security passkey credentials](top-security-passkeys.md) — protected-object access requires an object-scoped GT plus a 128-bit proof; never treat the GT alone as a secret
 - [Bank custody zeroization](bank-custody-zeroization.md) — wipe private lockbox storage before reuse; never expose backing records as ordinary Namespace memory

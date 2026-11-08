@@ -104,6 +104,7 @@ def _assemble_latest(backend, identifier, document, directory, inputs):
         # painted in the glass so it does not conceal contained objects.
         definitions = {row["slot"]: row for row in document["rows"]}
         regions = []
+        from server.development_image_view import lump_geometry
         for row in rows:
             definition = definitions[row["slot"]]
             kind = definition["kind"]
@@ -115,6 +116,8 @@ def _assemble_latest(backend, identifier, document, directory, inputs):
                 type=row["type"], policy=definition.get("policy"),
                 byteAddress=None if absent else row["location"] * 4,
                 byteLength=0 if absent else words * 4,
+                geometry=(lump_geometry(raw[row["location"] * 4:(row["location"] + words) * 4], "<")
+                          if kind == "lump" and not absent else None),
                 resident=not absent and kind != "mmio",
                 sequence=row["seq"], boot=definition.get("boot", False),
             ))

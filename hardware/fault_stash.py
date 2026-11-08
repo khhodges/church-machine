@@ -13,15 +13,12 @@ from .thread_design import THREAD_SUPPORTED_BODY_WORDS
 
 
 class FaultStash(Elaboratable):
-    def __init__(self, *, thread_base, thread_words, handler_gt):
+    def __init__(self, *, thread_base, thread_words):
         if (thread_base < 0 or thread_base % 4 or
                 thread_words not in THREAD_SUPPORTED_BODY_WORDS or
                 thread_base + thread_words * 4 > 65536):
             raise ValueError("Boot.Thread must fit aligned local RAM without aliasing")
-        if (not 0 <= handler_gt <= 0xffffffff or
-                handler_gt & 0xfe000000 != 0x4a000000 or not handler_gt & 0xffff):
-            raise ValueError("Expected E-only Inform handler GT")
-        self.base, self.words, self.handler = thread_base, thread_words, handler_gt
+        self.base, self.words = thread_base, thread_words
         self.start = Signal()
         self.safe = Signal()  # exclusive ownership, validated binding and no overlap
         self.thread_gt = Signal(32)
@@ -42,11 +39,12 @@ class FaultStash(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
-        index = Signal(range(31))
+        index = Signal(range(7))
         offset = Signal(13)
         caps = self.words - 12
         # First stores are the original identities, then original fault facts.
-        # Remaining homes and root frame are deterministic, not copied events.
+        # Only the fault ABI is replaced. Boot's CR0, other homes, DRs,
+        # suspended frame, stack indicator and flags remain its continuation.
         with m.Switch(index):
             with m.Case(0):
                 m.d.comb += [offset.eq(caps + 1), self.write_data.eq(self.thread_gt)]
@@ -59,24 +57,9 @@ class FaultStash(Elaboratable):
             with m.Case(4):
                 m.d.comb += [offset.eq(5), self.write_data.eq(self.fault_instruction)]
             with m.Case(5):
-                m.d.comb += offset.eq(1)  # DR0
-            with m.Case(6):
                 m.d.comb += offset.eq(4)  # DR3, save not attempted
-            with m.Case(7):
+            with m.Case(6):
                 m.d.comb += offset.eq(6)  # DR5
-            with m.Case(*range(8, 18)):
-                m.d.comb += offset.eq(index - 1)  # DR6..DR15
-            with m.Case(18):
-                m.d.comb += [offset.eq(caps), self.write_data.eq(self.handler)]
-            with m.Case(*range(19, 28)):
-                m.d.comb += offset.eq(caps + index - 16)  # CR3..CR11
-            with m.Case(28):
-                m.d.comb += [offset.eq(caps - 2), self.write_data.eq(self.handler)]
-            with m.Case(29):
-                m.d.comb += [offset.eq(caps - 1),
-                             self.write_data.eq((caps - 1) | 0x1000 | (0x7fff << 13))]
-            with m.Case(30):
-                m.d.comb += [offset.eq(17), self.write_data.eq((caps - 3) | 0x1000)]
         m.d.comb += self.address.eq(self.base + (offset << 2))
         with m.FSM() as fsm:
             with m.State("IDLE"):
@@ -102,7 +85,7 @@ class FaultStash(Elaboratable):
                 with m.If(~self.safe | ~self.read_valid |
                           (self.read_data != self.write_data)):
                     m.next = "CATASTROPHIC"
-                with m.Elif(index == 30):
+                with m.Elif(index == 6):
                     m.next = "DONE"
                 with m.Else():
                     m.d.sync += index.eq(index + 1)

@@ -24,11 +24,19 @@ def fault_fixture(boot_fault=False):
     desc(4, 0xb000, 256, 9)
     desc(5, 0xc000, 64, 11)
     mem[thread] = 0xf900820c
-    mem[code] = (31 << 27) | (2 << 10) | 2
-    mem[code + 4] = 0x070b0010  # LOAD CR1, CR6[1]
+    # Retained continuation, not a fresh root. The first instruction traps,
+    # so resetting to the startup entry cannot accidentally pass this test.
+    mem[thread + 68] = 0x10ed
+    mem[thread + 238 * 4] = 0x4a070003
+    mem[thread + 239 * 4] = 0x500030ef  # flags=5, resume offset=1, prior SP=239
+    mem[thread + 244 * 4] = 0x4a070003
+    mem[thread + 7 * 4] = 0x12345678  # retained DR6
+    mem[code] = (31 << 27) | (3 << 10) | 2
+    mem[code + 4] = 0xf7000000
+    mem[code + 8] = 0x070b0010  # LOAD CR1, CR6[1]
     if boot_fault:
-        mem[code + 4] = 0xf7000000
-    mem[code + 8] = 0x27008000  # CHANGE CR1, explicitly selecting healthy work
+        mem[code + 8] = 0xf7000000
+    mem[code + 12] = 0x27008000  # CHANGE CR1, explicitly selecting healthy work
     mem[code + 62 * 4] = 0x4a070003
     mem[code + 63 * 4] = 0x02090004
     mem[0xb000] = 0xf900820c
@@ -46,7 +54,7 @@ def fault_fixture(boot_fault=False):
     digest = hashlib.sha256(struct.pack("<16384I", *words)).hexdigest()
     binding = FaultBootBinding.from_image(
         words, namespace=0x02030001 | root << 32 | (255 | 3 << 21) << 64,
-        thread_gt=0x02050002, handler_gt=0x4a070003, image_sha256=digest,
+        thread_gt=0x02050002, image_sha256=digest,
         resident_words=True, boot_guard=GUARD)
     return mem, words, binding
 
@@ -54,13 +62,18 @@ def fault_fixture(boot_fault=False):
 @pytest.mark.parametrize("failure", [None, "save_grant", "stash_grant",
                                     "stash_response", "stash_mismatch",
                                     "status_grant", "activation_response", "delayed",
-                                    "pending_m6", "bad_binding", "bad_original"])
+                                    "pending_m6", "bad_binding", "bad_original",
+                                    "bad_frame", "bad_resume_gt"])
 def test_core_enters_exact_boot_after_real_fault(failure):
     mem, _, binding = fault_fixture()
     if failure == "delayed":
         mem[0x4008] = 0x07130070  # real LOAD, out-of-bounds C-list index
     if failure == "bad_binding":
         mem[0x8028] ^= 1
+    if failure == "bad_frame":
+        mem[0x9000 + 239 * 4] ^= 1
+    if failure == "bad_resume_gt":
+        mem[0x9000 + 238 * 4] ^= 1 << 16
     core = ChurchCore(expected_boot_guard=GUARD, fault_boot_binding=binding)
     sim = Simulator(core)
     sim.add_clock(1e-6)
@@ -109,7 +122,15 @@ def test_core_enters_exact_boot_after_real_fault(failure):
                     assert ctx.get(core.fault_catastrophic)
                 return
             if ctx.get(core.fault_entry_done):
-                assert pc == 0xa004
+                assert pc == 0xa008
+                assert ctx.get(core.debug_dr_words[6]) == 0x12345678
+                assert mem[0x9000 + 238 * 4] == 0x4a070003
+                assert mem[0x9000 + 239 * 4] == 0x500030ef
+                assert ctx.get(core.flags.as_value()) == 5
+                # Ordinary activation pops the indicator; it must not
+                # replace the frame or CR0 with a manufactured handler.
+                assert not any(a in (0x93b8, 0x93bc, 0x93d0)
+                               for a, _ in writes)
                 assert ctx.get(core.debug_cr_words[12][0]) == 0x02050002
                 assert ctx.get(core.debug_cr_words[15][0]) == 0x02030001
                 assert ctx.get(core.debug_dr_words[1]) == fault[1]
@@ -155,9 +176,11 @@ def test_full_wrapper_continues_without_bridge(control):
         held_checked = False
         evidence_captured = False
         async def send(byte):
+            nonlocal evidence_captured
             for bit in [0] + [(byte >> i) & 1 for i in range(8)] + [1]:
                 ctx.set(top.uart_rx_pin, bit)
                 for _ in range(8):
+                    evidence_captured |= bool(ctx.get(core.fault_evidence_captured))
                     await ctx.tick()
         # Commands use the physical serial input, never by forcing a
         # register, NIA, trace bypass, skip, reset or bridge-g approval.
@@ -280,7 +303,7 @@ def test_halt_nonce_on_initial_fault_edge_keeps_reason_two_evidence():
                 assert not ctx.get(core.fault_catastrophic)
                 if ctx.get(core.fault_entry_done):
                     assert coincident and captured
-                    assert ctx.get(core.nia) == 0xa004
+                    assert ctx.get(core.nia) == 0xa008
                     assert ctx.get(core.debug_dr_words[2]) == 0x4008
                     assert ctx.get(core.debug_dr_words[4]) == 0xf7000000
                     assert ctx.get(top.step_halted)

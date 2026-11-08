@@ -1,7 +1,30 @@
 ---
 name: Fault recovery boot precedence
-description: Boot wins after a fault; its three steps enter the prepared lightning-bolt target, without an implicit SelfTest.
+description: Hard Fault resumes Boot.Thread; distinguish that continuation from explicit boot/reboot preparation.
 ---
+
+## Hard Fault continuation clarification
+
+The user explicitly states: “After a Hard Fault the Boot.Thread runs as a
+continuation.” This takes precedence over interpreting the historical
+fault/reboot discussion below as a fresh startup after every Hard Fault.
+
+**Why:** Treating hardware fault entry as a separately selected recovery program
+introduced a new selection requirement that the user rejected; IDE
+Namespace/LightningBolt configuration already owns startup.
+
+**How to apply:** Distinguish explicit cold boot/reboot preparation from Hard
+Fault entry. Check that fault entry resumes Boot.Thread's continuation rather
+than replacing it with a freshly constructed handler frame. Do not equate a
+structurally valid handler binding with compliance with this continuation rule.
+
+Derive the hardware binding from the already selected prepared IDE image;
+do not introduce a second handler-selection or approval workflow.
+**Why:** The user rejected presenting old frozen images and handler hashes as
+new configuration decisions and authorized correcting the continuation path.
+**How to apply:** Bind foundational Namespace/Thread identities to exact bytes;
+the retained Thread frame, not a release-time executable pin, determines resume.
+Keep vendor builds and physical operations separately authorized.
 
 For the approved multi-Namespace design, the user subsequently qualified the
 reboot scope: a Namespace-attributable fault reboots only the responsible

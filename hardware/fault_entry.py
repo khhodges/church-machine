@@ -20,7 +20,6 @@ from .thread_design import (THREAD_SUPPORTED_BODY_WORDS, THREAD_MIN_N_MINUS_6,
 class FaultBootBinding:
     namespace: int
     thread: int
-    handler: int
     thread_words: int
     checks: tuple
     image_sha256: str
@@ -28,10 +27,37 @@ class FaultBootBinding:
     boot_guard: object
 
     @classmethod
-    def from_image(cls, words, *, namespace, thread_gt, handler_gt,
+    def from_prepared_image(cls, words, *, image_sha256, boot_guard):
+        """Consume the selected ascending IDE image; never select artifacts.
+
+        Boot Namespace and Boot.Thread are foundational slots 1 and 2.
+        The LightningBolt/retained frame is already in the prepared Thread.
+        No faultHandlerSlot or separate executable selection is consumed.
+        """
+        words = tuple(words)
+        if (len(words) != 16384 or
+                any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words)):
+            raise ValueError("Prepared Boot image must contain 16384 uint32 words")
+        if words[4] != 0:
+            raise ValueError("Prepared ascending Boot Namespace must start at zero")
+        expected_guard = (((words[5] >> 21) & 511) << 9) | ((words[9] >> 21) & 511)
+        if type(boot_guard) is not int or boot_guard != expected_guard:
+            raise ValueError("Boot guard differs from prepared Namespace/Thread versions")
+        namespace = (0x02000001 | ((words[5] >> 21) & 511) << 16 |
+                     words[5] << 64)
+        thread_gt = 0x02000002 | ((words[9] >> 21) & 511) << 16
+        return cls.from_image(
+            words, namespace=namespace, thread_gt=thread_gt,
+            image_sha256=image_sha256, resident_words=True, boot_guard=boot_guard)
+
+    @classmethod
+    def from_image(cls, words, *, namespace, thread_gt,
                    image_sha256, resident_words=False, boot_guard=None):
         """Bind explicit inputs, never discover/select an artifact or revision."""
         words = tuple(words)
+        if (len(words) != 16384 or
+                any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words)):
+            raise ValueError("Fault entry requires 16384 uint32 words")
         digest = hashlib.sha256(b"".join(struct.pack("<I", w) for w in words)).hexdigest()
         if len(words) != 16384 or digest != image_sha256:
             raise ValueError("Fault entry requires the exact 64 KiB admitted image")
@@ -45,8 +71,6 @@ class FaultBootBinding:
             raise ValueError("Invalid explicit Boot Namespace")
         if thread_gt & 0xfe00ffff != 0x02000002:
             raise ValueError("Boot.Thread must be permissionless slot 2")
-        if handler_gt & 0xfe000000 != 0x4a000000 or not handler_gt & 0xffff:
-            raise ValueError("Boot handler must be an explicit E-only Inform")
         checks = {}
 
         def descriptor(gt):
@@ -74,7 +98,6 @@ class FaultBootBinding:
         if root != namespace:
             raise ValueError("Boot root descriptor differs from trusted root")
         thread, base, limit = descriptor(thread_gt)
-        handler, code_base, code_limit = descriptor(handler_gt)
         size = limit + 1
         header = words[base // 4]
         if (size not in THREAD_SUPPORTED_BODY_WORDS or header >> 27 != 31 or
@@ -82,20 +105,12 @@ class FaultBootBinding:
                 1 << (((header >> 23) & 15) + 6) != size or
                 not 0 < (header >> 10) & 8191 < size - 30):
             raise ValueError("Invalid Boot.Thread geometry")
-        h = words[code_base // 4]
-        n, cw, cc = (h >> 23) & 15, (h >> 10) & 8191, h & 255
-        if (h >> 27 != 31 or (h >> 8) & 3 or n > 8 or
-                code_limit + 1 != 1 << (n + 6) or not cc or not cw or
-                cw >= code_limit + 1 - cc or
-                words[code_base // 4 + code_limit + 1 - cc] != handler_gt):
-            raise ValueError("Invalid exact handler or SELF binding")
-        # Neither priming nor outgoing saves may overwrite trusted inputs.
+        # The executable is selected by Boot.Thread's retained frame at
+        # runtime, not by a second release-time handler selection.
         checks[base] = header
-        for i in range(code_limit + 1):
-            checks[code_base + i * 4] = words[code_base // 4 + i]
         if any(base <= a < base + size * 4 and a != base for a in checks):
-            raise ValueError("Boot.Thread overlaps trusted descriptors/handler")
-        return cls(namespace, thread, handler, size, tuple(sorted(checks.items())),
+            raise ValueError("Boot.Thread overlaps trusted descriptors")
+        return cls(namespace, thread, size, tuple(sorted(checks.items())),
                    digest, resident_words, boot_guard)
 
 
@@ -144,8 +159,7 @@ class FaultEntry(Elaboratable):
         protected_overlap = Const(0)
         for a, _ in b.checks:
             protected_overlap = protected_overlap | ((source <= a) & (end > a))
-        stash = FaultStash(thread_base=base, thread_words=b.thread_words,
-                           handler_gt=b.handler & 0xffffffff)
+        stash = FaultStash(thread_base=base, thread_words=b.thread_words)
         m.submodules.stash = ResetInserter(~self.busy)(stash)
         m.d.comb += [
             stash.thread_gt.eq(self.thread[:32]), stash.namespace_gt.eq(self.namespace[:32]),

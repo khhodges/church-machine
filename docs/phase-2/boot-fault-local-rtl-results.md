@@ -6,15 +6,28 @@ Factory Build selection, vendor build or physical acceptance.
 
 ## Configuration boundary
 
-`FaultBootBinding.from_image` consumes explicitly supplied 64 KiB image words,
-their SHA-256, the full Boot Namespace capability, the exact slot-2 Thread GT,
-handler E-GT and boot guard. It validates sealed descriptors, versions, allocation,
-handler SELF and non-overlap. The wrapper rejects a different image. No editor,
-catalog, live image, mutable CR0 home or “latest” selection participates.
+Hard Fault entry resumes **Boot.Thread's retained continuation**. It does not
+restart the LightningBolt program or select a separate recovery executable.
+The IDE Namespace and its prepared startup state remain authoritative.
 
-No live binding was selected. Integrations without an explicit binding retain
-their existing behavior; enabling a concrete hardware release still requires
-its separately authorized exact-image preparation.
+`FaultBootBinding.from_prepared_image` consumes the exact selected 64 KiB
+ascending image, its SHA-256 and boot guard. It derives the foundational Boot
+Namespace and slot-2 Thread from that image's descriptors. The lower-level
+`from_image` supports explicitly supplied root/Thread identities for isolated
+fixtures. Neither API accepts a handler E-GT. Both validate sealed descriptors,
+versions, Thread geometry and descriptor non-overlap.
+
+`guarded_build_profile.bind_prepared_boot` carries those identities into the
+explicitly selected profile's RTL inputs and records continuation semantics in
+the preparation metadata. It does not select a profile or consult the catalog.
+The wrapper reconstructs and compares the binding against the selected bytes,
+not just a caller-supplied hash. No live image or latest-artifact lookup occurs.
+
+No live binding was selected or installed. Profile preparation now supplies
+the binding automatically from its already selected image; there is no second
+user-facing handler selection. Unprofiled integrations without an explicit
+binding retain their existing behavior. Vendor builds, image publication and
+physical operations still require their separate authorization.
 
 ## Sequencing and ownership
 
@@ -25,7 +38,9 @@ event register bank. Already accepted memory writes take their original edge;
 the next cycle gives the fault sequencer exclusive access.
 
 Boot immutable binding words are checked first. Boot receives the original
-CR12/CR15 GTs and fault facts, deterministic homes and poison root. Each Boot
+CR12/CR15 GTs in CR1/CR2 homes and fault facts/status in DR1–DR5 homes.
+CR0, CR3–CR11, DR0, DR6–DR15 and the retained stack/frame are not rewritten
+by the stash. Each Boot
 write receives one actual-port grant and one scheduled readback, without
 rewrites or retries. The outgoing context is streamed once from the held
 registers, with checked geometry. A missing outgoing grant/response reports
@@ -37,7 +52,11 @@ approval**. Execution-unit transaction state is cleared without FAULT_RST,
 without clearing architectural registers, changing Namespace ownership or
 rewinding boot. The shared ordinary transition validates the original root
 and Thread into incoming working CR2/CR1, then validates Boot's Thread,
-handler, homes and root frame. Original references never resolve under Boot's
+retained frame's executable, homes and continuation. Normal transition checks
+validate the executable's descriptor, SELF and resume offset; no release-time
+handler pin overrides that frame. Saved condition flags are restored. Ordinary
+activation pops the retained indicator, rather than manufacturing a root frame.
+Original references never resolve under Boot's
 colliding slots. It bypasses only the already-completed outgoing save and
 publishes through the existing Namespace/Thread commit states.
 
@@ -56,7 +75,9 @@ backpressure condition.
 
 `hardware/test_fault_entry_integration.py` authors a disposable exact image
 with distinct original and Boot roots and colliding Thread slot 4. Its Boot
-handler explicitly loads a healthy Thread GT and executes CHANGE. Full-wrapper
+continuation resumes at a nonzero offset with retained flags and data; the
+startup instruction traps, making an unintended restart observable. It then
+explicitly loads a healthy Thread GT and executes CHANGE. Full-wrapper
 tests observe repeated IADD progress through a loop without any bridge input,
 reset, skip, forced NIA or trace bypass. Separate tests cover a real delayed
 LOAD fault, pending scheduler request, corrupt binding/original reference,
@@ -69,6 +90,29 @@ racing entry, and verify that a subsequent fault in Boot.Thread enters the
 catastrophic loop. The existing heartbeat continues toggling LED[1] there
 with UART RX idle; no useful-work continuation is claimed for that outcome.
 
+Malformed retained frames and stale resume E-GTs fail without publishing
+Boot's context. Stash tests seed every Thread word and assert that only the
+seven fault-ABI homes change, including readback/grant failure cases.
+Prepared-image tests check derived identities, exact hashes, malformed input
+and forged binding fields. These are local tests, not physical acceptance.
+
+## Continuation correction validation
+
+The corrected suites cover 181 cases, including the prepared-image binding
+tests. The combined run passed 176 cases; four continuation assertions initially
+used the wrong Amaranth structured-flags comparison. After correcting that
+test assertion, all 13 core-entry cases passed. The eight prepared-binding cases
+(including the added guard-mismatch case) passed separately.
+Full-wrapper no-bridge progress, UART halt/upload races, malformed continuation
+denial and local netlist cycle checks were included in the combined run.
+
+Read-only preparation of the existing factory-continuation profile also
+confirmed that its exact image hash derives Boot Namespace
+`000000ff0000000002000001` and Boot.Thread
+`000000ff0000040002000002`. This is binding evidence only, not a new release
+selection or acceptance of that historical program's application behavior.
+No saved image, catalog artifact, hardware configuration or board was changed.
+
 ### Fault-reference lifetime limit
 
 The user selected **immediate handoff only** on 2026-11-08; see
@@ -80,8 +124,9 @@ GT-only homes cannot supply that association; matching slot numbers in Boot's
 Namespace must not be mistaken for the original fault references.
 
 No later-lifecycle storage or restoration extension is authorized. Before a
-hardware release, review the selected handler against the immediate-only
-lifetime, including how it finishes using and retires the pair before leaving.
+hardware release, review the program resumed by Boot.Thread against the
+immediate-only lifetime, including how it finishes using and retires the pair
+before leaving. This is not a separate handler-selection mechanism.
 The existing test totals below are historical RTL results, not new evidence
 for that handler obligation or a resumable-reference contract.
 
