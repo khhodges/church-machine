@@ -332,9 +332,20 @@ a replacement request, including one for the same target and USER.
 
 The identifier is correlation data, not authority; all required LUMP identity,
 integrity and runtime authority checks remain. It is outside the unchanged
-20-byte target payload. Identifier width, generation, binary session encoding,
-wrap behavior and duplicate/stale-message disposition remain to be settled.
+20-byte target payload. Binary session encoding/establishment and
+duplicate/stale-message disposition remain to be settled.
 The complete wire envelope size is not yet fixed.
+
+**Approved request-number encoding:** SYSTEM maintains one unsigned 32-bit
+counter per request session, shared across all USERs. Assign 1 to the first
+accepted LLR and increment for every subsequent accepted LLR. Zero is invalid;
+completed numbers are never reused within that session. `0xFFFFFFFF` is the
+last valid number; attempting another allocation hard-faults without wrapping
+or silently starting a new session. The exact diagnostic code remains open.
+Match the pair (session identity, request number), plus the expected target,
+not the number alone. The counter is SYSTEM software bookkeeping, not a GT
+version field or hardware version mutation. It belongs to the envelope,
+outside DR0–DR4's 20-byte target payload.
 
 **Approved reset lifetime:** a reset that reinitializes SYSTEM's pending
 records starts a fresh request session. Pre-reset requests do not survive
@@ -873,7 +884,7 @@ is not execution acceptance.
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
 | F.12 | Retirement | Only safe reclamation produces DONE/Signal; retain the slot and modified-state obligations. Deferred retirement does not hold SYSTEM indefinitely. |
 | F.13 | Pre-commit CALL suspension/restoration | Before suspension no callee frame/context or CALL advance is committed. Restore the original CALL location, GT, selector and operands; normal execution checks and dispatch occur once after delivery. No earlier USER instruction repeats and no partially executed pipeline state is resumed. |
-| F.14 | Event/session lifetime | Event Reset/reuse must not erase an active association during a session. SYSTEM pending-state reinitialization starts a fresh session and abandons pre-reset requests; old replies cannot install or wake a new USER. A transport disconnect alone retains the session, and indefinite waiting does not expire requests. |
+| F.14 | Event/session lifetime | Event Reset/reuse must not erase an active association during a session. SYSTEM pending-state reinitialization starts a fresh session and abandons pre-reset requests; old replies cannot install or wake a new USER. A transport disconnect alone retains the session, and indefinite waiting does not expire requests. Allocate unsigned 32-bit request numbers from 1 across USERs, never reuse completed numbers, reject 0, and hard-fault on allocation after 0xFFFFFFFF without wrap or silent session reset. Match session plus number, not number alone. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
 | F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. If all USERs are on hold, SYSTEM stays active with no X.2/X.3 handoff, BACKGROUND selection or blocked-USER resume. Handler completion precedes selection when USER work becomes eligible. |
 | F.17 | Repeated SYSTEM activation | Wired slot-2 GT selects SYSTEM; restore its saved service-loop executable/NIA and registers, then inject event parameters before execution. CR12 identifies the active Thread. Runtime entry saves USER first; no startup diagnostic rerun or forced fixed-handler jump. All USERs held: stay in the loop. CR13 remains reserved; no swap or replay of reset-only admission. |
@@ -927,8 +938,11 @@ The following are not settled by the design discussion:
   request the same Namespace/slot, so this payload alone cannot select which
   pending USER a reply completes. **Settled correlation:** SYSTEM assigns an
   identifier per accepted LLR in the envelope; IDE echoes it in DELIVER.
-  Match identifier and expected target before installation/completion. Width,
-  generation, binary session encoding, wrap behavior and duplicate/stale
+  Match session identity, request number and expected target before installation/completion.
+  **Settled request numbering:** one unsigned 32-bit SYSTEM counter per session,
+  shared across USERs, starts at 1; 0 invalid; no reuse; allocation after
+  0xFFFFFFFF hard-faults without wrap or silent reset. Binary session
+  encoding/establishment, the exhaustion diagnostic and duplicate/stale
   disposition remain open. **Settled lifetime:** pending-state reinitialization
   starts a fresh session; pre-reset requests do not survive, and their replies
   cannot install or wake in the new session. Disconnect alone is not reset.

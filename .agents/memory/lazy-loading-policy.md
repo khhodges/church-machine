@@ -391,8 +391,8 @@ and protect reused per-USER records from delayed old replies.
 
 **How to apply:** Retain the identifier in the pending record and match it plus
 the expected target before installation/completion. It grants no authority.
-Keep the target payload at 20 bytes; identifier width, generation, binary session
-encoding, wrap and duplicate disposition remain undecided.
+Keep the target payload at 20 bytes; request numbering is specified below.
+Binary session encoding/establishment and duplicate disposition remain open.
 
 A reset that reinitializes SYSTEM's pending records starts a fresh request
 session; pre-reset requests do not survive it.
@@ -405,3 +405,14 @@ the new session. Post-reset execution establishes new requests as needed.
 Disconnect alone does not reset the session; indefinite waits do not expire.
 This does not change diagnostic policy or authorize faulted execution recovery.
 Binary session identity remains to be defined.
+
+Use one unsigned 32-bit request counter per session across all USERs: start
+at 1, reserve 0 as invalid, never reuse numbers, and hard-fault after 0xFFFFFFFF.
+
+**Why:** The user approved this bounded non-wrapping correlation counter for
+Phase 2 instead of silent wrap or automatic session reset.
+
+**How to apply:** Allocate on acceptance, retain in the pending record, and
+match session identity plus number and expected target. The counter is software
+bookkeeping, not a GT version; keep it outside the 20-byte target payload.
+Session establishment and the exact exhaustion diagnostic remain open.
