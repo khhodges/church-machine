@@ -394,8 +394,8 @@ the expected target before installation/completion. It grants no authority.
 Keep the target payload at 20 bytes; request numbering is specified below.
 Binary session encoding/establishment and duplicate disposition remain open.
 
-A reset that reinitializes SYSTEM's pending records starts a fresh request
-session; pre-reset requests do not survive it.
+A SYSTEM reset means FPGA reset and starts a fresh request session;
+pre-reset requests do not survive it. A USER Thread reset is distinct.
 
 **Why:** The user explicitly approved a fresh session after reset instead of
 persistent pending requests.
@@ -405,6 +405,18 @@ the new session. Post-reset execution establishes new requests as needed.
 Disconnect alone does not reset the session; indefinite waits do not expire.
 This does not change diagnostic policy or authorize faulted execution recovery.
 Binary session identity remains to be defined.
+
+LLRs are individual USER Thread events, not FPGA-wide events. SYSTEM reset
+equals FPGA reset; a USER Thread reset must not be conflated with either.
+
+**Why:** The user explicitly corrected the scope while reviewing session setup.
+
+**How to apply:** Microcode transports an individual Thread's event to SYSTEM;
+it does not turn that event into a board reset or a new global session.
+USER reset does not reset SYSTEM, the shared session/counter or other USERs'
+pending requests. Define retirement of that USER's old pending association
+separately so delayed replies cannot wake its replacement context. Do not infer
+that USER contexts survive FPGA reset or that a software reset is a power cycle.
 
 Use one unsigned 32-bit request counter per session across all USERs: start
 at 1, reserve 0 as invalid, never reuse numbers, and hard-fault after 0xFFFFFFFF.
