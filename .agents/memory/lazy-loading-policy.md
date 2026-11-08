@@ -277,5 +277,15 @@ component of a lazy-load request rather than inventing a separate Namespace ID.
 the request was scoped to Namespace identity plus target slot.
 
 **How to apply:** Distinguish the Namespace's metadata name from the target
-slot's dot.name. Exact name encoding and parameter-transfer mechanics remain
-open; do not assume a complete name fits in one data register.
+slot's dot.name. Do not assume a complete name fits in one data register.
+
+Use today's four Namespace metadata words unchanged plus the target slot as
+a 20-byte lazy-load payload in SYSTEM DR0–DR4 after restoration.
+
+**Why:** The user proposed the five-word interface and explicitly approved
+proceeding with whatever metadata exists today, improving it later.
+
+**How to apply:** Capture from the requesting Namespace before transition;
+preserve USER's E-GT separately. Microcode passes data, SYSTEM sends it. Metadata
+redesign must not gate the first proof. Retain identity/correlation checks
+without asserting current metadata contains a complete readable name.

@@ -2,19 +2,21 @@
 
 ## Status and scope
 
-This document records the current design direction: a preconfigured SYSTEM
-Thread designated by CR13 handles UNAVAILABLE and later delivery events,
+This document records the current design direction: Boot.Thread, designated
+SYSTEM and located through the wired Namespace slot-2 Thread GT, handles UNAVAILABLE and later delivery events,
 one event at a time, to completion. It replaces the earlier USER-side
 Wait/CHANGE handoff proposal in this document.
 
 This is a proposed architectural revision, not a claim of installed hardware
 support. The current Phase 1 ISA reserves CR13 as NULL and untouched; ordinary
-`CHANGE CR13` faults. This proposal therefore requires explicit reconciliation
+`CHANGE CR13` faults. That reservation remains; the earlier CR13 SYSTEM proposal
+is superseded. Runtime event admission still requires explicit reconciliation
 with that ISA and the installed bitstream before implementation. No RTL edits,
 uploads, resets, flashing or new instruction encodings are authorized here.
 
-The user supplied the PP250 precedent: CR13 identifies a SYSTEM Thread that
-runs to completion. This document uses that precedent as a design model, not
+The user supplied the PP250 precedent of a SYSTEM Thread that runs to completion.
+The earlier CR13-specific analogy no longer defines the register interface.
+This document uses that precedent as a design model, not
 as independently verified historical or current-FPGA behavior.
 
 Namespace-type LUMPs remain excluded from lazy loading.
@@ -26,18 +28,14 @@ It is not replaced by an additional dedicated SYSTEM Thread. **Thread 1 and
 Thread 2 remain available for user programs.** These are Thread designations,
 not an assignment of Namespace slot numbers.
 
-CR13 designates this Boot/SYSTEM Thread for the proposed event-entry mechanism.
-**Boot objective:** retain the same Boot image, but load the Boot/SYSTEM Thread
-GT into CR13 instead of CR12. This is a requested Phase 2 architectural change,
-not a claim that current reset hardware supports it. The relationship between
-the fixed SYSTEM designation in CR13 and active-Thread identity/context saving
-currently defined through CR12 still needs explicit reconciliation.
-**Approved preservation rule:** event entry and exit leave CR13 unchanged.
-Save the outgoing Thread context separately; do not swap its Thread GT into
-CR13. Activate the configured SYSTEM context, then supply event parameters.
-Selecting another Thread after handler completion also preserves the configured
-SYSTEM destination. No matching swap-back is required. This does not authorize
-CR13 reconfiguration or settle the exit instruction or scheduling authority.
+**Revised boot/SYSTEM direction:** retain the Boot image and reuse the wired
+Namespace slot-2 Thread GT and incoming CHANGE activation machinery used at
+startup. CR12 continues to identify the active Thread, including SYSTEM.
+CR13 remains reserved and untouched; no swap or swap-back is involved.
+Runtime entry first preserves USER at the uncommitted CALL, unlike startup,
+which has no outgoing USER. Reusing activation machinery does not authorize
+replaying the current reset-only marker outside reset. Runtime admission,
+handler entry and exit remain to be defined.
 
 Its two responsibilities are:
 
@@ -104,8 +102,7 @@ belongs to the event ABI still to be defined.
 The no-parallel/preemptive-handler rule carries into this Phase 2 design.
 USER Threads run round robin, superseding the earlier arbitrary eligible-Thread
 selection rule. The existing Phase 1 ISA is not changed by this document.
-Whether SYSTEM may replace CR13 after startup remains undecided; the Thread-role
-mapping does not imply permission to do so.
+No CR13 provisioning or runtime reconfiguration mechanism is required.
 
 ## U.n method contracts — single naming authority
 
@@ -160,9 +157,40 @@ but share implementation where behavior is identical:
 
 The register ordering is mandatory: save USER before writing SYSTEM parameters,
 and supply the parameters after SYSTEM restoration so that restoration cannot
-overwrite them. Exact registers and transition mechanics remain to be defined.
+overwrite them. Lazy-load request registers are defined below; detailed
+transition mechanics and parameters for other event types remain open.
 This supersedes the earlier shadow-bank assumption, not the requirement to
 preserve suspended Thread state.
+
+### Initial lazy-load request payload
+
+Use the four existing 32-bit Namespace slot-0 metadata words unchanged, followed
+by the 32-bit unavailable target slot number: five words, a 20-byte payload.
+Do not redesign metadata or require an improved Namespace-name format before
+the first lazy-load proof.
+
+| SYSTEM register | Ordinary data supplied by microcode |
+|---|---|
+| DR0 | Requesting Namespace metadata word 0 |
+| DR1 | Requesting Namespace metadata word 1 |
+| DR2 | Requesting Namespace metadata word 2 |
+| DR3 | Requesting Namespace metadata word 3 |
+| DR4 | Unavailable target slot number |
+
+Capture the payload from the requesting Namespace before changing context,
+save USER, restore SYSTEM, then inject DR0–DR4. Preserve USER's original E-GT
+and CALL state separately. Do not load the unavailable E-GT into a SYSTEM
+capability register merely to send the request. These words are data, not
+authority to activate the missing target.
+
+Microcode captures/passes the payload; SYSTEM sends it through resident
+transport dependencies. A five-word transition buffer is not a full shadow
+register bank. Twenty bytes is the payload, not a new transport framing rule.
+The IDE interprets today's metadata with its Namespace/slot mapping; the
+payload does not claim that all four words form a complete readable name.
+Correlation and returned-identity checks remain required; ambiguous identity
+must not cause a guessed mapping or installation. Metadata improvements are
+deferred, not a prerequisite for this proof.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -199,7 +227,7 @@ suspended valid operation; it is not a hard-fault retry or a timer retry loop.
 | GT | Purpose | Must not be confused with |
 |---|---|---|
 | Original target abstraction GT | Authorizes USER's CALL to the user-programmed target and method. Retained with the pending operation. | SYSTEM's execution authority. |
-| CR13 SYSTEM Thread GT | Identifies the configured SYSTEM context for hardware event entry. | A service abstraction's executable GT, or an ordinary `CHANGE CR13` instruction. |
+| Wired slot-2 SYSTEM Thread GT | Activates Boot/SYSTEM through incoming CHANGE machinery, with active identity in CR12. | The unavailable target E-GT or a service abstraction's executable GT. |
 | SYSTEM's abstraction GTs | Authorize SYSTEM's own CALLs, such as FreeHandler and flag operations. | The original USER target GT or permissions. |
 
 Normal CALL enters another abstraction **within the same Thread**. When its
@@ -305,9 +333,10 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     target GT, operands/context;
  |     |     |     |     suspends USER execution.
  |     |---------->|     U.1c UNAVAILABLE event entry
- |     |     |     |     activates SYSTEM via CR13.
- |     |     |     |     CR13 unchanged; no GT swap.
- |     |     |     |     Not ordinary CHANGE CR13.
+ |     |     |     |     activates slot-2 SYSTEM;
+ |     |     |     |     CR12 identifies SYSTEM.
+ |     |     |     |     After restore: DR0–DR3 metadata,
+ |     |     |     |     DR4 target slot; no E-GT load.
  |     |     |     |     U.2 SYSTEM method records request,
  |     |     |     |     associates completion F,
  |     |     |     |     registers suspended USER.
@@ -317,7 +346,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     Check local binding.
  |     |     |     |     If ready, use U.5 directly.
  <-----------------|     U.3 SYSTEM REQUEST to IDE.
- |     |     |     |     Common TUNNEL object envelope.
+ |     |     |     |     20-byte payload in TUNNEL envelope.
  |     |     |     |     Retain local body until
  |     |     |     |     durable custody confirmed;
  |     |     |     |     never wait inside handler.
@@ -348,7 +377,7 @@ IDE   FPGA  OTHER SYSTEM  COMMENTS
  |     |     |     |     exact event-exit ABI open.
  |     |---->|     |     X.3 FPGA activates selected
  |     |     |     |     Thread's saved context.
- |     |     |     |     CR13 remains SYSTEM destination.
+ |     |     |     |     CR12 identifies selected Thread.
  |     |     |     |     Only then other work runs.
 ```
 
@@ -368,7 +397,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     Logical message endpoint;
  |     |     |     |     not asynchronous execution.
  |     |     |     |     Prior handler must finish.
- |     |---------->|     U.4e FPGA event entry via CR13
+ |     |---------->|     U.4e FPGA slot-2 SYSTEM entry
  |     |     |     |     activates delivery handling
  |     |     |     |     at a defined service point.
  |     |     |     |     U.4 SYSTEM method matches request;
@@ -460,7 +489,7 @@ the superseded USER-side Wait sequence without an agreed admission ABI.
 | U.1a | FPGA, then USER | Normal CALL dispatch stays in USER. |
 | U.0 | SYSTEM | Validate startup before normal USER execution; coordinate tests through successive activations. |
 | U.1b | FPGA | Preserve the unfinished operation and suspend USER; no USER-side service code is assumed. |
-| U.1c | FPGA event-entry machinery | Activate SYSTEM designated by CR13 before dispatching method U.2. |
+| U.1c | FPGA event-entry machinery | Activate slot-2 SYSTEM with CR12 active identity; inject the five-word request into DR0–DR4 after restoration, before U.2. |
 | U.2 | SYSTEM | Record request and register the already-suspended USER against F. |
 | U.3 | SYSTEM | Send REQUEST directly to IDE using SYSTEM's service/transport authority. |
 | U.3a / X.1–X.3 | SYSTEM, then FPGA | Finish event and activate the next eligible USER in round-robin order; all USERs blocked: BACKGROUND. |
@@ -620,7 +649,8 @@ suspends before CALL commit; SYSTEM requests the body from IDE; validated
 delivery installs it and makes USER eligible; on its round-robin turn USER
 executes the original CALL normally and the target method completes once.
 Capture the exact bitstream/LUMP identities and the transition evidence,
-including unchanged CR13 and preservation of the original CALL authority.
+including CR12 active identity, unchanged reserved CR13, the five-word request
+payload and preservation of the original CALL authority.
 Use a delayed delivery to demonstrate that USER remains blocked while other
 eligible USER work can proceed, without SYSTEM waiting inside its handler.
 
@@ -659,7 +689,7 @@ is not execution acceptance.
 | Test | Scenario | Required evidence |
 |---|---|---|
 | F.1 | Resident CALL | Original GT dispatches the intended method within USER; no SYSTEM event. |
-| F.2 | Unavailable CALL | FPGA retains original operation; CR13 event entry activates SYSTEM, without USER CALL Wait or GT substitution. |
+| F.2 | Unavailable CALL | FPGA retains original operation; slot-2 event entry activates SYSTEM into CR12, without USER CALL Wait or GT substitution. |
 | F.3 | Registration ownership | SYSTEM registers the suspended USER against F; SYSTEM itself never blocks on F. |
 | F.4 | Immediate IDE response | First handler completes registration and REQUEST before any DELIVER handler runs; arrival does not re-enter SYSTEM. |
 | F.5 | Indefinite unavailability | Request remains pending; handler finishes; another unblocked resident Thread runs; no timeout-driven fault or resume. |
@@ -674,13 +704,13 @@ is not execution acceptance.
 | F.14 | Event lifetime | No Reset or reuse erases an active association or redirects stale completion. |
 | F.15 | Run-to-completion | No second event handler or other Thread executes while the first handler is active; orderly handler completion precedes the next activation. |
 | F.16 | Cooperative round-robin USER selection | Explicit yield or blocking ends a USER turn; eligible resident USERs run in cyclic order, skipping blocked USERs. No timer-driven turn expiry. Completion restores eligibility, not an immediate turn. SYSTEM handlers finish before handoff; all USERs blocked selects BACKGROUND, with USER work preferred once runnable. |
-| F.17 | Repeated SYSTEM activation | CR13 retains the configured SYSTEM Thread GT through entry, exit and selection of another Thread. Outgoing context is saved separately; no USER GT swap into CR13 or matching swap-back occurs. Verify successive SYSTEM activations. |
+| F.17 | Repeated SYSTEM activation | Wired slot-2 GT activates SYSTEM using incoming CHANGE machinery; CR12 identifies the active Thread throughout successive selections. Runtime entry saves USER first. CR13 remains reserved; no swap or replay of reset-only admission. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
 | F.20 | One pending GT per USER | A blocked USER has one outstanding lifecycle association; a later request cannot overwrite it. Different Threads remain independent. |
 | F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
-| F.23 | Ordinary-register event API | USER state is saved before parameter writes; SYSTEM restoration precedes parameter injection; no full shadow bank is assumed. |
+| F.23 | Five-word lazy-load event API | Capture requesting Namespace's existing four metadata words plus target slot; save USER before writes; restore SYSTEM then inject DR0–DR4 exactly. Payload is 20 bytes; no unavailable E-GT activation and no full shadow bank. Verify SYSTEM sends the captured values without metadata redesign. |
 | F.24 | Explicit retirement and simple allocation | No unrequested eviction or compaction; allocation skips reserved/retained slots and does not silently exceed 1,000 slots. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
@@ -693,7 +723,8 @@ their separate authorization.
 
 The following are not settled by the design discussion:
 
-- CR13 provisioning/protection and reconciliation with the existing ISA.
+- Runtime admission to the wired slot-2 SYSTEM activation path and reconciliation
+  with reset-only startup admission; CR13 provisioning is no longer required.
 - Exact event entry, protected pending-operation storage, event exit and
   CHANGE relationship; no unapproved swap-back or opcode is assumed.
 - Non-preemptive service point for delivery admission and input retention.
