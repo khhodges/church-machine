@@ -361,7 +361,29 @@ wake the reset Thread. Keep the reserved record assigned to that USER; its
 next LLR may reuse it with a new request number. Other USERs' pending requests,
 the shared session ID and the shared request counter are unchanged.
 This rule does not require an IDE cancellation message. Reset authorization,
-reset-to-SYSTEM notification and late-reply disposition remain open.
+reset-to-SYSTEM notification and the detailed completion path remain open.
+
+**New approved Phase 2 rule — increment Thread version on Thread reset:**
+authorized reset software increments the USER Thread's Namespace-entry version
+before its reset context becomes eligible. Hardware compares versions; it
+does not increment them. The retained pre-reset Thread GT consequently fails
+the normal version check and must not authorize activation or completion of
+the replacement context. Do not rewrite the retained old GT to the new version
+to make an old request appear current.
+
+Separate target-object admission from requester eligibility. A valid returned
+LUMP is not discarded solely because its requesting USER reset; apply ordinary
+slot/GT/admission/GC rules to that object. The Thread-version check supplies the
+reset-specific stale-owner test. Existing request correlation, integrity and
+target checks still apply; unchanged Thread version alone does not prove that
+a reply belongs to the current request.
+
+The reset implementation must also provide the new context's legitimate
+Thread GT through the authorized path; existing old-version holders are not
+silently upgraded. Exact version-update ordering, provisioning of that GT,
+exhaustion/wrap behavior and stale-owner completion disposition remain open.
+This rule does not change another Thread's version, the target LUMP's version,
+the shared session ID or the request counter, and does not authorize FPGA edits.
 
 **Approved SYSTEM/FPGA-reset lifetime:** reinitializing SYSTEM's pending
 records starts a fresh request session. Pre-reset requests do not survive
@@ -961,7 +983,7 @@ is not execution acceptance.
 | F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
 | F.24 | Explicit retirement and simple allocation | No unrequested eviction or compaction; allocation skips reserved/retained slots and does not silently exceed 1,000 slots. |
 | F.25 | Fresh-session transport reset boundary | Hold pre-reset setup bytes and delayed work at FPGA, bridge and IDE stages, then reinitialize SYSTEM pending state. Verify none can be accepted into the new setup exchange; boundary verification precedes session acceptance and LLR dispatch. If the boundary cannot be established, setup must not report success. A single-buffer clear or socket reconnect is not sufficient evidence. Ordinary disconnect retains its established session. |
-| F.26 | USER-reset LLR invalidation | Reset one USER with an LLR queued, then in a separate case with an LLR already sent. Before the reset context becomes eligible, remove queued work or invalidate sent completion ownership. A late reply cannot complete the old CALL or wake the reset Thread. Its next LLR uses the same reserved record with a new request number. Other USERs' records, shared session and counter remain unchanged; no SYSTEM/FPGA reset or mandatory IDE cancellation message is implied. |
+| F.26 | USER-reset version and LLR invalidation | Reset one USER with an LLR queued, then in a separate case with an LLR already sent. Authorized software increments that Thread's Namespace-entry version before the reset context becomes eligible; hardware does not change it. Remove queued work or invalidate sent completion ownership. The retained old Thread GT fails normal version validation and cannot wake the reset context; never rewrite it to match. Treat a returned target under ordinary admission/slot/GT/GC rules, not an automatic reset-specific discard. The next LLR uses the reserved record with a new request number. Other USERs, target version, shared session and counter remain unchanged. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
@@ -993,8 +1015,13 @@ The following are not settled by the design discussion:
   its reset context eligible; remove queued work, invalidate sent completion
   ownership, retain its reserved record for a new request number. Shared session,
   counter and other USERs' requests stay intact. Define reset authorization,
-  reset-to-SYSTEM notification and late-reply disposition; no IDE cancellation
+  reset-to-SYSTEM notification and stale-owner completion disposition; no IDE cancellation
   message is required by this decision.
+  **Settled reset-version rule:** authorized software increments the reset
+  Thread's version before eligibility. Hardware only compares; old GTs are not
+  repaired. Returned-target admission follows ordinary slot/GT/GC rules, not
+  reset-specific discard. Define precise update/provisioning ordering and
+  version exhaustion/wrap behavior.
 - Request framing/byte order, capacity, correlation, event lifetime, cancellation
   and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.
   **Settled ownership and order:** SYSTEM decides and queues LLRs; FIFO dispatch

@@ -493,7 +493,18 @@ USER reset; the user wants ordinary slot/GT/GC control considered first.
 suggested the requesting Thread's version as the reset-specific test.
 
 **How to apply:** Separate returned-target admission from eligibility of the
-original requester. Version-based reset invalidation requires an explicit rule
-that authorized software changes the Thread version; hardware never changes
-versions. This direction does not waive normal target validation or request
-correlation, nor establish a new reset-version rule by itself.
+original requester. The user subsequently approved incrementing Thread version
+on USER reset, as specified below. This does not waive normal target validation
+or request correlation; hardware never changes versions.
+
+Increment the USER Thread's version on Thread reset, through authorized software
+before its reset context becomes runnable.
+
+**Why:** The user explicitly introduced the rule: "Increment thread version on
+reset thread" to use ordinary GT validity instead of special late-LUMP discard.
+
+**How to apply:** Compare the retained pre-reset Thread GT against the live entry;
+never rewrite it to match the new version. Separate valid target admission/GC
+from stale-requester eligibility. Preserve other Thread and target versions,
+session and request counter. Exact authorized reset/GT provisioning sequence,
+version exhaustion and stale-owner completion behavior remain open.
