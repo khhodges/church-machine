@@ -322,4 +322,7 @@ instead of the suggested DR5 event register.
 **How to apply:** Inject after USER save/SYSTEM restore; test immediately before
 flag-changing work. Queue state retains the request, not the flag. Prepare the
 no-event state before handoff and prevent stale replay; preserve USER flags.
-Exact N/Z/C/V choice and polarity remain open. The wire payload stays 20 bytes.
+The user subsequently approved Z=1 for a new LLR and Z=0 for no new event.
+Microcode preserves restored N/C/V while setting SYSTEM Z; ordinary instruction
+flag semantics remain unchanged. Exact initialization/test/reset sequences
+remain open. The wire payload stays 20 bytes.
