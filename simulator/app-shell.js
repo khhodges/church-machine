@@ -1965,7 +1965,7 @@ function init() {
         }
     }).catch(function() { window._hasOpenAIKey = false; });
     checkBootId();
-    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view','namespace-dna','development-image'];
+    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','ide-node','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view','namespace-dna','development-image'];
     const rawHash = window.location.hash.replace('#', '');
     const [hashView, hashQuery] = rawHash.split('?');
     const hashParams = {};
@@ -2904,7 +2904,7 @@ let _pendingGCPhases = null;   // phases[] from the current in-progress GC run
 
 // ── Default-view lightning bolt drag-and-drop ──────────────────────────────
 function _initDefaultViewBolt() {
-    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view','namespace-dna','development-image'];
+    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','ide-node','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view','namespace-dna','development-image'];
     const bolt = document.getElementById('hamDefaultBolt');
     const clearBtn = document.getElementById('hamDefaultClear');
     if (!bolt) return;

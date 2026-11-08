@@ -487,6 +487,7 @@
                                 <div class="ham-group" id="ham-grp-builder">
                                     <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">&#x1F50C; Connect Wukong</button>
                                     <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder<kbd class="ham-kbd">C+B</kbd></button>
+                                    <button class="ham-item" id="hamItem-ide-node" onclick="switchView('ide-node');closeHamburger()">IDE node</button>
                                     <a class="ham-item" href="/simulator/alice-mallory-lab.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;">Alice / Mallory Test Lab ↗</a>
                                     <button class="ham-item" id="hamItem-buildlog" onclick="switchView('builder');switchBuilderViewTab('buildlog');closeHamburger()">Build Log</button>
                                     <button class="ham-item" id="hamItem-lump-thread" onclick="switchView('builder');switchBuilderViewTab('lump-thread');closeHamburger()">Thread LUMP</button>
@@ -1207,16 +1208,9 @@
         </div>
     </div>
 
-    <div id="namespace" class="view">
+    <div id="ide-node" class="view">
         <div class="panel">
-            <div class="panel-title">Namespace Design</div>
-            <label for="namespaceDesignProfile">Namespace: </label>
-            <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
-                <option value="phase1">Phase 1</option>
-                <option value="ascending" selected>New Layout</option>
-                <option value="legacy">Original</option>
-            </select>
-            <p id="namespaceDesignEditingNotice" role="note">Bind Namespace Design saves the selected design and opens fresh C-list binding results. Only your view choice is remembered after reload; save edits explicitly to keep them. Unresolved or unauthenticated references remain blocked. Binding does not activate a simulation or change an installed image.</p>
+            <div class="panel-title">IDE node</div>
             <section class="settings-section" aria-labelledby="namespaceIdeNodeTitle">
                 <h3 id="namespaceIdeNodeTitle">IDE node</h3>
                 <p>Canonical namespace used to establish locally owned object definitions, for example <code>ide.UART</code> when the node is <code>ide</code>.</p>
@@ -1229,6 +1223,19 @@
                 <p id="namespaceIdeNodeHelp">Bind Namespace Design includes this setting, or use Save IDE node to save only this setting. Changes future ownership checks and retargets existing locally owned aliases. Does not rename saved LUMPs, edit source, or change the installed Namespace.</p>
                 <p id="namespaceIdeNodeStatus" role="status" aria-live="polite">Loading IDE node…</p>
             </section>
+        </div>
+    </div>
+
+    <div id="namespace" class="view">
+        <div class="panel">
+            <div class="panel-title">Namespace Design</div>
+            <label for="namespaceDesignProfile">Namespace: </label>
+            <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
+                <option value="phase1">Phase 1</option>
+                <option value="ascending" selected>New Layout</option>
+                <option value="legacy">Original</option>
+            </select>
+            <p id="namespaceDesignEditingNotice" role="note">Bind Namespace Design saves the selected design and opens fresh C-list binding results. Only your view choice is remembered after reload; save edits explicitly to keep them. Unresolved or unauthenticated references remain blocked. Binding does not activate a simulation or change an installed image.</p>
             <div id="namespaceTable"></div>
             <section id="bootCapacityPanel" aria-label="Boot capacity" style="padding:12px;border:1px solid #444;border-radius:6px;margin:10px 0;">
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -3703,7 +3710,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=sha256-c9ca39b9633d"></script>
     <script src="lump-registry.js?v=sha256-750a8c261af2"></script>
     <script src="target-state.js?v=sha256-5c980f1de9d9"></script>
-    <script src="app-shell.js?v=sha256-1ae3950886c0"></script>
+    <script src="app-shell.js?v=sha256-7ebc7adbc7c2"></script>
     <script src="app-tools.js?v=sha256-51daf085db3f"></script>
     <script src="thread-frame-decoder.js?v=sha256-923870b179d9"></script>
     <script src="app-cr-display.js?v=sha256-1081ddf02623"></script>
