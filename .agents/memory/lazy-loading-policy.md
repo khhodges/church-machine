@@ -369,5 +369,15 @@ allocated only after a USER has blocked.
 
 **How to apply:** Two configured USERs require two records, not one per Namespace
 slot. Keep records occupied while queued or awaiting completion. This does not
-reserve LUMP-body memory or transport buffers; byte layout and exact reuse
-boundary remain open.
+reserve LUMP-body memory or transport buffers; byte layout remains open.
+
+Mark a USER's pending record completed after validated installation and
+successful readiness signaling; retain it until that USER's next LLR replaces it.
+
+**Why:** The user approved completed-record reuse without a separate message
+confirming execution of the resumed CALL.
+
+**How to apply:** Never overwrite queued or awaiting-completion records.
+Completion means ready/eligible, not target-method execution. Reject stale
+replies against the replacement request using the yet-to-be-defined correlation
+contract; retaining a completed record alone does not solve stale correlation.

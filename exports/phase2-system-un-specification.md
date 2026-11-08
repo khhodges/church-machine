@@ -311,8 +311,17 @@ to these records, not duplicate saved contexts. A record stays occupied while
 its request is queued or awaiting completion. The initial two-USER setup needs
 capacity for two pending uses, independent of the 1,000 Namespace-slot capacity.
 This reservation covers request bookkeeping, not LUMP bodies or transport
-buffers. Exact record layout, completion/reuse boundary and transport
-backpressure handling remain open; this is not unbounded buffering.
+buffers. Exact record layout and transport backpressure handling remain open;
+this is not unbounded buffering.
+
+**Approved record reuse:** after validated installation and successful readiness
+signaling, mark the USER's record completed. Retain it until that same USER
+issues its next LLR; only then replace its contents with the new pending use.
+Never overwrite a queued or awaiting-completion record. Completed means that
+the target is ready and USER is eligible, not that the target method has run
+or returned. No additional USER-executed-CALL acknowledgement is required.
+Request correlation must prevent a delayed reply for the old use from completing
+the replacement use; its binary mechanism remains to be defined.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -843,7 +852,7 @@ is not execution acceptance.
 | F.17 | Repeated SYSTEM activation | Wired slot-2 GT selects SYSTEM; restore its saved service-loop executable/NIA and registers, then inject event parameters before execution. CR12 identifies the active Thread. Runtime entry saves USER first; no startup diagnostic rerun or forced fixed-handler jump. All USERs held: stay in the loop. CR13 remains reserved; no swap or replay of reset-only admission. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
-| F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Queued and awaiting-completion requests retain their records; a later request cannot overwrite an active association. Different USERs remain independent. Record byte layout and final reuse boundary remain separate contracts. |
+| F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Never overwrite queued or awaiting-completion records. After validated installation and successful readiness signaling mark completed; retain until the same USER's next LLR replaces it, without a USER-executed-CALL acknowledgement. A stale old reply must not complete the replacement use. Record byte layout/correlation remain open. |
 | F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
 | F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
@@ -881,8 +890,10 @@ The following are not settled by the design discussion:
   follows SYSTEM acceptance order without priorities or reordering. Multiple
   dispatched LLRs may await delivery concurrently, with one pending use per
   blocked USER and serial handlers. Reserve one pending record per configured
-  USER before release; FIFO holds record references. Record layout, exact
-  completion/reuse boundary and transport buffering/backpressure remain open.
+  USER before release; FIFO holds record references. After validated installation
+  and successful readiness signaling, mark completed and retain until the same
+  USER's next LLR. Record layout, correlation and transport buffering/backpressure
+  remain open; no executed-CALL acknowledgement is required for record reuse.
   **Newly explicit:** define exact wire serialization and how the IDE associates
   current raw metadata with the requesting Namespace. Verify that mapping for
   the first proof without requiring metadata improvements. Multiple USERs can
