@@ -31,6 +31,50 @@
         }
     }
     const drafts = {};
+    function selectionKey() {
+        return 'namespace:' + (!state.active ? 'legacy' :
+            state.designId ? 'copy:' + state.designId : state.profile);
+    }
+    function publishSelection() {
+        root.NamespaceSelection?.select(selectionKey());
+    }
+    async function selectShared(key) {
+        if (key === selectionKey()) return true;
+        if (state.loading || state.saving || state.dirty ||
+                root._nsTableDirty || root._nsPrefetchDirty) {
+            throw Error('Save the current Namespace before switching. Your draft is retained.');
+        }
+        if (!/^namespace:(legacy|ascending|phase1|copy:[^:]+)$/.test(key))
+            throw Error('This is historical inspection, not an editable Namespace.');
+        const value=key.slice(10);
+        if (value.startsWith('copy:')) {
+            if (!copiesLoaded) {
+                const response=await fetch('/api/namespace/design-copies',{cache:'no-store'});
+                const result=await response.json();
+                if(!response.ok || !result.ok) throw Error(result.error || 'Namespace list unavailable');
+                copies=result.copies; copiesLoaded=true;
+            }
+            const item=copies.find(c=>c.id===value.slice(5));
+            if (!item) throw Error('The selected Namespace is unavailable.');
+            state.active=true;
+            await selectCopy(item.id);
+        } else {
+            root.DesignSimulation?.stop();
+            root.DesignSimulation?.invalidate();
+            if(typeof root.stopSim==='function') root.stopSim();
+            ++sourceRequest; invalidatePreview();
+            state.active=value!=='legacy';
+            state.designId=''; state.document=null;
+            if(state.active) state.profile=value;
+            try { root.localStorage.setItem(profileKey,value); } catch (_) {}
+            if(state.active) await load();
+            else root.updateNamespace();
+        }
+        if (state.error) throw Error(state.error);
+        render();
+        publishSelection();
+        return true;
+    }
     const slotCount = () => state.document.slotCount || 64;
     const metadata = () => [(0xf8800100 | (slotCount() << 10)) >>> 0, 0, state.document.rows.length - 1, 0];
     function paintBindingProgress() {
@@ -89,6 +133,7 @@
         state.persisted = typeof data.persisted === 'boolean' ? data.persisted : null;
         state.dirty = false;
         state.error = '';
+        publishSelection();
     }
     async function load() {
         if (state.loading) return;
@@ -195,6 +240,10 @@
         dialog.showModal(); dialog.querySelector('input').focus();
     }
     function setProfile(value) {
+        if (state.dirty || root._nsTableDirty || root._nsPrefetchDirty) {
+            root.alert('Save the current Namespace before switching. Your draft is retained.');
+            render(); return;
+        }
         invalidatePreview();
         if(root.DesignSimulation) root.DesignSimulation.stop();
         if(typeof root.stopSim==='function') root.stopSim();
@@ -226,6 +275,7 @@
         const legacy = document.getElementById('bootCapacityPanel');
         if (legacy) legacy.hidden = state.active;
         root.updateNamespace();
+        publishSelection();
     }
     function changed() {
         invalidatePreview();
@@ -236,7 +286,12 @@
         if (typeof root.updateThreadControl === 'function') root.updateThreadControl();
         if (typeof root._renderTraceExecutionIdentity === 'function') root._renderTraceExecutionIdentity();
         const selector = document.getElementById('namespaceDesignProfile');
-        if (selector) selector.value = state.active ? state.profile : 'legacy';
+        if (selector) {
+            selector.innerHTML='<option value="legacy">Original</option><option value="ascending">New Layout</option><option value="phase1">Phase 1</option>'+
+                copies.map(c=>`<option value="copy:${esc(c.id)}">${esc(c.name)}</option>`).join('');
+            selector.value=selectionKey().slice(10);
+            selector.disabled=state.loading || state.saving;
+        }
         if (!state.active) return;
         const host = document.getElementById('namespaceTable');
         if (!host) return;
@@ -294,10 +349,6 @@
             : state.persisted === true ? 'Saved design'
             : state.persisted === false ? 'Generated defaults — not saved' : 'Saved status unknown';
         return `<div id="namespaceDesignStatus" role="status" style="margin:0 0 10px;padding:10px;border:1px solid #6b5320;border-radius:4px">
-            <label>Namespace <select id="namespaceSavedCopy" onchange="NamespaceDesignV1.selectCopy(this.value)" ${state.loading || state.saving?'disabled':''}>
-                <option value="">Original — ${esc(root.NamespaceProfileNames.label(state.profile))}</option>
-                ${copies.filter(c=>c.profile===state.profile).map(c=>`<option value="${esc(c.id)}" ${c.id===state.designId?'selected':''}>${esc(c.name)}</option>`).join('')}
-            </select></label>
             <button type="button" id="reloadNamespaceSaved" onclick="NamespaceDesignV1.reloadSaved()" ${state.loading || state.saving?'disabled':''}>Reload saved design</button>
             <button type="button" id="duplicateNamespace" onclick="NamespaceDesignV1.duplicateNamespace()" ${state.loading || state.saving?'disabled':''}>Duplicate Namespace</button>
             <strong>${esc(profileLabel())} · ${label}</strong>
@@ -760,7 +811,22 @@
     }
     root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad};
     if(typeof document!=='undefined') {
+        root.NamespaceDesignV1.selectShared=selectShared;
+        root.NamespaceDesignV1.selectionKey=selectionKey;
+        root.addEventListener?.('storage', event=>{
+            if(event.key===root.NamespaceSelection?.designKey && event.newValue &&
+                    event.newValue!==selectionKey())
+                selectShared(event.newValue).catch(error=>{
+                    state.error=error.message; publishSelection(); render();
+                });
+        });
         const initialize = () => {
+            const selected=root.NamespaceSelection?.current();
+            if (selected && selected!==selectionKey()) {
+                selectShared(selected).catch(error=>{state.error=error.message;render();});
+                return;
+            }
+            publishSelection();
             const capacity = document.getElementById('bootCapacityPanel');
             if (capacity) capacity.hidden = state.active;
             render();

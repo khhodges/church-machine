@@ -56,7 +56,7 @@
         if (typeof namespace === 'string') {
             selection = namespace;
             root.NamespaceSelection?.remember(selection);
-        } else selection = root.NamespaceSelection?.read() ?? selection;
+        } else selection = root.NamespaceSelection?.current() ?? root.NamespaceSelection?.read() ?? selection;
         load(false);
         if (!isActive()) root.switchView(VIEW); else syncHash();
     }

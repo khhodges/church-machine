@@ -22,6 +22,16 @@ discard drafts or rewrite immutable images.
 Use the creation-defined name throughout; development/testing status, layout,
 build labels and revision identifiers must not replace that name.
 
+Selection identity must be independent of content fingerprints.
+
+**Why:** Saving changes the fingerprint, and two independent named copies may
+initially contain identical bytes. Neither should rename or merge the user's
+selected Namespace.
+
+**How to apply:** Synchronize the persistent design identity across pages;
+resolve exact saved/build revisions separately for inspection and execution.
+Navigation must not trigger compilation or hardware transfer.
+
 For runtime-image reload verification, the user explicitly selected **New
 Layout**, the design that runs in the Simulator, rather than a legacy Wukong
 factory projection.

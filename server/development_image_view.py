@@ -263,7 +263,7 @@ def register(app, backend):
                 entries.append(dict(id=NS_ID, name="Amoeba retry — inspected Namespace",
                                     preparation="Inspection only"))
             response = jsonify(ok=True, entries=[
-                {k: item.get(k) for k in ("id", "name", "saved_at", "preparation")}
+                {k: item.get(k) for k in ("id", "name", "saved_at", "preparation", "selection_key")}
                 for item in entries], warnings=warnings)
         except (OSError, ValueError, KeyError, TypeError) as error:
             response = jsonify(ok=False, error=str(error), dataChanged=False)

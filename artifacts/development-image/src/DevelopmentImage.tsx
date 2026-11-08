@@ -17,6 +17,20 @@ export default function DevelopmentImage() {
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [namespace, setNamespace] = useState("");
   const [refresh, setRefresh] = useState(0);
+  const [selectionRefresh, setSelectionRefresh] = useState(0);
+  useEffect(() => {
+    const update = (event: StorageEvent) => {
+      if (event.key === NamespaceSelection.designKey)
+        setSelectionRefresh(value => value + 1);
+    };
+    window.addEventListener("storage", update);
+    const parentUpdate = () => setSelectionRefresh(value => value + 1);
+    if (window.parent !== window) window.parent.addEventListener("namespace-selection", parentUpdate);
+    return () => {
+      window.removeEventListener("storage", update);
+      if (window.parent !== window) window.parent.removeEventListener("namespace-selection", parentUpdate);
+    };
+  }, []);
   const [input, setInput] = useState<Inspection | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,31 +127,34 @@ export default function DevelopmentImage() {
         result.entries = result.entries.map(entry => ({...entry, name: NamespaceSelection.name(entry.id, entry.name)}));
         result.entries = latestChoices(result.entries);
         setEntries(result.entries);
-        const linked = new URLSearchParams(location.search).get("namespace") ?? NamespaceSelection.read();
-        const choice = linked !== null ? result.entries.find(item => item.id === linked) :
-          result.entries.find(item => item.name === "Original") ?? result.entries[0];
+        const linked = NamespaceSelection.current() ??
+          new URLSearchParams(location.search).get("namespace") ?? NamespaceSelection.read();
+        const choice = linked !== null ? result.entries.find(item => item.id === sourceId(linked) || item.selection_key === linked) :
+          result.entries.find(item => item.selection_key === "namespace:ascending") ?? result.entries[0];
         if (!choice) throw Error(linked ? "The linked Namespace is unavailable. Select an exact saved Namespace." : "No saved Namespaces are available. Save a Namespace in the IDE first.");
-        setNamespace(choice.id);
+        setNamespace(choice.selection_key || choice.id);
       }).catch(cause => { if (!controller.signal.aborted) {setError(cause.message); setLoading(false);} });
     return () => controller.abort();
-  }, []);
+  }, [selectionRefresh]);
 
   useEffect(() => {
     if (!namespace) return;
-    NamespaceSelection.remember(sourceId(namespace));
+    const choice=entries.find(entry=>(entry.selection_key || entry.id)===namespace);
+    const exactId=choice?.id || sourceId(namespace);
+    NamespaceSelection.remember(exactId);
     const controller = new AbortController();
     setLoading(true); setInput(null); setError("");
     setBuiltImage(null); setBuiltRows([]); setView("saved"); setSelectedSlot(null);
-    inspectChoice(namespace, controller.signal)
+    inspectChoice(exactId, controller.signal)
       .then(result => {
         if (controller.signal.aborted) return;
         if (result.layoutSource === "latest-built-image" && result.image) showBuilt(result.image);
-        setInput(result);
+        setInput(choice ? {...result,name:choice.name} : result);
       })
       .catch(cause => { if (!controller.signal.aborted) setError(cause.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [namespace, refresh]);
+  }, [namespace, refresh, entries]);
 
   useEffect(() => {
     if (!receipt) return;
@@ -174,8 +191,10 @@ export default function DevelopmentImage() {
 
   useEffect(() => {
     if (!loadRequest) return;
-    if (namespace !== loadRequest.namespace) {
-      if (entries.some(entry => entry.id === loadRequest.namespace)) changeNamespace(loadRequest.namespace);
+    const selectedEntry=entries.find(entry=>(entry.selection_key || entry.id)===namespace);
+    if ((selectedEntry?.id || namespace) !== loadRequest.namespace) {
+      const requested=entries.find(entry=>entry.id===loadRequest.namespace);
+      if (requested) void changeNamespace(requested.selection_key || requested.id);
       else if (entries.length) { handledLoads.current.add(loadRequest.requestId); setLoadRequest(null);
         setSendStatus("Not sent — the requested Namespace is not an exact saved Namespace."); }
       return;
@@ -187,8 +206,20 @@ export default function DevelopmentImage() {
     void beginSend();
   });
 
-  function changeNamespace(value: string) {
+  async function changeNamespace(value: string) {
     if (busy.current) return;
+    const entry=entries.find(item=>(item.selection_key || item.id)===value);
+    if (entry?.selection_key) {
+      try {
+        const parent = window.parent as Window & {NamespaceDesignV1?: {selectShared(key:string):Promise<boolean>}};
+        if (parent !== window && parent.NamespaceDesignV1)
+          await parent.NamespaceDesignV1.selectShared(entry.selection_key);
+        NamespaceSelection.select(entry.selection_key);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+        return;
+      }
+    }
     setNamespace(value);
     setSelectedSlot(null);
     setBuiltImage(null); setBuiltRows([]); setView("saved"); setAddress("");
@@ -290,7 +321,11 @@ export default function DevelopmentImage() {
             <label htmlFor="kiss-namespace">Namespace</label>
             <select id="kiss-namespace" value={namespace} disabled={sending || !!confirmation} onChange={event => changeNamespace(event.target.value)}>
               {!namespace && <option value="">Select a saved Namespace</option>}
-              {entries.map(entry => <option key={entry.id} value={entry.id}>{entry.name}{entries.filter(other => other.name === entry.name).length > 1 ? ` · ${entry.id.slice(-12)}` : ""}</option>)}
+              <optgroup label="Namespaces">
+                {entries.filter(entry=>entry.selection_key).map(entry => <option key={entry.selection_key} value={entry.selection_key}>{entry.name}</option>)}
+              </optgroup>
+              {!entries.find(entry=>entry.selection_key===namespace) && namespace &&
+                <option value={namespace}>{entries.find(entry=>entry.id===namespace)?.name} · Historical inspection</option>}
             </select>
           </div>
           <div className="kiss-selector">

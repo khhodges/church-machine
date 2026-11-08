@@ -34,6 +34,24 @@ def original_id(backend):
     return "design:" + hashlib.sha256(Path(backend.NS_STATE_PATH).read_bytes()).hexdigest()
 
 
+def test_catalog_selection_identity_survives_saved_revision(backend):
+    app = Flask(__name__)
+    register(app, backend)
+    client = app.test_client()
+    def selected():
+        entries = client.get("/api/development-image/catalog").get_json()["entries"]
+        return next(row for row in entries if row["name"] == "Original")
+    before = selected()
+    assert before["selection_key"] == "namespace:legacy"
+    path = Path(backend.NS_STATE_PATH)
+    value = json.loads(path.read_text())
+    value["note"] = "isolated new saved revision"
+    path.write_text(json.dumps(value))
+    after = selected()
+    assert after["selection_key"] == before["selection_key"]
+    assert after["id"] != before["id"]
+
+
 def test_inclusive_extents_and_types():
     rows = normalize_rows([
         {"slot": 0, "name": "Boot.NS", "location": "0x10", "limit": "0x3f"},

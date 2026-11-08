@@ -82,16 +82,16 @@ def catalog(records, snapshots, namespace_path):
         entry["approval"] = "Legacy snapshot — approval unverified"
 
     root = Path(namespace_path).parent / "design-drafts"
-    paths = [(Path(namespace_path), "Original", {})]
-    paths += [(root / "ascending-v1.json", "New Layout", {}),
-              (root / "phase1.json", "Phase 1", {})]
+    paths = [(Path(namespace_path), "Original", {"selection_key": "namespace:legacy"})]
+    paths += [(root / "ascending-v1.json", "New Layout", {"selection_key": "namespace:ascending"}),
+              (root / "phase1.json", "Phase 1", {"selection_key": "namespace:phase1"})]
     for path in sorted((root / "copies").glob("*/design.json")):
         name = f"Saved copy {path.parent.name}"
         try:
             name = json.loads((path.parent / "metadata.json").read_text()).get("name") or name
         except (OSError, ValueError):
             pass
-        paths.append((path, name, {}))
+        paths.append((path, name, {"selection_key": "namespace:copy:" + path.parent.name}))
     for path, name, extra in paths:
         if path.is_file():
             saved_file(path, name, "design", **extra)

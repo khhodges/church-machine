@@ -1210,11 +1210,11 @@
     <div id="namespace" class="view">
         <div class="panel">
             <div class="panel-title">Namespace Design</div>
-            <label for="namespaceDesignProfile">Namespace design: </label>
-            <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.setProfile(this.value)">
-                <option value="phase1">Phase 1 — 256-slot default / metadata, self, entry Thread</option>
-                <option value="ascending" selected>New layout — ascending table / four-word header</option>
-                <option value="legacy">Previous saved design / committed-image controls</option>
+            <label for="namespaceDesignProfile">Namespace: </label>
+            <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
+                <option value="phase1">Phase 1</option>
+                <option value="ascending" selected>New Layout</option>
+                <option value="legacy">Original</option>
             </select>
             <p id="namespaceDesignEditingNotice" role="note">Bind Namespace Design saves the selected design and opens fresh C-list binding results. Only your view choice is remembered after reload; save edits explicitly to keep them. Unresolved or unauthenticated references remain blocked. Binding does not activate a simulation or change an installed image.</p>
             <section class="settings-section" aria-labelledby="namespaceIdeNodeTitle">

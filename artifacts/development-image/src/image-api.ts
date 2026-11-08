@@ -7,7 +7,7 @@ export type Slot = {
   seq?: number; sequence?: number; boot?: boolean; filename?: string; lump_version?: number;
   selection?: {filename?: string; revision?: number; token?: string};
 };
-export type CatalogEntry = {id: string; name: string; saved_at: string; preparation: string};
+export type CatalogEntry = {id: string; name: string; saved_at: string; preparation: string; selection_key?: string};
 export type PreparedImage = {
   profile: string; namespace_revision_id: string; artifact_sha256: string;
   required_bitstream_sha256: string; size: number;

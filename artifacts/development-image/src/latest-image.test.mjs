@@ -9,8 +9,9 @@ try {
     "--bundle", "--platform=node", "--format=esm", `--outfile=${temp}/module.mjs`]);
   const {latestChoices, inspectChoice, sourceId} = await import(`file://${temp}/module.mjs`);
   const entries = [{id: "design:one", name: "New Layout"}, {id: "archive", name: "Old"}];
-  assert.equal(latestChoices(entries)[0].id, "latest:design:one");
-  assert.equal(latestChoices(entries).length, 3);
+  assert.equal(latestChoices(entries)[0].id, "design:one");
+  assert.equal(latestChoices(entries)[0].name, "New Layout");
+  assert.equal(latestChoices(entries).length, 2);
   assert.equal(sourceId("latest:design:one"), "design:one");
   const calls = [];
   let bad = false;
@@ -25,14 +26,10 @@ try {
   };
   const built = await inspectChoice("latest:design:one", new AbortController().signal);
   assert.equal(built.rows[0].location, 9000, "Saved inspection remains separate");
-  assert.equal(built.image.layout_rows[0].location, 160);
-  assert.equal(built.capacityWords, 16384);
-  assert.equal(built.fingerprint, "hash");
-  assert.equal(calls.length, 2);
-  bad = true;
-  await assert.rejects(inspectChoice("latest:design:one", new AbortController().signal), /matching built layout/);
+  assert.equal(built.image, undefined);
+  assert.equal(calls.length, 1, "Old latest links must not compile on navigation");
   calls.length = 0;
   await inspectChoice("design:one", new AbortController().signal);
   assert.equal(calls.length, 1, "Saved inspection must not compile");
-  console.log("Latest dropdown, exact geometry, no fallback, and inspection-only requests passed");
+  console.log("One name per Namespace; navigation never compiles or sends");
 } finally { rmSync(temp, {recursive: true, force: true}); }
