@@ -15,6 +15,10 @@ integration ports, not evidence of SecurityRegulator provisioning or validated
 instruction completion. Its block-program-writes output requests containment;
 it does not prove that any core/memory consumer implements it.
 
+The [Phase 2 hardware-address map](hardware-address-map-and-diagnostic-mmio.md)
+records `0xFFFFFF18` as the proposed WDT address and a possible full-range
+diagnostic MMIO interface. Neither is an approved or implemented binding.
+
 Remaining integration obligations:
 
 - Agree the exact watchdog control-register address and capability binding.

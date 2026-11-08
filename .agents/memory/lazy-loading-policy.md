@@ -748,3 +748,13 @@ images, restarts, vendor builds, uploads, resets and flashing.
 ports as software authority or timer expiry as proof of memory-write containment.
 Keep address/provisioning, actual completion bounds and integrated recovery
 evidence explicit before claiming a working execution watchdog.
+
+The user suggested full hardware-range diagnostic MMIO for Phase 2, citing
+the approach used for PP250.
+
+**Why:** Diagnostic addressability is a stated investigation goal, not approval
+to expose every control register or implement a second watchdog authority path.
+
+**How to apply:** Treat the PP250 comparison as user-reported precedent; keep
+the diagnostic access model and WDT address binding proposals until approved.
+Preserve SecurityRegulator's exclusive raw watchdog-control custody.
