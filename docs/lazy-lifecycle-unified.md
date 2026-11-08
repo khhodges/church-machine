@@ -79,8 +79,9 @@ startup. CR12 continues to identify the active Thread, including SYSTEM.
 CR13 remains reserved and untouched; no swap or swap-back is involved.
 Runtime entry first preserves USER at the uncommitted CALL, unlike startup,
 which has no outgoing USER. Reusing activation machinery does not authorize
-replaying the current reset-only marker outside reset. Runtime admission remains
-to be defined; exit to a selected USER uses ordinary CHANGE as approved below.
+replaying the current reset-only marker outside reset. Runtime admission uses
+the approved internal CALL trigger below; exit to a selected USER uses ordinary
+CHANGE.
 
 ### Approved Thread identity and SYSTEM recognition
 
@@ -104,6 +105,27 @@ SYSTEM is still a SYSTEM LLR and therefore a HardFault. USER Thread 1/2 remain
 role labels, not assignments to Namespace slots 1/2.
 
 This is an approved design contract, not a claim of installed FPGA support.
+
+### Approved runtime admission: internal CALL trigger
+
+A running USER's valid-but-unavailable CALL directly triggers one internal
+microcode transition into slot-2 SYSTEM. No extra software enable, new instruction
+or replay of the reset marker is required. Apply the normal authority checks
+possible before the target body is present; invalid authority or context causes
+HardFault, not an LLR. Checks requiring the body still run when the original
+CALL executes after loading. An unavailable CALL originating in SYSTEM causes
+HardFault instead of runtime LLR entry.
+
+Save USER at the uncommitted CALL using its normal protected Thread storage,
+restore SYSTEM's saved continuation, then inject DR0–DR5 and Z=1 under the
+approved register/flag contract. Save/restore validation failures HardFault.
+The USER remains suspended while its LLR is in progress: continued target
+absence must not retrigger the CALL or issue another request for that pending
+use. The reset-only startup path remains reset-only; runtime admission is a
+distinct internal trigger reusing the context-transition machinery.
+
+This approves the Phase 2 entry contract, not RTL changes, reset-marker reuse,
+installation or physical operations.
 
 ### Approved SYSTEM runtime entry: saved service-loop continuation
 
@@ -145,7 +167,8 @@ handoff data, not a second saved USER context. SYSTEM's private pending-request
 association remains separate from this protected execution state. If validation
 of the protected save fails, HardFault; do not enter SYSTEM with an incomplete
 USER save. This is an internal microcode transition, not a CHANGE instruction
-inserted into the USER program. Runtime admission remains a separate contract.
+inserted into the USER program. Runtime admission follows the internal CALL
+trigger defined above.
 
 ### Approved SYSTEM exit: ordinary CHANGE
 
@@ -388,9 +411,9 @@ suspended at its saved original CALL; do not periodically resume that CALL to
 rediscover the absent body. Other Thread activity, SYSTEM activations and
 continued absence of the body do not retrigger that pending use.
 Resume only through the approved completion/eligibility path; reset invalidates
-the old association under the separate reset rules. This constraint does not
-approve the broader proposed runtime-entry admission mechanism or prescribe a
-new hardware pending bit. It also does not settle coalescing independent USER
+the old association under the separate reset rules. The approved runtime-entry
+contract incorporates this constraint without prescribing a new hardware pending
+bit. It does not settle coalescing independent USER
 requests for the same target; their owner associations remain distinct.
 
 **Approved record reuse:** after validated installation and successful readiness
@@ -1120,6 +1143,14 @@ that use. The suspended CALL must not execute as a polling retry. Complete
 through the existing validated completion path, or invalidate under the reset
 rules. This is an acceptance requirement, not an executed test.
 
+**F.32 — internal runtime admission:** execute a valid-but-unavailable CALL in a
+running USER and require one internal transition through normal USER save,
+slot-2 SYSTEM restoration and DR0–DR5/Z injection without an extra software
+enable or instruction. Invalid authority/context and SYSTEM-originated
+unavailable CALLs HardFault. The in-progress LLR cannot retrigger. Runtime entry
+must neither replay nor reopen the reset-only startup marker. This is an
+acceptance requirement, not an executed test or installed-FPGA claim.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1130,14 +1161,19 @@ their separate authorization.
 
 The following are not settled by the design discussion:
 
-- Runtime admission to the wired slot-2 SYSTEM activation path and reconciliation
-  with reset-only startup admission; CR13 provisioning is no longer required.
+- Implementing and verifying the approved runtime entry against the current
+  ISA and installed bitstream remains outstanding.
+  **Settled admission:** a valid-but-unavailable running USER CALL directly
+  triggers internal slot-2 SYSTEM entry, with no extra software enable or new
+  instruction. In-progress LLRs cannot retrigger; invalid authority/context and
+  SYSTEM-originated unavailable CALLs HardFault. Startup remains reset-only.
   **Settled runtime entry:** restore SYSTEM's saved service-loop continuation,
   not startup. An existing condition flag is the approved lazy-load entry
   discriminator (Z=1 new LLR, Z=0 none); initialization/test/reset instructions
   and software continuation placement remain open. The Thread GT is not a
   method selector.
-- Exact event-entry admission and transition details remain open.
+- Internal transition wiring and capture-latch details remain implementation work;
+  the runtime LLR admission rule is settled.
   **Settled USER save:** reuse ordinary outgoing Thread-save machinery and
   existing protected Thread storage, preserving the original uncommitted CALL
   as the continuation. No separate LLR execution-context block is required.

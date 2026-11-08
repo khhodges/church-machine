@@ -587,5 +587,19 @@ request for LLRs in process.
 **How to apply:** Keep that USER suspended, not periodically executing its saved
 CALL to rediscover absence. Preserve the existing pending association through
 other Thread/SYSTEM activity; no duplicate event, queue entry or request ID.
-This does not approve the full runtime-entry proposal, introduce a pending bit,
-or decide coalescing across independent USER requests for the same target.
+The subsequently approved runtime-entry rule below incorporates this constraint.
+It does not introduce a pending bit or decide coalescing across independent
+USER requests for the same target.
+
+A running USER's valid-but-unavailable CALL directly admits one internal
+slot-2 SYSTEM transition, with the no-duplicate-in-progress rule.
+
+**Why:** The user approved the revised entry rule after requiring suppression
+of second requests for LLRs already in progress.
+
+**How to apply:** No extra software enable, new instruction or reset-marker
+replay. Use normal USER save, SYSTEM restore and DR0–DR5/Z injection. Invalid
+authority/context and SYSTEM-originated unavailable CALLs HardFault. Keep the
+USER suspended until eligible; body-dependent CALL checks run after loading.
+Startup stays reset-only. Approval is architectural, not permission for RTL or
+physical operations.
