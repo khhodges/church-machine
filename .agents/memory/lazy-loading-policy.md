@@ -298,7 +298,8 @@ the event payload, not automatic transmission or queue policy.
 **How to apply:** Keep the queue SYSTEM-private and retain per-USER pending
 associations. Do not confuse serial handler execution with a one-outstanding-
 request limit; multiple outstanding requests were subsequently approved.
-Storage capacity remains undecided. FIFO order was approved as described below.
+Pending capacity is one reserved record per configured USER, as approved below.
+FIFO order was approved as described below.
 Review flow/message decisions one at a time rather than presenting newly found
 issues as the complete unresolved list.
 
@@ -347,7 +348,7 @@ without priorities or reordering.
 **How to apply:** Preserve each request's USER association even for equal
 targets. FIFO governs dispatch, not delivery or completion order, and does
 not imply a single request in flight. Multiple outstanding requests were
-subsequently approved; storage capacity remains open.
+subsequently approved; pending capacity is one reserved record per USER.
 
 Allow multiple dispatched LLRs from different blocked USERs to await delivery
 at once, retaining one pending use per USER.
@@ -358,4 +359,15 @@ target blocking dispatch of later requests whose targets may be ready.
 **How to apply:** Dispatch FIFO without waiting for an earlier delivery; keep
 handlers and sends serialized. Match out-of-order deliveries to their own
 pending USER. This does not authorize unbounded storage or parallel execution;
-capacity and transport backpressure remain separate contracts.
+record layout and transport backpressure remain separate contracts.
+
+Reserve one SYSTEM-private pending record per configured USER before releasing
+USER execution; FIFO entries reference these records without duplicating contexts.
+
+**Why:** The user approved per-USER capacity so request bookkeeping need not be
+allocated only after a USER has blocked.
+
+**How to apply:** Two configured USERs require two records, not one per Namespace
+slot. Keep records occupied while queued or awaiting completion. This does not
+reserve LUMP-body memory or transport buffers; byte layout and exact reuse
+boundary remain open.

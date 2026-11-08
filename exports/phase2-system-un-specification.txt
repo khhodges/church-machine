@@ -195,7 +195,7 @@ Thread 1 and Thread 2 remain USER Threads.
 
 | Identifier | Owner | Contract |
 |---|---|---|
-| **U.0** | SYSTEM method | Startup validation: check setup, coordinate hardware/event tests across serialized activations, release normal USER execution only after success. |
+| **U.0** | SYSTEM method | Startup validation: check setup, reserve one SYSTEM-private pending record per configured USER before releasing it, coordinate hardware/event tests across serialized activations, release normal USER execution only after success. |
 | **U.1** | USER/FPGA operation, not a SYSTEM method | Original CALL with USER's target GT; dispatch normally if resident, otherwise retain the operation and enter SYSTEM through the UNAVAILABLE mechanism. |
 | **U.2** | SYSTEM method | Consume the protected UNAVAILABLE record; register the suspended USER, pending operation and completion event; resolve locally if possible, otherwise queue the LLR under SYSTEM ownership. |
 | **U.3** | SYSTEM method | Send registered queued LLRs directly to IDE in SYSTEM acceptance order (FIFO). Do not wait inside the handler for DELIVER. |
@@ -230,7 +230,7 @@ but share implementation where behavior is identical:
 | Reduction | Required design |
 |---|---|
 | Shared completion | U.5 and U.8 use one internal complete-and-signal operation after their distinct readiness conditions succeed. Keep both U.n contracts and tests. |
-| One pending use per blocked USER | Retain one saved-object GT for the blocking lifecycle operation. A suspended Thread cannot issue another operation; no per-Thread request queue is needed for this path. Other Threads may each have their own pending use. |
+| One pending use per blocked USER | Reserve one SYSTEM-private pending record per configured USER before USER release, retaining one saved-object GT for its blocking lifecycle operation. A suspended Thread cannot issue another operation; no per-Thread request queue is needed. FIFO entries reference these records rather than duplicate saved contexts. |
 | Private pending storage | Keep the helper C-list and LLR queue as SYSTEM-private storage, not a separately callable Pending service unless a specific authority boundary justifies it. Queue references to pending uses without duplicating full saved objects. |
 | One TUNNEL envelope | Use one GT-associated object envelope with an operation/type field for requests, saved contexts and returns. Retain identity, integrity, custody acknowledgement and stale-return checks. Transport IDs do not confer authority. |
 | Explicit retirement only | Initially retire explicitly selected safe objects, beginning with SelfTest/WCH. No automatic eviction, working-set replacement or speculative prefetch policy. Preserve modified state and active-use checks. |
@@ -303,8 +303,16 @@ is compatible with a SYSTEM queue containing requests from several USERs.
 next queued request without waiting for an earlier delivery. Each blocked USER
 still has only one pending use; SYSTEM handlers and transmissions remain
 sequential, not parallel. An unavailable earlier target must not by itself
-prevent a later queued request from being sent. Queue/storage capacity and
-transport backpressure handling remain open; this is not unbounded buffering.
+prevent a later queued request from being sent.
+
+**Approved pending capacity:** reserve one SYSTEM-private pending record per
+configured USER Thread before releasing those USERs. The FIFO holds references
+to these records, not duplicate saved contexts. A record stays occupied while
+its request is queued or awaiting completion. The initial two-USER setup needs
+capacity for two pending uses, independent of the 1,000 Namespace-slot capacity.
+This reservation covers request bookkeeping, not LUMP bodies or transport
+buffers. Exact record layout, completion/reuse boundary and transport
+backpressure handling remain open; this is not unbounded buffering.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -835,7 +843,7 @@ is not execution acceptance.
 | F.17 | Repeated SYSTEM activation | Wired slot-2 GT selects SYSTEM; restore its saved service-loop executable/NIA and registers, then inject event parameters before execution. CR12 identifies the active Thread. Runtime entry saves USER first; no startup diagnostic rerun or forced fixed-handler jump. All USERs held: stay in the loop. CR13 remains reserved; no swap or replay of reset-only admission. |
 | F.18 | First boot-object retirement | After successful initial diagnostics and return, U.7/U.8 retires SelfTest/WCH bodies safely; retain their identities/results and preserve required communication dependencies. |
 | F.19 | Diagnostics deferred until operator power cycle | Later software hard faults and software resets do not reload diagnostic bodies; containment/evidence and mandatory validation remain active. A human power-off/power-on invokes U.0 diagnostics before USER release and permits subsequent safe retirement again. |
-| F.20 | One pending GT per USER | A blocked USER has one outstanding lifecycle association; a later request cannot overwrite it. Different Threads remain independent. |
+| F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Queued and awaiting-completion requests retain their records; a later request cannot overwrite an active association. Different USERs remain independent. Record byte layout and final reuse boundary remain separate contracts. |
 | F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
 | F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
@@ -872,8 +880,9 @@ The following are not settled by the design discussion:
   **Settled ownership and order:** SYSTEM decides and queues LLRs; FIFO dispatch
   follows SYSTEM acceptance order without priorities or reordering. Multiple
   dispatched LLRs may await delivery concurrently, with one pending use per
-  blocked USER and serial handlers. Storage capacity and transport backpressure
-  handling remain to be decided one at a time.
+  blocked USER and serial handlers. Reserve one pending record per configured
+  USER before release; FIFO holds record references. Record layout, exact
+  completion/reuse boundary and transport buffering/backpressure remain open.
   **Newly explicit:** define exact wire serialization and how the IDE associates
   current raw metadata with the requesting Namespace. Verify that mapping for
   the first proof without requiring metadata improvements. Multiple USERs can
