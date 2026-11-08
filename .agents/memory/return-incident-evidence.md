@@ -20,3 +20,14 @@ making a UI reset look like an instruction failure.
 
 **How to apply:** Resuming a booted machine must preserve its live frames;
 image refresh and replacement belong to explicit boot/preparation operations.
+
+Separate an invalid-bus poisoning test from instruction-trace identity proof.
+
+**Why:** Full guarded-core LLR tests executed correctly while a retirement
+instruction field reflected the deliberately poisoned, inactive fetch bus.
+Using that field alone would misdiagnose control-flow failure.
+
+**How to apply:** Check accepted fixture bytes, committed NIA, independent
+execution effects and return continuation. Do not claim the trace field is
+correct merely because those controls pass; trace-identity qualification is
+a separate obligation.

@@ -49,9 +49,39 @@ stall; accepted target/NIA/flags are poisoned after issue. Assertions check
 preservation, exact injection order, no publication on failure and no NIA
 handoff before injection finishes.
 
-Full guarded-core runtime LLR entry, transport delivery, all fault timing and
-exact-build physical behavior are not claimed by the unit-level guarded tests.
-Current guarded startup regressions are separate from runtime LLR qualification.
+The unit-level guarded tests alone do not establish full guarded-core runtime
+behavior. The subsequent full-core checks below provide bounded runtime evidence.
+Transport delivery, all fault timing and exact-build physical behavior remain
+outside these local tests.
+
+## Subsequent full guarded-core checks
+
+`python3 -m pytest -q -p no:cacheprovider hardware/test_phase2_guarded_llr.py --tb=short`
+
+Result: **6 passed in 14.76 seconds**. No RTL correction was needed.
+
+The fresh synthetic fixture pins Namespace version 46, SYSTEM version 419,
+SYSTEM executable version 73 and USER version 7. It starts through actual
+Namespace/Thread admission, the reset-only marker and final boot CALL, without
+debug capability writes or forced execution addresses.
+
+The successful case executes SYSTEM's initial instructions and ordinary CHANGE
+to USER, observes the unavailable CALL handoff at SYSTEM's saved continuation,
+checks DR0/DR1–DR6, flags and protected USER state, then executes ordinary CHANGE
+back. After changing only the isolated fixture's absent body to a callable
+body, the original CALL retires once, executes a literal callee instruction
+and RETURN, and continues after the original CALL. The reset marker remains
+consumed throughout. This models availability, not a transport DELIVER service.
+
+Five controls reject stale SYSTEM version, malformed SYSTEM continuation frame,
+stale USER ownership, corrupt target seal and SYSTEM-originated unavailable CALL.
+They assert no memory or architectural-register publication on failure.
+
+**Trace-oracle limitation:** the harness deliberately poisons the fetch word
+after acceptance. The existing `retire_instr` field follows that inactive bus,
+so it cannot certify the accepted word under this stimulus. Execution evidence
+uses committed NIA, exact fixture instruction words, observed callee effects
+and RETURN continuation. No retirement-instruction trace repair is claimed.
 
 ## Regression evidence
 
