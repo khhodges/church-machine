@@ -3,6 +3,19 @@ name: M-bit I/O object
 description: Canonical representation and custody rule for CR M state.
 ---
 
+SecurityRegulator must include a GT-version increment method alongside its
+B-bit methods, as a software companion to the Phase 2 Thread-reset rule.
+
+**Why:** The user explicitly requested this method while limiting the main
+lifecycle review to FPGA rules.
+
+**How to apply:** Preserve the existing SR invocation/authority model; B alone
+does not grant access. For Thread reset, change the authoritative entry version
+so old GTs become stale, with no wrap/HardFault on exhaustion. Do not mutate
+versions automatically in FPGA or silently upgrade other GT copies. Exact
+method name, ABI and returned-GT semantics remain open; this is not permission
+to implement or provision it.
+
 ## Current mechanism-versus-policy clarification
 
 The user approved trusted IDE/Builder provisioning of the raw M-control

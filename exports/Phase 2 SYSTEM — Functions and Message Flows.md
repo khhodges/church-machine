@@ -398,6 +398,14 @@ new GT, exhaustion diagnostic and stale-owner completion disposition remain open
 This rule does not change another Thread's version, the target LUMP's version,
 the shared session ID or the request counter, and does not authorize FPGA edits.
 
+**Requested software companion:** the B-bit SecurityRegulator must include a
+GT-version increment method for this authorized operation. Its Thread-reset use
+must affect the authoritative Namespace-entry version so old GTs become stale,
+not merely change a copied token. Apply the Phase 2 no-wrap/HardFault rule.
+Exact method name, register ABI and new-GT result semantics remain open in the
+[SecurityRegulator operation review](phase-1/security-regulator-operation-review.md).
+This records a software dependency, not another FPGA rule or implementation.
+
 **Approved SYSTEM/FPGA-reset lifetime:** reinitializing SYSTEM's pending
 records starts a fresh request session. Pre-reset requests do not survive
 that reinitialization; delayed replies from the old session must not install
