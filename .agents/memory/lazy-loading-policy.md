@@ -310,5 +310,16 @@ reviewing startup-only activation versus ordinary protected frame restoration.
 **How to apply:** Startup enters the resident loop once; SYSTEM handoff saves
 a continuation into that loop. Runtime entry preserves USER, restores SYSTEM,
 then injects event parameters before execution. When all USERs are held,
-SYSTEM stays in the loop. Event recognition remains open. Do not claim the
+SYSTEM stays in the loop. Event recognition uses the entry-flag rule below. Do not claim the
 current Boot executable already contains this software or replay reset admission.
+
+Use an existing Indicator condition flag for transient lazy-load entry
+recognition, not DR5 or a new protected Indicator bit.
+
+**Why:** The user proposed Indicator flags and approved an existing entry flag
+instead of the suggested DR5 event register.
+
+**How to apply:** Inject after USER save/SYSTEM restore; test immediately before
+flag-changing work. Queue state retains the request, not the flag. Prepare the
+no-event state before handoff and prevent stale replay; preserve USER flags.
+Exact N/Z/C/V choice and polarity remain open. The wire payload stays 20 bytes.

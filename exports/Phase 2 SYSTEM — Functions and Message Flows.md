@@ -45,7 +45,8 @@ Namespace-type LUMPs remain excluded from lazy loading.
 ### Newly exposed details, not additional approved features
 
 The fixed payload makes the remaining handoff and wire details concrete:
-how the resumed SYSTEM service loop recognizes an event, how DR0–DR4 are
+the exact condition-flag encoding used by the resumed SYSTEM service loop,
+how DR0–DR4 are
 consumed before reuse, and how the five
 words are serialized. The payload contains no explicit USER/request identifier;
 existing protected pending state and transport correlation must supply that
@@ -80,8 +81,8 @@ then restores SYSTEM, then injects DR0–DR4 before SYSTEM executes.
 
 SYSTEM resumes the saved service-loop continuation; it does not restart boot
 diagnostics, jump to a new fixed handler address, or treat its Thread GT as a
-method selector. Event recognition and the pending-USER association still need
-definition. When all USERs are on hold, SYSTEM stays in its service loop without
+method selector. Event recognition uses the approved entry-flag contract below;
+the pending-USER association still needs definition. When all USERs are on hold, SYSTEM stays in its service loop without
 a Thread switch; handlers remain serialized.
 
 Startup's incoming-only activation and runtime continuation restoration are
@@ -89,6 +90,26 @@ distinct uses of the Thread machinery. This contract requires service-loop
 software; it does not establish that existing Boot executable bytes already
 provide that loop, authorize replacing them, or permit replay of the reset-only
 activation marker.
+
+### Approved event recognition: existing Indicator condition flag
+
+Use an existing N/Z/C/V condition flag as a transient SYSTEM entry signal,
+not DR5, a new Indicator bit, or a persistent pending-request flag.
+The exact selected flag and binary polarity remain to be approved.
+
+After saving USER and restoring SYSTEM, microcode supplies DR0–DR4 and sets
+the selected SYSTEM flag to the new-LLR state before SYSTEM executes. SYSTEM
+tests it immediately at its saved service-loop continuation, before any
+flag-changing instruction. Preserve USER's saved condition flags unchanged.
+
+Once SYSTEM has safely recorded the event, its private queue owns the pending
+work. SYSTEM prepares the no-new-event flag state before yielding, preserving
+that convention through the handoff so ordinary resumption cannot replay an
+old LLR. The loop must not reinterpret subsequent arithmetic flags as fresh
+events; this signal is meaningful at the defined entry check only.
+Initial no-event setup and exact test/reset instruction sequences will be
+specified with the encoding. DR5 remains unreserved by this ABI, the request
+payload remains 20 bytes, and stack/size/reserved Indicator bits are unchanged.
 
 Its two responsibilities are:
 
@@ -150,8 +171,8 @@ boot objects or change the installed boot image.
 
 Boot/SYSTEM remains the same Thread across these roles; startup validation is
 not repeated on every event. Startup follows its initial path; runtime resumes
-the saved service loop. How that loop recognizes each incoming event remains
-part of the event ABI still to be defined.
+the saved service loop. Lazy-load entry uses an existing condition flag;
+its exact encoding and recognition of other event types remain open.
 
 The no-parallel/preemptive-handler rule carries into this Phase 2 design.
 USER Threads run round robin, superseding the earlier arbitrary eligible-Thread
@@ -406,6 +427,8 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     continuation, not startup.
  |     |     |     |     After restore: DR0–DR3 metadata,
  |     |     |     |     DR4 target slot; no E-GT load.
+ |     |     |     |     Set SYSTEM entry flag;
+ |     |     |     |     loop tests before flag changes.
  |     |     |     |     U.2 SYSTEM method records request,
  |     |     |     |     associates completion F,
  |     |     |     |     registers suspended USER.
@@ -784,7 +807,7 @@ is not execution acceptance.
 | F.20 | One pending GT per USER | A blocked USER has one outstanding lifecycle association; a later request cannot overwrite it. Different Threads remain independent. |
 | F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
-| F.23 | Five-word lazy-load event API | Capture requesting Namespace's existing four metadata words plus target slot; save USER before writes; restore SYSTEM then inject DR0–DR4 exactly. Payload is 20 bytes; no unavailable E-GT activation and no full shadow bank. Verify SYSTEM sends the captured values without metadata redesign. |
+| F.23 | Five-word lazy-load event API | Capture requesting Namespace's existing four metadata words plus target slot; save USER before writes; restore SYSTEM then inject DR0–DR4 and the selected condition-flag entry signal. Test it before flag changes, record once, and prepare no-event state before handoff. Ordinary resumption must not requeue stale payload; USER flags remain preserved. Payload is 20 bytes; DR5 is not reserved, no unavailable E-GT activation and no full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
 | F.24 | Explicit retirement and simple allocation | No unrequested eviction or compaction; allocation skips reserved/retained slots and does not silently exceed 1,000 slots. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
@@ -800,8 +823,10 @@ The following are not settled by the design discussion:
 - Runtime admission to the wired slot-2 SYSTEM activation path and reconciliation
   with reset-only startup admission; CR13 provisioning is no longer required.
   **Settled runtime entry:** restore SYSTEM's saved service-loop continuation,
-  not startup. The loop's event discriminator and exact software continuation
-  placement remain open; the Thread GT is not a method selector.
+  not startup. An existing condition flag is the approved lazy-load entry
+  discriminator; exact flag/polarity, initialization/test/reset instructions
+  and software continuation placement remain open. The Thread GT is not a
+  method selector.
 - Exact event entry, protected pending-operation storage, event exit and
   CHANGE relationship; no unapproved swap-back or opcode is assumed.
   **Five-word handoff detail:** define capture/transition latches and when
