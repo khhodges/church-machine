@@ -170,6 +170,22 @@ USER save. This is an internal microcode transition, not a CHANGE instruction
 inserted into the USER program. Runtime admission follows the internal CALL
 trigger defined above.
 
+### Approved USER yield: ordinary CHANGE to SYSTEM
+
+A USER holding the valid, permissionless slot-2 SYSTEM Thread GT voluntarily
+yields through ordinary CHANGE using that GT. No new YIELD instruction or
+special microcode entry is required. Save USER's continuation after CHANGE,
+unlike LLR suspension, which saves the original uncommitted CALL.
+
+Restore SYSTEM's saved service-loop context normally. Do not inject DR0–DR5
+or force Z=1; this is not a new LLR. SYSTEM's previously saved Z=0 convention
+identifies ordinary resumption. Normal Thread GT, version and context checks
+apply, with HardFault on invalid state. SYSTEM then performs its software
+scheduling work.
+
+This does not automatically grant every USER a SYSTEM Thread GT. Supplying
+that capability remains part of authorized Thread setup, not a hardware grant.
+
 ### Approved SYSTEM exit: ordinary CHANGE
 
 When SYSTEM selects a ready USER, it executes ordinary CHANGE using that USER's
@@ -666,8 +682,9 @@ handoff; maintenance scheduling is deferred.
 Scheduling is cooperative; no fixed time slice or timer-driven USER preemption
 is introduced. A USER that neither yields nor blocks can hold execution
 indefinitely; round robin alone does not guarantee bounded waiting.
-The exact yield interface and SYSTEM idle behavior when no service work is
-available remain open. Delivery is handled through transport receive/status
+Voluntary USER yield uses ordinary CHANGE to SYSTEM with its valid permissionless
+Thread GT. SYSTEM idle behavior when no service work is available remains open.
+Delivery is handled through transport receive/status
 while SYSTEM runs, without a delivery-triggered Thread transition.
 **Scope freeze:** keep simple cooperative round robin for now; scheduling
 improvements are deferred. The proposed queued-delivery checks at cooperative
@@ -1196,6 +1213,14 @@ is not rejected solely due to outstanding software LLR state. Normal GT/version
 and context failures still HardFault. This is a design acceptance requirement,
 not an executed test or permission to issue a premature live CHANGE.
 
+**F.35 — ordinary CHANGE yield:** give a USER an authorized, valid permissionless
+SYSTEM Thread GT and yield using ordinary CHANGE. Verify USER's continuation is
+after CHANGE, SYSTEM's saved service-loop context is restored, and no DR0–DR5
+injection or forced Z=1 occurs. The saved SYSTEM Z=0 convention must identify
+ordinary resumption without replaying an LLR. Normal invalid GT/version/context
+checks HardFault. No new opcode or implicit capability grant is required.
+This is an acceptance requirement, not an executed test.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1296,8 +1321,11 @@ The following are not settled by the design discussion:
   disconnect does not invoke this reset rule. Storage mechanics and exact
   boundary handshake/enforcement/evidence remain open.
   No added target-payload word is assumed.
-- Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
+- Round-robin cursor rules and SYSTEM's idle
   mechanism when no USER is eligible and no service work is available.
+  **Settled yield:** ordinary CHANGE with a valid permissionless SYSTEM Thread GT
+  supplied through authorized setup; USER continues after CHANGE. Restore SYSTEM
+  normally without LLR parameter injection or forced Z=1, using saved Z=0.
   SYSTEM remaining active when all USERs are on hold is settled; maintenance
   scheduling and other scheduler improvements remain deferred.
 - FreeQueue exhaustion, retirement admission/deferred-work scheduling,

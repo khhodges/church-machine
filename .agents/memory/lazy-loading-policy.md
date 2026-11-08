@@ -627,3 +627,15 @@ preventing duplicate requests rather than suppressing them after premature
 execution. FPGA performs normal GT/version/context checks only; do not promise
 rejection of an otherwise valid CHANGE solely because an LLR is outstanding.
 This does not grant DR5 protected-state authority or change ordinary validation.
+
+Voluntary USER yield uses ordinary CHANGE with a valid permissionless slot-2
+SYSTEM Thread GT; no new YIELD instruction or microcode event.
+
+**Why:** The user approved ordinary CHANGE for USER-to-SYSTEM yield, including
+the distinction from uncommitted-CALL suspension.
+
+**How to apply:** Save USER's continuation after CHANGE and restore SYSTEM's
+saved service loop normally. Do not inject DR0–DR5 or force Z=1; saved SYSTEM
+Z=0 identifies ordinary resumption. Apply normal GT/version/context checks.
+The USER must receive its SYSTEM GT through authorized setup, not an automatic
+hardware grant.
