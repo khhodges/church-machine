@@ -2,6 +2,15 @@
 
 ## Status and scope
 
+**Current review scope — FPGA rules only:** settle architectural and microcode
+behavior and its software-visible interface. Previously recorded SYSTEM/IDE
+queue, session and persistence decisions remain software context, not FPGA
+implementation requirements. Do not expand them into software algorithms in
+this review. The proposed six-step software USER-reset sequence was not approved.
+Hardware remains responsible for context transitions, parameter delivery and
+ordinary capability/version checks, not software queue management, session-ID
+allocation or automatic version changes.
+
 This document records the current design direction: Boot.Thread, designated
 SYSTEM and located through the wired Namespace slot-2 Thread GT, handles UNAVAILABLE and later delivery events,
 one event at a time, to completion. It replaces the earlier USER-side

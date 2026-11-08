@@ -519,3 +519,14 @@ the design with version-reuse or recovery mechanisms.
 **How to apply:** Do not publish a wrapped version or release the reset context
 when increment is impossible. Keep hardware comparison-only; no automatic
 slot replacement or version recycling. Exact diagnostic code remains open.
+
+Keep the ongoing Phase 2 review to FPGA rules and microcode/software interface
+contracts, not SYSTEM or IDE software orchestration.
+
+**Why:** The user corrected the proposed software reset sequence: "We only
+need FPGA rules". That six-step sequence was not approved.
+
+**How to apply:** Separate existing software decisions from hardware obligations.
+Review suspension, save/restore, event register/flag delivery, validation and
+fault boundaries. Do not ask further queue/session/storage implementation
+questions as FPGA requirements or infer hardware version mutation.
