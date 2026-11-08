@@ -14,9 +14,10 @@ authorization to install an image or program hardware.
   CR13 remains reserved. Full GTs preserve version; slots are Namespace-scoped.
 - A valid unavailable USER CALL enters SYSTEM internally, saving the original
   uncommitted CALL in normal protected Thread storage. No new entry instruction.
-- After SYSTEM restoration: DR0–DR3 Namespace metadata, DR4 target slot,
-  DR5 unchanged outgoing USER Thread GT, Z=1; preserve restored N/C/V and USER flags.
-  DR0–DR4 alone form the 20-byte IDE target payload.
+- After SYSTEM restoration: DR1–DR4 Namespace metadata, DR5 target slot,
+  DR6 unchanged outgoing USER Thread GT, Z=1; preserve restored N/C/V and USER flags.
+  DR1–DR5 alone form the 20-byte IDE target payload.
+  DR0 remains hardwired to zero; the earlier DR0–DR5 handoff is superseded.
 - Ordinary CHANGE handles USER yield and SYSTEM exit. Yield resumes after CHANGE;
   LLR restoration resumes the original CALL. Saved SYSTEM Z=0 marks ordinary entry.
 - SYSTEM software owns pending/ready state and cooperative round robin; no FPGA

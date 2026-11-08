@@ -282,7 +282,7 @@ the request was scoped to Namespace identity plus target slot.
 slot's dot.name. Do not assume a complete name fits in one data register.
 
 Use today's four Namespace metadata words unchanged plus the target slot as
-a 20-byte lazy-load payload in SYSTEM DR0–DR4 after restoration.
+a 20-byte lazy-load payload in SYSTEM DR1–DR5 after restoration.
 
 **Why:** The user proposed the five-word interface and explicitly approved
 proceeding with whatever metadata exists today, improving it later.
@@ -318,7 +318,7 @@ SYSTEM stays in the loop. Event recognition uses the entry-flag rule below. Do n
 current Boot executable already contains this software or replay reset admission.
 
 Use an existing Indicator condition flag for transient lazy-load entry
-recognition, not DR5 or a new protected Indicator bit.
+recognition, not DR6 or a new protected Indicator bit.
 
 **Why:** The user proposed Indicator flags and approved an existing entry flag
 instead of the suggested DR5 event register.
@@ -332,14 +332,14 @@ flag semantics remain unchanged. Exact initialization/test/reset sequences
 remain open. The wire payload stays 20 bytes.
 
 For Phase 2, microcode passes the suspended USER's unchanged 32-bit Thread GT
-from outgoing CR12 as ordinary data in SYSTEM DR5 after restoration.
+from outgoing CR12 as ordinary data in SYSTEM DR6 after restoration.
 
 **Why:** The user approved this owner-identification proposal with "OK for
 Phase 2"; the target Namespace/slot alone cannot distinguish multiple USERs.
 
-**How to apply:** Capture before the switch, preserve USER's original DR5, and
-inject SYSTEM DR5 alongside DR0–DR4 before Z=1. This is not the target E-GT,
-not an event code and not an authority grant. Keep DR5 out of the 20-byte IDE
+**How to apply:** Capture before the switch, preserve USER's original DR6, and
+inject SYSTEM DR6 alongside DR1–DR5 before Z=1. This is not the target E-GT,
+not an event code and not an authority grant. Keep DR6 out of the 20-byte IDE
 target payload; protected association and registration authority remain open.
 
 SYSTEM dispatches queued LLRs FIFO, in the order SYSTEM accepts them.
@@ -551,7 +551,7 @@ separate numeric Thread-ID system.
 **Why:** The user agreed to the distinction between slot designation and
 versioned identity after asking whether software and microcode use different IDs.
 
-**How to apply:** Preserve the complete outgoing CR12 GT in DR5 and pending
+**How to apply:** Preserve the complete outgoing CR12 GT in DR6 and pending
 associations; never reduce stale-owner checks to slot equality. Recognize SYSTEM
 from the validated active Thread in the applicable Namespace, not a permanently
 fixed complete GT. CALL does not change Thread classification. USER Thread 1/2
@@ -600,7 +600,7 @@ slot-2 SYSTEM transition, with the no-duplicate-in-progress rule.
 of second requests for LLRs already in progress.
 
 **How to apply:** No extra software enable, new instruction or reset-marker
-replay. Use normal USER save, SYSTEM restore and DR0–DR5/Z injection. Invalid
+replay. Use normal USER save, SYSTEM restore and DR1–DR6/Z injection. Invalid
 authority/context and SYSTEM-originated unavailable CALLs HardFault. Keep the
 USER suspended until eligible; body-dependent CALL checks run after loading.
 Startup stays reset-only. Approval is architectural, not permission for RTL or
@@ -612,7 +612,7 @@ DELIVER is ordinary transport receive/status input, not a microcode event.
 cooperative-delivery tradeoff.
 
 **How to apply:** Arrival does not switch Threads, interrupt handlers, inject
-DR0–DR5 or set the LLR Z flag. Active SYSTEM consumes input after the prior handler.
+DR1–DR6 or set the LLR Z flag. Active SYSTEM consumes input after the prior handler.
 All-held means SYSTEM is already active; a non-yielding/non-blocking USER can
 delay processing, but remains subject to the existing watchdog/exemptions.
 Retain unread data within bounded capacity;
@@ -629,7 +629,7 @@ consequence that ordinary CHANGE does not enforce software LLR waiting state.
 preventing duplicate requests rather than suppressing them after premature
 execution. FPGA performs normal GT/version/context checks only; do not promise
 rejection of an otherwise valid CHANGE solely because an LLR is outstanding.
-This does not grant DR5 protected-state authority or change ordinary validation.
+This does not grant DR6 protected-state authority or change ordinary validation.
 
 Voluntary USER yield uses ordinary CHANGE with a valid permissionless slot-2
 SYSTEM Thread GT; no new YIELD instruction or microcode event.
@@ -638,7 +638,7 @@ SYSTEM Thread GT; no new YIELD instruction or microcode event.
 the distinction from uncommitted-CALL suspension.
 
 **How to apply:** Save USER's continuation after CHANGE and restore SYSTEM's
-saved service loop normally. Do not inject DR0–DR5 or force Z=1; saved SYSTEM
+saved service loop normally. Do not inject DR1–DR6 or force Z=1; saved SYSTEM
 Z=0 identifies ordinary resumption. Apply normal GT/version/context checks.
 The USER must receive its SYSTEM GT through authorized setup, not an automatic
 hardware grant.
@@ -699,3 +699,14 @@ earlier cross-document audit missed that interaction.
 semantics; a zero-valued fixture can conceal the conflict. Seek explicit approval
 for an ABI remap rather than silently making DR0 writable or changing the agreed
 wire payload. Architectural agreement and available RTL are separate evidence.
+
+The user approved the corrected Phase 2 LLR ABI: DR1–DR4 metadata, DR5 target
+slot, DR6 unchanged outgoing USER GT; DR0 remains zero.
+
+**Why:** This preserves the zero-register invariant while keeping the IDE target
+payload at five words/20 bytes and the owner GT internal.
+
+**How to apply:** The approval covers specification and test requirements only,
+not RTL changes or baseline-failure repairs. Keep Z/N/C/V semantics unchanged,
+preserve original USER registers before injection, and test nonzero metadata
+to expose accidental use of DR0.

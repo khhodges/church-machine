@@ -39,6 +39,12 @@ Namespace-type LUMPs remain excluded from lazy loading.
 
 ### Review summary
 
+**Approved register correction:** the handoff uses DR1–DR6, not DR0–DR5.
+DR0 remains hardwired to zero; there is no event-only write exception.
+DR1–DR4 carry metadata, DR5 the target slot and DR6 the outgoing USER GT.
+The five-word wire payload and Z/N/C/V rules are unchanged. This corrects the
+software-visible specification only; it does not authorize RTL implementation.
+
 - **SYSTEM is Boot.Thread at Namespace slot 2, not a CR13-designated Thread.**
   Reuse the wired Thread GT and incoming startup CHANGE machinery; CR12 remains
   the active-Thread identity. CR13 stays reserved. Runtime admission is still
@@ -46,10 +52,10 @@ Namespace-type LUMPs remain excluded from lazy loading.
 - **Pass data, not the unavailable E-GT, into SYSTEM.** Microcode captures the
   requesting Namespace's four existing slot-0 metadata words plus the target
   slot number. After saving USER and restoring SYSTEM, inject them into
-  DR0–DR4, in that order.
+  DR1–DR5, in that order.
 - **Phase 2 ownership parameter:** microcode also captures the outgoing USER's
   Thread GT from CR12 and passes its unchanged 32-bit value as ordinary data in
-  SYSTEM DR5. This is internal association data, not a sixth IDE payload word.
+  SYSTEM DR6. This is internal association data, not a sixth IDE payload word.
 - **The lazy-load request payload is 20 bytes.** SYSTEM sends it through resident
   transport dependencies; microcode need not implement transport sending.
   Preserve the original E-GT with USER's pending CALL.
@@ -63,10 +69,10 @@ Namespace-type LUMPs remain excluded from lazy loading.
 
 The fixed payload makes the remaining handoff and wire details concrete:
 the initialization/test/reset instructions for the service-loop Z entry flag,
-how DR0–DR4 are
+how DR1–DR5 are
 consumed before reuse, and how the five
 words are serialized. The target payload contains no USER/request identifier;
-DR5 supplies internal USER identity and an approved envelope request identifier supplies that
+DR6 supplies internal USER identity and an approved envelope request identifier supplies that
 association rather than treating Namespace/slot as a unique pending use.
 Section 6 identifies these open details. No extra payload word, new opcode,
 metadata redesign or hardware implementation is approved by this revision.
@@ -97,7 +103,7 @@ The full GT preserves versioned identity; a retained slot alone cannot distingui
 the old and new incarnations of a reset Thread.
 
 CR12 holds the active Thread reference. LLR entry preserves the outgoing USER's
-unchanged full 32-bit Thread GT in DR5 as data, not merely its slot. CHANGE
+unchanged full 32-bit Thread GT in DR6 as data, not merely its slot. CHANGE
 requires a permissionless Thread GT, not a NULL GT, and still validates identity,
 version and protected Thread context using microcode privileges.
 
@@ -122,7 +128,7 @@ CALL executes after loading. An unavailable CALL originating in SYSTEM causes
 HardFault instead of runtime LLR entry.
 
 Save USER at the uncommitted CALL using its normal protected Thread storage,
-restore SYSTEM's saved continuation, then inject DR0–DR5 and Z=1 under the
+restore SYSTEM's saved continuation, then inject DR1–DR6 and Z=1 under the
 approved register/flag contract. Save/restore validation failures HardFault.
 The USER remains suspended while its LLR is in progress: continued target
 absence must not retrigger the CALL or issue another request for that pending
@@ -139,13 +145,13 @@ Whenever it hands execution to USER, its saved continuation leads back into
 that loop. Runtime event entry selects SYSTEM using the wired slot-2 Thread
 GT and restores its protected saved executable/NIA frame and register context.
 For an unavailable CALL, microcode first saves USER at the uncommitted CALL,
-then restores SYSTEM, then injects DR0–DR4 plus the outgoing USER Thread GT
-in DR5 before SYSTEM executes.
+then restores SYSTEM, then injects DR1–DR5 plus the outgoing USER Thread GT
+in DR6 before SYSTEM executes.
 
 SYSTEM resumes the saved service-loop continuation; it does not restart boot
 diagnostics, jump to a new fixed handler address, or treat its Thread GT as a
 method selector. Event recognition uses the approved entry-flag contract below;
-DR5 identifies the pending USER, while registration authority and retained
+DR6 identifies the pending USER, while registration authority and retained
 association mechanics still need definition. When all USERs are on hold, SYSTEM stays in its service loop without
 a Thread switch; handlers remain serialized.
 
@@ -182,7 +188,7 @@ yields through ordinary CHANGE using that GT. No new YIELD instruction or
 special microcode entry is required. Save USER's continuation after CHANGE,
 unlike LLR suspension, which saves the original uncommitted CALL.
 
-Restore SYSTEM's saved service-loop context normally. Do not inject DR0–DR5
+Restore SYSTEM's saved service-loop context normally. Do not inject DR1–DR6
 or force Z=1; this is not a new LLR. SYSTEM's previously saved Z=0 convention
 identifies ordinary resumption. Normal Thread GT, version and context checks
 apply, with HardFault on invalid state. SYSTEM then performs its software
@@ -210,11 +216,11 @@ If all USERs remain held, SYSTEM stays active without a CHANGE.
 ### Approved event recognition: existing Indicator condition flag
 
 Use the existing Z condition flag as a transient SYSTEM entry signal,
-not a DR5 event code, a new Indicator bit, or a persistent pending-request flag.
+not a DR6 event code, a new Indicator bit, or a persistent pending-request flag.
 **Approved encoding at the service-loop entry check:** Z=1 means a new LLR
-is present in DR0–DR4; Z=0 means no new LLR has been supplied.
+is present in DR1–DR5; Z=0 means no new LLR has been supplied.
 
-After saving USER and restoring SYSTEM, microcode supplies DR0–DR5 and sets
+After saving USER and restoring SYSTEM, microcode supplies DR1–DR6 and sets
 SYSTEM Z=1 before SYSTEM executes, leaving restored N, C and V unchanged. SYSTEM
 tests it immediately at its saved service-loop continuation, before any
 flag-changing instruction. Preserve USER's saved condition flags unchanged.
@@ -226,7 +232,7 @@ old LLR. The loop must not reinterpret subsequent arithmetic flags as fresh
 events; this signal is meaningful at the defined entry check only.
 Initial Z=0 setup and exact test/reset instruction sequences remain to be
 specified using the existing ISA. Ordinary instructions retain their flag
-semantics. DR5 carries the Phase 2 USER Thread identity, not event status. The request
+semantics. DR6 carries the Phase 2 USER Thread identity, not event status. The request
 payload remains 20 bytes, and stack/size/reserved Indicator bits are unchanged.
 
 Its two responsibilities are:
@@ -367,32 +373,38 @@ the first lazy-load proof.
 
 | SYSTEM register | Ordinary data supplied by microcode |
 |---|---|
-| DR0 | Requesting Namespace metadata word 0 |
-| DR1 | Requesting Namespace metadata word 1 |
-| DR2 | Requesting Namespace metadata word 2 |
-| DR3 | Requesting Namespace metadata word 3 |
-| DR4 | Unavailable target slot number |
+| DR1 | Requesting Namespace metadata word 0 |
+| DR2 | Requesting Namespace metadata word 1 |
+| DR3 | Requesting Namespace metadata word 2 |
+| DR4 | Requesting Namespace metadata word 3 |
+| DR5 | Unavailable target slot number |
+
+DR0 remains zero throughout. Exercise distinct nonzero metadata words (including
+word 0), a nonzero target slot and a full versioned USER GT in acceptance tests;
+zero-filled metadata must not conceal a wrong register assignment. Assert the
+exact DR1–DR6 mapping, unchanged DR0, and preservation of the outgoing USER's
+original DR1–DR6 in its saved context before SYSTEM injection.
 
 Capture the payload from the requesting Namespace before changing context,
-save USER, restore SYSTEM, then inject DR0–DR4. Preserve USER's original E-GT
+save USER, restore SYSTEM, then inject DR1–DR5. Preserve USER's original E-GT
 and CALL state separately. Do not load the unavailable E-GT into a SYSTEM
 capability register merely to send the request. These words are data, not
 authority to activate the missing target.
 
 **Approved Phase 2 internal ownership parameter:** before switching, microcode
 also captures the outgoing USER's Thread GT from CR12. After SYSTEM restoration,
-place that unchanged 32-bit GT value in DR5 alongside DR0–DR4, before setting
+place that unchanged 32-bit GT value in DR6 alongside DR1–DR5, before setting
 Z=1 and starting SYSTEM execution. This is the USER Thread GT, not the absent
 target's E-GT and not SYSTEM's restored CR12 identity.
 
-SYSTEM records DR5 with the LLR and its protected suspended context. Do not
+SYSTEM records DR6 with the LLR and its protected suspended context. Do not
 infer the owner from the target slot or the round-robin cursor: two USERs may
-request the same target. DR5 is ordinary internal data; it neither activates
+request the same target. DR6 is ordinary internal data; it neither activates
 the Thread nor grants permission to edit protected Thread state. Registration
 authority and subsequent identity/context validation remain required.
-The internal handoff has six data words plus the Z signal; only DR0–DR4 form
-the five-word, 20-byte target payload sent to IDE. DR5 is not added to that
-wire payload. Preservation of USER's original DR5 is part of the preceding
+The internal handoff has six data words plus the Z signal; only DR1–DR5 form
+the five-word, 20-byte target payload sent to IDE. DR6 is not added to that
+wire payload. Preservation of USER's original DR6 is part of the preceding
 USER context save, like the other original registers.
 
 Microcode captures/passes the payload; SYSTEM sends it through resident
@@ -438,7 +450,7 @@ periodically executing its CALL and suppressing requests afterward. Ordinary
 CHANGE does not independently reject an otherwise valid Thread GT merely
 because its Thread has an outstanding LLR. SYSTEM must not select that USER
 until completion; hardware does not enforce this software scheduling restriction.
-This does not waive normal authority checks or give DR5 permission to modify
+This does not waive normal authority checks or give DR6 permission to modify
 protected Thread storage. Software association/provisioning details remain
 separate from this settled FPGA boundary.
 
@@ -486,7 +498,7 @@ or silently starting a new session. The exact diagnostic code remains open.
 Match the pair (session identity, request number), plus the expected target,
 not the number alone. The counter is SYSTEM software bookkeeping, not a GT
 version field or hardware version mutation. It belongs to the envelope,
-outside DR0–DR4's 20-byte target payload.
+outside DR1–DR5's 20-byte target payload.
 
 **Reset scopes:** LLRs are individual USER Thread events, not FPGA-wide events.
 Microcode hands a Thread's event to SYSTEM; it does not turn the request into
@@ -644,7 +656,7 @@ a system-service GT into the original CALL.
 
 **Approved DELIVER interface:** DELIVER is ordinary transport input, not a
 microcode event. Arrival makes data available through transport receive/status;
-it does not switch Threads, inject DR0–DR5, set the LLR entry flag Z or interrupt
+it does not switch Threads, inject DR1–DR6, set the LLR entry flag Z or interrupt
 an executing handler. SYSTEM checks receive status and processes replies when
 it runs, after the prior handler finishes. If all USERs are held, SYSTEM is
 already active. Otherwise delivery waits for cooperative handoff. A USER that
@@ -802,9 +814,9 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     CR12 identifies SYSTEM.
  |     |     |     |     Restore saved service-loop
  |     |     |     |     continuation, not startup.
- |     |     |     |     After restore: DR0–DR3 metadata,
- |     |     |     |     DR4 target slot; no E-GT load.
- |     |     |     |     DR5 outgoing USER Thread GT.
+ |     |     |     |     After restore: DR1–DR4 metadata,
+ |     |     |     |     DR5 target slot; no E-GT load.
+ |     |     |     |     DR6 outgoing USER Thread GT.
  |     |     |     |     Set SYSTEM Z=1;
  |     |     |     |     loop tests before flag changes.
  |     |     |     |     U.2 SYSTEM method records request,
@@ -964,7 +976,7 @@ the superseded USER-side Wait sequence without an agreed admission ABI.
 | U.1a | FPGA, then USER | Normal CALL dispatch stays in USER. |
 | U.0 | SYSTEM | Validate startup before normal USER execution; coordinate tests through successive activations. |
 | U.1b | FPGA | Preserve the unfinished operation and suspend USER; no USER-side service code is assumed. |
-| U.1c | FPGA event-entry machinery | Activate slot-2 SYSTEM with CR12 active identity; after restoration inject target payload into DR0–DR4, outgoing USER Thread GT into DR5, then Z=1 before U.2. |
+| U.1c | FPGA event-entry machinery | Activate slot-2 SYSTEM with CR12 active identity; after restoration inject target payload into DR1–DR5, outgoing USER Thread GT into DR6, then Z=1 before U.2. |
 | U.2 | SYSTEM | Record request and register the already-suspended USER against F. |
 | U.3 | SYSTEM | Send REQUEST directly to IDE using SYSTEM's service/transport authority. |
 | U.3a / X.1–X.3 | SYSTEM, then FPGA if handing off | Finish event; activate the next eligible USER in round-robin order, or stay in SYSTEM if all USERs are on hold. |
@@ -1182,10 +1194,10 @@ is not execution acceptance.
 |---|---|---|
 | F.1 | Resident CALL | Original GT dispatches the intended method within USER; no SYSTEM event. |
 | F.2 | Unavailable CALL | FPGA retains original operation; slot-2 event entry activates SYSTEM into CR12, without USER CALL Wait or GT substitution. |
-| F.3 | Registration ownership | DR5 equals the outgoing USER's captured CR12 Thread GT, not restored SYSTEM CR12 or the target E-GT. Associate the LLR with that suspended USER even when two USERs request the same target. SYSTEM itself never blocks on F; original USER DR5 remains saved. |
+| F.3 | Registration ownership | DR6 equals the outgoing USER's captured CR12 Thread GT, not restored SYSTEM CR12 or the target E-GT. Associate the LLR with that suspended USER even when two USERs request the same target. SYSTEM itself never blocks on F; original USER DR6 remains saved. |
 | F.4 | Immediate IDE response | First handler completes registration and REQUEST before any DELIVER handler runs; arrival does not re-enter SYSTEM. |
 | F.5 | Indefinite unavailability | Request remains pending; handler finishes; another eligible USER runs, or SYSTEM stays active. No request-timeout fault or resume; executing Threads still satisfy the watchdog. |
-| F.6 | Delivery admission | SYSTEM consumes ordinary transport receive/status input while active after the previous handler finishes. Arrival causes no Thread switch, DR0–DR5 injection, Z entry signal or asynchronous preemption. |
+| F.6 | Delivery admission | SYSTEM consumes ordinary transport receive/status input while active after the previous handler finishes. Arrival causes no Thread switch, DR1–DR6 injection, Z entry signal or asynchronous preemption. |
 | F.7 | Invalid/mismatched delivery | No completion signal or USER resume; validation-fault ownership follows its agreed contract. |
 | F.8 | Duplicate/stale delivery | IDE echoes the SYSTEM-assigned envelope request identifier. Match it and expected target before installation/completion. An old reply cannot complete a replacement use, even for the same USER and target; no second install, signal or wakeup. Pre-reset replies cannot install or wake in a fresh session. Widths/lifetimes are settled; exact duplicate/stale disposition and wire framing/ordering remain open. |
 | F.9 | Multiple outstanding requests | Handlers execute serially; dispatch requests from distinct blocked USERs in FIFO acceptance order without waiting for earlier delivery. Delay the first target and deliver a later one: only its associated USER becomes eligible. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. One pending use per USER remains enforced. |
@@ -1202,7 +1214,7 @@ is not execution acceptance.
 | F.20 | Reserved pending record per USER | Before USER release, reserve one SYSTEM-private record per configured USER. The two-USER proof has capacity for two pending uses; FIFO entries reference records without duplicating saved contexts. Never overwrite queued or awaiting-completion records. After validated installation and successful readiness signaling mark completed; retain until the same USER's next LLR replaces it, without a USER-executed-CALL acknowledgement. A stale old reply must not complete the replacement use. Record byte layout and wire ordering remain open; identifier widths/lifetimes are settled. |
 | F.21 | Shared completion | U.5 and U.8 use the common completion path only after their own preconditions, signal the correct USER and consume each pending association once. |
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
-| F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
+| F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR1–DR6 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR1–DR5 (20 bytes), excluding DR6. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
 | F.24 | Explicit retirement and simple allocation | No unrequested eviction or compaction; allocation skips reserved/retained slots and does not silently exceed 1,000 slots. |
 | F.25 | Fresh-session transport reset boundary | Hold pre-reset setup bytes and delayed work at FPGA, bridge and IDE stages, then reinitialize SYSTEM pending state. Verify none can be accepted into the new setup exchange; boundary verification precedes session acceptance and LLR dispatch. If the boundary cannot be established, setup must not report success. A single-buffer clear or socket reconnect is not sufficient evidence. Ordinary disconnect retains its established session. |
 | F.26 | USER-reset version and LLR invalidation | Reset one USER with an LLR queued, then in a separate case with an LLR already sent. Authorized software increments that Thread's Namespace-entry version before the reset context becomes eligible; hardware does not change it. Remove queued work or invalidate sent completion ownership. The retained old Thread GT fails normal version validation and cannot wake the reset context; never rewrite it to match. Treat a returned target under ordinary admission/slot/GT/GC rules, not an automatic reset-specific discard. The next LLR uses the reserved record with a new request number. Other USERs, target version, shared session and counter remain unchanged. |
@@ -1248,7 +1260,7 @@ rules. This is an acceptance requirement, not an executed test.
 
 **F.32 — internal runtime admission:** execute a valid-but-unavailable CALL in a
 running USER and require one internal transition through normal USER save,
-slot-2 SYSTEM restoration and DR0–DR5/Z injection without an extra software
+slot-2 SYSTEM restoration and DR1–DR6/Z injection without an extra software
 enable or instruction. Invalid authority/context and SYSTEM-originated
 unavailable CALLs HardFault. The in-progress LLR cannot retrigger. Runtime entry
 must neither replay nor reopen the reset-only startup marker. This is an
@@ -1256,7 +1268,7 @@ acceptance requirement, not an executed test or installed-FPGA claim.
 
 **F.33 — transport-only delivery:** receive DELIVER while USER is running and
 while SYSTEM is executing a handler. Arrival must not activate SYSTEM, interrupt
-execution, inject DR0–DR5 or alter Z. Retain unread input within the defined
+execution, inject DR1–DR6 or alter Z. Retain unread input within the defined
 capacity; process it through receive/status when SYSTEM is active and the prior
 handler has completed. Verify the all-USERs-held case with SYSTEM already active.
 No bounded successful response time is promised without cooperative progress;
@@ -1274,7 +1286,7 @@ not an executed test or permission to issue a premature live CHANGE.
 
 **F.35 — ordinary CHANGE yield:** give a USER an authorized, valid permissionless
 SYSTEM Thread GT and yield using ordinary CHANGE. Verify USER's continuation is
-after CHANGE, SYSTEM's saved service-loop context is restored, and no DR0–DR5
+after CHANGE, SYSTEM's saved service-loop context is restored, and no DR1–DR6
 injection or forced Z=1 occurs. The saved SYSTEM Z=0 convention must identify
 ordinary resumption without replaying an LLR. Normal invalid GT/version/context
 checks HardFault. No new opcode or implicit capability grant is required.
@@ -1298,7 +1310,7 @@ Failed/skipped CHANGE must not renew, and deadline equality must retain existing
 expiry precedence. This is an acceptance requirement, not an executed test.
 
 **F.38 — internal LLR completion renewal:** complete USER save, SYSTEM restoration
-and DR0–DR5/Z injection strictly before the active watchdog deadline and verify
+and DR1–DR6/Z injection strictly before the active watchdog deadline and verify
 that SYSTEM starts with a full selected interval. LLR detection alone, partial
 entry and failed transitions must not renew or pause the timer. At deadline
 equality or expiry before completion, preserve existing expiry/fault precedence;
@@ -1341,7 +1353,7 @@ The following are not settled by the design discussion:
   Thread GT, saving SYSTEM's continuation and restoring USER's context under
   normal validation. No special event-exit instruction or swap-back is required.
   **Five-word handoff detail:** define capture/transition latches and when
-  SYSTEM consumes or retains DR0–DR5 before calls or later activations can
+  SYSTEM consumes or retains DR1–DR6 before calls or later activations can
   overwrite them. The register assignment and save/restore ordering are settled.
 - Transport buffer capacity and full-buffer behavior remain open.
   **Settled delivery interface:** ordinary receive/status consumed by active
@@ -1349,7 +1361,7 @@ The following are not settled by the design discussion:
   register injection or Z entry signal. Retain unread input without silent loss.
 - SYSTEM's authorized registration of an already-suspended USER on an event.
   **Settled Phase 2 owner input:** outgoing CR12 Thread GT as ordinary data in
-  SYSTEM DR5. **Settled FPGA boundary:** pending/ready state is SYSTEM software
+  SYSTEM DR6. **Settled FPGA boundary:** pending/ready state is SYSTEM software
   bookkeeping; no new FPGA LLR-blocked bit or hardware wait-list. SYSTEM prevents
   duplicate requests by not selecting waiting USERs. Ordinary CHANGE does not
   reject an otherwise valid Thread solely for outstanding software LLR state.

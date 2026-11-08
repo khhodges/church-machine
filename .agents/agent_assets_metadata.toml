@@ -1849,14 +1849,14 @@ content_type = "text/markdown"
 id = "vS3vEqqtXXkSHjQF7gJ23"
 uri = "file://exports/phase2-system-un-specification.html"
 type = "html"
-title = "Phase 2 — Aligned Lifecycle Specification"
-description = "Current agreements including ordinary CHANGE, transport-only delivery, software waiting state and watchdog renewal. Includes a Markdown download."
+title = "Phase 2 SYSTEM — Corrected DR1–DR6 Specification"
+description = "Updated lifecycle contract and diagrams, with an embedded Markdown download. DR0 remains zero; wire payload remains 20 bytes."
 logical_id = "9b1c1423-b5e0-4208-af45-d18b9433093a"
-content_hash = "sha256:ca54f8cbb138a311b551299b9409a3b9c4e372ddf190166560ab85e5c6ada6e3"
-size = 224699
-mtime_ms = 1794148254063
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/0a6aa66e-8ada-46fc-9d8b-94869030e704"
-storage_version_token = "1794148295587825"
+content_hash = "sha256:252ee71a4bac7b635017950983d028b9732fffd15bef91a5097686bfcfec00ea"
+size = 226928
+mtime_ms = 1794150766041
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9b1c1423-b5e0-4208-af45-d18b9433093a/102fb438-4770-4756-abc3-2f7838856c83"
+storage_version_token = "1794150834853742"
 content_type = "text/html"
 
 [[outputs]]
@@ -1891,14 +1891,14 @@ content_type = "text/markdown"
 id = "dLCNwhtpyzdbJ0InWRh8A"
 uri = "file://exports/phase2-test-checklist.html"
 type = "html"
-title = "Phase 2 — Complete Test Checklist"
-description = "89 test groups with expected results, unresolved-contract gates and execution order. Includes a Markdown download; no test is claimed passed."
+title = "Phase 2 — Updated Acceptance Checklist"
+description = "89 scenario groups, including nonzero metadata and exact DR1–DR6 mapping requirements. Requirements only, not execution results."
 logical_id = "b2ad50ab-5b85-42e3-84c5-b41943138833"
-content_hash = "sha256:f1fc6365afd37912e1d63f402cec30b5bf7a1504167a3a7cc931c84f4c22174f"
-size = 55076
-mtime_ms = 1794148254151
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b2ad50ab-5b85-42e3-84c5-b41943138833/431ae3d7-3666-4ba4-9573-a594bdd8b66e"
-storage_version_token = "1794148294769670"
+content_hash = "sha256:51be82e40197eadacdb2e4892cbe4ecd577d47520d30642584758b86b3f78c6e"
+size = 56206
+mtime_ms = 1794150793957
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b2ad50ab-5b85-42e3-84c5-b41943138833/ece74d21-addf-4594-9ae0-c109bbbee9db"
+storage_version_token = "1794150835522236"
 content_type = "text/html"
 
 [[outputs]]

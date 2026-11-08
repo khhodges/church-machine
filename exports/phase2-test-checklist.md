@@ -5,6 +5,13 @@ claimed run or passed. Listing a case does not authorize RTL edits, boot-image
 replacement, upload, reset or flashing. Physical operations require separate
 authorization. Updated to include the approved internal-LLR watchdog renewal.
 
+The approved register correction uses DR1–DR4 for metadata, DR5 for target
+slot and DR6 for the outgoing USER GT. DR0 stays hardwired to zero.
+F.23 must use distinct nonzero metadata words, target slot and a full versioned
+USER GT, verify exact DR1–DR6 placement and unchanged DR0, and verify USER's
+original DR1–DR6 were saved before injection. T1 transmits only DR1–DR5
+(20 bytes); DR6 remains internal. This adds assertions, not new case IDs.
+
 ## Authority and scope
 
 - [Unified lifecycle](../lazy-lifecycle-unified.md) owns F.1–F.38 and the current
@@ -60,7 +67,7 @@ delivery, disable the watchdog or bypass admission because a contract is open.
 |---|---|---|
 | F.1 | Resident CALL executes intended method in USER with no SYSTEM entry/request. | Agreed |
 | F.2 | Valid absent-body CALL saves USER and activates slot-2 SYSTEM/CR12; no USER Wait or substituted GT. | Agreed |
-| F.3 | DR5 is outgoing USER's unchanged full GT; preserve original USER DR5; distinguish owners of equal targets. | G3 association |
+| F.3 | DR6 is outgoing USER's unchanged full GT; preserve original USER DR6; distinguish owners of equal targets. | G3 association |
 | F.4 | Immediate response cannot interrupt request registration or re-enter SYSTEM. | G1/G3 integration |
 | F.5 | Delayed/unavailable target stays pending without request timeout, duplicate or premature resume; other USER/SYSTEM work obeys watchdog. | G1/G3 |
 | F.6 | Delivery is consumed by active SYSTEM through receive/status; no Thread switch, register injection or Z entry signal on arrival. | G1 capacity |
@@ -80,7 +87,7 @@ delivery, disable the watchdog or bypass admission because a contract is open.
 | F.20 | Reserve one record per configured USER; no in-flight overwrite; completed record reused on next LLR with fresh ID, without CALL-execution ACK. | G3 |
 | F.21 | Shared completion serves U.5/U.8 only after respective readiness/retirement preconditions, consumes once and signals correct owner. | G3/G5 |
 | F.22 | Retain local state until durable custody ACK; validate returned saved context/identity before restoration; reject stale authority. | Later, G5 |
-| F.23 | Capture Namespace words/target/USER GT before switch; save USER, restore SYSTEM, inject DR0–DR5/Z=1; preserve N/C/V and USER flags. Wire target is only DR0–DR4, 20 bytes; saved Z=0 prevents replay. | Agreed API; G1 wire |
+| F.23 | Capture Namespace words/target/USER GT before switch; save USER, restore SYSTEM, inject DR1–DR6/Z=1; preserve N/C/V and USER flags. Wire target is only DR1–DR5, 20 bytes; saved Z=0 prevents replay. | Agreed API; G1 wire |
 | F.24 | Explicit retirement only; next eligible allocation skips reserved/retained slots, respects 1,000 total slots and never silently expands or evicts. | Later, G5 exhaustion |
 | F.25 | Exclude old setup bytes/work across FPGA, bridge and IDE before new session; failure to prove boundary cannot report setup success. Disconnect alone preserves session. | G2 |
 | F.26 | Reset one USER queued and then in-flight; increment only its version through software, invalidate its old association, preserve other USER/session/counter state. Valid returned object admission remains separate. | G4 |
@@ -119,7 +126,7 @@ algorithms implemented in microcode.
 
 | ID | Test and required result | Gate |
 |---|---|---|
-| T1 | Exact five-word payload, original Namespace mapping and target slot; DR5 excluded. Serialize u64 session plus u32 request separately; round-trip agreed byte order. | G1 |
+| T1 | Exact five-word payload, original Namespace mapping and target slot; DR6 excluded. Serialize u64 session plus u32 request separately; round-trip agreed byte order. | G1 |
 | T2 | Split/coalesced/truncated/oversized frames and delayed bytes do not corrupt following messages or create partial accepted deliveries. | G1 framing/errors |
 | T3 | Fill receive capacity during USER and SYSTEM work; bounded retention and explicit full-buffer handling, no silent overwrite; no delivery IRQ/register injection. | G1 capacity/backpressure |
 | T4 | First session is nonzero; durable increasing u64 allocation survives restart without reuse; exhaustion or lost/rolled-back trusted state cannot silently issue IDs. | G2 |
