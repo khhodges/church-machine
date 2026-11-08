@@ -174,9 +174,17 @@ Account for active-low pin polarity; do not count execution cycles or stalls.
 
 Any Hard Fault overrides the counter display. The chosen visual indication is
 both LEDs blinking together at 2 Hz, latched so subsequent successful execution
-cannot hide the event. Initialize the count to zero and clear this indication
-on an explicit board reset; a Thread/Namespace fault recovery must not silently
-clear it. This is an indicator only, not a change to fault containment or recovery.
+cannot hide the event. Initialize the count and indication to zero on board
+reset. During operation, the security monitor explicitly clears the indication
+once it has handled the fault; this supersedes the earlier reset-only clearing
+rule. Clearing returns the LEDs to the current two-bit count without resetting
+that count or erasing recorded fault details. A new Hard Fault sets the
+indication again; a simultaneous fault takes priority over clearing.
+A successful CHANGE alone never clears it: a healthy Thread's progress does
+not establish that a fault elsewhere has been handled.
+This is an indicator only, not a change to fault containment or recovery.
+The protected clear interface remains to be assigned; this specification
+does not invent an MMIO address or grant ordinary callers clearing authority.
 Its blink clock must continue independently of instruction retirement.
 
 The FPGA must not freeze on a Thread Hard Fault: unaffected working Threads
@@ -184,8 +192,8 @@ must continue. The latched flag controls only the LED display; it must never
 gate the execution clock, stall the scheduler, halt other Threads or request
 a board-wide reset. The two-bit counter continues counting successful CHANGE
 completions behind the fault display. Clearing the display is not a prerequisite
-for continued execution; the reset rule above describes indicator clearing,
-not a required fault-recovery action.
+for continued execution. Monitor clearing must not interrupt working Threads,
+and no board reset is required to resume the normal counter display.
 
 The counter represents actual CHANGE completions, not a slowed or divided count;
 fast execution may not be individually visible. A static `11` count is not a

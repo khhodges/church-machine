@@ -24,3 +24,14 @@ halt or a requirement to reset the board before unaffected work can continue.
 **How to apply:** Latch only the indication. Keep unaffected Threads executing
 and the CHANGE counter advancing behind the fault display; never use the LED
 fault flag to stall scheduling or gate execution.
+
+The user approved explicit security-monitor clearing once the fault is handled,
+superseding reset-only clearing.
+
+**Why:** The LEDs must indicate recovery rather than remain a fault-history
+display requiring a board reset.
+
+**How to apply:** Restore the current count without clearing recorded fault
+details or interrupting working Threads. Successful CHANGE alone does not clear
+the flag. A new fault relatches it and wins over a simultaneous clear. Keep the
+protected control interface separate from this behavioral approval.
