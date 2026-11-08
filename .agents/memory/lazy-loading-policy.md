@@ -416,3 +416,14 @@ Phase 2 instead of silent wrap or automatic session reset.
 match session identity plus number and expected target. The counter is software
 bookkeeping, not a GT version; keep it outside the 20-byte target payload.
 Session establishment and the exact exhaustion diagnostic remain open.
+
+IDE issues the fresh session identifier when SYSTEM initializes a new request
+session; SYSTEM retains it and IDE echoes it with the request number in DELIVER.
+
+**Why:** The user approved IDE issuance to avoid an FPGA persistent boot counter
+or random-number source for this purpose.
+
+**How to apply:** Require explicit session establishment before LLR dispatch,
+while allowing LLR queuing beforehand. Disconnect preserves an established
+session. ID size, freshness/non-reuse, setup messages and delayed-setup-reply
+protection remain open; do not claim REQUEST/DELIVER alone completes setup.

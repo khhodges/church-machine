@@ -357,6 +357,19 @@ waiting does not expire a request. This rule does not change the power-cycle-onl
 diagnostic policy or authorize resuming faulted execution. The binary mechanism
 that distinguishes sessions remains to be specified.
 
+**Approved session issuer:** IDE issues the fresh session identifier when
+SYSTEM initializes a new request session. SYSTEM retains it and includes it
+with each request number; IDE echoes both in DELIVER. SYSTEM does not require
+an FPGA persistent boot counter or random-number source for session issuance.
+
+Establishment requires an explicit session-setup exchange, not yet defined
+or implemented. LLRs may queue before setup completes but cannot dispatch
+under an unestablished session. Temporary disconnection preserves the
+established session; it does not automatically request a replacement.
+Identifier size, freshness/non-reuse guarantees, setup messages and protection
+against delayed setup replies remain open. The REQUEST/DELIVER pair alone is
+therefore not the complete session-establishment protocol.
+
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
 durable IDE custody before discarding the local body copy. Process acceptance
@@ -946,6 +959,10 @@ The following are not settled by the design discussion:
   disposition remain open. **Settled lifetime:** pending-state reinitialization
   starts a fresh session; pre-reset requests do not survive, and their replies
   cannot install or wake in the new session. Disconnect alone is not reset.
+  **Settled issuer:** IDE issues the fresh session ID; SYSTEM retains it and
+  includes it with every request number, and IDE echoes both. Queuing before
+  setup is allowed; dispatch before establishment is not. Define the setup
+  exchange, ID size/freshness and delayed-setup-reply protection next.
   No added target-payload word is assumed.
 - Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
   mechanism when no USER is eligible and no service work is available.
