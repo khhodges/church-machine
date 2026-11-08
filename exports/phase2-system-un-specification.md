@@ -147,8 +147,8 @@ Thread 1 and Thread 2 remain USER Threads.
 |---|---|---|
 | **U.0** | SYSTEM method | Startup validation: check setup, coordinate hardware/event tests across serialized activations, release normal USER execution only after success. |
 | **U.1** | USER/FPGA operation, not a SYSTEM method | Original CALL with USER's target GT; dispatch normally if resident, otherwise retain the operation and enter SYSTEM through the UNAVAILABLE mechanism. |
-| **U.2** | SYSTEM method | Consume the protected UNAVAILABLE record; register the suspended USER, pending operation and completion event; resolve locally if possible. |
-| **U.3** | SYSTEM method | Send the registered REQUEST directly to IDE. Do not wait inside the handler for DELIVER. |
+| **U.2** | SYSTEM method | Consume the protected UNAVAILABLE record; register the suspended USER, pending operation and completion event; resolve locally if possible, otherwise queue the LLR under SYSTEM ownership. |
+| **U.3** | SYSTEM method | Send a registered queued LLR directly to IDE when SYSTEM selects it for dispatch. Do not wait inside the handler for DELIVER. |
 | **U.4** | SYSTEM method | Process an admitted DELIVER: match/validate, resolve and install using FreeHandler when required. |
 | **U.5** | SYSTEM method | Publish readiness and signal the associated USER exactly once. Does not itself switch Threads. |
 | **U.6** | USER/FPGA operation, not a SYSTEM method | Restore/complete the original use under its retained authority when USER is selected. |
@@ -181,7 +181,7 @@ but share implementation where behavior is identical:
 |---|---|
 | Shared completion | U.5 and U.8 use one internal complete-and-signal operation after their distinct readiness conditions succeed. Keep both U.n contracts and tests. |
 | One pending use per blocked USER | Retain one saved-object GT for the blocking lifecycle operation. A suspended Thread cannot issue another operation; no per-Thread request queue is needed for this path. Other Threads may each have their own pending use. |
-| Private pending storage | Keep the helper C-list as SYSTEM-private storage, not a separately callable Pending service unless a specific authority boundary justifies it. Do not duplicate full saved objects in a second request table. |
+| Private pending storage | Keep the helper C-list and LLR queue as SYSTEM-private storage, not a separately callable Pending service unless a specific authority boundary justifies it. Queue references to pending uses without duplicating full saved objects. |
 | One TUNNEL envelope | Use one GT-associated object envelope with an operation/type field for requests, saved contexts and returns. Retain identity, integrity, custody acknowledgement and stale-return checks. Transport IDs do not confer authority. |
 | Explicit retirement only | Initially retire explicitly selected safe objects, beginning with SelfTest/WCH. No automatic eviction, working-set replacement or speculative prefetch policy. Preserve modified state and active-use checks. |
 | Simple slot allocation | Process accepted requests serially and take the next eligible empty slot. No balancing, compaction or speculative allocation. Preserve the 1,000-slot capacity, reservations and retained identities. |
@@ -223,6 +223,15 @@ payload does not claim that all four words form a complete readable name.
 Correlation and returned-identity checks remain required; ambiguous identity
 must not cause a guessed mapping or installation. Metadata improvements are
 deferred, not a prerequisite for this proof.
+
+**SYSTEM owns LLR decisions and queuing.** Microcode hands the event data to
+SYSTEM; it neither sends the request automatically nor chooses queue policy.
+U.2 associates the request with its suspended USER and queues unresolved work.
+U.3 dispatches work selected by SYSTEM. Queued and sent-awaiting-delivery are
+distinct states; neither makes USER runnable. One pending use per blocked USER
+is compatible with a SYSTEM queue containing requests from several USERs.
+Queue order, capacity and the number of sent requests allowed to await delivery
+remain open; ownership alone does not impose a single outstanding wire request.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -377,6 +386,8 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     No USER CALL Wait(F).
  |     |     |     |     Check local binding.
  |     |     |     |     If ready, use U.5 directly.
+ |     |     |     |     Otherwise SYSTEM queues LLR;
+ |     |     |     |     decides when to dispatch.
  <-----------------|     U.3 SYSTEM REQUEST to IDE.
  |     |     |     |     20-byte payload in TUNNEL envelope.
  |     |     |     |     Retain local body until
@@ -564,7 +575,8 @@ Within the UNAVAILABLE handler, SYSTEM:
 
 1. Records the request, original operation ownership and expected target.
 2. Establishes the completion event and registers the suspended USER.
-3. Sends REQUEST if a local verified binding cannot satisfy the operation.
+3. Queues the LLR if a local verified binding cannot satisfy the operation;
+   SYSTEM decides when U.3 sends the registered REQUEST.
 4. Finishes the handler and hands off.
 
 Within a later DELIVER handler, SYSTEM:
@@ -769,6 +781,8 @@ The following are not settled by the design discussion:
 - SYSTEM's authorized registration of an already-suspended USER on an event.
 - Request framing/byte order, capacity, correlation, event lifetime, cancellation
   and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.
+  **Settled ownership:** SYSTEM decides and queues LLRs. Queue order, capacity
+  and dispatch/in-flight limits remain to be decided one at a time.
   **Newly explicit:** define exact wire serialization and how the IDE associates
   current raw metadata with the requesting Namespace. Verify that mapping for
   the first proof without requiring metadata improvements. Multiple USERs can

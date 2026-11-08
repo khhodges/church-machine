@@ -289,3 +289,14 @@ proceeding with whatever metadata exists today, improving it later.
 preserve USER's E-GT separately. Microcode passes data, SYSTEM sends it. Metadata
 redesign must not gate the first proof. Retain identity/correlation checks
 without asserting current metadata contains a complete readable name.
+
+SYSTEM decides and queues Lazy Load Requests (LLRs); microcode only supplies
+the event payload, not automatic transmission or queue policy.
+
+**Why:** The user explicitly clarified "SYSTEM must decide and queue LLR".
+
+**How to apply:** Keep the queue SYSTEM-private and retain per-USER pending
+associations. Do not confuse serial handler execution with a one-outstanding-
+request limit; queue order, capacity and in-flight limits remain undecided.
+Review flow/message decisions one at a time rather than presenting newly found
+issues as the complete unresolved list.
