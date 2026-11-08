@@ -193,6 +193,24 @@ A separate host/debug MMIO window is not selected by this decision.
 WDT control remains private to SecurityRegulator; diagnostics use its explicitly
 authorized methods rather than acquiring raw watchdog-control authority.
 
+### Decomposed Diagnostic Abstractions
+
+The user clarified that diagnostic MMIO need not be one dangerous GT spanning
+the hardware range. Decompose it into several Diagnostic Abstractions with
+separately scoped GTs for their respective functions. Full-range diagnostic
+coverage is the collective coverage of those abstractions, not a requirement
+for one caller or abstraction to hold authority over the entire range.
+
+**GTMint is the first example:** its DATA-write/capability-load facility has a
+dedicated manufacturing grant, separate from unrelated diagnostic operations.
+This does not broaden Mint's private construction authority or change the
+approved transient-result rule. WDT control remains separately held by
+SecurityRegulator.
+
+Each abstraction's GT bounds and permissions must match its intended operations;
+authority for one function does not imply authority for the others. The remaining
+decomposition, public methods and provisioning are not assigned here.
+
 This approval selects the design direction only. It does not authorize
 implementation or physical operations, grant a full-range capability, or settle
 per-port access semantics, address units/translation, provisioning or method ABI.

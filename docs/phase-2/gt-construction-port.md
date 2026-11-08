@@ -7,6 +7,12 @@ a 32-bit DATA word and permits that result to be LOADed as a capability.
 This is a narrowly scoped GT-construction facility privately held by Mint,
 not general data-to-capability conversion through diagnostic MMIO.
 
+The user identifies this **GTMint port as the first example of decomposed
+Diagnostic Abstractions**: several separately scoped GTs, rather than one
+dangerous diagnostic GT covering the whole hardware range. This describes
+the decomposition, not a grant of manufacturing authority to general diagnostic
+callers. Mint's private custody and the transient-result rules remain unchanged.
+
 Conceptual sequence, not assigned assembler syntax:
 
 ```text

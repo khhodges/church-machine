@@ -9,7 +9,8 @@ authorization to install an image or program hardware.
   first-proof selection, unresolved-contract gates and later objectives.
 - **[Hardware-address map and diagnostic MMIO](hardware-address-map-and-diagnostic-mmio.md)** —
   full declared range, approved WDT address `0xFFFFFF18`, current decoder differences,
-  and the approved Church capability-controlled diagnostic direction.
+  and decomposed, Church capability-controlled Diagnostic Abstractions with
+  separately scoped GTs; GTMint is the first example.
 - **[Mint-private GT-construction port](gt-construction-port.md)** —
   approved dedicated DATA-write/capability-load direction and transient-result
   lifetime; exact access interface remains to be settled.
