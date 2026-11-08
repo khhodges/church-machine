@@ -58,7 +58,29 @@ standard was already agreed when reviewing Mint pseudocode.
 the established standard distinct from any remaining compiler/map integration
 work; this reminder alone does not establish hardware acceptance.
 
-The user subsequently approved Namespace-local reboot for a fault attributable
+The later consolidated Boot fault-entry contract, approved 2026-10-27,
+supersedes the Namespace-local reboot disposition below. Use
+`docs/phase-1/boot-fault-rtl-contract.md` for the approved direct Boot stash,
+one-save and shared Namespace/Thread activation contract.
+
+**Why:** Earlier recovery proposals retain historical approval language that
+can be mistaken for the current contract.
+
+**How to apply:** Do not re-propose Namespace reboot or a separate event bank.
+The approved catastrophic Boot-entry failure exception is not evidence of
+general healthy-Thread liveness.
+
+The user explicitly reaffirmed “Keep looping” when asked whether unsafe Boot
+recovery retains its indefinite catastrophic LED-loop exception to healthy-
+Thread continuation.
+
+**Why:** The newer no-freeze requirement could otherwise be misread as authority
+to bypass failed Boot stash/activation checks.
+
+**How to apply:** Keep the exception; never turn the loop into an instruction
+retry or claim healthy-work liveness in this catastrophic case.
+
+Historically, the user approved Namespace-local reboot for a fault attributable
 to that Namespace: reboot only the Namespace that caused the error, preserving
 other Namespaces. This qualifies the recovery scope, not the instruction's
 fail-stop behavior.
