@@ -14,3 +14,13 @@ design uses a latched simultaneous blink to override the count for Hard Faults.
 Keep this observation separate from execution/fault recovery and from approval
 to build or flash hardware. The blink encoding is an implementation choice,
 not a separately user-selected pattern.
+
+The user explicitly requires: “The FPGA must never freeze any working threads
+must continue.”
+
+**Why:** A latched fault display must not be confused with a global execution
+halt or a requirement to reset the board before unaffected work can continue.
+
+**How to apply:** Latch only the indication. Keep unaffected Threads executing
+and the CHANGE counter advancing behind the fault display; never use the LED
+fault flag to stall scheduling or gate execution.

@@ -179,6 +179,14 @@ on an explicit board reset; a Thread/Namespace fault recovery must not silently
 clear it. This is an indicator only, not a change to fault containment or recovery.
 Its blink clock must continue independently of instruction retirement.
 
+The FPGA must not freeze on a Thread Hard Fault: unaffected working Threads
+must continue. The latched flag controls only the LED display; it must never
+gate the execution clock, stall the scheduler, halt other Threads or request
+a board-wide reset. The two-bit counter continues counting successful CHANGE
+completions behind the fault display. Clearing the display is not a prerequisite
+for continued execution; the reset rule above describes indicator clearing,
+not a required fault-recovery action.
+
 The counter represents actual CHANGE completions, not a slowed or divided count;
 fast execution may not be individually visible. A static `11` count is not a
 fault indication: the repeated blink distinguishes the fault state.
