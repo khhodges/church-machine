@@ -1070,7 +1070,13 @@ valid target's body is a waiting condition.
 itself for lazy loading, enqueue its own missing dependency, or recursively
 enter SYSTEM. Its execution and required service/transport dependencies must
 be resident. Serving a USER's LLR is normal SYSTEM work; originating an LLR
-from SYSTEM execution is the fault case. Exact fault encoding remains open.
+from SYSTEM execution is the fault case.
+**Approved reason code: ABSENT_OUTFORM (0x11).** Reuse the existing reason value,
+not its historical software-loading trap behavior: this SYSTEM case is a
+HardFault with no automatic load, request or recursive entry. The active Thread
+identity distinguishes SYSTEM from USER. A valid USER LLR remains the approved
+suspension path, not a HardFault. Invalid GTs, versions and contexts retain their
+applicable fault reasons rather than being relabeled ABSENT_OUTFORM.
 This rule does not constitute approval of the separately proposed
 non-interleaved microcode-entry contract.
 SYSTEM status does not bypass capability checks. Hardware
@@ -1159,10 +1165,13 @@ preceding version to the maximum remains valid subject to ordinary reset checks.
 No automatic slot replacement or recovery is expected.
 
 **F.28 — SYSTEM unavailable dependency:** while SYSTEM executes, encounter a
-valid-but-unavailable dependency that would cause a USER LLR. Require HardFault,
+valid-but-unavailable dependency that would cause a USER LLR. Require HardFault
+with reason ABSENT_OUTFORM (0x11),
 not SYSTEM suspension, request queuing, IDE REQUEST emission or recursive event
 entry for that dependency. Separately confirm that SYSTEM can serve a USER's
-LLR normally using resident dependencies. This is an acceptance requirement,
+LLR normally using resident dependencies. Verify no historical automatic-loading
+trap is invoked and invalid authority/context retains its applicable fault reason.
+This is an acceptance requirement,
 not a claim of an executed test.
 
 **F.29 — ordinary CHANGE exit:** select a ready USER and exit SYSTEM through

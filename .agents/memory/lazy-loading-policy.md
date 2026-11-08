@@ -639,3 +639,14 @@ saved service loop normally. Do not inject DR0–DR5 or force Z=1; saved SYSTEM
 Z=0 identifies ordinary resumption. Apply normal GT/version/context checks.
 The USER must receive its SYSTEM GT through authorized setup, not an automatic
 hardware grant.
+
+A SYSTEM-originated valid-but-unavailable dependency HardFaults with reason
+ABSENT_OUTFORM (0x11), reusing the existing reason value.
+
+**Why:** The user approved reuse rather than allocating a distinct SYSTEM LLR
+fault code.
+
+**How to apply:** Do not reuse the historical software-loading trap behavior:
+no automatic load, request or recursive SYSTEM entry. USER LLRs remain normal
+suspension events. Invalid GT/version/context retains its applicable fault reason.
+This approves the design, not a hardware change.
