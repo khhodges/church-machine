@@ -237,6 +237,9 @@ is introduced. A USER that neither yields nor blocks can hold execution
 indefinitely; round robin alone does not guarantee bounded waiting.
 The exact yield interface, delivery service point and idle behavior when no
 maintenance work exists remain open.
+**Scope freeze:** keep simple cooperative round robin for now; scheduling
+improvements are deferred. The proposed queued-delivery checks at cooperative
+handoff points have not been approved and are not part of this decision.
 This selection decision does not approve the proposed event-scoped scheduling
 authority mechanism; registration authority remains an unresolved contract.
 

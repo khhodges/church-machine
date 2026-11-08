@@ -110,6 +110,16 @@ timer-driven preemption. A non-yielding, non-blocking USER can retain execution
 indefinitely. Yield-interface and cursor details remain open. The proposed
 event-scoped scheduling-authority mechanism was not approved by this correction.
 
+Keep scheduling at simple cooperative round robin; improvements are for later.
+
+**Why:** The user explicitly narrowed the discussion: "Just round robin
+improvements later".
+
+**How to apply:** Do not expand this decision into delivery prioritization,
+queue-draining policy or additional scheduler mechanisms. Proposed delivery
+checks at handoff points remain unapproved; leave those contracts open rather
+than repeatedly requesting scheduling refinements.
+
 Phase 1 SYSTEM event handling is serialized and runs to completion: no
 asynchronous interruption or parallel event-handler execution.
 
