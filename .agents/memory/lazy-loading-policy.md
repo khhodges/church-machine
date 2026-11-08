@@ -118,7 +118,9 @@ Threads; completion restores eligibility rather than forcing immediate execution
 Keep SYSTEM handlers serialized; SYSTEM stays active if all USERs are on hold. USER turns end on
 explicit yield or blocking, as separately approved by the user; there is no
 timer-driven preemption. A non-yielding, non-blocking USER can retain execution
-indefinitely. Yield-interface and cursor details remain open. The proposed
+without a scheduler time slice, but remains subject to the existing watchdog
+and exemptions. Yield uses ordinary CHANGE as subsequently approved; cursor
+details remain open. The proposed
 event-scoped scheduling-authority mechanism was not approved by this correction.
 
 Keep scheduling at simple cooperative round robin; improvements are for later.
@@ -612,7 +614,8 @@ cooperative-delivery tradeoff.
 **How to apply:** Arrival does not switch Threads, interrupt handlers, inject
 DR0–DR5 or set the LLR Z flag. Active SYSTEM consumes input after the prior handler.
 All-held means SYSTEM is already active; a non-yielding/non-blocking USER can
-delay processing indefinitely. Retain unread data within bounded capacity;
+delay processing, but remains subject to the existing watchdog/exemptions.
+Retain unread data within bounded capacity;
 capacity and full-buffer behavior remain open, with no silent loss. Do not claim
 the existing transport is verified or introduce a delivery activation path.
 
@@ -650,3 +653,15 @@ fault code.
 no automatic load, request or recursive SYSTEM entry. USER LLRs remain normal
 suspension events. Invalid GT/version/context retains its applicable fault reason.
 This approves the design, not a hardware change.
+
+Phase 2 retains existing watchdog rules and Debug/Trace exemptions, with no
+new SYSTEM exemption.
+
+**Why:** The user approved retaining the watchdog after the document audit
+exposed the conflict with unconditional indefinite execution claims.
+
+**How to apply:** Distinguish indefinite suspended LLR waiting from active
+execution requiring timely renewal. SYSTEM must also satisfy the timer when
+all USERs wait. Do not introduce an LLR timeout, preemptive scheduling or
+watchdog recovery. SYSTEM's specific renewal mechanism and internal-LLR
+transition renewal semantics require separate decisions.

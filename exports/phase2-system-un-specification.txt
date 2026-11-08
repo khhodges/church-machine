@@ -640,8 +640,9 @@ microcode event. Arrival makes data available through transport receive/status;
 it does not switch Threads, inject DR0–DR5, set the LLR entry flag Z or interrupt
 an executing handler. SYSTEM checks receive status and processes replies when
 it runs, after the prior handler finishes. If all USERs are held, SYSTEM is
-already active. Otherwise delivery waits for cooperative handoff; a USER that
-never yields or blocks can delay processing indefinitely.
+already active. Otherwise delivery waits for cooperative handoff. A USER that
+does not yield or block delays processing, but remains subject to the existing
+watchdog; no unconditional indefinite execution is promised.
 
 Unread input must be retained until consumed within bounded transport capacity.
 Exact capacity and full-buffer behavior remain open; silent loss of unread data
@@ -680,8 +681,10 @@ handoff; maintenance scheduling is deferred.
 
 **Approved turn boundary:** a USER's turn ends on explicit yield or blocking.
 Scheduling is cooperative; no fixed time slice or timer-driven USER preemption
-is introduced. A USER that neither yields nor blocks can hold execution
-indefinitely; round robin alone does not guarantee bounded waiting.
+is introduced. A USER that neither yields nor blocks does not receive a
+scheduler-enforced time slice, but remains subject to watchdog expiry unless
+it performs a qualifying renewal or is under an existing Debug/Trace exemption.
+Round robin alone does not guarantee useful progress or bounded delivery time.
 Voluntary USER yield uses ordinary CHANGE to SYSTEM with its valid permissionless
 Thread GT. SYSTEM idle behavior when no service work is available remains open.
 Delivery is handled through transport receive/status
@@ -691,6 +694,24 @@ improvements are deferred. The proposed queued-delivery checks at cooperative
 handoff points have not been approved and are not part of this decision.
 This selection decision does not approve the proposed event-scoped scheduling
 authority mechanism; registration authority remains an unresolved contract.
+
+### Approved Phase 2 watchdog policy: retain existing rules
+
+Keep the existing ISA watchdog rules, including the current Debug/Trace
+exemptions. Do not add a SYSTEM or maintenance exemption. The executing Thread,
+including SYSTEM when all USERs are waiting, must satisfy the watchdog.
+The existing selected interval is 0.25, 0.5, 1 or 2 seconds, initially 1 second;
+successful CHANGE/SWITCH renews it, while ordinary loops and CALL/RETURN do not.
+Existing expiry precedence and exemption rules remain unchanged.
+
+A suspended USER may wait indefinitely for its LLR: waiting does not itself
+create a request timeout. This is distinct from indefinite execution of SYSTEM
+or another USER without renewal. Watchdog expiry remains a HardFault, not a
+preemptive scheduling event, a duplicate request or automatic fault recovery.
+
+SYSTEM's concrete renewal mechanism and watchdog-renewal semantics of the
+internal LLR transition still require a separate decision. Reusing context-save
+machinery alone does not settle that internal transition's timer behavior.
 
 ## 2. Unified numbered charts
 
@@ -1210,7 +1231,8 @@ while SYSTEM is executing a handler. Arrival must not activate SYSTEM, interrupt
 execution, inject DR0–DR5 or alter Z. Retain unread input within the defined
 capacity; process it through receive/status when SYSTEM is active and the prior
 handler has completed. Verify the all-USERs-held case with SYSTEM already active.
-No bounded response time is promised for a USER that never yields or blocks.
+No bounded successful response time is promised without cooperative progress;
+executing USER/SYSTEM still obeys the existing watchdog and exemptions.
 Capacity/full-buffer acceptance awaits the separate transport contract. This
 is an acceptance requirement, not an executed test.
 
@@ -1230,6 +1252,15 @@ ordinary resumption without replaying an LLR. Normal invalid GT/version/context
 checks HardFault. No new opcode or implicit capability grant is required.
 This is an acceptance requirement, not an executed test.
 
+**F.36 — retained watchdog policy:** distinguish a pending USER's indefinite
+LLR wait from active execution. Outside existing Debug/Trace exemptions,
+executing USER and SYSTEM must obey the selected watchdog interval and existing
+renewal/expiry rules, including when all USERs are held. A loop or CALL/RETURN
+alone must not renew the timer. Expiry HardFaults, not schedules or retries.
+Verify no LLR request timeout or SYSTEM exemption is introduced. SYSTEM's
+concrete renewal and internal-LLR timer behavior await their separate decisions.
+This is an acceptance requirement, not an executed test.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1240,6 +1271,9 @@ their separate authorization.
 
 The following are not settled by the design discussion:
 
+- SYSTEM's concrete watchdog-renewal mechanism and renewal semantics of the
+  internal LLR transition. **Settled policy:** retain existing watchdog rules
+  and Debug/Trace exemptions; no new SYSTEM exemption or LLR request timeout.
 - Implementing and verifying the approved runtime entry against the current
   ISA and installed bitstream remains outstanding.
   **Settled admission:** a valid-but-unavailable running USER CALL directly
