@@ -449,3 +449,15 @@ exhausted or trusted state is unavailable; no wrap, guessing or restart at 1.
 An older restored state needs non-reuse verification before issuance. Storage
 mechanics and delayed-setup-reply binding remain open; do not claim counter
 uniqueness alone makes an old setup response fresh.
+
+Fresh-session setup after SYSTEM pending-state reinitialization requires a
+verified end-to-end FPGA/bridge/IDE transport reset boundary.
+
+**Why:** The user approved excluding delayed pre-reset setup responses; unique
+session IDs alone cannot tell a freshly reset receiver that a setup reply is old.
+
+**How to apply:** Exclude pre-reset queued bytes and delayed work before accepting
+a session ID or dispatching LLRs. One-buffer clearing or socket reconnection is
+not sufficient. No setup success without the boundary. Ordinary disconnect
+preserves the existing session. Handshake, enforcement and evidence remain open;
+do not claim the current transport already implements this requirement.

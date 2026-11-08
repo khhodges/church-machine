@@ -366,8 +366,8 @@ Establishment requires an explicit session-setup exchange, not yet defined
 or implemented. LLRs may queue before setup completes but cannot dispatch
 under an unestablished session. Temporary disconnection preserves the
 established session; it does not automatically request a replacement.
-Allocation/non-reuse follows the persistent-counter rule below; setup messages and protection
-against delayed setup replies remain open. The REQUEST/DELIVER pair alone is
+Allocation/non-reuse follows the persistent-counter rule below; setup messages
+and enforcement of the approved transport reset boundary remain open. The REQUEST/DELIVER pair alone is
 therefore not the complete session-establishment protocol.
 
 **Approved session-ID representation:** an unsigned 64-bit value carried as two
@@ -387,8 +387,23 @@ sessions: do not wrap, guess, or restart at 1. A restored older allocation
 state is not safe for resumed issuance without establishing non-reuse.
 This is an IDE storage requirement, not FPGA persistent state. Storage choice,
 rollback/non-reuse verification and failure reporting still need specification.
-Non-reused IDs alone do not protect against a delayed setup reply; that binding
-remains a separate open contract.
+Non-reused IDs alone do not protect against a delayed setup reply; apply the
+approved reset-boundary requirement below.
+
+**Approved fresh-session reset boundary:** before accepting fresh-session setup
+after SYSTEM pending-state reinitialization, establish a verified boundary
+across the FPGA/bridge/IDE transport path. Pre-reset queued bytes and delayed
+work must not enter the new setup exchange. Clearing one receive buffer or
+reconnecting a socket alone does not establish this end-to-end guarantee.
+Only after the boundary is established may SYSTEM accept the new session ID
+and subsequently dispatch LLRs. If the boundary cannot be established, setup
+must not report success.
+
+This requirement applies to pending-state reinitialization, not an ordinary
+disconnect that preserves the session. Exact handshake messages, enforcement,
+evidence and fault reporting remain to be defined. This is not a claim that
+the current bridge implements the boundary and does not authorize a reset or
+transport change.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -928,6 +943,7 @@ is not execution acceptance.
 | F.22 | TUNNEL custody and restoration | Local body survives until durable acknowledgement; returned context is validated before restoration; stale packets cannot confer authority or wake a different USER. |
 | F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
 | F.24 | Explicit retirement and simple allocation | No unrequested eviction or compaction; allocation skips reserved/retained slots and does not silently exceed 1,000 slots. |
+| F.25 | Fresh-session transport reset boundary | Hold pre-reset setup bytes and delayed work at FPGA, bridge and IDE stages, then reinitialize SYSTEM pending state. Verify none can be accepted into the new setup exchange; boundary verification precedes session acceptance and LLR dispatch. If the boundary cannot be established, setup must not report success. A single-buffer clear or socket reconnect is not sufficient evidence. Ordinary disconnect retains its established session. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
@@ -982,7 +998,7 @@ The following are not settled by the design discussion:
   **Settled issuer:** IDE issues the fresh session ID; SYSTEM retains it and
   includes it with every request number, and IDE echoes both. Queuing before
   setup is allowed; dispatch before establishment is not. Define the setup
-  exchange, ID freshness and delayed-setup-reply protection next.
+  exchange and enforcement of the approved reset boundary next.
   **Settled ID width:** unsigned 64 bits in two 32-bit words; zero means
   unestablished and is not issuable. Session ID plus request number occupies
   12 envelope bytes, outside the 20-byte target payload; byte/word order and
@@ -991,7 +1007,11 @@ The following are not settled by the design discussion:
   before transmission, and never reissues an ID. Stop issuance on exhaustion
   or untrusted/unavailable allocation state; never wrap or restart at 1.
   Older restored state requires non-reuse verification before issuance.
-  Storage mechanics and binding setup replies to current initialization remain open.
+  **Settled setup freshness requirement:** verify an end-to-end FPGA/bridge/IDE
+  reset boundary excluding pre-reset bytes and delayed work before accepting
+  fresh setup; no success if that boundary cannot be established. Ordinary
+  disconnect does not invoke this reset rule. Storage mechanics and exact
+  boundary handshake/enforcement/evidence remain open.
   No added target-payload word is assumed.
 - Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
   mechanism when no USER is eligible and no service work is available.
