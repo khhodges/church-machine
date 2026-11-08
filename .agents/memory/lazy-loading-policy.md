@@ -541,3 +541,16 @@ HardFault".
 unavailable dependency itself. Keep SYSTEM's required dependencies resident.
 Do not add recursive handler entry, SYSTEM LLR queuing or a recovery path.
 The cancelled non-interleaved-entry proposal was not approved by this correction.
+
+Thread identity uses a full versioned GT; microcode uses its slot field for
+Namespace-scoped lookup and validated slot-2 SYSTEM recognition. There is no
+separate numeric Thread-ID system.
+
+**Why:** The user agreed to the distinction between slot designation and
+versioned identity after asking whether software and microcode use different IDs.
+
+**How to apply:** Preserve the complete outgoing CR12 GT in DR5 and pending
+associations; never reduce stale-owner checks to slot equality. Recognize SYSTEM
+from the validated active Thread in the applicable Namespace, not a permanently
+fixed complete GT. CALL does not change Thread classification. USER Thread 1/2
+are role labels, not reserved Namespace slots. Do not add a mode bit or CR13 role.

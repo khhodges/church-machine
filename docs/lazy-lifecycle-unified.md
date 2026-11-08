@@ -82,6 +82,29 @@ which has no outgoing USER. Reusing activation machinery does not authorize
 replaying the current reset-only marker outside reset. Runtime admission and
 the exact exit mechanism remain to be defined.
 
+### Approved Thread identity and SYSTEM recognition
+
+Software references a Thread with its complete GT; microcode extracts the GT's
+slot field to locate its Namespace entry. These are not separate Thread-ID
+systems. The slot is meaningful within its applicable Namespace, not globally.
+The full GT preserves versioned identity; a retained slot alone cannot distinguish
+the old and new incarnations of a reset Thread.
+
+CR12 holds the active Thread reference. LLR entry preserves the outgoing USER's
+unchanged full 32-bit Thread GT in DR5 as data, not merely its slot. CHANGE
+requires a permissionless Thread GT, not a NULL GT, and still validates identity,
+version and protected Thread context using microcode privileges.
+
+For Phase 2, recognize Boot/SYSTEM from slot 2 of the validated active Thread GT
+in the applicable Namespace. Do not use unchecked slot equality or equality to
+one permanently fixed complete GT value. No separate numeric Thread-ID field,
+SYSTEM-mode bit or CR13 role is introduced. CALL into another abstraction retains
+the active Thread: an unavailable dependency encountered by code called within
+SYSTEM is still a SYSTEM LLR and therefore a HardFault. USER Thread 1/2 remain
+role labels, not assignments to Namespace slots 1/2.
+
+This is an approved design contract, not a claim of installed FPGA support.
+
 ### Approved SYSTEM runtime entry: saved service-loop continuation
 
 Boot/SYSTEM executes startup once, then enters a resident service loop.
