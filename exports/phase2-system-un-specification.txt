@@ -301,8 +301,9 @@ U.7 → U.8 for completed retirement. A deferred U.7 does not invoke U.8.
 Each chain finishes through X.1–X.3. Startup U.0 coordinates its tests through
 successive completed activations; it does not wait for a nested handler.
 
-Lettered steps are subordinate actions, not extra SYSTEM methods. FPGA event
-entry precedes U.2 or U.4; it does not execute their software bodies. FreeHandler
+Lettered steps are subordinate actions, not extra SYSTEM methods. FPGA LLR
+entry precedes U.2; U.4 instead consumes ordinary transport input while SYSTEM
+is active, without delivery event entry. FPGA does not execute their software bodies. FreeHandler
 and Signal remain separate abstractions called from the owning U.n method.
 X.1–X.3 remain the common handler-exit/scheduling path, not a renamed U.n method.
 
@@ -604,14 +605,27 @@ a system-service GT into the original CALL.
 
 ### Serialized, run-to-completion SYSTEM handling
 
+**Approved DELIVER interface:** DELIVER is ordinary transport input, not a
+microcode event. Arrival makes data available through transport receive/status;
+it does not switch Threads, inject DR0–DR5, set the LLR entry flag Z or interrupt
+an executing handler. SYSTEM checks receive status and processes replies when
+it runs, after the prior handler finishes. If all USERs are held, SYSTEM is
+already active. Otherwise delivery waits for cooperative handoff; a USER that
+never yields or blocks can delay processing indefinitely.
+
+Unread input must be retained until consumed within bounded transport capacity.
+Exact capacity and full-buffer behavior remain open; silent loss of unread data
+is not an acceptable implementation. No new delivery interrupt or activation
+mechanism is required. This is a design requirement, not a claim that the
+current transport already supplies these guarantees.
+
 - Only one event handler executes at a time.
 - There is no asynchronous handler preemption, nested event handling or parallel
   Thread/handler execution in this Phase 1 model.
 - A second event cannot begin handling until the first handler has finished.
 - External bytes may arrive meanwhile. Arrival is not handler execution and
-  must not cause re-entry. The ingress retention/acceptance mechanism remains
-  to be specified; no particular interrupt, polling or buffering implementation
-  is implied.
+  must not cause re-entry. SYSTEM uses transport receive/status; buffer capacity
+  and full-buffer behavior remain to be specified.
 - SYSTEM finishes registering the pending USER and event before relinquishing
   execution. A DELIVER handler cannot interleave with those updates.
 - Multiple outstanding requests may exist after successive handlers finish;
@@ -638,8 +652,9 @@ handoff; maintenance scheduling is deferred.
 Scheduling is cooperative; no fixed time slice or timer-driven USER preemption
 is introduced. A USER that neither yields nor blocks can hold execution
 indefinitely; round robin alone does not guarantee bounded waiting.
-The exact yield interface, delivery service point and SYSTEM idle behavior
-when no service work is available remain open.
+The exact yield interface and SYSTEM idle behavior when no service work is
+available remain open. Delivery is handled through transport receive/status
+while SYSTEM runs, without a delivery-triggered Thread transition.
 **Scope freeze:** keep simple cooperative round robin for now; scheduling
 improvements are deferred. The proposed queued-delivery checks at cooperative
 handoff points have not been approved and are not part of this decision.
@@ -777,9 +792,9 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     Logical message endpoint;
  |     |     |     |     not asynchronous execution.
  |     |     |     |     Prior handler must finish.
- |     |---------->|     U.4e FPGA slot-2 SYSTEM entry
- |     |     |     |     activates delivery handling
- |     |     |     |     at a defined service point.
+ |     |     |     |     U.4e SYSTEM checks transport
+ |     |     |     |     receive/status while active;
+ |     |     |     |     no delivery microcode entry.
  |     |     |     |     U.4 SYSTEM method matches request;
  |     |     |     |     match echoed ID and target,
  |     |     |     |     verifies target/evidence.
@@ -811,11 +826,10 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     target executes in USER.
 ```
 
-U.4e is not an extra IDE forwarding message. It is the hardware activation
-required before SYSTEM can process the direct message. The exact service point
-and delivery-event admission mechanism are open; no asynchronous interrupt is
-introduced by this arrow. Preserve the context of whichever Thread is running
-when a permitted event entry occurs.
+U.4e is SYSTEM consuming ordinary transport input, not an extra IDE forwarding
+message or FPGA activation. Arrival leaves the executing Thread and its
+registers/flags unchanged. SYSTEM handles the reply when active, after any
+preceding handler completes. There is no delivery-event entry or preemption.
 
 Signal makes USER eligible; it does not execute CHANGE or promise USER runs
 immediately. If another unblocked resident Thread is selected, use chart B
@@ -875,7 +889,7 @@ the superseded USER-side Wait sequence without an agreed admission ABI.
 | U.3 | SYSTEM | Send REQUEST directly to IDE using SYSTEM's service/transport authority. |
 | U.3a / X.1–X.3 | SYSTEM, then FPGA if handing off | Finish event; activate the next eligible USER in round-robin order, or stay in SYSTEM if all USERs are on hold. |
 | U.4m | IDE | Supply a correlated delivery for U.4; does not signal USER or interrupt SYSTEM. |
-| U.4e | FPGA event-entry machinery | Admit a later serialized delivery event and activate SYSTEM. |
+| U.4e | SYSTEM using transport receive/status | Consume retained delivery input while active, after the prior handler completes; no microcode event, activation or preemption. |
 | U.4 | SYSTEM | Match, validate, resolve and install the admitted delivery. |
 | U.4a–U.4d | SYSTEM | CALL/RETURN FreeHandler using SYSTEM's abstraction GTs. |
 | U.5 | SYSTEM | Publish validated usable binding/body. |
@@ -1085,7 +1099,7 @@ is not execution acceptance.
 | F.3 | Registration ownership | DR5 equals the outgoing USER's captured CR12 Thread GT, not restored SYSTEM CR12 or the target E-GT. Associate the LLR with that suspended USER even when two USERs request the same target. SYSTEM itself never blocks on F; original USER DR5 remains saved. |
 | F.4 | Immediate IDE response | First handler completes registration and REQUEST before any DELIVER handler runs; arrival does not re-enter SYSTEM. |
 | F.5 | Indefinite unavailability | Request remains pending; handler finishes; another unblocked resident Thread runs; no timeout-driven fault or resume. |
-| F.6 | Delivery admission | Incoming data is handled at the defined service point with no asynchronous preemption; previous handler has finished. |
+| F.6 | Delivery admission | SYSTEM consumes ordinary transport receive/status input while active after the previous handler finishes. Arrival causes no Thread switch, DR0–DR5 injection, Z entry signal or asynchronous preemption. |
 | F.7 | Invalid/mismatched delivery | No completion signal or USER resume; validation-fault ownership follows its agreed contract. |
 | F.8 | Duplicate/stale delivery | IDE echoes the SYSTEM-assigned envelope request identifier. Match it and expected target before installation/completion. An old reply cannot complete a replacement use, even for the same USER and target; no second install, signal or wakeup. Pre-reset replies cannot install or wake in a fresh session. Exact duplicate/stale disposition and binary session encoding remain open. |
 | F.9 | Multiple outstanding requests | Handlers execute serially; dispatch requests from distinct blocked USERs in FIFO acceptance order without waiting for earlier delivery. Delay the first target and deliver a later one: only its associated USER becomes eligible. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. One pending use per USER remains enforced. |
@@ -1151,6 +1165,15 @@ unavailable CALLs HardFault. The in-progress LLR cannot retrigger. Runtime entry
 must neither replay nor reopen the reset-only startup marker. This is an
 acceptance requirement, not an executed test or installed-FPGA claim.
 
+**F.33 — transport-only delivery:** receive DELIVER while USER is running and
+while SYSTEM is executing a handler. Arrival must not activate SYSTEM, interrupt
+execution, inject DR0–DR5 or alter Z. Retain unread input within the defined
+capacity; process it through receive/status when SYSTEM is active and the prior
+handler has completed. Verify the all-USERs-held case with SYSTEM already active.
+No bounded response time is promised for a USER that never yields or blocks.
+Capacity/full-buffer acceptance awaits the separate transport contract. This
+is an acceptance requirement, not an executed test.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1184,7 +1207,10 @@ The following are not settled by the design discussion:
   **Five-word handoff detail:** define capture/transition latches and when
   SYSTEM consumes or retains DR0–DR5 before calls or later activations can
   overwrite them. The register assignment and save/restore ordering are settled.
-- Non-preemptive service point for delivery admission and input retention.
+- Transport buffer capacity and full-buffer behavior remain open.
+  **Settled delivery interface:** ordinary receive/status consumed by active
+  SYSTEM, after the prior handler; no delivery microcode event, Thread switch,
+  register injection or Z entry signal. Retain unread input without silent loss.
 - SYSTEM's authorized registration of an already-suspended USER on an event.
   **Settled Phase 2 owner input:** outgoing CR12 Thread GT as ordinary data in
   SYSTEM DR5; protected pending association and registration authority remain open.

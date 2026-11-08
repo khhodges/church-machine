@@ -603,3 +603,15 @@ authority/context and SYSTEM-originated unavailable CALLs HardFault. Keep the
 USER suspended until eligible; body-dependent CALL checks run after loading.
 Startup stays reset-only. Approval is architectural, not permission for RTL or
 physical operations.
+
+DELIVER is ordinary transport receive/status input, not a microcode event.
+
+**Why:** The user agreed to the simpler FPGA design after confirming its
+cooperative-delivery tradeoff.
+
+**How to apply:** Arrival does not switch Threads, interrupt handlers, inject
+DR0–DR5 or set the LLR Z flag. Active SYSTEM consumes input after the prior handler.
+All-held means SYSTEM is already active; a non-yielding/non-blocking USER can
+delay processing indefinitely. Retain unread data within bounded capacity;
+capacity and full-buffer behavior remain open, with no silent loss. Do not claim
+the existing transport is verified or introduce a delivery activation path.
