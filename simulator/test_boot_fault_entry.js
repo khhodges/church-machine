@@ -20,7 +20,7 @@ function fixture() {
     for (const ns of [0,8192]) {
         desc(ns,1,ns,255);
         const assembler = new Assembler();
-        const words = assembler.assemble(ns ? 'DREAD DR1, CR3, #0\nHALT' : 'HALT').words;
+        const words = assembler.assemble(ns ? 'DREAD DR1, CR3, #0\nHALT' : 'NOP\nHALT').words;
         assert.equal(assembler.errors.length,0);
         sim.memory[ns+512] = sim.packLumpHeader(0,words.length,1,0);
         sim.memory.set(words,ns+513);
@@ -32,7 +32,14 @@ function fixture() {
         desc(ns,2,ns+256,255);
     }
     sim.configureBootFaultEntry({root:root(0),threadGT:0x02000002,
-        handlerGT,imageIdentity:'isolated-fixture-exact-words'});
+        imageIdentity:'isolated-fixture-exact-words'});
+    // Boot has yielded at a nonzero NIA, retaining an ordinary suspended frame.
+    sim.flags={Z:true,N:false,C:true,V:false};
+    sim.memory[256+layout.stackEnd]=sim._packFrameWord(1,1,layout.stackEnd);
+    sim.flags={Z:false,N:false,C:false,V:false};
+    // A different saved CR0 must not select the continuation executable.
+    sim.memory[256+layout.capsStart]=0;
+    sim.memory[256+7]=0x12345678; // DR6 is not part of the fault ABI.
     assert(sim.startEntryThread(), JSON.stringify(sim.faultLog));
     return sim;
 }
@@ -52,10 +59,16 @@ function fixture() {
     assert.equal(sim.dr[2],(8192+513)*4);
     assert.equal(sim.bootFaultStatus.saveAttempts,1);
     assert.equal(sim.bootFaultStatus.writes[0],256+layout.capsStart+1);
-    assert.equal(sim.pc,0);
-    assert.equal(sim.sto,layout.stackEnd-2,'fault entry retains the poison root beneath CALLs');
+    assert.equal(sim.pc,1);
+    assert.equal(result.pc,1);
+    assert.equal(sim.dr[6],0x12345678);
+    assert.equal(sim.cr[0].word0,0,'CR0 is restored, not replaced by an E handler');
+    assert(sim.flags.Z && sim.flags.C,'retained frame flags survive');
+    assert.equal(sim.sto,layout.stackEnd,'fault entry pops the retained frame');
     assert.equal(sim.halted,false);
-    assert.equal(sim._unpackFrameWord(sim.memory[256+layout.stackEnd]).returnPC,0x7fff);
+    assert.equal(sim._unpackFrameWord(sim.memory[256+layout.stackEnd]).returnPC,1);
+    sim.step();
+    assert(sim.halted,'retained NIA executes HALT, not a fresh entry');
 }
 {
     const sim=fixture();sim.sto=0;
@@ -77,7 +90,7 @@ function fixture() {
     assert.equal(sim.bootFaultStatus.writes.length,count,'no retry');
 }
 {
-    const sim=fixture();sim.memory[513]^=1;sim.step();
+    const sim=fixture();sim.memory[256]^=1;sim.step();
     assert.equal(sim.bootFaultStatus.state,'catastrophic');
     assert.equal(sim.bootFaultStatus.writes.length,0);
 }
@@ -109,4 +122,16 @@ function fixture() {
     assert.equal(sim.dr[3],2);
     assert.equal(sim.dr[5],8);
 }
-console.log('PASS Boot fault entry: foreign roots, stash ordering, save status, CR13, poison root, failed stash and immutable configuration');
+{
+    const sim=fixture();
+    sim.memory[256+layout.stackEnd]=sim._packFrameWord(0x7fff,1,layout.stackEnd);
+    sim.step();
+    assert.equal(sim.bootFaultStatus.state,'catastrophic','no fresh-start fallback');
+}
+{
+    const sim=fixture();
+    sim.memory[256+layout.stackEnd]=sim._packFrameWord(9,1,layout.stackEnd);
+    sim.step();
+    assert.equal(sim.bootFaultStatus.state,'catastrophic','invalid retained NIA cannot restart code');
+}
+console.log('PASS Boot fault entry: retained continuation, foreign roots, stash ordering, save status, CR13, failed stash and immutable configuration');

@@ -26,6 +26,13 @@ new configuration decisions and authorized correcting the continuation path.
 the retained Thread frame, not a release-time executable pin, determines resume.
 Keep vendor builds and physical operations separately authorized.
 
+Historical saved `faultHandlerSlot` values are retained for document
+compatibility, not interpreted as runtime authority.
+**Why:** The old simulator path used them to replace the retained frame with a
+fresh handler entry, contradicting the clarified continuation rule.
+**How to apply:** Do not migrate exact saved artifacts just to remove the field,
+or restore a separate selector in new simulation clients.
+
 For the approved multi-Namespace design, the user subsequently qualified the
 reboot scope: a Namespace-attributable fault reboots only the responsible
 Namespace, preserving other Namespaces and the running FPGA configuration.

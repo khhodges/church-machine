@@ -87,7 +87,7 @@ function create(baseline) {
 function start(candidate) {
     const sim = Simulator.fromAscendingNamespaceImage(candidate.image, root);
     sim.configureBootFaultEntry({root,threadGT:0x02000002,
-        handlerGT:sim.createGT(0,21,{E:1},1),imageIdentity:candidate.imageHash});
+        imageIdentity:candidate.imageHash});
     sim.beginBoot({clearNonBootThreads:true,freshThreadSlots:[11,12]});
     for(let i=0;i<3;i++) assert(sim._bootStep(), JSON.stringify(sim.faultLog));
     return sim;

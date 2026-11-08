@@ -7,8 +7,6 @@
     let reportedMachine = null, reportedOutput = '', reportedFaults = 0;
     let previousSimulator = null;
     let pendingPreparation = null;
-    let faultHandlerSlot = null;
-    let faultHandlerOwner = null;
     let bindingEpoch = 0;
 
     function freezeRecord(value) {
@@ -104,15 +102,8 @@
     }
     function markup() {
         const ready = machine && owner && same(owner);
-        const rows = root.NamespaceDesignV1?.state.document?.rows || [];
-        const selectedHandler = effectiveFaultHandler();
         return '<strong>Selected design · private simulator</strong> ' +
-            '<label>Fault entry handler <select onchange="DesignSimulation.selectFaultHandler(this.value)"' +
-            (busy || running ? ' disabled' : '') + '><option value="">Stop on fault (not configured)</option>' +
-            rows.filter(row => row.kind === 'lump').map(row =>
-                '<option value="'+row.slot+'"'+(selectedHandler===row.slot?' selected':'')+'>'+
-                esc((row.name || 'LUMP')+' · slot '+row.slot)+'</option>').join('')+
-            '</select></label> ' +
+            '<span>Hard Fault resumes Boot.Thread’s retained continuation.</span> ' +
             '<button class="btn btn-sm" onclick="DesignSimulation.prepare()" title="Validate, approve and load this exact saved design for private simulation"' + (busy?' disabled':'') + '>Prepare fresh simulation</button> ' +
             ['Step','Run','Stop','Reset'].map(action =>
                 '<button class="btn btn-sm" onclick="DesignSimulation.'+action.toLowerCase()+'()"' +
@@ -175,18 +166,6 @@
         message='Namespace binding changed. Prepare a fresh private simulation before execution; no image was patched.';
         render();
     }
-    function handlerOwner(selected) {
-        // Handler choice belongs to the design, not a particular Bind attempt.
-        const {bindingEpoch: ignored, ...design} = selected;
-        return JSON.stringify(design);
-    }
-    function effectiveFaultHandler() {
-        try {
-            const selected = selection();
-            return faultHandlerOwner === handlerOwner(selected) ? faultHandlerSlot :
-                (JSON.parse(selected.document).faultHandlerSlot ?? faultHandlerSlot);
-        } catch (_) { return faultHandlerSlot; }
-    }
     async function request(selected, action, payload) {
         const response = await fetch('/api/simulation/design/'+selected.profile+'/'+action+
             (selected.designId?'?design='+encodeURIComponent(selected.designId):''), {
@@ -202,19 +181,15 @@
         const rows = selected ? JSON.parse(selected.document).rows : [];
         const freshThreadSlots = rows.filter(row => row.kind === 'thread' &&
             Number.isInteger(row.preparedThread?.entryNia)).map(row => row.slot);
-        if (faultHandlerSlot !== null) {
-            if (handlerOwner(selected) !== faultHandlerOwner)
-                throw Error('Namespace selection changed. Select its fault handler explicitly before preparing simulation.');
-            const handler = instance.readNSEntry(faultHandlerSlot);
-            const thread = instance.readNSEntry(2);
-            if (!handler || !thread) throw Error('Selected fault handler or Boot.Thread is unavailable');
-            instance.configureBootFaultEntry({
-                root: {...instance.cr[15]},
-                threadGT: instance.createGT(instance.parseNSWord1(thread.word1_limit).gtSeq, 2, {}, 1),
-                handlerGT: instance.createGT(instance.parseNSWord1(handler.word1_limit).gtSeq, faultHandlerSlot, {E:1}, 1),
-                imageIdentity: record.imageHash,
-            });
-        }
+        // faultHandlerSlot in older saved documents is historical metadata.
+        // Startup remains owned by beginBoot and the prepared LightningBolt.
+        const thread = instance.readNSEntry(2);
+        if (!thread) throw Error('Prepared Boot.Thread is unavailable');
+        instance.configureBootFaultEntry({
+            root: {...instance.cr[15]},
+            threadGT: instance.createGT(instance.parseNSWord1(thread.word1_limit).gtSeq, 2, {}, 1),
+            imageIdentity: record.imageHash,
+        });
         instance.beginBoot({clearNonBootThreads:true, freshThreadSlots});
         instance.simulationConfiguration=freezeRecord(record);
         if(typeof instance.on==='function') {
@@ -250,11 +225,6 @@
         const ticket=generation;
         try {
             const selected=selection();
-            const declaredHandler=JSON.parse(selected.document).faultHandlerSlot;
-            if (declaredHandler !== undefined && faultHandlerOwner !== handlerOwner(selected)) {
-                faultHandlerSlot=declaredHandler;
-                faultHandlerOwner=handlerOwner(selected);
-            }
             const check=()=>{if(ticket!==generation || !same(selected)) throw Error('Namespace selection changed during preparation. Retry the selected design.');};
             message='Validating exact saved identities and preparing private simulation…'; render();
             const review=await request(selected,'prepare',{namespaceFingerprint:selected.fingerprint});
@@ -486,15 +456,7 @@
             return false;
         }
     }
-    function selectFaultHandler(value) {
-        stop();
-        faultHandlerSlot = value === '' ? null : Number(value);
-        faultHandlerOwner = handlerOwner(selection());
-        invalidate();
-        message = 'Fault handler selection changed. Prepare fresh simulation to bind it to the exact image. Saved Namespace and hardware are unchanged.';
-        render();
-    }
-    root.DesignSimulation={selectFaultHandler,prepare,command,stop,invalidate,bindingChanged,markup,render,run,reset,traceContext,traceIdentity,threadDisplay,
+    root.DesignSimulation={prepare,command,stop,invalidate,bindingChanged,markup,render,run,reset,traceContext,traceIdentity,threadDisplay,
         step:()=>{if(!running) execute(1);}};
 
     // Inspection only: declared membership survives missing/revoked admission.

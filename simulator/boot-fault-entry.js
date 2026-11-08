@@ -5,13 +5,12 @@
 // application restart policy. Physical port timing remains an RTL obligation.
 (function(root) {
     class BootFaultEntry {
-        constructor(sim, {root: bootRoot, threadGT, handlerGT, imageIdentity}) {
+        constructor(sim, {root: bootRoot, threadGT, imageIdentity}) {
             if (sim._liveThreadOwned || sim.stepCount || !imageIdentity)
                 throw Error('Configure fault entry on a fresh image, before execution');
             this.sim = sim;
             this.root = Object.freeze({...bootRoot, m: 0});
             this.threadGT = threadGT >>> 0;
-            this.handlerGT = handlerGT >>> 0;
             this.imageIdentity = String(imageIdentity);
             this.withRoot(() => {
                 const ns = sim.namespaceGeometry();
@@ -19,19 +18,9 @@
                 if (t.index !== 2 || t.type !== 1 || Object.values(t.permissions).some(Boolean))
                     throw Error('Boot fault target must be permissionless Thread slot 2');
                 const thread = this.checked(this.threadGT);
-                const handler = this.checked(this.handlerGT, 'E');
-                const hp = sim.parseGT(this.handlerGT);
-                if (Object.entries(hp.permissions).some(([p,v]) => p !== 'E' && v))
-                    throw Error('Fault handler requires an E-only GT');
                 this.base = thread.entry.word0_location;
                 this.layout = sim._threadLayoutAtBase(this.base);
                 if (!this.layout || !this.layout.valid) throw Error('Invalid Boot.Thread geometry');
-                this.handlerBase = handler.entry.word0_location;
-                const header = sim.parseLumpHeader(sim.memory[this.handlerBase]);
-                if (!header.valid || header.typ !== 0 || !header.cw || !header.cc)
-                    throw Error('Fault handler must be resident executable code');
-                if (this.overlaps(this.handlerBase, header.lumpSize))
-                    throw Error('Fault handler overlaps Boot.Thread');
                 // Exact immutable admission inputs, not a fault-event bank.
                 this.pinned = [];
                 const pin = (base, count, descriptors = false) => {
@@ -41,9 +30,7 @@
                 };
                 pin(ns.base, 2);
                 pin(ns.base + 4, 8, true); // G is a validation cache, not identity
-                pin(ns.base + hp.index * 4, 4, true);
                 pin(this.base, 1);
-                pin(this.handlerBase, header.lumpSize);
                 Object.freeze(this.pinned);
             });
             Object.freeze(this);
@@ -102,12 +89,8 @@
                 write(b + 5, event.faultRawWord == null
                     ? s.memory[event.physicalPC] >>> 0 : event.faultRawWord);
                 write(b + 6, 0);
-                write(b + 1, 0);
-                for (let i = 6; i < 16; i++) write(b + 1 + i, 0);
-                for (let i = 0; i < 12; i++)
-                    if (i !== 1 && i !== 2) write(b + l.capsStart + i, i === 0 ? this.handlerGT : 0);
-                // Canonical poison root; never a continuation into denied code.
-                s._formatThreadRootSentinel(b, l, this.handlerGT);
+                // Only fault facts replace homes. Preserve Boot's CR0, other
+                // homes, indicator, stack and CHURCH continuation frame.
                 status.state = 'saving';
                 status.saveAttempts = 1;
                 let saveError = null;
@@ -143,14 +126,14 @@
                 status.state = 'activating';
                 s.cr[15] = {...this.root};
                 const result = s._activateChangeThread(this.threadGT, {crDst: 12},
-                    0, true, activation);
+                    0, false, activation);
                 if (!result) throw Error('Boot activation failed');
                 s.bootComplete = true;
                 s.halted = false;
                 status.state = 'entered';
                 event.bootFaultEntry = {state: 'entered', saveStatus: saveError ? 2 : 1};
-                s.output += '[fault-entry] Entered configured Boot handler at word offset 0.\n';
-                return {faultEntry: true, pc: 0, physicalPC: s.cr[14].word1 + 1,
+                s.output += '[fault-entry] Resumed Boot.Thread retained continuation.\n';
+                return {faultEntry: true, pc: s.pc, physicalPC: s.physicalPC,
                     pipeline: [], desc: 'HardFault → Boot.Thread', event,
                     executionEvidence: s.lastStepEvidence};
             } catch (error) {

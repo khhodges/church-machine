@@ -15,11 +15,8 @@ const beforeRaw = fs.readFileSync(dir+'/before.bin');
 const beforeWords = Uint32Array.from({length:beforeRaw.length/4},(_,i)=>beforeRaw.readUInt32LE(i*4));
 const oldBoot = beforeWords[8];
 assert.deepEqual(Array.from(words.slice(boot,boot+256)),Array.from(beforeWords.slice(oldBoot,oldBoot+256)));
-const handler = doc.faultHandlerSlot;
-assert.equal(handler,21);
 sim.configureBootFaultEntry({root,
     threadGT:sim.createGT(sim.parseNSWord1(sim.readNSEntry(2).word1_limit).gtSeq,2,{},1),
-    handlerGT:sim.createGT(sim.parseNSWord1(sim.readNSEntry(handler).word1_limit).gtSeq,handler,{E:1},1),
     imageIdentity:evidence.imageHash});
 sim.beginBoot({clearNonBootThreads:true,freshThreadSlots:doc.rows.filter(r=>
     r.kind==='thread' && Number.isInteger(r.preparedThread?.entryNia)).map(r=>r.slot)});

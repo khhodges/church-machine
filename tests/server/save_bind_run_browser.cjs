@@ -93,15 +93,11 @@ async function main() {
         // invalidated, without executing an instruction.
         await page.locator('button[onclick="resetSim()"]').click();
         const [prepared, approved, active] = await responses;
-        // Configuring an explicit handler validates Boot.Thread and the handler
-        // with mLoad, setting only their descriptor G cache bits. Admission
+        // Configuring fault entry validates Boot.Thread with mLoad,
+        // setting only its descriptor G cache bit. Admission
         // bytes remain immutable; compare runtime with that exact expected delta.
         const expected = active.words.slice();
-        const handler = (await document(page)).faultHandlerSlot;
-        if (handler !== undefined) {
-            for (const slot of [2, handler])
-                expected[slot*4+1] = (expected[slot*4+1] | 0x40000000) >>> 0;
-        }
+        expected[2*4+1] = (expected[2*4+1] | 0x40000000) >>> 0;
         prebootHash = hash(expected);
         await expect.poll(async () => hash((await snapshot(page)).words)).toBe(prebootHash);
         assert.equal(prepared.imageHash, active.imageHash);

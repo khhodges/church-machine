@@ -8997,8 +8997,6 @@ class ChurchSimulator {
         }
         const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx, selfSuspend, allowRoot);
         if (!resume) return null;
-        if (faultEntry && resume.resumePC !== 0)
-            throw new Error('Fault handler must enter at word offset zero');
         // Validate the actual C-List backing the saved executable context before
         // suspending the outgoing Thread or publishing any incoming registers.
         const codeBase = resume.checked.entry.word0_location;
@@ -9105,9 +9103,8 @@ class ChurchSimulator {
         // are rejected before any context is committed; only explicit boot
         // activation may initialize execution from a preformatted root.
         const resumePC = resume.resumePC;
-        // Fault entry starts a root invocation, not a popped continuation.
-        // Keep the poison frame beneath the handler's future CALL frames.
-        const resumeSTO = resume.frame.savedSTO - (faultEntry ? 2 : 0);
+        // Fault activation pops the retained continuation just like CHANGE.
+        const resumeSTO = resume.frame.savedSTO;
         this.sto = resumeSTO;
         this.flags = resume.frame.flags;
         this.pc = resumePC;

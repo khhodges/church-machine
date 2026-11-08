@@ -199,6 +199,8 @@ def validate(document):
                 if value and (not isinstance(value, str) or not re.fullmatch(rf"[0-9a-fA-F]{{{width}}}", value)):
                     raise ValueError(f"Invalid selection {field}")
     by_slot = {r["slot"]: r for r in rows}
+    # Legacy saved metadata: retain its schema for exact document round trips.
+    # It does not select runtime fault entry; Boot.Thread retains continuation.
     if "faultHandlerSlot" in document:
         handler_slot = document["faultHandlerSlot"]
         handler = by_slot.get(handler_slot, {}) if type(handler_slot) is int else {}

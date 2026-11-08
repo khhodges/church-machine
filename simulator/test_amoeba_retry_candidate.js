@@ -25,7 +25,7 @@ function createAliceMalloryThreadFixture() {
     sim._nsSymbolicEntries = {...sim._nsSymbolicEntries};
     sim._nsFreeSequences = {...sim._nsFreeSequences};
     sim.configureBootFaultEntry({root, threadGT:0x02000002,
-        handlerGT:sim.createGT(0,21,{E:1},1), imageIdentity:'isolated-retry-fixture'});
+        imageIdentity:'isolated-retry-fixture'});
     sim.beginBoot({clearNonBootThreads:true, freshThreadSlots:[11,12]});
     for (let i=0;i<3;i++) assert(sim._bootStep(), JSON.stringify(sim.faultLog));
     const bodies = [2,11,12].map(slot => {
