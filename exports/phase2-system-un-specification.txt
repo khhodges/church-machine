@@ -198,7 +198,7 @@ Thread 1 and Thread 2 remain USER Threads.
 | **U.0** | SYSTEM method | Startup validation: check setup, coordinate hardware/event tests across serialized activations, release normal USER execution only after success. |
 | **U.1** | USER/FPGA operation, not a SYSTEM method | Original CALL with USER's target GT; dispatch normally if resident, otherwise retain the operation and enter SYSTEM through the UNAVAILABLE mechanism. |
 | **U.2** | SYSTEM method | Consume the protected UNAVAILABLE record; register the suspended USER, pending operation and completion event; resolve locally if possible, otherwise queue the LLR under SYSTEM ownership. |
-| **U.3** | SYSTEM method | Send a registered queued LLR directly to IDE when SYSTEM selects it for dispatch. Do not wait inside the handler for DELIVER. |
+| **U.3** | SYSTEM method | Send registered queued LLRs directly to IDE in SYSTEM acceptance order (FIFO). Do not wait inside the handler for DELIVER. |
 | **U.4** | SYSTEM method | Process an admitted DELIVER: match/validate, resolve and install using FreeHandler when required. |
 | **U.5** | SYSTEM method | Publish readiness and signal the associated USER exactly once. Does not itself switch Threads. |
 | **U.6** | USER/FPGA operation, not a SYSTEM method | Restore/complete the original use under its retained authority when USER is selected. |
@@ -293,11 +293,14 @@ deferred, not a prerequisite for this proof.
 **SYSTEM owns LLR decisions and queuing.** Microcode hands the event data to
 SYSTEM; it neither sends the request automatically nor chooses queue policy.
 U.2 associates the request with its suspended USER and queues unresolved work.
-U.3 dispatches work selected by SYSTEM. Queued and sent-awaiting-delivery are
+U.3 dispatches queued work in SYSTEM acceptance order (FIFO), without priorities
+or reordering. Each request retains its own USER association, including when
+several USERs request the same target. FIFO governs dispatch, not delivery
+arrival or completion order. Queued and sent-awaiting-delivery are
 distinct states; neither makes USER runnable. One pending use per blocked USER
 is compatible with a SYSTEM queue containing requests from several USERs.
-Queue order, capacity and the number of sent requests allowed to await delivery
-remain open; ownership alone does not impose a single outstanding wire request.
+Queue capacity and the number of sent requests allowed to await delivery
+remain open; FIFO does not impose a single outstanding wire request.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -462,7 +465,7 @@ IDE   FPGA  USER  SYSTEM  COMMENTS
  |     |     |     |     Check local binding.
  |     |     |     |     If ready, use U.5 directly.
  |     |     |     |     Otherwise SYSTEM queues LLR;
- |     |     |     |     decides when to dispatch.
+ |     |     |     |     dispatches in acceptance order.
  <-----------------|     U.3 SYSTEM REQUEST to IDE.
  |     |     |     |     20-byte payload in TUNNEL envelope.
  |     |     |     |     Retain local body until
@@ -791,7 +794,7 @@ are not a separate method-name mapping.
 |---|---|
 | U.0 | Boot.Thread runs setup validation before normal USER release; event-path tests use successive activations; failures hard-fault. |
 | U.2 | Receives the protected pending-operation record from U.1c; preserves target authority and registers the correct suspended USER. |
-| U.3 | Emits the correctly correlated REQUEST to IDE and completes without waiting for delivery. |
+| U.3 | Emits correctly correlated REQUESTs to IDE in FIFO acceptance order, without priority reordering or waiting inside a handler for delivery. |
 | U.4 | Accepts only a matching validated delivery; FreeHandler CALL/RETURN stays in SYSTEM; duplicate/stale input cannot complete twice. |
 | U.5 | Publishes usable readiness before Signal; only the associated USER becomes eligible; no implicit Thread switch. |
 | U.7 | Releases only safely reclaimable memory; retains slot/identity; deferred work finishes its activation without invoking U.8. |
@@ -817,7 +820,7 @@ is not execution acceptance.
 | F.6 | Delivery admission | Incoming data is handled at the defined service point with no asynchronous preemption; previous handler has finished. |
 | F.7 | Invalid/mismatched delivery | No completion signal or USER resume; validation-fault ownership follows its agreed contract. |
 | F.8 | Duplicate/stale delivery | No second install, signal or completion and no wakeup of a reused identity. |
-| F.9 | Multiple outstanding requests | Handlers execute serially; completion of one request affects only its associated USER. |
+| F.9 | Multiple pending requests | Handlers execute serially; queued requests dispatch in SYSTEM acceptance order without priorities. Retain separate USER associations for equal targets; FIFO does not require delivery/completion order. Completion affects only the associated USER. Test the permitted sent-awaiting-delivery count once that limit is agreed. |
 | F.10 | Several USERs need one LUMP | Each pending use completes correctly; one flag signal is not assumed to broadcast. |
 | F.11 | FreeHandler | FreeN/Release CALL and RETURN stay within SYSTEM and use SYSTEM's capabilities. |
 | F.12 | Retirement | Only safe reclamation produces DONE/Signal; retain the slot and modified-state obligations. Deferred retirement does not hold SYSTEM indefinitely. |
@@ -862,8 +865,9 @@ The following are not settled by the design discussion:
   SYSTEM DR5; protected pending association and registration authority remain open.
 - Request framing/byte order, capacity, correlation, event lifetime, cancellation
   and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.
-  **Settled ownership:** SYSTEM decides and queues LLRs. Queue order, capacity
-  and dispatch/in-flight limits remain to be decided one at a time.
+  **Settled ownership and order:** SYSTEM decides and queues LLRs; FIFO dispatch
+  follows SYSTEM acceptance order without priorities or reordering. Capacity
+  and the sent-awaiting-delivery limit remain to be decided one at a time.
   **Newly explicit:** define exact wire serialization and how the IDE associates
   current raw metadata with the requesting Namespace. Verify that mapping for
   the first proof without requiring metadata improvements. Multiple USERs can

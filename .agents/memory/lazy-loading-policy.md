@@ -297,7 +297,8 @@ the event payload, not automatic transmission or queue policy.
 
 **How to apply:** Keep the queue SYSTEM-private and retain per-USER pending
 associations. Do not confuse serial handler execution with a one-outstanding-
-request limit; queue order, capacity and in-flight limits remain undecided.
+request limit; capacity and in-flight limits remain undecided. FIFO order was
+subsequently approved as described below.
 Review flow/message decisions one at a time rather than presenting newly found
 issues as the complete unresolved list.
 
@@ -337,3 +338,12 @@ Phase 2"; the target Namespace/slot alone cannot distinguish multiple USERs.
 inject SYSTEM DR5 alongside DR0–DR4 before Z=1. This is not the target E-GT,
 not an event code and not an authority grant. Keep DR5 out of the 20-byte IDE
 target payload; protected association and registration authority remain open.
+
+SYSTEM dispatches queued LLRs FIFO, in the order SYSTEM accepts them.
+
+**Why:** The user explicitly approved FIFO dispatch for the Phase 2 proof,
+without priorities or reordering.
+
+**How to apply:** Preserve each request's USER association even for equal
+targets. FIFO governs dispatch, not delivery or completion order, and does
+not imply a single request in flight. Capacity and in-flight limit remain open.
