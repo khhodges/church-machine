@@ -12,7 +12,17 @@ authority, not ordinary diagnostic access.
 
 **How to apply:** Preserve ordinary memory's DATA/capability separation and
 SecurityRegulator's separate WDT custody. Do not treat this as approval of
-general mixed-domain tokens, a port address, pending-result lifetime semantics
-or physical operations. Resolve these interface details one at a time.
-The recommendation to consume on successful LOAD and invalidate on context
-handoff/fault/reset remains a proposal until accepted.
+general mixed-domain tokens, a port address or physical operations.
+Resolve remaining interface details one at a time.
+
+The user approved one transient result: successful validated LOAD consumes it;
+successful CHANGE/SWITCH/completed internal LLR handoff (including self-transfers),
+fault or reset clears it. LOAD without a pending result hard-faults.
+
+**Why:** Another Thread must not inherit pending manufacturing output; clearing
+only after LOAD does not prevent cross-context consumption.
+
+**How to apply:** Do not save the pending result in Thread storage or replay an
+interrupted write/load pair. Mint must complete the pair without a context
+handoff. Exact fault code and remaining operation/ordering details are not
+settled by this approval.

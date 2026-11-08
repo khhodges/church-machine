@@ -51,12 +51,12 @@ explicit device-only permission combination remains an interface decision.
 Existing admission/publication obligations are not waived by this proposal;
 the port alone cannot prove publication-bound result delivery.
 
-## First unresolved contract: pending-result lifetime
+## Approved pending-result lifetime
 
 A global writable register can be overwritten or read by a different Thread
 between DWRITE and LOAD. Clearing after LOAD alone is insufficient.
 
-**Recommendation for review, not yet approved:** use one transient result,
+**Approved:** use one transient result,
 consume it only on a successful validated LOAD, and invalidate it on a
 successful CHANGE/SWITCH/completed internal LLR handoff, fault or reset.
 Do not preserve it in Thread storage or automatically replay an interrupted
@@ -69,13 +69,14 @@ Namespace transition or be inherited by a newly active Thread.
 
 The cost is explicit: Mint cannot suspend between writing and loading the
 result and expect the value to survive. This is not a fault-recovery strategy.
-Failed/skipped transfers, a fault during LOAD, CALL/RETURN boundaries, duplicate
+A fault during LOAD clears the pending result under the fault rule.
+Failed/skipped transfers without a fault, CALL/RETURN boundaries, duplicate
 writes, NULL results, and same-edge transition/access ordering require precise
 rules before integration. No partially validated LOAD may publish a CR value.
 
 ## Remaining interface and verification work
 
-After settling pending-result lifetime, review one issue at a time:
+With pending-result lifetime settled, review remaining issues one at a time:
 
 - Exact port address and address units, width/alignment and decode.
 - W/L access representation and provisioning without a general mixed-domain

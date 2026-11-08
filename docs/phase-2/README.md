@@ -11,8 +11,8 @@ authorization to install an image or program hardware.
   full declared range, approved WDT address `0xFFFFFF18`, current decoder differences,
   and the approved Church capability-controlled diagnostic direction.
 - **[Mint-private GT-construction port](gt-construction-port.md)** —
-  approved dedicated DATA-write/capability-load direction; pending-result
-  lifetime and exact interface remain to be settled.
+  approved dedicated DATA-write/capability-load direction and transient-result
+  lifetime; exact access interface remains to be settled.
 
 ## Current agreed FPGA boundary
 
