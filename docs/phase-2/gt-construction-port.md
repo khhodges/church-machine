@@ -16,11 +16,20 @@ callers. Mint's private custody and the transient-result rules remain unchanged.
 Conceptual sequence, not assigned assembler syntax:
 
 ```text
-Mint constructs GT bits
+Security monitor executes the trusted GT-construction sequence
   -> authorized DWRITE to the construction port
+  -> explicitly set the source port capability's GT.M = true
   -> authorized LOAD through the construction port
   -> validated capability in the destination CR
+     and consumption of source GT.M and the pending result
 ```
+
+The user clarified that this low-level code belongs to the security monitor
+that controls M. “Set GT.M” above denotes an authorized use of the existing
+M-control mechanism, not a new SET M opcode or an ordinary caller's ability
+to elevate itself. Preserve SecurityRegulator's M-control custody; this does
+not grant raw M-control to ordinary Mint callers. The exact service boundary
+and calling ABI are not assigned by this example.
 
 This replaces the need for a writable memory alias to a private result C-list
 for result materialization. It does not by itself allocate a Namespace slot,

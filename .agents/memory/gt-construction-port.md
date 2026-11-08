@@ -70,3 +70,14 @@ The user explicitly corrected “CR.M” to “GT.M” and directed consumption.
 normal validation and transient-result rules. Do not imply that existing LOAD
 hardware already implements it. Use GT.M in subsequent design discussion;
 consume it on successful LOAD rather than treating it as a reusable grant.
+
+The user clarified that the low-level GT-construction code belongs to the
+security monitor that controls M; show an explicit GT.M = true step before LOAD.
+
+**Why:** Omitting the authorized M-setting step made the sequence incomplete
+and obscured who can renew the consumed authority.
+
+**How to apply:** Include authorized M setting in conceptual examples without
+inventing a SET M opcode, automatic DWRITE elevation or raw M-control grants to
+ordinary callers. Preserve SecurityRegulator custody and keep the exact service
+ABI separate from this clarification.
