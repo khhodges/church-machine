@@ -148,6 +148,10 @@ class ChurchDRead(Elaboratable):
                 with m.Elif(~in_bounds):
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.BOUNDS)]
                     m.next = "IDLE"
+                with m.Elif((cr_view.word1_location == MONITOR_CLEAR_PORT) |
+                            (effective_addr == MONITOR_CLEAR_PORT)):
+                    m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.INVALID_OP)]
+                    m.next = "IDLE"
                 with m.Else():
                     # Both the complete word offset and byte address passed
                     # bounds. Only now is narrowing to the 32-bit bus safe.

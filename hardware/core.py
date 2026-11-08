@@ -61,8 +61,11 @@ class ChurchCore(Elaboratable):
     historical callers; it does not select or support an ascending image.
     """
 
-    def __init__(self, iot_profile=False, *, expected_boot_guard=None):
+    def __init__(self, iot_profile=False, *, expected_boot_guard=None,
+                 monitor_clear_enabled=False):
         self.iot_profile = iot_profile
+        self.monitor_clear_enabled = monitor_clear_enabled
+        self.monitor_clear = Signal()
         if expected_boot_guard is not None:
             validate_boot_guard(expected_boot_guard)
         self.expected_boot_guard = expected_boot_guard
@@ -328,7 +331,8 @@ class ChurchCore(Elaboratable):
             resident_word_locations=self.expected_boot_guard is not None)
         m.submodules.u_shared_mload = _rst(u_shared_mload)
         u_dread = ChurchDRead()
-        u_dwrite = ChurchDWrite()
+        u_dwrite = ChurchDWrite(monitor_clear_enabled=self.monitor_clear_enabled)
+        m.d.comb += self.monitor_clear.eq(u_dwrite.monitor_clear)
         u_cload = ChurchCLoad(
             resident_word_locations=self.expected_boot_guard is not None)
 
@@ -3099,6 +3103,12 @@ class ChurchCore(Elaboratable):
             with m.Elif(u_irq_dispatch.null_base_fault):
                 m.d.comb += [self.fault.eq(FaultType.IRQ_NULL_BASE), self.fault_valid.eq(1)]
         with m.Elif(mwin_fault_valid):
+            m.d.comb += [self.fault.eq(FaultType.INVALID_OP), self.fault_valid.eq(1)]
+        with m.Elif((self.dmem_addr == MONITOR_CLEAR_PORT) &
+                    (self.dmem_rd_en | self.dmem_wr_en)):
+            # Authorized DWRITE uses a dedicated completion pulse, never
+            # DMEM. Reads, capability transfers and internal accesses cannot
+            # turn this device address into ordinary memory or a clear.
             m.d.comb += [self.fault.eq(FaultType.INVALID_OP), self.fault_valid.eq(1)]
         with m.Else():
             m.d.comb += [self.fault.eq(FaultType.NONE), self.fault_valid.eq(0)]

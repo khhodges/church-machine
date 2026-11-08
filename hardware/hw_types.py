@@ -145,6 +145,10 @@ ENABLE_GC = True
 CHURCH_HW_RANGE_BASE = 0xFFFFFF00
 CHURCH_HW_RANGE_END  = 0xFFFFFFFF
 
+# Dedicated logical device address, not a byte lane in an aligned register.
+# SecurityRegulator alone is provisioned with the exact, limit-zero W grant.
+MONITOR_CLEAR_PORT = 0xFFFFFF19
+
 # Segment 1 — CR Ports (0xFFFFFF00–0xFFFFFF0F)
 # L-perm → authority to load from that CR.
 # S-perm → authority to CHANGE (store to) that CR.

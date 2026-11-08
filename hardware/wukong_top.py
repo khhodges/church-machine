@@ -585,16 +585,19 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.d.comb += ClockSignal("sync").eq(self.clk)
 
         # ── ChurchCore ─────────────────────────────────────────────────────────
-        core = m.submodules.core = ChurchCore(expected_boot_guard=self.expected_boot_guard)
+        core = m.submodules.core = ChurchCore(
+            expected_boot_guard=self.expected_boot_guard,
+            monitor_clear_enabled=self.phase2_status_leds)
         if self.phase2_status_leds:
             from hardware.thread_status_leds import ThreadStatusLEDs
             status_leds = m.submodules.status_leds = ThreadStatusLEDs(
                 clock_hz=self.clk_freq)
             status_leds.connect_core(m, core)
             # Domain reset initializes it. CM reboot/skip/Thread recovery must
-            # not clear the indicator. Real protected monitor ABI is pending.
+            # not clear the indicator. Only admitted DWRITE clears in hardware.
             m.d.comb += status_leds.monitor_clear.eq(
-                self.sim_status_monitor_clear if self.sim_mode else 0)
+                core.monitor_clear |
+                (self.sim_status_monitor_clear if self.sim_mode else 0))
             if self.sim_mode:
                 self.sim_status_leds = status_leds
         if self.sim_mode:
@@ -896,6 +899,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         #  14  TIMER.ALARM_CMP  alarm compare vs TICKS_LO (R/W)
         #  15  TIMER.ALARM_CTL  [0]=arm [1]=fired; write 1→[1] to clear (R/W)
         is_mmio = Signal()
+        from hardware.hw_types import MONITOR_CLEAR_PORT
+        is_monitor_port = Signal()
+        m.d.comb += is_monitor_port.eq(core.dmem_addr == MONITOR_CLEAR_PORT)
         m.d.comb += is_mmio.eq(core.dmem_addr[30] & ~core.dmem_addr[31])
         mmio_reg_sel = Signal(4)
         m.d.comb += mmio_reg_sel.eq(core.dmem_addr[2:6])
@@ -1080,7 +1086,8 @@ class ChurchWukongXC7A100T(Elaboratable):
             with m.Default():
                 m.d.comb += mmio_rd_data.eq(0)
 
-        m.d.comb += core.dmem_rd_data.eq(Mux(is_mmio_read, mmio_rd_data, dmem_rd.data))
+        m.d.comb += core.dmem_rd_data.eq(
+            Mux(is_monitor_port, 0, Mux(is_mmio_read, mmio_rd_data, dmem_rd.data)))
 
         # ── dmem_rd_valid ──────────────────────────────────────────────────────
         # BRAM read has 1-cycle latency; MMIO reads are combinatorial.
@@ -1102,7 +1109,7 @@ class ChurchWukongXC7A100T(Elaboratable):
             m.d.comb += [cpu_wr_data.eq(core.ns_wr_data[:32]), cpu_wr_en.eq(1)]
         with m.Elif(core.clist_wr_en):
             m.d.comb += [cpu_wr_data.eq(core.clist_wr_data), cpu_wr_en.eq(1)]
-        with m.Elif(~is_mmio):
+        with m.Elif(~is_mmio & ~is_monitor_port):
             m.d.comb += [cpu_wr_data.eq(core.dmem_wr_data), cpu_wr_en.eq(core.dmem_wr_en)]
 
         with m.If(hw_init_wr_en):

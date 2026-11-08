@@ -36,6 +36,18 @@ details or interrupting working Threads. Successful CHANGE alone does not clear
 the flag. A new fault relatches it and wins over a simultaneous clear. Keep the
 protected control interface separate from this behavioral approval.
 
+The user subsequently approved the proposed protected write-only clear contract
+and delegated choosing a non-conflicting hardware address.
+
+**Why:** The simulation-only input was insufficient; the monitor needs a real
+instruction path without giving ordinary callers a grant.
+
+**How to apply:** Preserve exclusive SecurityRegulator custody and exact
+one-word W access. The address map records the selected ABI. Local synthetic
+grants are test evidence, not approval to provision saved images, run vendor
+builds or operate the board. Indicator clearing and the separate fault-hold
+recovery work must not be conflated.
+
 Keep local LED integration opt-in until the protected monitor-clear interface
 and release selection are settled.
 

@@ -1,10 +1,10 @@
 """Passive two-LED status unit for the bounded Phase 2 RTL trial.
 
 Inputs must be synchronous: one pulse per successful CHANGE, every Hard Fault,
-and an already-authorized security-monitor clear. No MMIO ABI is assigned.
+and an already-authorized security-monitor clear.
 This unit has no execution, scheduler, fault-record or reset-request outputs.
 The Wukong wrapper offers this as an opt-in local candidate, not an installed
-bitstream. Monitor clear has no software access path yet.
+bitstream. The core admits the dedicated DWRITE monitor-clear port.
 """
 from amaranth import Elaboratable, Module, Signal
 

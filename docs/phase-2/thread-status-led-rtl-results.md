@@ -75,8 +75,8 @@ The Wukong wrapper enables the new display only with the explicit
 `phase2_status_leds=True` candidate option. Default builds retain the existing
 display until release selection. The status unit uses the normal ungated sync
 clock and cannot drive execution controls. CM reboot and skip do not clear it.
-Monitor clear authorization and its software/MMIO interface remain unimplemented:
-simulation alone supplies a clear input, tied inactive outside simulation.
+The original trial supplied clear only in simulation. The subsequently approved
+protected DWRITE interface now supplies it in candidate hardware too; see below.
 
 This does not establish general multi-Thread Hard Fault recovery. The existing
 Wukong fault-recovery controller still holds core execution for fault capture
@@ -86,3 +86,43 @@ remains a system-level acceptance obligation, not a result of these LED tests.
 
 No live artifacts, serving workflows, vendor builds, board contact, reset,
 upload or flashing were performed. The installed LEDs retain their old behavior.
+
+## Protected monitor-clear implementation
+
+The approved contract and delegated address choice are recorded in the
+[address map](hardware-address-map-and-diagnostic-mmio.md#protected-monitor-clear-port-at-0xffffff19).
+The chosen port is `0xFFFFFF19`. Exact one-word W capability admission occurs
+in DWRITE, with a dedicated completion pulse carried by ChurchCore to the
+opt-in wrapper display. No live capability is provisioned. The test-only
+clear stimulus remains available for the original isolated fault-display test;
+it is not the production path.
+
+```sh
+python3 -m pytest hardware/test_monitor_clear.py -q --disable-warnings
+```
+
+Observed: **18 passed**. Cases cover exact successful admission, disabled
+feature, invalid payloads/reserved bits, NULL and missing W, Abstract and
+oversized capabilities, nonzero offsets, neighboring-base access, accepted
+input capture, denied read without DR write, and no clear from neighboring
+or legacy-aliased addresses. A core test creates a real fault record and then
+executes the clear instruction, checking preserved diagnostic fields/count and
+subsequent healthy instruction execution without reset. A full-wrapper test
+executes DWRITE using a synthetic grant and observes the hardware clear wire
+with the simulation-clear input held zero.
+
+The existing LED tests cover simultaneous fault/clear priority, a concurrent
+CHANGE completion, relatching, and uninterrupted counting behind the display.
+The LED unit/core-wrapper suites and DWRITE acceptance-capture regressions
+passed in the combined run. The unchanged scheduler-contract suite subsequently
+passed **51 tests in 55.25 seconds**; `git diff --check` was clean.
+These remain bounded local tests, not evidence of live SecurityRegulator
+provisioning or general multi-Thread recovery. In particular, the full-wrapper
+instruction test clears an already-clear indication; recovery from a captured
+fault still depends on the separately tracked fault-hold work.
+
+The broader `tests/hardware/test_data_access_full_width.py` run has two
+pre-existing failures in its `65536-0-1-True-4096` read/write cases: the fixture
+uses the retired immediate-mode encoding, whereas current units decode indexed
+plus/minus offsets. Replaying the unchanged HEAD versions of DREAD/DWRITE
+reproduced both failures (24 other cases passed). They are not changed here.

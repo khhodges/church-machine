@@ -53,7 +53,8 @@ CHANGE/SWITCH operations targeting CR13 hard-fault with INVALID_OP; stale
 | `14` | GTMint | Approved specification address; not implemented |
 | `15–17` | Unassigned | No function established by the inspected map |
 | `18` | WDT control | Approved specification address; not wired to the local RTL unit |
-| `19–1B` | Unassigned | No WDT countdown/status ports proposed |
+| `19` | Monitor indication clear | Approved protected write-only port; opt-in local RTL |
+| `1A–1B` | Unassigned | No WDT countdown/status ports proposed |
 | `1C` | M-bit control | Declared single 32-bit M-bit object |
 | `1D–1F` | Unassigned | No function established by the inspected map |
 
@@ -183,8 +184,8 @@ indication again; a simultaneous fault takes priority over clearing.
 A successful CHANGE alone never clears it: a healthy Thread's progress does
 not establish that a fault elsewhere has been handled.
 This is an indicator only, not a change to fault containment or recovery.
-The protected clear interface remains to be assigned; this specification
-does not invent an MMIO address or grant ordinary callers clearing authority.
+The protected clear interface is defined below. It grants no ordinary caller
+clearing authority.
 Its blink clock must continue independently of instruction retirement.
 
 The FPGA must not freeze on a Thread Hard Fault: unaffected working Threads
@@ -201,11 +202,58 @@ fault indication: the repeated blink distinguishes the fault state.
 
 The status unit and opt-in Wukong candidate wiring now have
 [bounded local test results](thread-status-led-rtl-results.md).
-Protected monitor software access, general fault-containment liveness and
-physical behavior remain unverified.
+The protected instruction path has local RTL evidence. Live capability
+provisioning, general fault-containment liveness and physical behavior remain
+unverified.
 It replaces the intended normal LED/fault display for this profile, not the
 current installed bitstream. No build, installation or flashing is authorized
 by this specification.
+
+### Protected monitor-clear port at `0xFFFFFF19`
+
+The user approved the protected contract and delegated selection of a
+non-conflicting address. Offset `19` was unassigned in the declared map and
+had no existing implementation assignment. It is now reserved exclusively
+for this indication-clear function, not WDT status or a countdown.
+
+- SecurityRegulator alone is to hold the exact one-word Inform W capability:
+  location `0xFFFFFF19`, limit zero, Church domain. No Namespace slot or live
+  grant is allocated here. Privilege follows capability custody, never an
+  abstraction/Thread name comparison. No ordinary-caller method is introduced.
+- Access is a full 32-bit DWRITE with effective word offset zero and payload
+  exactly `0x00000001`. It is an idempotent clear request, including when no
+  indication is pending. All other payloads are INVALID_OP.
+- This is an exact **logical device address**. At offset zero the cached
+  location is compared unchanged against all 32 address bits. It is not
+  rounded down, divided by four, decoded as a byte lane, or translated through
+  Wukong's four-bit MMIO selector. Existing RAM offset arithmetic is unchanged;
+  nonzero offsets cannot access this limit-zero object.
+- Normal NULL, domain/W and bounds checks apply first. An Abstract capability,
+  oversized descriptor, or a neighboring-base capability whose offset lands
+  on the port cannot clear it. Such malformed port accesses use INVALID_OP
+  after the ordinary permission/bounds checks. Permission and bounds failures
+  retain their existing fault codes.
+- There is no readback or capability LOAD/SAVE operation. DREAD rejects the
+  port before reading memory or writing a DR. Other DMEM transactions reaching
+  this exact address fault INVALID_OP and cannot clear it; the Wukong wrapper
+  suppresses their RAM write and returns no RAM contents for that address.
+- Admitted DWRITE emits a one-cycle internal clear pulse on completion, not a
+  DMEM store. Capability, offset and payload are captured at acceptance.
+  The pulse is wired in non-simulation candidate hardware as well as simulation.
+  It does not grant a host/UART clear command.
+- Clear affects only the LED latch. It never clears retained fault telemetry,
+  resets the CHANGE counter, renews a watchdog, stalls execution, or requests
+  recovery/reset. A same-cycle Hard Fault wins; CHANGE can increment in that
+  same cycle. This is acknowledgement of monitor handling, not hardware proof
+  that all faults were handled.
+- The instruction path is enabled only by `phase2_status_leds=True`. With the
+  feature disabled the port rejects clear requests rather than writing RAM.
+
+Local tests provision synthetic capabilities only. This contract does not
+provision SecurityRegulator in a saved image, authorize a vendor build, change
+the default display, or permit physical operations. The existing wrapper
+fault-hold problem is separate: this clear adds no execution hold and does not
+remove the recovery controller's existing one.
 
 ## PP250-style diagnostic MMIO: approved access direction
 

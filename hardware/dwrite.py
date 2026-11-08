@@ -25,7 +25,9 @@ class ChurchDWrite(Elaboratable):
         IDLE -> PERM_CHECK -> MEM_WRITE
     """
 
-    def __init__(self):
+    def __init__(self, *, monitor_clear_enabled=False):
+        self.monitor_clear_enabled = monitor_clear_enabled
+        self.monitor_clear = Signal()
         self.start      = Signal()
         self.busy       = Signal()
         self.done       = Signal()
@@ -174,6 +176,22 @@ class ChurchDWrite(Elaboratable):
                 with m.Elif(~in_bounds):
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.BOUNDS)]
                     m.next = "IDLE"
+                with m.Elif((cr_view.word1_location == MONITOR_CLEAR_PORT) |
+                            (effective_addr == MONITOR_CLEAR_PORT)):
+                    # A dedicated one-word capability, not a broad range or
+                    # an address computed from a neighboring device.
+                    with m.If(Const(self.monitor_clear_enabled) &
+                              (cr_gt.gt_type == GT_TYPE_INFORM) &
+                              (cr_view.word1_location == MONITOR_CLEAR_PORT) &
+                              (limit == 0) & (eff_off == 0) &
+                              (dr_data_reg == 1)):
+                        m.next = "MONITOR_CLEAR"
+                    with m.Else():
+                        m.d.comb += [
+                            self.fault.eq(1),
+                            self.fault_type.eq(FaultType.INVALID_OP),
+                        ]
+                        m.next = "IDLE"
                 with m.Else():
                     # Both the complete word offset and byte address passed
                     # bounds. Only now is narrowing to the 32-bit bus safe.
@@ -189,6 +207,12 @@ class ChurchDWrite(Elaboratable):
                     self.dmem_wr_data.eq(dr_data_reg),
                     self.dmem_wr_en.eq(1),
                     self.done.eq(1),
+                ]
+                m.next = "IDLE"
+
+            with m.State("MONITOR_CLEAR"):
+                m.d.comb += [
+                    self.busy.eq(1), self.monitor_clear.eq(1), self.done.eq(1),
                 ]
                 m.next = "IDLE"
 
