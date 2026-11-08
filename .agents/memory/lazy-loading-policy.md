@@ -737,3 +737,14 @@ than name/Thread privilege. Hardware retains transition-based renewal and
 expiry enforcement; SYSTEM self-CHANGE needs no service CALL. Add no general
 software kick, SYSTEM exemption or remaining-time read. Approval settles
 ownership only, not watchdog implementation or physical operations.
+
+The user subsequently approved local watchdog RTL work and tests, with
+unresolved interface or containment decisions brought back rather than invented.
+
+**Why:** Approval was explicitly limited to local code/tests and excluded live
+images, restarts, vendor builds, uploads, resets and flashing.
+
+**How to apply:** Implement settled logic independently, but do not treat unit
+ports as software authority or timer expiry as proof of memory-write containment.
+Keep address/provisioning, actual completion bounds and integrated recovery
+evidence explicit before claiming a working execution watchdog.
