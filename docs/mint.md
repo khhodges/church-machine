@@ -1,5 +1,11 @@
 # Mint
 
+> **Current Phase 2 authority:** Genesis has approved the
+> [revised Mint abstraction contract](phase-2/mint-abstraction.md).
+> The document below is historical; its Encode/stub, authorization and issuance
+> descriptions must not override the revised contract. Executable migration
+> still requires the explicitly listed machine interfaces.
+
 **v1.0 — 2026-04-30**
 **CONFIDENTIAL**
 

@@ -22,6 +22,15 @@ dependency-ordered implementation and verification proposal. It is not a
 completed worldwide audit, certification, formal isolation proof, implementation
 approval, or permission to install, build, upload or flash anything.
 
+## Current Phase 2 authority
+
+Genesis has approved updating Mint to the
+[revised Phase 2 abstraction contract](../../phase-2/mint-abstraction.md).
+This package remains the historical Phase 1 contract/evidence, not authority to
+reintroduce superseded result materialization or qualify the outdated path.
+The new contract explicitly distinguishes approved decisions from unresolved
+interfaces and does not claim an executable migration.
+
 ## Start here
 
 | Reader's question | Document |

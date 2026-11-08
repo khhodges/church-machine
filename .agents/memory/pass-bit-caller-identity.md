@@ -11,7 +11,9 @@ do not turn the proposed simplification into a prohibition or claim passcodes
 are inherently unworkable.
 
 **How to apply:** Keep application-level passcodes available while discussing
-simpler internal authorization. The complete Pass Bit design is not yet approved.
+simpler internal authorization. Genesis has explicitly approved incorporating
+these decisions into the Mint abstraction; exact Pass Bit mechanics remain
+unspecified. Do not reopen the approved direction or invent missing interfaces.
 
 Recorded caller E-GT identity must include the Namespace ID.
 

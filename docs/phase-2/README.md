@@ -14,13 +14,17 @@ authorization to install an image or program hardware.
 - **[Mint-private GT-construction port](gt-construction-port.md)** —
   approved address `0xFFFFFF14`, W plus dedicated seventeenth-bit GT.M access, and transient-result
   lifetime; successful LOAD consumes GT.M and the result; integration remains open.
+- **[Genesis-approved Mint abstraction](mint-abstraction.md)** —
+  current consolidated Phase 2 contract, replacement boundaries and outstanding
+  inputs for the executable update.
 
 ## Current agreed FPGA boundary
 
 **[Pass Bit and caller identity discussion](pass-bit-and-caller-identity.md):**
 avoid general Passcode slot/C-list proliferation without prohibiting private
 program use; recorded caller E-GT identity must include the Namespace ID.
-The complete Pass Bit mechanism remains under discussion.
+Genesis has approved incorporating these decisions into Mint; exact Pass Bit
+mechanics remain to be specified in the revised abstraction contract.
 
 **Mint testing scope:** Do not spend current effort testing or qualifying the
 outdated Mint path. Mint testing is deferred to Phase 2 and should target the

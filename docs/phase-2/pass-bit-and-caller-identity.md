@@ -2,9 +2,10 @@
 
 ## Status
 
-The Pass Bit is under discussion as a simpler internal authorization mechanism.
-This note records the user's clarifications; it does not approve a complete
-replacement of the existing Passcode contract, a bit allocation or implementation.
+Genesis approved incorporating the simpler authorization direction and the
+clarifications below into the [revised Mint abstraction](mint-abstraction.md).
+Exact Pass Bit mechanics remain unspecified; this does not assign a bit,
+provide a complete executable replacement or claim implementation.
 
 ## Passcodes remain available to programs
 

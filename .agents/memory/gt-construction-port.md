@@ -85,3 +85,14 @@ and obscured who can renew the consumed authority.
 inventing a SET M opcode, automatic DWRITE elevation or raw M-control grants to
 ordinary callers. Preserve SecurityRegulator custody and keep the exact service
 ABI separate from this clarification.
+
+Genesis explicitly approved updating Mint to match the accumulated Phase 2
+decisions, including dedicated GT.M and Namespace-qualified caller identity.
+
+**Why:** The approved architecture must govern Mint rather than leaving the
+outdated result-alias/credential implementation as the design authority.
+
+**How to apply:** Use the revised Phase 2 Mint contract for new work, retain
+historical executable evidence, and distinguish approval from missing machine
+interfaces. Do not strip live authorization checks or invent runnable opcodes
+to simulate an unimplemented GTMint/Pass Bit path.
