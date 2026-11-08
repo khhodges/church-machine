@@ -507,4 +507,15 @@ reset thread" to use ordinary GT validity instead of special late-LUMP discard.
 never rewrite it to match the new version. Separate valid target admission/GC
 from stale-requester eligibility. Preserve other Thread and target versions,
 session and request counter. Exact authorized reset/GT provisioning sequence,
-version exhaustion and stale-owner completion behavior remain open.
+stale-owner completion behavior remain open. For Phase 2, version exhaustion
+hard-faults instead of wrapping, as specified below.
+
+Phase 2 Thread reset never wraps the Thread version; incrementing beyond the
+existing field maximum hard-faults.
+
+**Why:** The user chose no-wrap/HardFault for this phase rather than extending
+the design with version-reuse or recovery mechanisms.
+
+**How to apply:** Do not publish a wrapped version or release the reset context
+when increment is impossible. Keep hardware comparison-only; no automatic
+slot replacement or version recycling. Exact diagnostic code remains open.

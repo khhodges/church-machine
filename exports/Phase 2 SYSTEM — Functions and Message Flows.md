@@ -380,8 +380,12 @@ a reply belongs to the current request.
 
 The reset implementation must also provide the new context's legitimate
 Thread GT through the authorized path; existing old-version holders are not
-silently upgraded. Exact version-update ordering, provisioning of that GT,
-exhaustion/wrap behavior and stale-owner completion disposition remain open.
+silently upgraded. **Phase 2 exhaustion rule:** never wrap the Thread version.
+If incrementing on reset would exceed the existing version field's maximum,
+hard-fault rather than publish a wrapped version or make the reset context
+runnable. No automatic slot replacement, version recycling or recovery
+mechanism is introduced. Exact version-update ordering, provisioning of the
+new GT, exhaustion diagnostic and stale-owner completion disposition remain open.
 This rule does not change another Thread's version, the target LUMP's version,
 the shared session ID or the request counter, and does not authorize FPGA edits.
 
@@ -985,6 +989,12 @@ is not execution acceptance.
 | F.25 | Fresh-session transport reset boundary | Hold pre-reset setup bytes and delayed work at FPGA, bridge and IDE stages, then reinitialize SYSTEM pending state. Verify none can be accepted into the new setup exchange; boundary verification precedes session acceptance and LLR dispatch. If the boundary cannot be established, setup must not report success. A single-buffer clear or socket reconnect is not sufficient evidence. Ordinary disconnect retains its established session. |
 | F.26 | USER-reset version and LLR invalidation | Reset one USER with an LLR queued, then in a separate case with an LLR already sent. Authorized software increments that Thread's Namespace-entry version before the reset context becomes eligible; hardware does not change it. Remove queued work or invalidate sent completion ownership. The retained old Thread GT fails normal version validation and cannot wake the reset context; never rewrite it to match. Treat a returned target under ordinary admission/slot/GT/GC rules, not an automatic reset-specific discard. The next LLR uses the reserved record with a new request number. Other USERs, target version, shared session and counter remain unchanged. |
 
+**F.27 — Thread reset version exhaustion:** exercise the largest valid version
+and an attempted reset increment beyond it. Require a hard fault with no
+wrapped version published and no reset-context release. An increment from the
+preceding version to the maximum remains valid subject to ordinary reset checks.
+No automatic slot replacement or recovery is expected.
+
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
 Functional acceptance is hardware-first; no separate simulator implementation
@@ -1021,7 +1031,9 @@ The following are not settled by the design discussion:
   Thread's version before eligibility. Hardware only compares; old GTs are not
   repaired. Returned-target admission follows ordinary slot/GT/GC rules, not
   reset-specific discard. Define precise update/provisioning ordering and
-  version exhaustion/wrap behavior.
+  exhaustion diagnostic. **Settled Phase 2 limit:** no version wrap; a reset
+  increment beyond the existing field maximum hard-faults without publishing
+  a wrapped identity or releasing the reset context.
 - Request framing/byte order, capacity, correlation, event lifetime, cancellation
   and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.
   **Settled ownership and order:** SYSTEM decides and queues LLRs; FIFO dispatch
