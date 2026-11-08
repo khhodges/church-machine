@@ -663,5 +663,16 @@ exposed the conflict with unconditional indefinite execution claims.
 **How to apply:** Distinguish indefinite suspended LLR waiting from active
 execution requiring timely renewal. SYSTEM must also satisfy the timer when
 all USERs wait. Do not introduce an LLR timeout, preemptive scheduling or
-watchdog recovery. SYSTEM's specific renewal mechanism and internal-LLR
-transition renewal semantics require separate decisions.
+watchdog recovery. SYSTEM's renewal uses ordinary self-CHANGE as approved below;
+internal-LLR transition renewal semantics still require a separate decision.
+
+SYSTEM renews the watchdog through ordinary self-CHANGE (`CHANGE CR12`) while
+no USER is eligible, completing before the deadline.
+
+**Why:** The user approved reuse of the existing self-CHANGE renewal rule rather
+than adding a refresh register, new instruction or exemption.
+
+**How to apply:** Continue after CHANGE with normal saved/restored context; no
+startup rerun, new LLR or waiting-USER activation. Failed/skipped CHANGE does
+not renew, and expiry keeps its existing precedence. Software must bound work
+between renewals. This does not settle internal-LLR transition timer behavior.
