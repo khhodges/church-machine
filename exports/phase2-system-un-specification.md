@@ -926,8 +926,16 @@ Ordinary fetches select the approved LUMP, not the latest compilation.
 An explicit `+` test name selects a later version using a new slot. Exact
 grammar remains open. Waiting never authorizes a silent revision upgrade.
 
-Invalid authority or integrity hard-faults; absence of a valid target's body is
-a waiting condition. SYSTEM status does not bypass capability checks. Hardware
+Invalid authority or integrity hard-faults; for USER execution, absence of a
+valid target's body is a waiting condition.
+**SYSTEM encountering an LLR condition is a HardFault.** SYSTEM must not suspend
+itself for lazy loading, enqueue its own missing dependency, or recursively
+enter SYSTEM. Its execution and required service/transport dependencies must
+be resident. Serving a USER's LLR is normal SYSTEM work; originating an LLR
+from SYSTEM execution is the fault case. Exact fault encoding remains open.
+This rule does not constitute approval of the separately proposed
+non-interleaved microcode-entry contract.
+SYSTEM status does not bypass capability checks. Hardware
 never changes version numbers. Delivery-fault ownership remains to be specified.
 
 ## 5. Development and physical acceptance
@@ -1011,6 +1019,13 @@ and an attempted reset increment beyond it. Require a hard fault with no
 wrapped version published and no reset-context release. An increment from the
 preceding version to the maximum remains valid subject to ordinary reset checks.
 No automatic slot replacement or recovery is expected.
+
+**F.28 — SYSTEM unavailable dependency:** while SYSTEM executes, encounter a
+valid-but-unavailable dependency that would cause a USER LLR. Require HardFault,
+not SYSTEM suspension, request queuing, IDE REQUEST emission or recursive event
+entry for that dependency. Separately confirm that SYSTEM can serve a USER's
+LLR normally using resident dependencies. This is an acceptance requirement,
+not a claim of an executed test.
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.

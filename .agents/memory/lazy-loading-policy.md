@@ -530,3 +530,14 @@ need FPGA rules". That six-step sequence was not approved.
 Review suspension, save/restore, event register/flag delivery, validation and
 fault boundaries. Do not ask further queue/session/storage implementation
 questions as FPGA requirements or infer hardware version mutation.
+
+A lazy-load condition originating in SYSTEM execution is a HardFault, never
+a nested LLR or a reason to suspend SYSTEM awaiting its own dependency.
+
+**Why:** The user corrected the transition discussion: "A SYSTEM LLR is a
+HardFault".
+
+**How to apply:** Distinguish serving a USER's LLR from SYSTEM encountering an
+unavailable dependency itself. Keep SYSTEM's required dependencies resident.
+Do not add recursive handler entry, SYSTEM LLR queuing or a recovery path.
+The cancelled non-interleaved-entry proposal was not approved by this correction.
