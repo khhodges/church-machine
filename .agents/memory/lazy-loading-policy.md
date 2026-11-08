@@ -425,5 +425,16 @@ or random-number source for this purpose.
 
 **How to apply:** Require explicit session establishment before LLR dispatch,
 while allowing LLR queuing beforehand. Disconnect preserves an established
-session. ID size, freshness/non-reuse, setup messages and delayed-setup-reply
+session. Freshness/non-reuse, setup messages and delayed-setup-reply
 protection remain open; do not claim REQUEST/DELIVER alone completes setup.
+
+The IDE-issued session ID is unsigned 64 bits (two 32-bit words); zero means
+unestablished and cannot be issued.
+
+**Why:** The user approved this representation alongside the 32-bit request
+counter for Phase 2 correlation.
+
+**How to apply:** Session plus request number is 12 envelope bytes, separate
+from the 20-byte target payload. Do not call this the complete packet size or
+treat width as proof of freshness. Byte order, allocation/non-reuse and setup
+reply protection remain open.

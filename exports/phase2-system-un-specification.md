@@ -366,9 +366,17 @@ Establishment requires an explicit session-setup exchange, not yet defined
 or implemented. LLRs may queue before setup completes but cannot dispatch
 under an unestablished session. Temporary disconnection preserves the
 established session; it does not automatically request a replacement.
-Identifier size, freshness/non-reuse guarantees, setup messages and protection
+Freshness/non-reuse guarantees, setup messages and protection
 against delayed setup replies remain open. The REQUEST/DELIVER pair alone is
 therefore not the complete session-establishment protocol.
+
+**Approved session-ID representation:** an unsigned 64-bit value carried as two
+32-bit words. Zero means no established session and must not be issued as a
+valid session ID. Together with the unsigned 32-bit request number, correlation
+occupies 12 bytes in the envelope. The target payload remains 20 bytes; message
+type, length and other framing are separate, so this does not fix total packet
+size. Word/byte order remains to be specified. Field width alone does not
+guarantee freshness or non-reuse.
 
 Long-lived request/context bodies may be held by the IDE behind retained GTs.
 The GT references the saved object; it is not itself the saved bytes. Confirm
@@ -962,7 +970,11 @@ The following are not settled by the design discussion:
   **Settled issuer:** IDE issues the fresh session ID; SYSTEM retains it and
   includes it with every request number, and IDE echoes both. Queuing before
   setup is allowed; dispatch before establishment is not. Define the setup
-  exchange, ID size/freshness and delayed-setup-reply protection next.
+  exchange, ID freshness and delayed-setup-reply protection next.
+  **Settled ID width:** unsigned 64 bits in two 32-bit words; zero means
+  unestablished and is not issuable. Session ID plus request number occupies
+  12 envelope bytes, outside the 20-byte target payload; byte/word order and
+  full framing remain open.
   No added target-payload word is assumed.
 - Exact explicit-yield interface and round-robin cursor rules; SYSTEM's idle
   mechanism when no USER is eligible and no service work is available.
