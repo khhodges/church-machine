@@ -256,3 +256,14 @@ Distinguish shared activation machinery from replaying the reset-only marker:
 the current ISA admits that marker only once per reset, and runtime entry must
 first preserve the suspended USER at its uncommitted CALL. Runtime admission
 and event parameters remain to be defined; this is not hardware authorization.
+
+Microcode must pass the unavailable CALL's lazy-load E-GT into SYSTEM context.
+
+**Why:** The user explicitly identified this parameter transfer as another
+difference between startup activation and runtime lazy-load entry.
+
+**How to apply:** Preserve the original target E-GT across USER save and SYSTEM
+restoration, then supply it as a SYSTEM parameter without changing its authority.
+Keep it distinct from the wired slot-2 Thread GT used to activate SYSTEM.
+The destination register remains undecided; do not overwrite restored parameters
+or lose the original CALL state needed for USER resumption.
