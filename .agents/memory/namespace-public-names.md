@@ -6,6 +6,17 @@ The Namespace dropdown names are the public naming authority. Use their exact
 wording in profile banners, inspection views, and user-facing reports; do not
 substitute internal keys or aliases such as NewLayout or Legacy Namespace.
 
+The user requires Namespace Table and Development Image to always show the
+same selected item, including development and testing views.
+
+**Why:** Conflicting names and independent selections obscure which Namespace
+is being developed or tested.
+
+**How to apply:** Treat both pages as views of one selected Namespace, not
+independent pickers. Keep design identity distinct from exact built/tested
+revision evidence; synchronizing selection must not imply installation,
+discard drafts or rewrite immutable images.
+
 For runtime-image reload verification, the user explicitly selected **New
 Layout**, the design that runs in the Simulator, rather than a legacy Wukong
 factory projection.
