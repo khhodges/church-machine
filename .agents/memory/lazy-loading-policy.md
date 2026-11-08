@@ -414,8 +414,8 @@ equals FPGA reset; a USER Thread reset must not be conflated with either.
 **How to apply:** Microcode transports an individual Thread's event to SYSTEM;
 it does not turn that event into a board reset or a new global session.
 USER reset does not reset SYSTEM, the shared session/counter or other USERs'
-pending requests. Define retirement of that USER's old pending association
-separately so delayed replies cannot wake its replacement context. Do not infer
+pending requests. Apply the approved local invalidation below so delayed replies
+cannot wake its replacement context. Do not infer
 that USER contexts survive FPGA reset or that a software reset is a power cycle.
 
 Use one unsigned 32-bit request counter per session across all USERs: start
@@ -473,3 +473,15 @@ a session ID or dispatching LLRs. One-buffer clearing or socket reconnection is
 not sufficient. No setup success without the boundary. Ordinary disconnect
 preserves the existing session. Handshake, enforcement and evidence remain open;
 do not claim the current transport already implements this requirement.
+
+USER reset invalidates only that USER's pending LLR before its reset context
+becomes eligible: remove queued dispatch or invalidate an already-sent association.
+
+**Why:** The user explicitly approved local invalidation, distinct from
+SYSTEM/FPGA reset and global session initialization.
+
+**How to apply:** Late replies cannot complete the old CALL or wake the reset
+Thread. Keep the record reserved for that USER's next LLR with a new number.
+Preserve other USERs, shared session and counter. No IDE cancellation message
+is required by this decision; reset authority/notification and late-reply
+disposition remain open.

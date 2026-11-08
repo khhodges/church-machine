@@ -317,7 +317,8 @@ this is not unbounded buffering.
 **Approved record reuse:** after validated installation and successful readiness
 signaling, mark the USER's record completed. Retain it until that same USER
 issues its next LLR; only then replace its contents with the new pending use.
-Never overwrite a queued or awaiting-completion record. Completed means that
+Never overwrite a queued or awaiting-completion record without the explicitly
+approved USER-reset invalidation below. Completed means that
 the target is ready and USER is eligible, not that the target method has run
 or returned. No additional USER-executed-CALL acknowledgement is required.
 Request correlation must prevent a delayed reply for the old use from completing
@@ -347,7 +348,22 @@ not the number alone. The counter is SYSTEM software bookkeeping, not a GT
 version field or hardware version mutation. It belongs to the envelope,
 outside DR0–DR4's 20-byte target payload.
 
-**Approved reset lifetime:** a reset that reinitializes SYSTEM's pending
+**Reset scopes:** LLRs are individual USER Thread events, not FPGA-wide events.
+Microcode hands a Thread's event to SYSTEM; it does not turn the request into
+a board reset or a new session. **SYSTEM reset means FPGA reset**, distinct
+from a USER Thread reset.
+
+**Approved USER-reset invalidation:** SYSTEM invalidates only that USER's old
+pending LLR association before its reset context becomes eligible to run.
+Remove a still-queued LLR from dispatch. For an already-sent LLR, invalidate
+its completion association so a late reply cannot complete the old CALL or
+wake the reset Thread. Keep the reserved record assigned to that USER; its
+next LLR may reuse it with a new request number. Other USERs' pending requests,
+the shared session ID and the shared request counter are unchanged.
+This rule does not require an IDE cancellation message. Reset authorization,
+reset-to-SYSTEM notification and late-reply disposition remain open.
+
+**Approved SYSTEM/FPGA-reset lifetime:** reinitializing SYSTEM's pending
 records starts a fresh request session. Pre-reset requests do not survive
 that reinitialization; delayed replies from the old session must not install
 a body or wake a USER in the new session. Post-reset execution establishes
@@ -399,8 +415,9 @@ Only after the boundary is established may SYSTEM accept the new session ID
 and subsequently dispatch LLRs. If the boundary cannot be established, setup
 must not report success.
 
-This requirement applies to pending-state reinitialization, not an ordinary
-disconnect that preserves the session. Exact handshake messages, enforcement,
+This requirement applies to SYSTEM/FPGA reset that reinitializes pending state,
+not USER Thread reset or an ordinary disconnect that preserves the session.
+Exact handshake messages, enforcement,
 evidence and fault reporting remain to be defined. This is not a claim that
 the current bridge implements the boundary and does not authorize a reset or
 transport change.
@@ -944,6 +961,7 @@ is not execution acceptance.
 | F.23 | Lazy-load event API and five-word wire payload | Capture requesting Namespace's existing four metadata words plus target slot and outgoing USER Thread GT; save USER before writes; restore SYSTEM then inject DR0–DR5 and Z=1 without changing restored N/C/V. Test Z before flag changes, record once, and establish Z=0 before handoff. Ordinary Z=0 resumption must not requeue stale payload; USER flags remain preserved. IDE target payload is exactly DR0–DR4 (20 bytes), excluding DR5. No unavailable E-GT activation or full shadow bank. Verify SYSTEM sends captured metadata unchanged. |
 | F.24 | Explicit retirement and simple allocation | No unrequested eviction or compaction; allocation skips reserved/retained slots and does not silently exceed 1,000 slots. |
 | F.25 | Fresh-session transport reset boundary | Hold pre-reset setup bytes and delayed work at FPGA, bridge and IDE stages, then reinitialize SYSTEM pending state. Verify none can be accepted into the new setup exchange; boundary verification precedes session acceptance and LLR dispatch. If the boundary cannot be established, setup must not report success. A single-buffer clear or socket reconnect is not sufficient evidence. Ordinary disconnect retains its established session. |
+| F.26 | USER-reset LLR invalidation | Reset one USER with an LLR queued, then in a separate case with an LLR already sent. Before the reset context becomes eligible, remove queued work or invalidate sent completion ownership. A late reply cannot complete the old CALL or wake the reset Thread. Its next LLR uses the same reserved record with a new request number. Other USERs' records, shared session and counter remain unchanged; no SYSTEM/FPGA reset or mandatory IDE cancellation message is implied. |
 
 The old preemptive interleaving test is replaced by proof of serialization and
 sequential ordering. No simulated parallel-handler behavior is required.
@@ -971,6 +989,12 @@ The following are not settled by the design discussion:
 - SYSTEM's authorized registration of an already-suspended USER on an event.
   **Settled Phase 2 owner input:** outgoing CR12 Thread GT as ordinary data in
   SYSTEM DR5; protected pending association and registration authority remain open.
+  **Settled USER reset:** invalidate only that USER's old LLR before making
+  its reset context eligible; remove queued work, invalidate sent completion
+  ownership, retain its reserved record for a new request number. Shared session,
+  counter and other USERs' requests stay intact. Define reset authorization,
+  reset-to-SYSTEM notification and late-reply disposition; no IDE cancellation
+  message is required by this decision.
 - Request framing/byte order, capacity, correlation, event lifetime, cancellation
   and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.
   **Settled ownership and order:** SYSTEM decides and queues LLRs; FIFO dispatch
