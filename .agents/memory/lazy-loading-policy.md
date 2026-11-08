@@ -48,6 +48,17 @@ that testing should be on the hardware.
 bitstream and LUMP bytes. Keep cheap build/static checks distinct from functional
 acceptance. This direction alone does not authorize uploading or flashing.
 
+The first Phase 2 proof priority is end-to-end lazy loading on hardware,
+not finishing every lifecycle contract before testing.
+
+**Why:** The user explicitly requested "Prioritize lazy load testing as fisrt
+task to prove".
+
+**How to apply:** Scope prerequisites to a safe absent-body CALL → SYSTEM
+request → validated delivery/install → original CALL execution proof.
+Keep retirement and scheduling improvements later; do not bypass authority
+checks or infer permission to flash from this priority.
+
 An unready or unavailable LUMP separates REQUEST from DELIVER and suspends the
 USER THREAD for an indefinite period.
 

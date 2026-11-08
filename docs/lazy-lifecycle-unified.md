@@ -607,6 +607,25 @@ never changes version numbers. Delivery-fault ownership remains to be specified.
 
 ## 5. Development and physical acceptance
 
+### First priority: prove lazy loading
+
+The first proof milestone is an end-to-end lazy load on physical hardware:
+a USER CALL targets a valid approved LUMP whose body is absent; hardware
+suspends before CALL commit; SYSTEM requests the body from IDE; validated
+delivery installs it and makes USER eligible; on its round-robin turn USER
+executes the original CALL normally and the target method completes once.
+Capture the exact bitstream/LUMP identities and the transition evidence,
+including unchanged CR13 and preservation of the original CALL authority.
+Use a delayed delivery to demonstrate that USER remains blocked while other
+eligible USER work can proceed, without SYSTEM waiting inside its handler.
+
+Resolve only the entry/exit, registration, delivery and restoration contracts
+needed to make this proof safe and meaningful as prerequisites to this
+milestone. Do not make completion of the entire lifecycle design, retirement,
+or scheduling improvements a prerequisite. Existing validation and authority
+requirements remain mandatory. This priority does not authorize RTL changes,
+uploading or flashing, and is not a claim that the proof has been run.
+
 ### Method-level test references
 
 Use the same U.n identifiers for method tests and chart assertions; descriptions
