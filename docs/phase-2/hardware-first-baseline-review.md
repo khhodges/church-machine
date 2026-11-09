@@ -31,6 +31,29 @@ on the board. No replacement or flash is recommended yet.
 
 ## Step 2 — bounded source findings
 
+### Uploaded latest files: identity verified
+
+The user supplied `attached_assets/BootBuildOct26_1794226668643.zip` as the
+latest files. Inspection was in memory, without extracting or programming:
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| `amoeba-retry-a4acb0ef.bit` | 3,826,002 | `a4acb0ef9a39ba985d7769031cf146edb68fb65ff96e0b4f4a895093b54e5d4e` |
+| `BootBuild.mcs` | 10,761,048 | `a713e9919821828117ee045454c8dd088a2c2dd019b4b074ee78ad70f5feb732` |
+
+The BIT exactly matches the native Amoeba retry profile. Its internal build
+header names `7a100tfgg676`, date `2026/10/30`, time `18:08:41`.
+The ZIP filename's October 26 label is not the build date.
+
+All Intel HEX record checksums passed. The MCS contains 3,825,788 data bytes
+from address zero through exclusive end `0x3a607c`; the complete decoded data
+matches the BIT configuration payload directly, without bit reversal.
+Thus these are matching configuration artifacts, not two different builds.
+
+This identifies the supplied files, not the installed configuration or current
+runtime RAM. Operator confirmation of which file was actually programmed,
+and whether later programming or UART image replacement occurred, remains open.
+
 ### Already present locally
 
 `hardware/core.py` routes the CALL absence signal into ordinary CHANGE's
