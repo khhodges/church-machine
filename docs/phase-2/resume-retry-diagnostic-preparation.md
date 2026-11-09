@@ -76,16 +76,31 @@ stop boundary, even if the underlying CALL/CHANGE RTL needs no correction.
 No new candidate implementation, local full-top acceptance, vendor build,
 or physical resume/retry result is claimed by this preparation document.
 
-## First local observation
+## Local still-absent control: passed
 
-The new full-top still-absent control does not yet pass. With the diagnostic
-stop disabled, its first `llr_complete` observation sees NIA 0x2014 instead
-of the asserted handoff boundary 0x2010. This is an observation mismatch,
-not yet a diagnosed RTL defect: pipeline timing versus continuation execution
-must be distinguished before changing RTL or relaxing the check.
+Both full-top cases passed at simulated UART rates 125000 and 62500 baud
+with a 1 MHz simulation clock (2 passed in 19.49 seconds). These rates exercise
+different UART drain delays; they do not qualify physical timing.
 
-No RTL was changed and no vendor build should be started from this result.
-The earlier stop-enabled physical result is unaffected.
+The initially reported NIA mismatch was an incorrect test expectation and
+an incorrect description of which handoff had failed. Cycle-level observation
+established that the mismatch occurred on the SECOND handoff:
+
+- SYSTEM CHANGE at 0x200C saves continuation 0x2010.
+- First unavailable CALL enters SYSTEM at 0x2010.
+- SYSTEM CHANGE at 0x2010 resumes USER and saves continuation 0x2014.
+- Retrying the still-absent CALL enters SYSTEM at 0x2014.
+
+The revised test checks those exact addresses separately, one retirement per
+ordinary CHANGE, restoration of all 16 USER DRs plus flags and CR12 GT before
+retry, the seven handoff arguments, and no unavailable-CALL or target-body
+retirement. It neither modifies memory during execution nor changes RTL.
+
+This is a local full-top resume/reattempt control, not successful target-body
+execution. The test ends at the second completed handoff; a terminal diagnostic
+stop and physical snapshot for this second boundary are not implemented here.
+No new vendor package or build is ready. The earlier stop-enabled physical
+result is unaffected.
 
 Reproduction (run from the isolated source directory to prevent the main
 project hardware package shadowing the candidate):
