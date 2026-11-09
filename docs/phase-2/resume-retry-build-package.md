@@ -29,7 +29,10 @@ Expected terminal evidence: reason 3, NIA 0x400C, CR12 GT 0x02070004, DR12 13.
 This marks a prepositioned body available; it is not a full loading service.
 The execution watchdog remains absent.
 
-No new BIT exists yet. The user runs the droplet build manually, in a fresh
-directory. No JTAG, reset, upload or flash commands are included or authorized
-by package delivery. Review the resulting timing and receipt before separately
-approving physical testing.
+At package delivery, no new BIT existed and physical testing was not authorized.
+The user subsequently completed the manual vendor build and separately approved
+temporary JTAG testing. The uploaded build evidence and physical terminal
+snapshot passed verification on 2026-11-09; see the
+[verified physical result](resume-retry-physical-result.md) for exact hashes,
+checks, evidence paths, and acceptance limits. Package delivery itself does not
+authorize JTAG, reset, upload, or persistent-flash operations.
