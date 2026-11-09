@@ -19,6 +19,111 @@ ARCHIVE = ROOT / "generated-artifacts/uart-retry-build-only.zip"
 SUCCESS = "UART_RETRY_DIAGNOSTIC_BITSTREAM_BUILD_PASS"
 
 
+class ReceiptProductionTests(unittest.TestCase):
+    """Exercise future verifier generation, not a patched frozen UART archive."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "uart_export", ROOT / "scripts/prepare_uart_retry_build_export.py")
+        self.export = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.export)
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.package = Path(self.temp.name)
+        parent = self.export.BASE
+        (self.package / "verify.py").write_text(
+            self.export.prepare_verifier((parent / "verify.py").read_text()))
+        shutil.copyfile(parent / "initializer_route_verify.py",
+                        self.package / "initializer_route_verify.py")
+        for source, destination in (("uart-retry-fixture.bin", "candidate-le.bin"),
+                                    ("uart-retry-frame.bin", "fixed-frame.bin")):
+            shutil.copyfile(ROOT / "generated-artifacts" / source,
+                            self.package / destination)
+        (self.package / "rtl").mkdir()
+        profile = dict(imageSha256=self.export.IMAGE, diagnosticLlrStop=False,
+                       diagnosticRetryReturnStop=True, expectedBootGuard=23971,
+                       executionWatchdogIntegrated=False, clockHz=25000000,
+                       diagnosticUartReceive=True, debugCommandsEnabled=False,
+                       fixedFrameSha256=self.export.FRAME)
+        (self.package / "rtl/guarded-profile.json").write_text(json.dumps(profile))
+        (self.package / "evidence").mkdir()
+        for name, count in (("uart-retry-results.xml", 22),
+                            ("uart-disabled-regression-results.xml", 2)):
+            (self.package / "evidence" / name).write_text(
+                "<testsuite>" + "<testcase/>" * count + "</testsuite>")
+        # Small, explicitly synthetic source fixture; no elaboration or vendor tools.
+        (self.package / "source-snapshot").mkdir()
+        (self.package / "source-snapshot/fixture.txt").write_text("offline test only")
+        sources = self.export.files(self.package / "source-snapshot")
+        self.source_hash = hashlib.sha256(json.dumps(
+            sources, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        manifest = dict(imageSha256=self.export.IMAGE, sourceFiles=sources,
+                        sourceFilesSha256=self.source_hash,
+                        files=self.export.files(self.package))
+        (self.package / "manifest.json").write_text(json.dumps(manifest))
+        self.outputs = ("candidate-EXPERIMENTAL.bit", "routed.dcp", "synthesized.dcp",
+                        "timing.txt", "precise-slack.txt", "drc.txt", "route-status.txt")
+        for name in self.outputs:
+            (self.package / name).write_text("FAKE offline output: " + name)
+        (self.package / "timing.txt").write_text(
+            "WNS(ns) TNS(ns) TPWS Total Endpoints\n----------\n"
+            "0.1 0 0 100 0.01 0 0 100 0.2 0 0 30\n")
+
+    def record(self):
+        return subprocess.run(
+            [sys.executable, "-I", "-c",
+             "import sys,runpy; sys.path.insert(0,'.'); "
+             "sys.argv=['verify.py','--record','2026.1']; "
+             "runpy.run_path('verify.py',run_name='__main__')"],
+            cwd=self.package, capture_output=True, text=True, timeout=20)
+
+    def test_record_produces_receipt_with_exact_hashes(self):
+        result = self.record()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("UART_RETRY_DIAGNOSTIC_BUILD_RECEIPT_WRITTEN", result.stdout)
+        receipt_path = self.package / "build-receipt.json"
+        receipt = json.loads(receipt_path.read_text())
+        self.assertEqual(receipt["schema"], "church.uart-retry-diagnostic-build/v1")
+        self.assertEqual(receipt["sourceFilesSha256"], self.source_hash)
+        for field, name in (("imageSha256", "candidate-le.bin"),
+                            ("fixedFrameSha256", "fixed-frame.bin"),
+                            ("manifestSha256", "manifest.json")):
+            self.assertEqual(receipt[field], self.export.sha(self.package / name))
+        self.assertEqual(receipt["files"], {
+            name: self.export.sha(self.package / name) for name in self.outputs})
+        self.assertEqual(receipt["vivadoVersion"], "2026.1")
+        self.assertEqual(receipt["timing"], dict(
+            WNS=0.1, TNS=0, setupFail=0, setupTotal=100,
+            WHS=0.01, THS=0, holdFail=0, holdTotal=100,
+            WPWS=0.2, TPWS=0, pulseFail=0, pulseTotal=30))
+        self.assertIs(receipt["diagnosticUartReceive"], True)
+        for field in ("debugCommandsEnabled", "executionWatchdogIntegrated",
+                      "physicalBoardTested", "releaseApproved", "programmingAuthorized"):
+            self.assertIs(receipt[field], False)
+        original = receipt_path.read_bytes()
+        self.assertNotEqual(self.record().returncode, 0)
+        self.assertEqual(receipt_path.read_bytes(), original)
+
+    def test_record_rejects_invalid_inputs_without_receipt(self):
+        for name, content in (("timing.txt", "invalid timing"),
+                              ("routed.dcp", None),
+                              ("fixed-frame.bin", "changed input")):
+            with self.subTest(name=name):
+                path = self.package / name
+                original = path.read_bytes()
+                try:
+                    if content is None:
+                        path.unlink()
+                    else:
+                        path.write_text(content)
+                    result = self.record()
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertNotIn("BUILD_RECEIPT_WRITTEN", result.stdout)
+                    self.assertFalse((self.package / "build-receipt.json").exists())
+                finally:
+                    path.write_bytes(original)
+
+
 class RunnerProcessTests(unittest.TestCase):
     """Execute the frozen shell pipeline, never a vendor binary or board tool."""
 

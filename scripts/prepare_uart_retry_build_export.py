@@ -33,6 +33,28 @@ def replace_once(text, old, new):
     return text.replace(old, new, 1)
 
 
+def prepare_verifier(text):
+    """Adapt the frozen parent's verifier without modifying retained evidence."""
+    text = text.replace(OLD_IMAGE, IMAGE).replace("COPY_RETRY", "UART_RETRY")
+    text = text.replace("copy-retry", "uart-retry")
+    text = replace_once(text, '("uart-retry-results.xml", 6)',
+                        '("uart-retry-results.xml", 22), ("uart-disabled-regression-results.xml", 2)')
+    text = replace_once(text, '    profile = json.loads',
+                        f'    require(sha(ROOT / "fixed-frame.bin") == "{FRAME}", "Frame changed")\n'
+                        '    profile = json.loads')
+    text = replace_once(text, '    for name, count in',
+                        '    require(profile["diagnosticUartReceive"] is True and\n'
+                        '            profile["debugCommandsEnabled"] is False and\n'
+                        f'            profile["fixedFrameSha256"] == "{FRAME}", "UART boundary changed")\n'
+                        '    for name, count in')
+    text = replace_once(text, '    verify()\n', '    manifest = verify()\n')
+    return replace_once(text, 'imageSha256=IMAGE, vivadoVersion=args[1], timing=timing,',
+                        f'imageSha256=IMAGE, fixedFrameSha256="{FRAME}",\n'
+                        '                       sourceFilesSha256=manifest["sourceFilesSha256"],\n'
+                        '                       diagnosticUartReceive=True, debugCommandsEnabled=False,\n'
+                        '                       vivadoVersion=args[1], timing=timing,')
+
+
 def main():
     archive = OUT.with_suffix(".zip")
     if OUT.exists() or archive.exists():
@@ -87,21 +109,7 @@ def main():
                                 '    "fixedFrameSha256": "' + FRAME + '",\n'
                                 '    "diagnosticLlrStop": False,')
         if name == "verify.py":
-            text = replace_once(text, '("uart-retry-results.xml", 6)',
-                                '("uart-retry-results.xml", 22), ("uart-disabled-regression-results.xml", 2)')
-            text = replace_once(text, '    profile = json.loads',
-                                f'    require(sha(ROOT / "fixed-frame.bin") == "{FRAME}", "Frame changed")\n'
-                                '    profile = json.loads')
-            text = replace_once(text, '    for name, count in',
-                                '    require(profile["diagnosticUartReceive"] is True and\n'
-                                '            profile["debugCommandsEnabled"] is False and\n'
-                                f'            profile["fixedFrameSha256"] == "{FRAME}", "UART boundary changed")\n'
-                                '    for name, count in')
-            text = replace_once(text, 'imageSha256=IMAGE, vivadoVersion=args[1], timing=timing,',
-                                f'imageSha256=IMAGE, fixedFrameSha256="{FRAME}",\n'
-                                '                       sourceFilesSha256=manifest["sourceFilesSha256"],\n'
-                                '                       diagnosticUartReceive=True, debugCommandsEnabled=False,\n'
-                                '                       vivadoVersion=args[1], timing=timing,')
+            text = prepare_verifier(text)
         if name == "run.sh":
             text = replace_once(text, 'cd "$(dirname "$0")"',
                                 '[[ $# == 0 ]] || { echo "No override arguments supported"; exit 1; }\n'
