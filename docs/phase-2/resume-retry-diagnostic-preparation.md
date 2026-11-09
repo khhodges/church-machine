@@ -73,8 +73,40 @@ Run/Step does not release that diagnostic latch. A physical resume/retry
 demonstration therefore requires a separate BIT with a different diagnostic
 stop boundary, even if the underlying CALL/CHANGE RTL needs no correction.
 
-No new candidate implementation, local full-top acceptance, vendor build,
-or physical resume/retry result is claimed by this preparation document.
+The following sections record local candidate acceptance only. No vendor build
+or physical resume/retry result is claimed.
+
+## Successful retry and terminal snapshot: locally passed
+
+An isolated copy at `generated-artifacts/resume-retry-candidate` preserves the
+original handoff source/package. Its only top-level RTL change is an opt-in
+stop after the synthetic callee's RETURN at 0x500C. The change is retained in
+`resume-retry-top.patch`; CALL/CHANGE/RETURN implementations are unchanged.
+
+The fixture gives SYSTEM CR3 a W-only Inform capability for slot 6 and
+preloads DR7 with the published header. Ordinary DWRITE at 0x2010 writes
+0xF8001001 to 0x5000; CHANGE at 0x2014 resumes USER. No testbench inserts bytes
+or modifies runtime memory. The body was prepositioned, not loaded.
+
+Both successful-retry tests decode a CRC-valid snapshot with reason 3,
+NIA 0x400C, USER CR12 GT 0x02070004, and DR12 result 13. They verify one
+handoff, exactly one target-header write, exact retirement sequence including
+boot, no caller-continuation retirement, and no fetch or writes during the
+100-cycle post-snapshot observation.
+
+Combined validation: **18 passed in 142.49 seconds**, covering the 12 guarded
+core cases, two original handoff-top cases, two still-absent controls and two
+successful-retry cases. Six pytest warnings concern JUnit property formatting,
+not execution failures.
+
+Evidence: `generated-artifacts/resume-retry-results.xml`.
+Image: `generated-artifacts/resume-retry-fixture.bin` (65536 bytes), SHA-256:
+`fe6e7cc5fe8d1ae99d840e77b762176a18b5d1d5888159576edb19d9abd19dc9`.
+Local hashes: `generated-artifacts/resume-retry-local-hashes.json`.
+
+This candidate still needs production-top export, exact-image admission,
+package/provenance checks and separate vendor-build authorization. No BIT
+exists for this new candidate. Watchdog containment remains absent.
 
 ## Local still-absent control: passed
 

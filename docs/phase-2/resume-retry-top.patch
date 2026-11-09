@@ -1,0 +1,56 @@
+--- a/hardware/wukong_top.py
++++ b/hardware/wukong_top.py
+@@ -465,7 +465,8 @@
+                  button_debounce_cycles=None, sim_dmem_init=True,
+                  upload_watchdog_limit=None, sim_upload_only=False,
+                  expected_boot_guard=None, sim_boot_image_words=None, runtime_image_words=None,
+-                 clock_mode="direct", diagnostic_llr_stop=False):
++                 clock_mode="direct", diagnostic_llr_stop=False,
++                 diagnostic_retry_return_stop=False):
+         if clock_mode not in ("direct", "mmcm-25mhz"):
+             raise ValueError("Unsupported board clock mode")
+         if clock_mode == "mmcm-25mhz" and (clk_freq != 25_000_000 or sim_upload_only):
+@@ -474,6 +475,7 @@
+             raise ValueError("Direct board clock is physically 50 MHz")
+         self.clock_mode = clock_mode
+         self.diagnostic_llr_stop = diagnostic_llr_stop
++        self.diagnostic_retry_return_stop = diagnostic_retry_return_stop
+         self.diagnostic_llr_stopped = Signal()
+         self.clk_freq = clk_freq
+         self.baud     = baud
+@@ -1262,10 +1264,16 @@
+         recovery_hold = recovery.fault_pending
+         stop_retire = Signal()
+         llr_stop = Signal()
++        # Private synthetic retry fixture only: stop on its callee RETURN.
++        # This is a terminal observation latch, not watchdog containment.
+         m.d.comb += llr_stop.eq(core.llr_complete & int(self.diagnostic_llr_stop))
++        retry_stop = Signal()
++        m.d.comb += retry_stop.eq(
++            core.retire_valid & (core.retire_nia == 0x500C) &
++            int(self.diagnostic_retry_return_stop))
+         with m.If(cm_reboot):
+             m.d.sync += self.diagnostic_llr_stopped.eq(0)
+-        with m.Elif(llr_stop):
++        with m.Elif(llr_stop | retry_stop):
+             m.d.sync += self.diagnostic_llr_stopped.eq(1)
+         m.d.comb += stop_retire.eq(
+             core.retire_valid & (
+@@ -1275,7 +1283,7 @@
+         )
+ 
+         # Breakpoint hit or fault → force step_mode + halt; takes highest priority.
+-        with m.If(bp_hit | fault_halt | llr_stop):
++        with m.If(bp_hit | fault_halt | llr_stop | retry_stop):
+             m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+         with m.Elif(step_grant & step_mode):
+             # step_grant clears halt for one retire (re-set on next retire_valid)
+@@ -1290,7 +1298,7 @@
+                 snapshot_pending.eq(1),
+                 snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
+             ]
+-        with m.If(llr_stop):
++        with m.If(llr_stop | retry_stop):
+             m.d.sync += [snapshot_pending.eq(1), snapshot_reason.eq(3)]
+         # Skip advances NIA while fetch is still held. Emit a fresh reason-3
+         # snapshot from that post-skip boundary so the bridge can prove board

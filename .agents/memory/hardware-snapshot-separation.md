@@ -28,3 +28,15 @@ producing a misleading unsupported-constructor error.
 
 **How to apply:** Verify the imported module's origin when comparing candidate
 behavior with production. Do not modify candidate RTL to fix import failures.
+
+## Retirement-triggered diagnostic stops
+
+Latch a retirement-triggered stop at the clock edge; do not feed its
+combinational result back into fetch validity or halt inputs.
+
+**Why:** A private resume/retry diagnostic initially stalled simulation because
+retirement itself depended on those inputs. The existing pre-acceptance
+handoff-stop gating cannot be reused unchanged for a retirement-triggered stop.
+
+**How to apply:** Distinguish pre-instruction stops from post-retirement stops,
+and prove that the next instruction is not accepted after the latch takes effect.
