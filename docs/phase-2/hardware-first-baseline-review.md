@@ -130,3 +130,81 @@ what is installed, not what the ISA permits. Simulator disagreement alone is
 not a blocker, but a demonstrated safety failure is. Any required programming
 is separately authorized and verified; partial installation never authorizes
 execution.
+
+## Minimum-change assessment — subsequent source inspection
+
+This assessment inspected current RTL references, the existing LLR fixtures,
+watchdog status, the consolidated checklist, server Python paths, the LUMP
+manifest and simulator assembly examples. No simulations or builds were run.
+Absence findings below are bounded to that inspection, not a claim that every
+historical archive was searched.
+
+| Component | What can be reused | What remains |
+|---|---|---|
+| Protected unavailable-CALL entry | Current CALL/core/ordinary CHANGE implementation; recorded 18 local and six guarded-core passes | Select and qualify its exact dependencies against the frozen board build; no vendor/physical acceptance of this transition established |
+| USER restoration and CALL retry | Existing CHANGE and ordinary CALL path; guarded fixture demonstrates retry/RETURN | Positive fixture patches memory directly; real delivery and stale/wrong retained target GT at retry remain separate acceptance obligations |
+| Execution watchdog | `hardware/execution_watchdog.py`; documented 33 unit-test passes | Only tests instantiate the unit in the inspected hardware Python tree; core/top integration, access/provisioning and write containment are absent |
+| SYSTEM service | Approved slot-2 Boot/SYSTEM architecture and saved continuation contract | No complete machine-executed pending/request/install/resume service established by this inspection |
+| Legacy Scheduler | Existing scheduler example and simulator hooks | Not a SYSTEM implementation: the assembly example is a RETURN body and explicitly delegates behavior to the simulator |
+| Transport | Existing UART transport and guarded full-image upload | No verified per-LUMP DELIVER service established; full-image upload halts/replaces the runtime and cannot substitute for delivery while another USER progresses |
+| Test evidence | Existing guarded handoff fixtures and trace/snapshot mechanisms | Exact candidate image, accepted-instruction evidence and physical results; do not rely solely on `retire_instr`, whose poisoned-fetch limitation is documented |
+
+### First handoff experiment versus end-to-end acceptance
+
+**Handoff-only experiment:** one unavailable USER CALL, preserved USER context,
+slot-2 SYSTEM saved continuation, exact DR1–DR6/Z injection and no CALL retirement.
+It can stop at that boundary without pretending to implement delivery.
+Necessary local negative controls cover invalid authority/context. An observer
+limit stops observation, never introduces a USER timeout or automatic resume.
+
+The first action toward this experiment should be an offline fixture/dependency
+specification, not a vendor build. Any proposal for a physical handoff-only
+candidate must explicitly declare watchdog readiness and exclusions. This
+assessment grants no watchdog exemption and does not treat incomplete enforcement
+as accepted Phase 2 behavior.
+
+**End-to-end Lazy CALL:** additionally requires resident SYSTEM pending/ready
+software, one request and validated delivery/install path, ordinary retried-CALL
+authority checks, another USER progressing during the wait, and the applicable
+integrated execution watchdog. The checklist also requires the all-USER-wait
+case with SYSTEM self-CHANGE. Stale/wrong retained GT, duplicate/stale/wrong-target
+delivery and installation fault handling are required controls, not optional
+polish after a happy-path demonstration.
+
+The watchdog unit is useful completed work, but its integration is not a wire-only
+change. Expiry must stop new program writes and handle already-accepted writes
+within a proven boundary; raw timer expiry alone does not establish containment.
+
+### Contracts that must be settled, not guessed
+
+For the single-request fixture, close only the necessary portions of:
+
+- **G1:** request/response framing, byte order, receive capacity and backpressure.
+- **G2:** session setup/reset correlation and non-reuse; existing agreed u64
+  session/u32 request widths are not permission to omit their lifecycle.
+- **G3:** private pending record, registration/completion authority, ready-state
+  publication and selection of the other eligible USER.
+- **Safe installation:** validated destination/body binding and fault handling,
+  without granting new authority or silently modifying a retained target GT.
+- **Watchdog integration:** approved `0xFFFFFF18` access/provisioning path,
+  completed-transition renewal, Debug/Trace/reset behavior and write containment.
+
+No new protocol or grants were chosen in this assessment.
+
+### Bounded next recommendation
+
+Specify one **handoff-only fixture and its exact hardware dependency delta** from
+the confirmed baseline. List each dependency with a reason; do not copy today's
+entire hardware tree into a new build. Define entry state, absent target, saved
+SYSTEM continuation, expected registers and fault controls. Identify any
+unresolved watchdog safety boundary before proposing physical execution.
+
+Deliver that specification for review before running RTL tests or implementing,
+building or programming anything. Defer request/delivery implementation until
+the small G1–G3 and safe-installation contract is explicit. No simulator parity,
+general scheduling framework, retirement, storage or networking work is included.
+
+**Conclusion:** the handoff logic already exists locally, but complete hardware
+Lazy CALL is not just a new BIT plus an existing service. There are real SYSTEM,
+delivery and watchdog-integration gaps. No defensible small implementation
+estimate follows until the candidate dependencies and contracts are resolved.
