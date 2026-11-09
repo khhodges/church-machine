@@ -7,6 +7,15 @@ Do not assume a separately validated experimental correction has become part
 of production source. Before packaging a later candidate, reconcile required
 prior corrections against its actual frozen source and generated hardware.
 
+For the diagnostic handoff candidate, the user will operate the DigitalOcean
+droplet manually; provide commands rather than connecting or starting remote work.
+
+**Why:** The user explicitly chose manual droplet operation for this build.
+
+**How to apply:** Guide package verification, build execution and evidence
+collection step by step. Build operations remain separate from programming
+either FPGA; do not use stored SSH credentials to act on this user's behalf.
+
 **Why:** A continuation candidate copied production sources while the validated
 startup initializer correction remained a separate overlay. Amaranth recovery
 and routed timing passed, but the physical startup showed evidence consistent
