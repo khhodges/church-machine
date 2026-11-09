@@ -4,7 +4,7 @@ expertMode = true
 integrations = ["resend:1.0.0"]
 
 [workflows]
-runButton = "Project"
+runButton = "Church Machine IDE"
 
 [[workflows.workflow]]
 name = "Project"

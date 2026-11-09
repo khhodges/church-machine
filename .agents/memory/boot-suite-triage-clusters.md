@@ -7,6 +7,9 @@ Durable lessons:
 - **Why:** a module-scoped pytest fixture provides no process-level exclusion; parallel suites and the dev server write the same directory.
 - **How to apply:** any new test that writes the live lumps directory must take the shared write lock (or use a temp dir) rather than adding another snapshot/restore.
 - Until every mutating suite is isolated, do not run the full parallel test launcher against the live development workspace: its LUMPS guard detects corruption but does not restore the prepared boot image, manifest, approvals, or test-created binaries.
+- Keep ordinary IDE startup separate from the parallel test launcher.
+  **Why:** The launcher also runs configuration-mutating tests alongside the serving app; an ordinary restart must not trigger those mutations or unrelated suite failures.
+  **How to apply:** Preserve an app-only Run button and invoke validation explicitly, with isolated inputs.
 - When triaging a large batch of test failures after platform changes, most failures are usually stale expectations (hardcoded format tags, sizing formulas, legacy filenames, fixtures missing newly-mandatory inputs); classify per root-cause cluster with exact per-test F/E counts that reconcile to the headline totals, so no failure is lost in follow-up.
 - Existing workflow output without a run timestamp and input fingerprints is historical evidence, not a fresh test of the current checkout. Keep source inspection and new read-only probes separately attributed.
 - **Why:** Baseline triage can encounter a still-running full suite alongside cached failed workflow outputs. Combining those with current file hashes would falsely imply one coherent run.
