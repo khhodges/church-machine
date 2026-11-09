@@ -2,6 +2,9 @@
 
 No debug register writes, forced NIA, live artifacts, transport or board access.
 """
+import hashlib
+import json
+
 import pytest
 from amaranth.sim import Simulator
 from hardware.core import ChurchCore
@@ -39,28 +42,81 @@ def guarded_fixture():
     return mem
 
 
-@pytest.mark.parametrize("case", ["resume", "stale_system", "bad_system_frame",
-                                  "bad_owner", "bad_target", "system_absent"])
+CASES = ["resume", "stale_system", "bad_system_frame",
+         "bad_owner", "bad_target", "system_absent"]
+
+
+@pytest.mark.parametrize("case", CASES)
 def test_guarded_startup_llr_and_original_call(case):
+    _run_guarded_case(case)
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_guarded_handoff_only(case, record_property):
+    evidence = {"case": case, "scope": "RTL handoff only; no delivery or resume"}
+    try:
+        _run_guarded_case(case, handoff_only=True, evidence=evidence)
+        evidence["outcome"] = "passed"
+    except BaseException:
+        evidence["outcome"] = "failed"
+        raise
+    finally:
+        record_property("handoff_evidence", json.dumps(evidence, sort_keys=True))
+
+
+def _run_guarded_case(case, *, handoff_only=False, evidence=None):
     mem = guarded_fixture()
+    if evidence is None:
+        evidence = {}
+    evidence["initial_fixture_sha256"] = hashlib.sha256(
+        json.dumps(sorted(mem.items()), separators=(",", ":")).encode()).hexdigest()
     core = ChurchCore(expected_boot_guard=GUARD)
 
     async def bench(ctx):
         writes, retired = [], []
+        cycle = 0
+        watching = False
+        changes, timed_writes, issued = [], [], []
+        previous_state = None
+
+        def state():
+            return {
+                "nia": ctx.get(core.imem_addr),
+                "crs": [tuple(ctx.get(w) for w in cr) for cr in core.debug_cr_words],
+                "drs": [ctx.get(w) for w in core.debug_dr_words],
+                "flags": ctx.get(core.flags.as_value()),
+            }
+
         async def tick():
+            nonlocal cycle, previous_state
+            if watching:
+                current = state()
+                if current != previous_state:
+                    changes.append({"cycle": cycle, **current})
+                    previous_state = current
             rd = ctx.get(core.dmem_addr) if ctx.get(core.dmem_rd_en) else None
             data = mem.get(rd, 0)
             if ctx.get(core.dmem_wr_en):
                 addr, value = ctx.get(core.dmem_addr), ctx.get(core.dmem_wr_data)
                 writes.append((addr, value))
+                if watching:
+                    timed_writes.append((cycle, addr, value))
                 mem[addr] = value
             if ctx.get(core.retire_valid):
                 retired.append((ctx.get(core.retire_nia), ctx.get(core.retire_instr)))
             assert not ctx.get(core.ns_wr_en)
             assert not ctx.get(core.clist_wr_en)
             await ctx.tick()
+            cycle += 1
             ctx.set(core.dmem_rd_valid, rd is not None)
             ctx.set(core.dmem_rd_data, data)
+            evidence["last_observation"] = {
+                "cycle": cycle, "nia": ctx.get(core.imem_addr),
+                "fault": ctx.get(core.fault) if ctx.get(core.fault_valid) else None,
+                "read_enable": ctx.get(core.dmem_rd_en),
+                "write_enable": ctx.get(core.dmem_wr_en),
+                "memory_address": ctx.get(core.dmem_addr),
+            }
 
         async def until(predicate, limit=3000):
             for i in range(limit):
@@ -74,6 +130,7 @@ def test_guarded_startup_llr_and_original_call(case):
         async def issue(*, rom=None, finish=None, fault=None):
             address = ctx.get(core.imem_addr)
             word = mem[address] if rom is None else rom
+            issued.append({"address": address, "word": word, "reset_rom": rom is not None})
             ctx.set(core.imem_data, word)
             ctx.set(core.imem_fetch_address, address)
             ctx.set(core.imem_from_reset_rom, rom is not None)
@@ -141,14 +198,27 @@ def test_guarded_startup_llr_and_original_call(case):
             expected_fault = 0x11
         before_mem = dict(mem)
         start_writes = len(writes)
+        start_retired = len(retired)
+        watching = handoff_only
+        previous_state = state()
+        evidence["before"] = previous_state
+        evidence["issued_instructions"] = issued
+        evidence["state_changes"] = changes
+        evidence["transition_writes"] = timed_writes
+        evidence["attempt_fixture_sha256"] = hashlib.sha256(
+            json.dumps(sorted(mem.items()), separators=(",", ":")).encode()).hexdigest()
         events = await issue(finish=(lambda: False) if expected_fault else
                              lambda: ctx.get(core.imem_addr) == 0x2010,
                              fault=expected_fault)
+        evidence["after"] = state()
+        evidence["retirement_addresses"] = [nia for nia, _ in retired[start_retired:]]
+        evidence["fault"] = ctx.get(core.fault) if ctx.get(core.fault_valid) else None
         if expected_fault:
             assert len(writes) == start_writes and mem == before_mem
             assert [tuple(ctx.get(w) for w in cr) for cr in core.debug_cr_words] == before_crs
             assert [ctx.get(w) for w in core.debug_dr_words] == before_drs
             assert ctx.get(core.flags.as_value()) == before_flags
+            assert retired[start_retired:] == [], "faulting CALL must not retire"
             return
         assert events == [], "unavailable CALL must not retire"
         assert ctx.get(core.flags.as_value()) == system_flags | 2
@@ -160,6 +230,36 @@ def test_guarded_startup_llr_and_original_call(case):
         assert mem[0x3000 + 243 * 4] >> 13 & 0x7FFF == 1
         assert mem[0x3000 + 243 * 4] >> 28 == before_flags
         assert not ctx.get(core.boot_marker_available)
+        if handoff_only:
+            # The protected homes retain the exact twelve outgoing GT words,
+            # including CR2's absent-target authority; no host-side renewal.
+            saved_homes = [mem[0x3000 + (244 + i) * 4] for i in range(12)]
+            assert saved_homes == [cr[0] for cr in before_crs[:12]]
+            assert mem[0x3000 + 242 * 4] == (
+                (before_crs[6][0] & 0x87FFFFFF) | 0x48000000)
+            assert mem[0x3000 + 243 * 4] & 0x1FFF == before_mem[0x3000 + 68] & 0x1FFF
+            target_addresses = [a for a in before_mem if 0x5000 <= a < 0x5100]
+            assert {a: mem[a] for a in target_addresses} == {
+                a: before_mem[a] for a in target_addresses}
+            assert all(0x3000 <= a < 0x3400 or a == 0x1000 + 68
+                       for _, a, _ in timed_writes), "unexpected transition write"
+            user_writes = [t for t, a, _ in timed_writes if 0x3000 <= a < 0x3400]
+            assert user_writes and changes
+            assert min(change["cycle"] for change in changes) > max(user_writes), (
+                "architectural restoration began before USER save completed")
+            # An addressed SYSTEM continuation is not permission to execute it.
+            assert issued[-1] == {"address": 0x4008, "word": CALL, "reset_rom": False}
+            assert not any(i["address"] == 0x2010 for i in issued)
+            for change in changes:
+                if change["nia"] == 0x2010:
+                    assert change["drs"][:7] == [0, mem[0], mem[4], mem[8], mem[12], 6, USER_GT]
+                    assert change["flags"] == system_flags | 2
+            evidence["saved_user_homes"] = saved_homes
+            evidence["saved_user_frame"] = [mem[0x3000 + i * 4] for i in (242, 243)]
+            evidence["saved_user_drs"] = [mem[0x3000 + (i + 1) * 4] for i in range(16)]
+            evidence["target_header"] = mem[0x5000]
+            evidence["stop_boundary"] = "SYSTEM continuation addressed, not executed"
+            return
         await issue()  # saved SYSTEM continuation: ordinary CHANGE back to USER
         assert ctx.get(core.imem_addr) == 0x4008
         assert [ctx.get(w) for w in core.debug_dr_words] == before_drs

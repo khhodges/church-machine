@@ -4,6 +4,10 @@ Date: 2026-11-09
 Status: proposed test specification; no tests, implementation, vendor build or
 physical operations authorized by this document.
 
+Subsequent user approval authorized the six local RTL cases. They were
+implemented and run; see [bounded results](handoff-only-rtl-results.md).
+Vendor build and physical operations remain outside approval.
+
 ## 1. Question and execution level
 
 Can the current development **RTL**, starting from an admitted guarded boot
