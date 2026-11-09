@@ -40,3 +40,15 @@ handoff-stop gating cannot be reused unchanged for a retirement-triggered stop.
 
 **How to apply:** Distinguish pre-instruction stops from post-retirement stops,
 and prove that the next instruction is not accepted after the latch takes effect.
+
+## Diagnostic evidence classification
+
+Keep successful instruction counts separate from fault-event observations.
+
+**Why:** A missing-permission diagnostic correctly hard-faulted, but counting
+every trace event as a successful instruction falsely reported that the
+faulting access had committed. Trace labels alone are not architectural proof.
+
+**How to apply:** Check fault state alongside trace events, verify the faulting
+address explicitly, and use actual memory writes and terminal state to support
+claims about publication or execution.
