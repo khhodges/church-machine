@@ -1970,3 +1970,17 @@ mtime_ms = 1794250227392
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1553ffc7-5434-4c19-9fc7-8e2061fa6bc4/c9cec306-bca1-4270-8c2b-b7ac66ccb8cb"
 storage_version_token = "1794250248490547"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "IvZbTAOcw7XlGmcSHw1tw"
+uri = "file://generated-artifacts/uart-retry-build-only.zip"
+type = "unspecified"
+title = "UART diagnostic — manual build-only export"
+description = "Hash-locked source, image, fixed frame, RTL and Vivado runner. No hardware programming authorized. Instructions and hashes: docs/phase-2/uart-retry-build-package.md."
+logical_id = "e3bed951-3db9-4f08-b4ac-09264771362c"
+content_hash = "sha256:f8e6eb98a8190973c989544b1edc330118f0b288995fb70a9be7bd7fee117fe2"
+size = 3486705
+mtime_ms = 1794257545693
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e3bed951-3db9-4f08-b4ac-09264771362c/c4700fc7-77af-40c3-86a2-08a29e8124b4"
+storage_version_token = "1794257646778736"
+content_type = "application/octet-stream"
