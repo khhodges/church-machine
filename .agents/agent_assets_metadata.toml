@@ -1956,3 +1956,17 @@ mtime_ms = 1794244655594
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5fb0fb45-c5a8-40ba-a11d-c316d05c4e90/fe90c624-9dd4-4562-a214-244333b856ef"
 storage_version_token = "1794244676319278"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "WNz4l-UvY69WQG-G-48V-"
+uri = "file://generated-artifacts/copy-retry-build-only.zip"
+type = "unspecified"
+title = "Copy-and-retry diagnostic — build-only package"
+description = "Verified RTL export, six-case local evidence, locked Vivado runner, and hash manifest. No board programming included."
+logical_id = "1553ffc7-5434-4c19-9fc7-8e2061fa6bc4"
+content_hash = "sha256:b99f7134ca410f796fb0eef321a550e145729be9e01b57a4f4584749e6ebc2a2"
+size = 3457698
+mtime_ms = 1794250227392
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1553ffc7-5434-4c19-9fc7-8e2061fa6bc4/c9cec306-bca1-4270-8c2b-b7ac66ccb8cb"
+storage_version_token = "1794250248490547"
+content_type = "application/octet-stream"
