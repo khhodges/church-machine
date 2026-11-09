@@ -47,6 +47,18 @@ Programming success alone does not prove exact artifact identity or startup.
 
 Use unfiltered bridge telemetry for physical Step qualification.
 
+On 2026-11-09 the operator confirmed that the supplied Amoeba retry BIT and
+matching BootBuild MCS were used on two different Artix-7 boards with the same
+results. This is operator installation evidence, not current RAM readback or
+qualification of the later protected Lazy-CALL transition.
+
+**Why:** Repeated requests to identify the programmed build are unnecessary
+after the uploaded pair was hash-verified and the operator confirmed both boards.
+
+**How to apply:** Use this as the configuration baseline for the hardware-first
+review; do not infer which board is currently connected, later UART contents,
+or permission to rebuild, reset or flash.
+
 **Why:** On the second board, a verified snapshot advanced while church-only
 filtering caused the IDE to report no fresh retirement and keep Run locked.
 The operator repeated Step without the filter and obtained both a fresh

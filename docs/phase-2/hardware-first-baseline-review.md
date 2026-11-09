@@ -24,10 +24,10 @@ The retained October 26 candidate was freshly checked with SHA-256:
 It matches the historical report. That proves the retained file, not current
 board RAM. The report explicitly says full installed-byte equality was unavailable.
 
-**Open gate:** establish the actual current BIT and runtime image from the
-operator's latest programming/upload record; locate matching ROM/build evidence.
-Neither historical installation nor current source establishes Phase 2 support
-on the board. No replacement or flash is recommended yet.
+**Updated gate:** the operator subsequently confirmed using the uploaded build
+on two different Artix-7 boards with the same results. Treat this as installation
+attestation, not readback. Current runtime RAM and any later UART replacements
+remain unverified. No replacement or flash is authorized.
 
 ## Step 2 — bounded source findings
 
@@ -50,9 +50,30 @@ from address zero through exclusive end `0x3a607c`; the complete decoded data
 matches the BIT configuration payload directly, without bit reversal.
 Thus these are matching configuration artifacts, not two different builds.
 
-This identifies the supplied files, not the installed configuration or current
-runtime RAM. Operator confirmation of which file was actually programmed,
-and whether later programming or UART image replacement occurred, remains open.
+The operator confirmed these files were used on two different Artix-7 boards
+with the same results. This closes the operator-confirmation question for the
+configuration baseline; it does not establish current RAM equality or a new
+Lazy-CALL acceptance result.
+
+### Frozen build comparison after operator confirmation
+
+Freshly rehashed the retained vendor manifest, frozen CALL/core sources and
+candidate image. All matched their recorded hashes. The manifest hash
+`5ab35bf4d2060ca4fad7b36d4a1cd5f8f4498f960a8d717f56580e0c54a1604b`
+matches the preserved vendor verification that names the supplied BIT.
+The embedded candidate image hash is
+`5603d8e105e47ca0f6524e4553989387c088de19ac0e6b3f6fd9897e170cf16d`.
+
+The frozen CALL uses LAZY_LOAD_ABORT and the frozen core routes that signal
+through the legacy IRQ dispatcher, not the current protected LLR entry.
+Therefore the confirmed baseline does not contain the newer protected
+USER-to-SYSTEM transition. A software-image upload alone cannot add that
+hardware transition. This is a prerequisite finding, not flash permission.
+
+`reports/phase2-execution-watchdog-prerequisite.md` also documents missing
+execution-watchdog support in this frozen build; UART upload timeout is not
+that watchdog. Later current-source watchdog work must be assessed separately
+before sizing a new candidate. No new RTL simulations were run.
 
 ### Already present locally
 
@@ -99,9 +120,10 @@ volume until the installed target is resolved.
 
 ## Next bounded action
 
-Obtain the latest programming/upload record, then compare its exact build
-against the local LLR implementation. Finish the SYSTEM/service inventory for
-that target before preparing a fixture or proposing a BIT change.
+Scope the minimum candidate hardware delta from the confirmed frozen baseline,
+including the protected handoff and applicable execution-watchdog prerequisites.
+Finish the SYSTEM/service inventory before preparing a fixture. Do not build
+or flash merely because the prerequisite is absent.
 
 Observer limits must not introduce machine timeouts. Board behavior establishes
 what is installed, not what the ISA permits. Simulator disagreement alone is
