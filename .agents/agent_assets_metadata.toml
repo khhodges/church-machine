@@ -1914,3 +1914,17 @@ mtime_ms = 1794149248390
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/4ce7c099-218b-4612-87e0-4e89cbb29835/e365b1b0-a8a8-42a1-b666-16344e0f587f"
 storage_version_token = "1794149249421285"
 content_type = "text/html"
+
+[[outputs]]
+id = "n87Ya0Mo_pPlSvzhCtM93"
+uri = "file://docs/phase-2/simulator-fpga-parity-review-plan.md"
+type = "text"
+title = "Simulator / FPGA Parity — Review Plan"
+description = "Detailed implementation plan with existing-code assessment, ten work packages, code and test estimates, acceptance gates, and risks."
+logical_id = "1c3127ed-2d8a-4d22-bd40-6ca09f4b4643"
+content_hash = "sha256:10c90a7ef8cfe283c1db5c9213f3edce7b051e5d300c8e571d1f7de7a9040636"
+size = 24127
+mtime_ms = 1794220306695
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1c3127ed-2d8a-4d22-bd40-6ca09f4b4643/1383ce33-32cb-4f2c-aec8-1cb0d4beea73"
+storage_version_token = "1794220324831407"
+content_type = "text/markdown"
