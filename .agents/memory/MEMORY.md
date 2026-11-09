@@ -156,3 +156,4 @@
 - [GT-construction port](gt-construction-port.md) — Mint-private DATA-write/capability-load direction; diagnostic addressability does not grant minting authority.
 - [Pass Bit and caller identity](pass-bit-caller-identity.md) — private passcodes remain valid; recorded caller E-GT identity must include Namespace ID.
 - [Wukong LED feedback](wukong-led-feedback.md) — two-bit CHANGE counter with overriding Hard Fault indication; physical deployment remains separate.
+- [Simulator parity scope](simulator-parity-scope.md) — one-image diagnosis before alignment investment; stop at the first incompatibility, not a full parity programme.
