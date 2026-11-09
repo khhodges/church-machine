@@ -1928,3 +1928,17 @@ mtime_ms = 1794220306695
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1c3127ed-2d8a-4d22-bd40-6ca09f4b4643/1383ce33-32cb-4f2c-aec8-1cb0d4beea73"
 storage_version_token = "1794220324831407"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "6AlWqbe_3SdC4PoM1nrE9"
+uri = "file://generated-artifacts/handoff-build-only.zip"
+type = "unspecified"
+title = "Diagnostic handoff — build-only package"
+description = "Verified source, generated Verilog, exact test image, local RTL evidence and guarded Vivado build scripts. No finished BIT; no programming authorization."
+logical_id = "a48a5f4c-b120-4aef-93f4-5cc9bf9228fd"
+content_hash = "sha256:adfbe22bf0fa1ae6beed00eb6a37b551be1e3bea9406a8c83554ea6435cebf05"
+size = 3470352
+mtime_ms = 1794228955379
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a48a5f4c-b120-4aef-93f4-5cc9bf9228fd/d132b846-4ddf-45bf-9dfc-8f7106eb1d03"
+storage_version_token = "1794228987116663"
+content_type = "application/octet-stream"
