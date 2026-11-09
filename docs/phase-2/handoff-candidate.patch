@@ -1,0 +1,1045 @@
+--- a/hardware/call.py
++++ b/hardware/call.py
+@@ -43,6 +43,9 @@
+         self.mload_index = Signal(16)
+         self.mload_direct = Signal()
+         self.mload_direct_gt = Signal(32)
++        # Resolve privately until body/method admission succeeds. In particular
++        # an unavailable CALL must leave the issuing Thread's CR6/CR14 intact.
++        self.mload_resolved_cap = Signal(CAP_REG_LAYOUT)
+         self.mload_m_elevated = Signal()
+ 
+         self.mload_done = Signal()
+@@ -118,9 +121,9 @@
+         # authorises the M-window writeback.  Formerly named mgt_ns_seals.
+         self.mgt_cache_token32 = Signal(32)
+ 
+-        # Lazy-load IRQ outputs (Task #1523): pulsed when FETCH_LUMP detects cw=0
+-        # (CODE_NOT_RESIDENT).  No stack frame has been pushed at this point in
+-        # the CALL pipeline.  Core uses these to trigger ChurchIRQDispatch.
++        # Internal LLR admission pulse (historical signal name retained).
++        # cw=0 is detected before descriptor publication or frame construction.
++        # The non-IoT core routes this to protected Thread entry, not an IRQ.
+         self.lazy_load_irq     = Signal()     # 1-cycle pulse: evicted lump detected
+         self.lazy_load_ns_slot = Signal(16)   # NS slot of the evicted lump
+ 
+@@ -577,14 +580,12 @@
+                 )
+ 
+             with m.State("PHASE1_DONE"):
+-                # Combinatorially read back CR6 — Phase 1 mLoad has just deposited
+-                # the callee's cap entry there.  Latch word0_gt (pre-SET_CR6_LIMIT,
+-                # original perms from cload.py Phase 1) for STACK_WRITE_EGT.
+-                # cr6_adjusted changes cache geometry, not the Enter token.
+-                m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
++                # mLoad resolves without publishing. Keep the exact Enter
++                # identity and descriptor private until method admission.
+                 m.d.sync += callee_egt_latched.eq(
+-                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value()
++                    View(CAP_REG_LAYOUT, self.mload_resolved_cap).word0_gt.as_value()
+                 )
++                m.d.sync += cr6_latched.eq(self.mload_resolved_cap)
+                 m.d.sync += [phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
+                 m.d.sync += sub_start_reg.eq(1)
+                 m.next = "PHASE2"
+@@ -604,9 +605,8 @@
+                 )
+ 
+             with m.State("SET_M_READ"):
+-                # Read CR14 so we can assert M=1 (PERM_X) on the code capability
+-                m.d.comb += local_cr_rd_addr.eq(CR14_CODE)
+-                m.d.sync += cr14_latched.eq(self.cr_rd_data)
++                # Capture the second private resolution, not live caller CR14.
++                m.d.sync += cr14_latched.eq(self.mload_resolved_cap)
+                 m.next = "SET_M_WRITE"
+ 
+             with m.State("SET_M_WRITE"):
+@@ -691,8 +691,6 @@
+                     ]
+                     m.next = "CLEAR_B"
+                 with m.Else():
+-                    m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
+-                    m.d.sync += cr6_latched.eq(self.cr_rd_data)
+                     m.next = "SET_CR6_LIMIT"
+ 
+             with m.State("SET_CR6_LIMIT"):
+@@ -874,8 +872,8 @@
+             with m.State("LAZY_LOAD_ABORT"):
+                 # cw=0 detected in FETCH_LUMP: lump is CODE_NOT_RESIDENT.
+                 # No stack frame has been pushed at this point in the pipeline.
+-                # Abort the CALL silently; core dispatches to Scheduler.IRQ
+-                # via ChurchIRQDispatch (Task #1523, IRQ_REASON_LAZY_LOAD).
++                # No architectural capability was published. The core starts
++                # protected USER-to-SYSTEM entry, without retiring this CALL.
+                 m.next = "IDLE"
+ 
+         m.d.comb += [
+--- a/hardware/change.py
++++ b/hardware/change.py
+@@ -19,13 +19,16 @@
+ 
+ 
+ class ChurchChange(Elaboratable):
+-    def __init__(self, *, resident_word_locations=False):
++    def __init__(self, *, resident_word_locations=False, system_thread_gt=0x02000002):
+         self.resident_word_locations = resident_word_locations
++        self.system_thread_gt = system_thread_gt
+         self.change_start = Signal()
+         # Explicit decoded programmatic operation; not a scheduler request.
+         self.ordinary = Signal()
+         self.cr6_m = Signal()
+         self.namespace_handoff = Signal()
++        self.llr_entry = Signal()
++        self.llr_target = Signal(16)
+         self.incoming_namespace = Signal(CAP_REG_LAYOUT)
+         self.cr_src = Signal(4)
+         self.index = Signal(16)
+--- a/hardware/core.py
++++ b/hardware/core.py
+@@ -194,6 +194,7 @@
+         self.thread_switch_index = Signal(16)
+         self.thread_switch_busy = Signal()
+         self.thread_switch_complete = Signal()
++        self.llr_complete = Signal()  # completed internal transfer, not retirement
+         self.thread_switch_fault = Signal()
+         self.active_thread_slot = Signal(16, init=1)
+         # Byte address of the active Thread context body. CR12 remains the
+@@ -338,7 +339,9 @@
+             u_gc = ChurchGCUnit()
+             u_lambda = ChurchLambda()
+             u_change = ChurchChange(
+-                resident_word_locations=self.expected_boot_guard is not None)
++                resident_word_locations=self.expected_boot_guard is not None,
++                system_thread_gt=(0x02000002 |
++                    (((self.expected_boot_guard or 0) & 0x1FF) << 16)))
+             u_switch = ChurchSwitch()
+             u_eloadcall = ChurchELoadCall()
+             u_xloadlambda = ChurchXLoadLambda()
+@@ -712,6 +715,7 @@
+         xloadlambda_start_sig = Signal()
+         scheduler_inflight = Signal()
+         decoded_thread_change_inflight = Signal()
++        llr_inflight = Signal()
+ 
+         if not self.iot_profile:
+             cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
+@@ -2085,13 +2089,15 @@
+                 (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) &
+                  (self.imem_data != RESET_MARKER_WORD) &
+                  ~any_unit_busy) |
+-                thread_switch_start_sig | u_switch.handoff_start
++                thread_switch_start_sig | u_switch.handoff_start | u_call.lazy_load_irq
+             ))
+             m.d.comb += [
+                 u_change.change_start.eq(change_start_sig),
+                 u_change.cr6_m.eq(u_regs.m_bit_device_state[CR_CLIST]),
+-                u_change.ordinary.eq(u_switch.handoff_start |
++                u_change.ordinary.eq(u_call.lazy_load_irq | u_switch.handoff_start |
+                                     (~thread_switch_start_sig & ~boot_microcode_active)),
++                u_change.llr_entry.eq(u_call.lazy_load_irq),
++                u_change.llr_target.eq(u_call.lazy_load_ns_slot),
+                 u_change.namespace_handoff.eq(u_switch.handoff_start),
+                 u_change.incoming_namespace.eq(u_switch.incoming_namespace),
+                 u_change.cr_src.eq(Mux(thread_switch_start_sig, 15, cr_src)),
+@@ -2134,6 +2140,14 @@
+             with m.Elif(u_change.change_complete | u_change.change_fault):
+                 m.d.sync += decoded_thread_change_inflight.eq(0)
+             with m.If(clear_all):
++                m.d.sync += llr_inflight.eq(0)
++            with m.Elif(u_call.lazy_load_irq):
++                m.d.sync += llr_inflight.eq(1)
++            with m.Elif(u_change.change_complete | u_change.change_fault):
++                m.d.sync += llr_inflight.eq(0)
++            m.d.comb += self.llr_complete.eq(
++                llr_inflight & u_change.change_complete & ~u_change.change_fault & ~clear_all)
++            with m.If(clear_all):
+                 m.d.sync += [
+                     scheduler_inflight.eq(0),
+                     self.active_thread_slot.eq(1),
+@@ -2289,9 +2303,10 @@
+                                                  u_xloadlambda.lazy_resolve_slot)))
+                 ),
+                 irq_dispatch_start.eq(
+-                    (self.timer_alarm | u_call.lazy_load_irq |
++                    (self.timer_alarm |
+                      u_eloadcall.lazy_resolve_irq | u_xloadlambda.lazy_resolve_irq)
+                     & irq_armed_reg
++                    & ~u_call.lazy_load_irq & ~llr_inflight
+                     & ~u_irq_dispatch.busy
+                 ),
+                 u_irq_dispatch.start.eq(irq_dispatch_start),
+@@ -3208,7 +3223,7 @@
+         change_retire = Const(0)
+         if not self.iot_profile:
+             change_retire = (
+-                u_change.change_complete & ~scheduler_inflight)
++                u_change.change_complete & ~scheduler_inflight & ~llr_inflight)
+             retire_conds = (
+                 retire_conds_base |
+                 change_retire |
+@@ -3283,7 +3298,8 @@
+                 u_shared_mload.sub_direct.eq(u_call.mload_direct),
+                 u_shared_mload.sub_direct_gt.eq(u_call.mload_direct_gt),
+                 u_shared_mload.sub_m_elevated.eq(u_call.mload_m_elevated),
+-                u_shared_mload.sub_validate_only.eq(0),
++                u_shared_mload.sub_validate_only.eq(1),
++                u_call.mload_resolved_cap.eq(u_shared_mload.resolved_cap),
+             ]
+         with m.Elif(u_return.busy):
+             m.d.comb += [
+--- a/hardware/ordinary_change.py
++++ b/hardware/ordinary_change.py
+@@ -23,6 +23,7 @@
+         "mem_rd_data", "mem_rd_valid", "mem_wr_done", "dr_rd_data",
+         "flags_in", "nia_current", "code_base",
+         "namespace_handoff", "incoming_namespace", "cr6_m",
++        "llr_entry", "llr_target",
+     )
+     OUTPUTS = (
+         "change_busy", "change_complete", "change_fault", "fault_type",
+@@ -36,6 +37,7 @@
+ 
+     def __init__(self, ports, *, resident_word_locations=False):
+         self.resident_word_locations = resident_word_locations
++        self.system_thread_gt = ports.system_thread_gt
+         self.change_start = Signal()
+         for name in self.INPUTS + self.OUTPUTS:
+             setattr(self, name, Signal.like(getattr(ports, name), name="ordinary_" + name))
+@@ -96,6 +98,11 @@
+         out_base, out_egt = Signal(32), Signal(32)
+         owned, self_target = Signal(), Signal()
+         handoff, root_entry = Signal(), Signal()
++        llr, owner_pending = Signal(), Signal()
++        owner = Signal(CAP_REG_LAYOUT)
++        owner_view = View(CAP_REG_LAYOUT, owner)
++        metadata = Array(Signal(32, name=f"llr_metadata_{i}") for i in range(4))
++        target_slot = Signal(16)
+         flags, nia = Signal(4), Signal(15)
+         row = Signal(8)
+         phase = Signal(2)  # target Thread, incoming homes, frame E-GT, C-List
+@@ -174,17 +181,23 @@
+                         namespace.eq(Mux(self.namespace_handoff,
+                                          self.incoming_namespace, self.cr15_namespace)),
+                         handoff.eq(self.namespace_handoff), root_entry.eq(0),
+-                        gt.eq(Mux(self.namespace_handoff, 0x02000002,
+-                                  self.cr_rd_data.as_value()[:32])),
++                        llr.eq(self.llr_entry), owner_pending.eq(self.llr_entry),
++                        owner.eq(self.cr12_thread), target_slot.eq(self.llr_target),
++                        gt.eq(Mux(self.llr_entry, self.cr12_thread.as_value()[:32],
++                                  Mux(self.namespace_handoff, 0x02000002,
++                                      self.cr_rd_data.as_value()[:32]))),
+                         owned.eq(self.active_thread_owned),
+                         # CR12 is the architectural Thread identity. The
+                         # scheduler's backing-address hint is not authority.
+                         out_base.eq(View(CAP_REG_LAYOUT, self.cr12_thread).word1_location),
+                         flags.eq(self.flags_in),
+-                        nia.eq(((self.nia_current - self.code_base) >> 2) + 1),
++                        nia.eq(((self.nia_current - self.code_base) >> 2) +
++                               Mux(self.llr_entry, 0, 1)),
+                         phase.eq(0), row.eq(0), armed.eq(0), code.eq(0),
+                     ]
+-                    with m.If(~self.namespace_handoff &
++                    with m.If(self.llr_entry):
++                        m.next = "LLR_OWNER"
++                    with m.Elif(~self.namespace_handoff &
+                               (~indexed_form & ((self.cr_dst != 0) | (self.index != 0) |
+                                (self.cr_src == 13)))):
+                         m.d.sync += code.eq(FaultType.INVALID_OP)
+@@ -193,6 +206,14 @@
+                         m.next = "LOOKUP_CHECK"
+                     with m.Else():
+                         m.next = "CHECK"
++            with m.State("LLR_OWNER"):
++                # Internal admission is not an elevated or programmer-supplied
++                # CHANGE operand. Validate the complete active identity first.
++                with m.If(~owned | (gv.gt_type != GT_TYPE_INFORM) |
++                          (gv.perm != 0) | (gv.dom != 0)):
++                    fail(FaultType.THREAD_CONTEXT)
++                with m.Else():
++                    m.next = "CHECK"
+             with m.State("LOOKUP_CHECK"):
+                 # This is a bounded C-list read, never elevated Namespace
+                 # authority and never a temporary architectural CR write.
+@@ -260,6 +281,18 @@
+                 with m.Elif(gate.ns_gate_done):
+                     with m.If(invalid_descriptor | rw.f_flag | (resolved_base[:2] != 0)):
+                         fail(FaultType.BOUNDS)
++                    with m.Elif(owner_pending):
++                        with m.If((resolved_base != owner_view.word1_location) |
++                                  (resolved_authority != owner_view.word2_w2)):
++                            fail(FaultType.THREAD_CONTEXT)
++                        with m.Elif(gv.slot_id == 2):
++                            m.d.sync += code.eq(FaultType.ABSENT_OUTFORM)
++                            m.next = "FAULT"
++                        with m.Else():
++                            # Fixed profile identity, never adopt a version
++                            # from the mutable destination descriptor.
++                            m.d.sync += [owner_pending.eq(0), gt.eq(self.system_thread_gt)]
++                            m.next = "CHECK"
+                     with m.Elif(lookup_pending):
+                         with m.If((lookup_address < resolved_base) |
+                                   (lookup_address > resolved_base + (rw.limit_offset << 2))):
+@@ -273,7 +306,10 @@
+                             thread.eq(resolved), armed.eq(0),
+                             self_target.eq(~handoff & owned & (resolved_base == out_base)),
+                         ]
+-                        m.next = "HEADER"
++                        with m.If(llr):
++                            m.next = "LLR_METADATA"
++                        with m.Else():
++                            m.next = "HEADER"
+                     with m.Elif(phase == 1):
+                         m.d.sync += homes[row].eq(resolved)
+                         m.next = "HOME_NEXT"
+@@ -282,6 +318,20 @@
+                         m.next = "ENTRY_HEADER"
+                     with m.Else():
+                         m.next = "CLIST_NEXT"
++            with m.State("LLR_METADATA"):
++                ns_base = View(CAP_REG_LAYOUT, namespace).word1_location
++                with m.If((nw.limit_offset < 3) | (ns_base[:2] != 0) |
++                          (ns_base > 0xFFFFFFF0)):
++                    fail(FaultType.BOUNDS)
++                with m.Else():
++                    read(ns_base + (row << 2))
++                    with m.If(armed & self.mem_rd_valid):
++                        m.d.sync += [metadata[row].eq(self.mem_rd_data), armed.eq(0)]
++                        with m.If(row == 3):
++                            m.d.sync += row.eq(0)
++                            m.next = "HEADER"
++                        with m.Else():
++                            m.d.sync += row.eq(row + 1)
+             with m.State("HEADER"):
+                 read(tv.word1_location)
+                 with m.If(armed & self.mem_rd_valid):
+@@ -434,7 +484,9 @@
+                     m.d.sync += [out_header.eq(self.mem_rd_data), armed.eq(0)]
+                     m.next = "OUT_HEADER_CHECK"
+             with m.State("OUT_HEADER_CHECK"):
+-                with m.If(~valid_header(out_header, out_size)):
++                with m.If(~valid_header(out_header, out_size) |
++                          (llr & ((View(WORD2_LAYOUT, owner_view.word2_w2).limit_offset != out_size - 1) |
++                                  (out_base + ((out_size - 1) << 2) > 0xFFFFFFFF)))):
+                     fail(FaultType.BOUNDS)
+                 with m.Else():
+                     m.next = "OUT_INDICATOR"
+@@ -552,10 +604,34 @@
+                         (ev.word0_gt.as_value() & 0x87FFFFFF) | 0x18000000,
+                         (ev.word1_location + ((entry_size - entry_header[:8]) << 2))[:32],
+                         clist_w2)),
+-                    self.nia_restore_en.eq(1),
++                    self.nia_restore_en.eq(~llr),
+                     self.nia_restore_val.eq(ev.word1_location + 4 +
+                                            Mux(root_entry, 0, frame[13:28] << 2)),
+-                    self.flags_restore_en.eq(1), self.flags_restore_data.eq(frame[28:32]),
++                    self.flags_restore_en.eq(~llr), self.flags_restore_data.eq(frame[28:32]),
++                ]
++                with m.If(llr):
++                    m.d.sync += row.eq(1)
++                    m.next = "LLR_INJECT"
++                with m.Else():
++                    m.next = "DONE"
++            with m.State("LLR_INJECT"):
++                m.d.comb += [
++                    self.dr_wr_en.eq(1), self.dr_wr_addr.eq(row),
++                    self.dr_wr_data.eq(Mux(row <= 4, metadata[row - 1],
++                                          Mux(row == 5, target_slot,
++                                              owner_view.word0_gt.as_value()))),
++                ]
++                with m.If(row == 6):
++                    m.next = "LLR_COMMIT"
++                with m.Else():
++                    m.d.sync += row.eq(row + 1)
++            with m.State("LLR_COMMIT"):
++                m.d.comb += [
++                    self.nia_restore_en.eq(1),
++                    self.nia_restore_val.eq(ev.word1_location + 4 + (frame[13:28] << 2)),
++                    self.flags_restore_en.eq(1),
++                    # COND_FLAGS_LAYOUT is N,Z,C,V. Only the entry Z changes.
++                    self.flags_restore_data.eq(frame[28:32] | 2),
+                 ]
+                 m.next = "DONE"
+             with m.State("DONE"):
+--- /dev/null
++++ b/hardware/test_candidate_top.py
+@@ -0,0 +1,56 @@
++"""Isolated candidate top/ROM/BRAM/UART test; never contacts hardware."""
++import binascii
++import pytest
++from amaranth.sim import Simulator
++from hardware.wukong_top import ChurchWukongXC7A100T
++from hardware.test_phase2_guarded_llr import guarded_fixture, GUARD, SYSTEM_GT, USER_GT
++
++
++@pytest.mark.parametrize("baud", [125000, 62500])
++def test_top_stops_before_system_instruction_and_drains_snapshot(baud):
++    words = [0] * 16384
++    for addr, word in guarded_fixture().items():
++        words[addr // 4] = word
++    top = ChurchWukongXC7A100T(sim_mode=True, clk_freq=1000000, baud=baud,
++                    sim_boot_image_words=words, expected_boot_guard=GUARD,
++                    diagnostic_llr_stop=True)
++    async def bench(ctx):
++        ctx.set(top.uart_rx_pin, 1)
++        stopped = False
++        frame = bytearray()
++        stalled = 0
++        for cycle in range(150000):
++            core = top.sim_core
++            assert not ctx.get(core.fault_valid), (cycle, ctx.get(core.fault), hex(ctx.get(core.imem_addr)))
++            if ctx.get(core.retire_valid):
++                assert ctx.get(core.retire_nia) not in (0x4008, 0x2010)
++            if ctx.get(core.llr_complete) or ctx.get(top.diagnostic_llr_stopped):
++                stopped = True
++                assert not ctx.get(core.imem_valid), "SYSTEM fetch escaped stop"
++                assert ctx.get(core.imem_addr) == 0x2010
++                assert ctx.get(core.debug_cr_words[12][0]) == SYSTEM_GT
++                assert [ctx.get(x) for x in core.debug_dr_words[:7]] == [
++                    0, words[0], words[1], words[2], words[3], 6, USER_GT]
++                assert ctx.get(core.flags.as_value()) == 2
++                assert not ctx.get(core.dmem_wr_en)
++            if ctx.get(top.sim_snapshot_req):
++                if ctx.get(top.sim_snapshot_ack):
++                    frame.append(ctx.get(top.sim_snapshot_byte))
++                else:
++                    stalled += 1
++            if ctx.get(top.sim_snapshot_complete):
++                assert stopped and stalled > 0
++                assert ctx.get(top.sim_snapshot_reason) == 3
++                assert len(frame) == int.from_bytes(frame[2:4], "big") + 8
++                assert binascii.crc_hqx(frame[:-2], 0xffff) == int.from_bytes(frame[-2:], "big")
++                for _ in range(100):
++                    await ctx.tick()
++                    assert not ctx.get(core.imem_valid)
++                    assert ctx.get(core.imem_addr) == 0x2010
++                return
++            await ctx.tick()
++        pytest.fail(f"observer limit; stopped={stopped}, snapshot_bytes={len(frame)}")
++    sim = Simulator(top)
++    sim.add_clock(1e-6)
++    sim.add_testbench(bench)
++    sim.run()
+--- /dev/null
++++ b/hardware/test_phase2_guarded_llr.py
+@@ -0,0 +1,288 @@
++"""Full guarded-core LLR execution from synthetic reset-admitted bytes.
++
++No debug register writes, forced NIA, live artifacts, transport or board access.
++"""
++import hashlib
++import json
++
++import pytest
++from amaranth.sim import Simulator
++from hardware.core import ChurchCore
++from hardware.integrity32 import integrity32
++from hardware.test_phase2_llr import fixture
++
++
++GUARD = (46 << 9) | 419
++USER_GT = 0x02070004
++SYSTEM_GT = 0x03A30002
++SYSTEM_EGT = 0x4A490003
++CALL = 0x17100001
++CHANGE_CR1 = 0x27008000
++
++
++def guarded_fixture():
++    mem = fixture(7)
++    mem.update({0: 0xF8810100, 4: 0, 8: 5, 12: 0})
++    for slot, version in [(1, 46), (2, 419), (3, 73), (4, 7), (5, 0), (6, 0)]:
++        base = mem[slot * 16] >> 2
++        limit = 255 if slot == 1 else mem[slot * 16 + 4] & 0x1FFFFF
++        authority = limit | (version << 21)
++        mem.update({slot * 16: base, slot * 16 + 4: authority,
++                    slot * 16 + 8: integrity32(base, authority)})
++    for offset in (242, 244):
++        mem[0x1000 + offset * 4] = SYSTEM_EGT
++    mem[0x1000 + 243 * 4] = 0x0FFFF0F3  # genuine initial root frame
++    mem[0x2000 + 62 * 4] = SYSTEM_EGT
++    mem[0x3000 + 245 * 4] = SYSTEM_GT
++    mem[0x3000 + 243 * 4] = 0x10F3 | (1 << 13) | (9 << 28)
++    # Literal executable words; fetch supplies exactly the addressed fixture.
++    mem.update({0x2004: 2, 0x2008: 0xAF504007,  # IADD DR10,DR0,#7
++                0x200C: CHANGE_CR1, 0x2010: CHANGE_CR1,
++                0x4004: 2, 0x4008: CALL, 0x400C: 0xAF58400B})
++    return mem
++
++
++CASES = ["resume", "stale_system", "bad_system_frame",
++         "bad_owner", "bad_target", "system_absent"]
++
++
++@pytest.mark.parametrize("case", CASES)
++def test_guarded_startup_llr_and_original_call(case):
++    _run_guarded_case(case)
++
++
++@pytest.mark.parametrize("case", CASES)
++def test_guarded_handoff_only(case, record_property):
++    evidence = {"case": case, "scope": "RTL handoff only; no delivery or resume"}
++    try:
++        _run_guarded_case(case, handoff_only=True, evidence=evidence)
++        evidence["outcome"] = "passed"
++    except BaseException:
++        evidence["outcome"] = "failed"
++        raise
++    finally:
++        record_property("handoff_evidence", json.dumps(evidence, sort_keys=True))
++
++
++def _run_guarded_case(case, *, handoff_only=False, evidence=None):
++    mem = guarded_fixture()
++    if evidence is None:
++        evidence = {}
++    evidence["initial_fixture_sha256"] = hashlib.sha256(
++        json.dumps(sorted(mem.items()), separators=(",", ":")).encode()).hexdigest()
++    core = ChurchCore(expected_boot_guard=GUARD)
++
++    async def bench(ctx):
++        writes, retired = [], []
++        cycle = 0
++        watching = False
++        changes, timed_writes, issued = [], [], []
++        previous_state = None
++
++        def state():
++            return {
++                "nia": ctx.get(core.imem_addr),
++                "crs": [tuple(ctx.get(w) for w in cr) for cr in core.debug_cr_words],
++                "drs": [ctx.get(w) for w in core.debug_dr_words],
++                "flags": ctx.get(core.flags.as_value()),
++            }
++
++        async def tick():
++            nonlocal cycle, previous_state
++            if watching:
++                current = state()
++                if current != previous_state:
++                    changes.append({"cycle": cycle, **current})
++                    previous_state = current
++            rd = ctx.get(core.dmem_addr) if ctx.get(core.dmem_rd_en) else None
++            data = mem.get(rd, 0)
++            if ctx.get(core.dmem_wr_en):
++                addr, value = ctx.get(core.dmem_addr), ctx.get(core.dmem_wr_data)
++                writes.append((addr, value))
++                if watching:
++                    timed_writes.append((cycle, addr, value))
++                mem[addr] = value
++            if ctx.get(core.retire_valid):
++                retired.append((ctx.get(core.retire_nia), ctx.get(core.retire_instr)))
++            assert not ctx.get(core.ns_wr_en)
++            assert not ctx.get(core.clist_wr_en)
++            await ctx.tick()
++            cycle += 1
++            ctx.set(core.dmem_rd_valid, rd is not None)
++            ctx.set(core.dmem_rd_data, data)
++            evidence["last_observation"] = {
++                "cycle": cycle, "nia": ctx.get(core.imem_addr),
++                "fault": ctx.get(core.fault) if ctx.get(core.fault_valid) else None,
++                "read_enable": ctx.get(core.dmem_rd_en),
++                "write_enable": ctx.get(core.dmem_wr_en),
++                "memory_address": ctx.get(core.dmem_addr),
++            }
++
++        async def until(predicate, limit=3000):
++            for i in range(limit):
++                assert not ctx.get(core.fault_valid), (
++                    case, i, hex(ctx.get(core.imem_addr)), ctx.get(core.fault))
++                if predicate():
++                    return
++                await tick()
++            pytest.fail("guarded transition timed out")
++
++        async def issue(*, rom=None, finish=None, fault=None):
++            address = ctx.get(core.imem_addr)
++            word = mem[address] if rom is None else rom
++            issued.append({"address": address, "word": word, "reset_rom": rom is not None})
++            ctx.set(core.imem_data, word)
++            ctx.set(core.imem_fetch_address, address)
++            ctx.set(core.imem_from_reset_rom, rom is not None)
++            ctx.set(core.imem_valid, 1)
++            start = len(retired)
++            for i in range(3000):
++                if ctx.get(core.fault_valid):
++                    assert fault is not None, (case, i, hex(address), hex(ctx.get(core.fault)))
++                    assert ctx.get(core.fault) == fault
++                    ctx.set(core.imem_valid, 0)
++                    return
++                done = finish() if finish else ctx.get(core.retire_valid)
++                await tick()
++                # Once accepted, later bus words must not redefine the instruction.
++                ctx.set(core.imem_valid, 0)
++                ctx.set(core.imem_data, 0xFFFFFFFF)
++                if done:
++                    assert fault is None
++                    for _ in range(3):
++                        await tick()
++                        assert not ctx.get(core.fault_valid)
++                    return retired[start:]
++            pytest.fail("guarded instruction timed out")
++
++        ctx.set(core.defer_fault_reset, 1)
++        ctx.set(core.boot_start, 1)
++        await tick()
++        ctx.set(core.boot_start, 0)
++        await until(lambda: ctx.get(core.boot_thread_validated))
++        assert not writes and not ctx.get(core.boot_complete)
++        assert ctx.get(core.boot_namespace_admitted)
++        assert ctx.get(core.imem_addr) == 4
++        await issue(rom=0x27000001, finish=lambda: ctx.get(core.boot_thread_activated))
++        assert not writes
++        assert ctx.get(core.imem_addr) == 8
++        await issue(rom=0x17000001, finish=lambda: ctx.get(core.boot_complete))
++        assert ctx.get(core.imem_addr) == 0x2008
++        assert ctx.get(core.debug_cr_words[12][0]) == SYSTEM_GT
++        assert not ctx.get(core.boot_marker_available)
++        await issue()  # set SYSTEM flags with an actual instruction
++        system_flags = ctx.get(core.flags.as_value())
++        assert system_flags & 2 == 0
++        if case == "system_absent":
++            mem[0x200C] = CALL
++        else:
++            change_events = await issue()  # SYSTEM CHANGE to USER
++            assert [nia for nia, _ in change_events] == [0x200C]
++            assert ctx.get(core.imem_addr) == 0x4008
++            assert ctx.get(core.debug_cr_words[12][0]) == USER_GT
++        before_crs = [tuple(ctx.get(w) for w in cr) for cr in core.debug_cr_words]
++        before_drs = [ctx.get(w) for w in core.debug_dr_words]
++        before_flags = ctx.get(core.flags.as_value())
++        expected_fault = None
++        if case in ("stale_system", "bad_owner"):
++            slot = 2 if case == "stale_system" else 4
++            mem[slot * 16 + 4] += 1 << 21
++            mem[slot * 16 + 8] = integrity32(mem[slot * 16], mem[slot * 16 + 4])
++            expected_fault = 0x1D
++        elif case == "bad_system_frame":
++            mem[0x1000 + 241 * 4] ^= 1  # actual frame pushed by SYSTEM CHANGE
++            expected_fault = 0x1D
++        elif case == "bad_target":
++            mem[6 * 16 + 8] ^= 1
++            expected_fault = 0x0A
++        elif case == "system_absent":
++            expected_fault = 0x11
++        before_mem = dict(mem)
++        start_writes = len(writes)
++        start_retired = len(retired)
++        watching = handoff_only
++        previous_state = state()
++        evidence["before"] = previous_state
++        evidence["issued_instructions"] = issued
++        evidence["state_changes"] = changes
++        evidence["transition_writes"] = timed_writes
++        evidence["attempt_fixture_sha256"] = hashlib.sha256(
++            json.dumps(sorted(mem.items()), separators=(",", ":")).encode()).hexdigest()
++        events = await issue(finish=(lambda: False) if expected_fault else
++                             lambda: ctx.get(core.imem_addr) == 0x2010,
++                             fault=expected_fault)
++        evidence["after"] = state()
++        evidence["retirement_addresses"] = [nia for nia, _ in retired[start_retired:]]
++        evidence["fault"] = ctx.get(core.fault) if ctx.get(core.fault_valid) else None
++        if expected_fault:
++            assert len(writes) == start_writes and mem == before_mem
++            assert [tuple(ctx.get(w) for w in cr) for cr in core.debug_cr_words] == before_crs
++            assert [ctx.get(w) for w in core.debug_dr_words] == before_drs
++            assert ctx.get(core.flags.as_value()) == before_flags
++            assert retired[start_retired:] == [], "faulting CALL must not retire"
++            return
++        assert events == [], "unavailable CALL must not retire"
++        assert ctx.get(core.flags.as_value()) == system_flags | 2
++        assert ctx.get(core.debug_cr_words[12][0]) == SYSTEM_GT
++        assert tuple(ctx.get(w) for w in core.debug_cr_words[13]) == before_crs[13]
++        assert [ctx.get(core.debug_dr_words[i]) for i in range(7)] == [
++            0, mem[0], mem[4], mem[8], mem[12], 6, USER_GT]
++        assert [mem[0x3000 + (i + 1) * 4] for i in range(16)] == before_drs
++        assert mem[0x3000 + 243 * 4] >> 13 & 0x7FFF == 1
++        assert mem[0x3000 + 243 * 4] >> 28 == before_flags
++        assert not ctx.get(core.boot_marker_available)
++        if handoff_only:
++            # The protected homes retain the exact twelve outgoing GT words,
++            # including CR2's absent-target authority; no host-side renewal.
++            saved_homes = [mem[0x3000 + (244 + i) * 4] for i in range(12)]
++            assert saved_homes == [cr[0] for cr in before_crs[:12]]
++            assert mem[0x3000 + 242 * 4] == (
++                (before_crs[6][0] & 0x87FFFFFF) | 0x48000000)
++            assert mem[0x3000 + 243 * 4] & 0x1FFF == before_mem[0x3000 + 68] & 0x1FFF
++            target_addresses = [a for a in before_mem if 0x5000 <= a < 0x5100]
++            assert {a: mem[a] for a in target_addresses} == {
++                a: before_mem[a] for a in target_addresses}
++            assert all(0x3000 <= a < 0x3400 or a == 0x1000 + 68
++                       for _, a, _ in timed_writes), "unexpected transition write"
++            user_writes = [t for t, a, _ in timed_writes if 0x3000 <= a < 0x3400]
++            assert user_writes and changes
++            assert min(change["cycle"] for change in changes) > max(user_writes), (
++                "architectural restoration began before USER save completed")
++            # An addressed SYSTEM continuation is not permission to execute it.
++            assert issued[-1] == {"address": 0x4008, "word": CALL, "reset_rom": False}
++            assert not any(i["address"] == 0x2010 for i in issued)
++            for change in changes:
++                if change["nia"] == 0x2010:
++                    assert change["drs"][:7] == [0, mem[0], mem[4], mem[8], mem[12], 6, USER_GT]
++                    assert change["flags"] == system_flags | 2
++            evidence["saved_user_homes"] = saved_homes
++            evidence["saved_user_frame"] = [mem[0x3000 + i * 4] for i in (242, 243)]
++            evidence["saved_user_drs"] = [mem[0x3000 + (i + 1) * 4] for i in range(16)]
++            evidence["target_header"] = mem[0x5000]
++            evidence["stop_boundary"] = "SYSTEM continuation addressed, not executed"
++            return
++        change_events = await issue()  # ordinary CHANGE back to USER
++        assert [nia for nia, _ in change_events] == [0x2010]
++        assert ctx.get(core.imem_addr) == 0x4008
++        assert [ctx.get(w) for w in core.debug_dr_words] == before_drs
++        assert ctx.get(core.flags.as_value()) == before_flags
++        # Model body arrival only in isolated memory, not a DELIVER implementation.
++        mem.update({0x5000: 0xF8001001, 0x5004: 2, 0x50FC: 0x4A000006,
++                    0x5008: 0xAF60400D, 0x500C: 0x1F000000})  # IADD; RETURN
++        events = await issue()
++        # retire_instr currently mirrors the fetch bus, which this harness
++        # deliberately poisons while invalid. Count the committed NIA and
++        # verify the callee's executed effect, not that unrelated trace field.
++        assert [nia for nia, _ in events] == [0x4008]
++        assert ctx.get(core.imem_addr) == 0x5008
++        await issue()
++        assert ctx.get(core.debug_dr_words[12]) == 13
++        await issue()
++        assert ctx.get(core.imem_addr) == 0x400C
++        assert sum(nia == 0x4008 for nia, _ in retired) == 1
++        assert not ctx.get(core.boot_marker_available)
++
++    sim = Simulator(core)
++    sim.add_clock(1e-6)
++    sim.add_testbench(bench)
++    sim.run()
+--- /dev/null
++++ b/hardware/test_phase2_llr.py
+@@ -0,0 +1,253 @@
++"""Local RTL evidence only: real CALL/mLoad/CHANGE, no catalog or hardware I/O."""
++import pytest
++from amaranth.sim import Simulator
++from hardware.core import ChurchCore
++from hardware.change import ChurchChange
++from hardware.integrity32 import integrity32
++from hardware.sim_boot_helpers import boot_core
++from hardware.test_phase1_independent_execution import execute_data
++
++
++def fixture(version=0):
++    mem = {0: 0xF8004100, 4: 0x12345678, 8: 0x23456789, 12: 0x3456789A,
++           0x400: 0x02000001, 0x404: 0x02000004 | (version << 16)}
++    for slot, base, limit in [(1, 0, 63), (2, 0x1000, 255),
++                              (3, 0x2000, 63), (4, 0x3000, 255),
++                              (5, 0x4000, 63), (6, 0x5000, 63)]:
++        authority = limit | ((version << 21) if slot == 4 else 0)
++        for i, value in enumerate((base, authority, integrity32(base, authority), 0)):
++            mem[slot * 16 + i * 4] = value
++    for base, code, slot, entry_flags in [(0x1000, 0x2000, 3, 13),
++                                          (0x3000, 0x4000, 5, 0)]:
++        mem[base] = 0xF900020C | (32 << 10)
++        mem[base + 68] = 0x10F1
++        mem[base + 242 * 4] = 0x4A000000 | slot
++        mem[base + 243 * 4] = 0x10F3 | (entry_flags << 28)
++        for reg in range(12):
++            mem[base + (244 + reg) * 4] = 0
++        mem[base + 244 * 4] = 0x4A000000 | slot
++        mem[base + 245 * 4] = (0x02000004 | (version << 16)) if slot == 3 else 0x02000002
++        mem[base + 246 * 4] = 0x4A000006
++        for reg in range(1, 16):
++            mem[base + (reg + 1) * 4] = 0x60000000 + reg
++        mem[code] = 0xF8000002 | (48 << 10)
++        mem[code + 62 * 4] = 0x4A000000 | slot
++        mem[code + 63 * 4] = 0
++    # Valid Inform target and header, but no executable body.
++    mem[0x5000] = 0xF8000001
++    return mem
++
++
++@pytest.mark.parametrize("case", ["resume", "bad_system_frame", "bad_system_seal",
++                                  "outgoing_stack", "system_absent"])
++@pytest.mark.parametrize("version", [0, 7])
++def test_real_core_llr(case, version):
++    dut = ChurchCore()
++    mem = fixture(version)
++    user_gt = 0x02000004 | (version << 16)
++
++    async def bench(ctx):
++        ctx.set(dut.defer_fault_reset, 1)
++        await boot_core(ctx, dut)
++        for _ in range(3):
++            await execute_data(ctx, dut, 0xAF784001)
++
++        async def issue(word, *, llr=False, fault=None):
++            pending = None
++            before_writes = []
++            ctx.set(dut.imem_data, word)
++            ctx.set(dut.imem_valid, 1)
++            for cycle in range(3000):
++                ctx.set(dut.dmem_rd_valid, pending is not None)
++                ctx.set(dut.dmem_rd_data, mem.get(pending, 0))
++                await ctx.delay(1e-9)
++                rd = ctx.get(dut.dmem_addr) if ctx.get(dut.dmem_rd_en) else None
++                if ctx.get(dut.dmem_wr_en):
++                    addr = ctx.get(dut.dmem_addr)
++                    mem[addr] = ctx.get(dut.dmem_wr_data)
++                    before_writes.append(addr)
++                if ctx.get(dut.fault_valid):
++                    assert fault is not None, (case, cycle, ctx.get(dut.fault))
++                    assert ctx.get(dut.fault) == fault
++                    assert not before_writes
++                    return
++                if llr:
++                    assert not ctx.get(dut.retire_valid), "pending CALL retired"
++                    done = fault is None and ctx.get(dut.imem_addr) == 0x2004
++                else:
++                    done = ctx.get(dut.retire_valid)
++                await ctx.tick()
++                pending = rd
++                ctx.set(dut.imem_valid, 0)
++                ctx.set(dut.imem_data, 0xFFFFFFFF)
++                if done:
++                    assert fault is None
++                    for _ in range(3):
++                        await ctx.tick()
++                        assert not ctx.get(dut.fault_valid)
++                        assert not ctx.get(dut.retire_valid)
++                    return
++            pytest.fail("transition did not terminate")
++
++        await issue(0x077B0000)  # LOAD CR15 from boot C-list row 0
++        await issue(0x070B0010)  # LOAD CR1 = USER Thread
++        await issue(0x27008000)  # ordinary CHANGE CR1
++        assert ctx.get(dut.debug_cr_words[12][0]) == user_gt
++        for reg in range(1, 16):
++            await execute_data(ctx, dut, 0xAF004000 | (reg << 19) | (reg + 100))
++        before_drs = [ctx.get(dr) for dr in dut.debug_dr_words]
++        before_crs = [tuple(ctx.get(w) for w in cr) for cr in dut.debug_cr_words]
++        call_nia = ctx.get(dut.imem_addr)
++        user_flags = ctx.get(dut.flags.as_value())
++        expected_fault = None
++        if case == "bad_system_frame":
++            mem[0x1000 + 243 * 4] = 0x10F3 | (0x7FFF << 13)
++            expected_fault = 0x1D
++        elif case == "bad_system_seal":
++            mem[2 * 16 + 8] ^= 1
++            expected_fault = 0x1D
++        elif case == "outgoing_stack":
++            mem[0x3000 + 68] = 0x10D4
++            expected_fault = 0x1D
++        elif case == "system_absent":
++            await issue(0x27008000)
++            before_crs = [tuple(ctx.get(w) for w in cr) for cr in dut.debug_cr_words]
++            before_drs = [ctx.get(dr) for dr in dut.debug_dr_words]
++            expected_fault = 0x11
++        before_mem = dict(mem)
++        await issue(0x17100001, llr=True, fault=expected_fault)  # CALL CR2, method 1
++        if expected_fault is not None:
++            assert mem == before_mem
++            assert [tuple(ctx.get(w) for w in cr) for cr in dut.debug_cr_words] == before_crs
++            assert [ctx.get(dr) for dr in dut.debug_dr_words] == before_drs
++            return
++        assert ctx.get(dut.debug_cr_words[12][0]) == 0x02000002
++        assert ctx.get(dut.debug_cr_words[13][0]) == before_crs[13][0]
++        assert ctx.get(dut.flags.as_value()) == 15  # SYSTEM N/C/V retained, Z set
++        assert [ctx.get(dut.debug_dr_words[i]) for i in range(7)] == [
++            0, mem[0], mem[4], mem[8], mem[12], 6, user_gt]
++        assert [mem[0x3000 + (reg + 1) * 4] for reg in range(16)] == before_drs
++        saved_frame = mem[0x3000 + 243 * 4]
++        assert (saved_frame >> 13 & 0x7FFF) == (call_nia - 0x4004) // 4
++        assert saved_frame >> 28 == user_flags
++        assert mem[0x3000 + 242 * 4] == 0x4A000005
++        # Resume through ordinary CHANGE: no special restore or synthetic CALL.
++        await issue(0x27008000)
++        assert ctx.get(dut.imem_addr) == call_nia
++        assert ctx.get(dut.flags.as_value()) == user_flags
++        assert [ctx.get(dr) for dr in dut.debug_dr_words] == before_drs
++        # Exact original CALL now succeeds after body availability changes.
++        mem[0x5000] = 0xF8000001 | (4 << 10)
++        mem[0x5004] = 2
++        mem[0x50FC] = 0x4A000006
++        await issue(0x17100001)
++        assert ctx.get(dut.imem_addr) == 0x5008
++
++    sim = Simulator(dut)
++    sim.add_clock(1e-6)
++    sim.add_testbench(bench)
++    sim.run()
++
++
++@pytest.mark.parametrize("resident", [False, True])
++@pytest.mark.parametrize("case", ["ok", "stale_owner", "stale_system", "no_owner"])
++def test_llr_latches_inputs_and_obeys_profile_identity(resident, case):
++    """Exercise word-addressed guarded geometry and nonzero fixed identities.
++
++    This is the real transition unit, not guarded startup or FPGA evidence.
++    """
++    user_gt, system_gt = 0x02070004, 0x03A30002
++    dut = ChurchChange(resident_word_locations=resident, system_thread_gt=system_gt)
++    mem = fixture(7)
++    mem[2 * 16 + 4] |= 419 << 21
++    mem[2 * 16 + 8] = integrity32(mem[2 * 16], mem[2 * 16 + 4])
++    mem[0x3000 + 68] = 0x10F3
++    for slot in range(1, 7):
++        if resident:
++            mem[slot * 16] >>= 2
++            mem[slot * 16 + 8] = integrity32(mem[slot * 16], mem[slot * 16 + 4])
++    if case in ("stale_owner", "stale_system"):
++        slot = 4 if case == "stale_owner" else 2
++        mem[slot * 16 + 4] += 1 << 21
++        mem[slot * 16 + 8] = integrity32(mem[slot * 16], mem[slot * 16 + 4])
++    def cap(gt, base, authority):
++        return gt | (base << 32) | (authority << 64)
++    crs = [0] * 16
++    crs[0] = 0x4A000005
++    crs[6] = cap(0x1A000005, 0x40F8, 1)
++    crs[12] = cap(user_gt, 0x3000, 255 | (7 << 21))
++    crs[13] = 0x12345678
++    crs[14] = cap(0x52000005, 0x4004, 47)
++    crs[15] = cap(0x02000001, 0, 63)
++    drs = [0] + list(range(101, 116))
++    original = dict(mem)
++    writes, injections = [], []
++
++    async def bench(ctx):
++        pending = None
++        ctx.set(dut.ordinary, 1)
++        ctx.set(dut.llr_entry, 1)
++        ctx.set(dut.llr_target, 6)
++        ctx.set(dut.active_thread_owned, case != "no_owner")
++        ctx.set(dut.nia_current, 0x4014)
++        ctx.set(dut.code_base, 0x4004)
++        ctx.set(dut.flags_in.as_value(), 9)
++        for cycle in range(3000):
++            ctx.set(dut.change_start, cycle == 0)
++            ctx.set(dut.cr12_thread.as_value(), crs[12])
++            ctx.set(dut.cr15_namespace.as_value(), crs[15])
++            ctx.set(dut.cr_rd_data.as_value(), crs[ctx.get(dut.cr_rd_addr)])
++            ctx.set(dut.dr_rd_data, drs[ctx.get(dut.dr_rd_addr)])
++            ctx.set(dut.mem_rd_valid, pending is not None and cycle % 3 != 0)
++            ctx.set(dut.mem_rd_data, mem.get(pending, 0))
++            ctx.set(dut.mem_wr_done, cycle % 3 != 0)
++            await ctx.delay(1e-9)
++            ctx.set(dut.cr_rd_data.as_value(), crs[ctx.get(dut.cr_rd_addr)])
++            ctx.set(dut.dr_rd_data, drs[ctx.get(dut.dr_rd_addr)])
++            await ctx.delay(1e-9)
++            rd = ctx.get(dut.mem_rd_addr) if ctx.get(dut.mem_rd_en) else None
++            if ctx.get(dut.mem_wr_en) and ctx.get(dut.mem_wr_done):
++                addr = ctx.get(dut.mem_wr_addr)
++                mem[addr] = ctx.get(dut.mem_wr_data)
++                writes.append(addr)
++            if ctx.get(dut.cr_wr_en):
++                assert writes, "publication preceded USER save"
++                crs[ctx.get(dut.cr_wr_addr)] = ctx.get(dut.cr_wr_data.as_value())
++            if ctx.get(dut.dr_wr_en):
++                addr, value = ctx.get(dut.dr_wr_addr), ctx.get(dut.dr_wr_data)
++                if addr:
++                    drs[addr] = value
++                injections.append((addr, value))
++            if ctx.get(dut.nia_restore_en):
++                assert injections[-6:] == list(enumerate(
++                    [original[0], original[4], original[8], original[12], 6, user_gt], 1))
++                assert ctx.get(dut.nia_restore_val) == 0x2004
++                assert ctx.get(dut.flags_restore_data.as_value()) == 15
++            if ctx.get(dut.change_fault):
++                assert case != "ok"
++                assert ctx.get(dut.fault_type) == 0x1D
++                assert not writes and not injections and mem == original
++                assert crs[12] == cap(user_gt, 0x3000, 255 | (7 << 21))
++                return
++            if ctx.get(dut.change_complete):
++                assert case == "ok"
++                assert crs[12] & 0xFFFFFFFF == system_gt
++                assert crs[13] == 0x12345678 and drs[0] == 0
++                assert mem[0x3000 + 243 * 4] >> 13 & 0x7FFF == 4
++                assert mem[0x3000 + 243 * 4] >> 28 == 9
++                assert [mem[0x3000 + (i + 1) * 4] for i in range(16)] == [
++                    0, *range(101, 116)]
++                return
++            await ctx.tick()
++            pending = rd
++            if cycle == 0:
++                ctx.set(dut.llr_entry, 0)
++                ctx.set(dut.llr_target, 0xFFFF)
++                ctx.set(dut.nia_current, 0xDEAD)
++                ctx.set(dut.code_base, 0xBAD)
++                ctx.set(dut.flags_in.as_value(), 6)
++        pytest.fail("stalled LLR did not finish")
++    sim = Simulator(dut)
++    sim.add_clock(1e-6)
++    sim.add_testbench(bench)
++    sim.run()
+--- a/hardware/wukong_top.py
++++ b/hardware/wukong_top.py
+@@ -465,7 +465,7 @@
+                  button_debounce_cycles=None, sim_dmem_init=True,
+                  upload_watchdog_limit=None, sim_upload_only=False,
+                  expected_boot_guard=None, sim_boot_image_words=None, runtime_image_words=None,
+-                 clock_mode="direct"):
++                 clock_mode="direct", diagnostic_llr_stop=False):
+         if clock_mode not in ("direct", "mmcm-25mhz"):
+             raise ValueError("Unsupported board clock mode")
+         if clock_mode == "mmcm-25mhz" and (clk_freq != 25_000_000 or sim_upload_only):
+@@ -473,6 +473,8 @@
+         if not sim_mode and clock_mode == "direct" and clk_freq != 50_000_000:
+             raise ValueError("Direct board clock is physically 50 MHz")
+         self.clock_mode = clock_mode
++        self.diagnostic_llr_stop = diagnostic_llr_stop
++        self.diagnostic_llr_stopped = Signal()
+         self.clk_freq = clk_freq
+         self.baud     = baud
+         self.sim_mode = sim_mode
+@@ -761,6 +763,12 @@
+         snapshot_tx_ack = Signal()
+         snapshot_complete = Signal()
+         snapshot_complete_reason = Signal(2)
++        if self.sim_mode:
++            self.sim_snapshot_complete = snapshot_complete
++            self.sim_snapshot_reason = snapshot_complete_reason
++            self.sim_snapshot_req = snapshot_tx_req
++            self.sim_snapshot_ack = snapshot_tx_ack
++            self.sim_snapshot_byte = snapshot_tx_byte
+         # Board-state evidence frame, emitted only after an explicit Halt has
+         # been applied to step_mode/step_halted:
+         #   AD 01 01 01 nonce (AC XOR nonce)
+@@ -1253,6 +1261,12 @@
+         # cycle and is the correct architectural boundary for the hold.
+         recovery_hold = recovery.fault_pending
+         stop_retire = Signal()
++        llr_stop = Signal()
++        m.d.comb += llr_stop.eq(core.llr_complete & int(self.diagnostic_llr_stop))
++        with m.If(cm_reboot):
++            m.d.sync += self.diagnostic_llr_stopped.eq(0)
++        with m.Elif(llr_stop):
++            m.d.sync += self.diagnostic_llr_stopped.eq(1)
+         m.d.comb += stop_retire.eq(
+             core.retire_valid & (
+                 bp_hit | fault_halt |
+@@ -1261,7 +1275,7 @@
+         )
+ 
+         # Breakpoint hit or fault → force step_mode + halt; takes highest priority.
+-        with m.If(bp_hit | fault_halt):
++        with m.If(bp_hit | fault_halt | llr_stop):
+             m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+         with m.Elif(step_grant & step_mode):
+             # step_grant clears halt for one retire (re-set on next retire_valid)
+@@ -1276,6 +1290,8 @@
+                 snapshot_pending.eq(1),
+                 snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
+             ]
++        with m.If(llr_stop):
++            m.d.sync += [snapshot_pending.eq(1), snapshot_reason.eq(3)]
+         # Skip advances NIA while fetch is still held. Emit a fresh reason-3
+         # snapshot from that post-skip boundary so the bridge can prove board
+         # acceptance (a UART write ACK alone is not such proof).
+@@ -1310,8 +1326,10 @@
+             # tells the bridge/IDE which build has actually restarted.
+             core.imem_valid.eq(
+                 ~step_halted & ~trace_stall & imem_settled &
+-                ~sentinel_req & ~recovery_hold & ~core.thread_switch_busy),
+-            core.halt_req.eq(step_halted | trace_stall | recovery_hold),
++                ~sentinel_req & ~recovery_hold & ~core.thread_switch_busy &
++                ~llr_stop & ~self.diagnostic_llr_stopped),
++            core.halt_req.eq(step_halted | trace_stall | recovery_hold |
++                             llr_stop | self.diagnostic_llr_stopped),
+             core.free_run_start.eq(0),
+             core.free_run_nia.eq(0),
+             core.gc_start.eq(0),
