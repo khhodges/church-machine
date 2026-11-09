@@ -26,3 +26,13 @@ optional checks delaying the manual build.
 **How to apply:** Distinguish a bounded diagnostic from general qualification.
 Keep essential package-integrity, timing/DRC, and separate board-operation
 approval boundaries, but do not expand scope before handing over build commands.
+
+Do not treat a merged Library metadata record as proof a downloadable asset
+exists. Confirm local bytes and successful asset publication before handing off.
+
+**Why:** A source-only merge retained an archive's metadata but omitted its
+ignored ZIP and test evidence; both the attachment and Library download failed.
+
+**How to apply:** Recover and verify the real file first. If rebuilding is
+necessary, retain truthful new evidence and publish the new checksum rather
+than repeating the inaccessible archive's old identity.

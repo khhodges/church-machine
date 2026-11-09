@@ -7,8 +7,15 @@ or persistent flash operation was performed.
 
 ## Exact export identity
 
-Archive: `generated-artifacts/uart-retry-build-only.zip` (3,487,874 bytes).
+Archive: `generated-artifacts/uart-retry-build-only.zip` (3,488,073 bytes).
 Extracted directory: `generated-artifacts/uart-retry-build-only`.
+Recovered locally after the source-only merge omitted the generated archive
+and line-error evidence. The replacement reran all 46 cases (361.71 seconds,
+two documented cleanup warnings), retains the same source-map digest, and
+includes the corrected receipt binding. It replaces the inaccessible archive
+`b24949d5444a2e0771737019a8427be06da97dd33c8882267b15aaa0c9940a27`.
+Fresh extracted-package verification, archive manifest hashes, and registered
+download hash/size checks passed.
 This line-error-aware export supersedes the earlier archive
 `f8e6eb98a8190973c989544b1edc330118f0b288995fb70a9be7bd7fee117fe2`.
 That earlier export does not contain the tested UART error latch; do not use
@@ -16,8 +23,8 @@ it as evidence of fail-closed line-error handling.
 
 | Input | SHA-256 |
 | --- | --- |
-| Archive | `b24949d5444a2e0771737019a8427be06da97dd33c8882267b15aaa0c9940a27` |
-| `manifest.json` | `5271cc9540ce8da30e29fe68e338851b03a3cc4da8ce2f47ab5b8278a35753b7` |
+| Archive | `b6edad1cca275f12b9d2e4cd35d09442788e76b3050a8d57a05423a3729e1eae` |
+| `manifest.json` | `17ffc39b0e1954fabb55e0e0c3dcc70be0464b7e81945e4124b63a5e9397c824` |
 | Source file map | `2d2dc1f772dcc7ae4f4136ebb37796d7e2bb7620392a47731f9ddac0beafde1c` |
 | `candidate-le.bin` | `930c435ece1ffc91975cd6697d5b08ac445580903bd0e5568237e99e3af59aa7` |
 | `fixed-frame.bin` | `e5c4b31714c214060cf7f66d2cdf5273b1adc961b75bf4ffeef905baa88a3cca` |
