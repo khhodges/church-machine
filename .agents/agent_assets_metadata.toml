@@ -1942,3 +1942,17 @@ mtime_ms = 1794228955379
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a48a5f4c-b120-4aef-93f4-5cc9bf9228fd/d132b846-4ddf-45bf-9dfc-8f7106eb1d03"
 storage_version_token = "1794228987116663"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "dbCYgQR43wQ-chM-FLfi_"
+uri = "file://generated-artifacts/resume-retry-build-only.zip"
+type = "unspecified"
+title = "Resume/retry diagnostic — build-only package"
+description = "Verified source, exported RTL, exact synthetic image, 18-case local evidence, and Linux Vivado 2026.1 runner. No BIT yet; no programming operations."
+logical_id = "5fb0fb45-c5a8-40ba-a11d-c316d05c4e90"
+content_hash = "sha256:c4984c9a2d815316b78c89f7b3738129df62b30038a531678c24440bcabab7f6"
+size = 3464469
+mtime_ms = 1794244655594
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5fb0fb45-c5a8-40ba-a11d-c316d05c4e90/fe90c624-9dd4-4562-a214-244333b856ef"
+storage_version_token = "1794244676319278"
+content_type = "application/octet-stream"
