@@ -52,3 +52,17 @@ faulting access had committed. Trace labels alone are not architectural proof.
 **How to apply:** Check fault state alongside trace events, verify the faulting
 address explicitly, and use actual memory writes and terminal state to support
 claims about publication or execution.
+
+## New diagnostic I/O boundaries
+
+Validate a new peripheral's response at the instruction's consumption cycle,
+not merely at its bus-request cycle.
+
+**Why:** A UART diagnostic successfully claimed a validated receive buffer
+while SYSTEM still read zero: the combinational MMIO response disappeared
+before the multi-cycle instruction consumed it. Receiver-only tests could
+not catch the integration failure.
+
+**How to apply:** Pair isolated receiver checks with exact full-top serial-pin
+tests, including side-effect timing for claim/pop. Keep any diagnostic-only
+response adapter separate from changes to existing production peripherals.
