@@ -16,3 +16,15 @@ Compare condition flags by their named meanings, not raw packed integers across 
 **Why:** A handoff review initially quoted the internal packed flag value as the expected UART value. The physical snapshot used a different packing order but represented the same Z-only state; treating those integers as equivalent would have falsely diagnosed a hardware failure.
 
 **How to apply:** Inspect the exact candidate's flag layout and snapshot serializer before declaring a mismatch. State any correction to previously supplied expectations explicitly.
+
+## Isolated RTL imports
+
+Run isolated candidate tests from their source root and restrict pytest's
+ancestor configuration discovery; PYTHONPATH alone is not sufficient.
+
+**Why:** Running an external test from the main workspace loaded the production
+hardware package instead of the candidate despite a candidate PYTHONPATH,
+producing a misleading unsupported-constructor error.
+
+**How to apply:** Verify the imported module's origin when comparing candidate
+behavior with production. Do not modify candidate RTL to fix import failures.
