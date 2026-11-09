@@ -1,6 +1,9 @@
 # Copy-and-retry build-only package
 
-Prepared 2026-11-09. No vendor build or physical test performed.
+Prepared 2026-11-09. No vendor build or physical test had been performed at
+package creation. The subsequent manual build and separately approved temporary
+JTAG test passed their bounded checks; see the
+[verified physical result](copy-retry-physical-result.md).
 
 - Archive: `generated-artifacts/copy-retry-build-only.zip`
 - Size: 3,457,698 bytes.

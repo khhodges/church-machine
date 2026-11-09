@@ -91,8 +91,10 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest \
 
 This is local evidence for a fixed five-word copy, not authenticated admission,
 general allocation, interruption-safe delivery, external transport, DELIVER,
-or full lazy loading. No new bitstream or physical result exists. The prior
+or full lazy loading. At local preparation, no new bitstream or physical result
+existed. Subsequent build and physical evidence is recorded separately in
+[copy-retry-physical-result.md](copy-retry-physical-result.md). The prior
 physical test remains separately recorded in
 [resume-retry-physical-result.md](resume-retry-physical-result.md).
-Preparing a build-only export with this image requires separate work and must
-not reuse the old package's exact-image admission digest.
+The subsequent separate build-only export uses this image's own exact-image
+admission digest, not the old package's digest.
