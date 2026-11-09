@@ -3,6 +3,11 @@ name: Hardware release evidence
 description: Build-host, staging, artifact tracking, and release authority constraints.
 ---
 
+- [Diagnostic export evidence](diagnostic-export-evidence.md) — an internally valid older export does not qualify newly tested receiver behavior.
+- [Vendor observer portability](vendor-observer-portability.md) — Icarus acceptance does not prove xvlog compatibility; reuse verified synthesis after observer-only failures.
+- [W7 qualification method](w7-qualification-method.md) — reviewed route completeness and correct grants are separate obligations; bind physical claims to installed bytes.
+- [Wukong operator identity](wukong-operator-device-identity.md) — reuse the confirmed board's operator UID, never infer identity from COM3.
+- [UART profile authority](uart-profile-installation-authority.md) — pin software-image compatibility to the installed BIT; keep flash approval separate.
 - [Hardware abstraction](hardware-abstraction-boundary.md) — Artix7/Wukong catalogs include unused options without implying implementation or access.
 - [CHANGE fetch evidence](hardware-change-fetch-address.md) — actual fetch addresses and absolute saved NIAs prove activation, not completion alone.
 - [Internal probes](wukong-internal-probe-preservation.md) — preserve optional ILA observations and attributes without creating external ports.

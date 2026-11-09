@@ -38,7 +38,7 @@ def prepare_verifier(text):
     text = text.replace(OLD_IMAGE, IMAGE).replace("COPY_RETRY", "UART_RETRY")
     text = text.replace("copy-retry", "uart-retry")
     text = replace_once(text, '("uart-retry-results.xml", 6)',
-                        '("uart-retry-results.xml", 22), ("uart-disabled-regression-results.xml", 2)')
+                        '("uart-line-errors-results.xml", 46), ("uart-disabled-regression-results.xml", 2)')
     text = replace_once(text, '    profile = json.loads',
                         f'    require(sha(ROOT / "fixed-frame.bin") == "{FRAME}", "Frame changed")\n'
                         '    profile = json.loads')
@@ -60,12 +60,12 @@ def main():
     if OUT.exists() or archive.exists():
         raise ValueError("Export already exists; preserve it")
     # Verify retained evidence and the frozen parent before creating anything.
-    evidence = json.loads((ROOT / "generated-artifacts/uart-retry-local-hashes.json").read_text())
+    evidence = json.loads((ROOT / "generated-artifacts/uart-line-errors-hashes.json").read_text())
     for name, digest in evidence.items():
         if name != "candidateHardwareTreeSha256" and sha(ROOT / name) != digest:
             raise ValueError(f"Local evidence changed: {name}")
     subprocess.run([sys.executable, "verify.py"], cwd=BASE, check=True)
-    for name, count in (("uart-retry-results.xml", 22),
+    for name, count in (("uart-line-errors-results.xml", 46),
                         ("uart-disabled-regression-results.xml", 2)):
         cases = list(ET.parse(ROOT / "generated-artifacts" / name).iter("testcase"))
         if len(cases) != count or any(list(c) for c in cases):
@@ -94,8 +94,8 @@ def main():
     for name in evidence:
         if name != "candidateHardwareTreeSha256":
             shutil.copyfile(ROOT / name, OUT / "evidence" / Path(name).name)
-    shutil.copyfile(ROOT / "generated-artifacts/uart-retry-local-hashes.json",
-                    OUT / "evidence/uart-retry-local-hashes.json")
+    shutil.copyfile(ROOT / "generated-artifacts/uart-line-errors-hashes.json",
+                    OUT / "evidence/uart-line-errors-hashes.json")
     for name in ("board.xdc", "clock-guard.tcl", "initializer_route_verify.py",
                  "synth.tcl", "route.tcl", "run.sh", "verify.py", "generate.py"):
         text = (BASE / name).read_text()
@@ -129,12 +129,14 @@ This opt-in diagnostic DISABLES ALL DEBUG COMMANDS, including Run, Halt,
 Step, Reboot, Upload and recovery. Not for bridge pairing or production.
 Accepts only fixed-frame.bin (30 bytes, URX1 + length + five words + END!).
 This is one-shot allowlisting, NOT authentication or general DELIVER.
-Partial input waits indefinitely. Invalid/excess bytes before claim fail
-closed; after claim all bytes are ignored and data remains immutable.
+Partial input waits indefinitely. Invalid/excess bytes and UART framing errors
+before claim fail closed, including the claim cycle; after claim all bytes and
+errors are ignored and data remains immutable. No automatic recovery.
 Do NOT send this frame to the currently installed BIT.
 
-22 UART local cases and 2 receiver-disabled regression cases passed.
+46 UART local cases and 2 prior receiver-disabled regression cases passed.
 Two coroutine cleanup warnings remain in the full local log.
+Selected digital pin errors are tested, not analog noise or timing margins.
 No vendor build, timing result, physical transfer or hardware test is claimed.
 Expected terminal snapshot: reason 3, NIA 0x400C, CR12 0x02070004, DR12 13.
 

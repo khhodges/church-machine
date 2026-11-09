@@ -11,8 +11,10 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE = ROOT / "generated-artifacts/uart-retry-build-only.zip"
@@ -47,7 +49,7 @@ class ReceiptProductionTests(unittest.TestCase):
                        fixedFrameSha256=self.export.FRAME)
         (self.package / "rtl/guarded-profile.json").write_text(json.dumps(profile))
         (self.package / "evidence").mkdir()
-        for name, count in (("uart-retry-results.xml", 22),
+        for name, count in (("uart-line-errors-results.xml", 46),
                             ("uart-disabled-regression-results.xml", 2)):
             (self.package / "evidence" / name).write_text(
                 "<testsuite>" + "<testcase/>" * count + "</testsuite>")
@@ -447,6 +449,18 @@ class ExportTests(unittest.TestCase):
         result = self.verify()
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_registered_download_matches_local_archive(self):
+        metadata = tomllib.loads(
+            (ROOT / ".agents/agent_assets_metadata.toml").read_text())
+        matches = [entry for entry in metadata["outputs"]
+                   if entry.get("uri") == "file://generated-artifacts/uart-retry-build-only.zip"]
+        self.assertEqual(len(matches), 1, "Register exactly one current UART download")
+        entry = matches[0]
+        self.assertEqual(entry["content_hash"],
+                         "sha256:" + hashlib.sha256(ARCHIVE.read_bytes()).hexdigest(),
+                         "Republish the updated archive; the registered download is stale")
+        self.assertEqual(entry["size"], ARCHIVE.stat().st_size)
+
     def test_manifest_all_archived_files(self):
         meta = json.loads((self.package / "manifest.json").read_text())
         for name, digest in meta["files"].items():
@@ -471,6 +485,27 @@ class ExportTests(unittest.TestCase):
                     self.assertIn("Input changed", result.stderr)
                 finally:
                     path.write_bytes(saved)
+
+    def test_line_error_sources_and_evidence(self):
+        for name in ("uart_retry_receiver.py",):
+            self.assertEqual(
+                (self.package / "source-snapshot/hardware" / name).read_bytes(),
+                (ROOT / "docs/phase-2" / name).read_bytes())
+        top = (self.package / "source-snapshot/hardware/wukong_top.py").read_text()
+        self.assertIn("diagnostic_rx.error.eq(uart_rx.error)", top)
+        cases = list(ET.parse(
+            self.package / "evidence/uart-line-errors-results.xml").iter("testcase"))
+        self.assertEqual(len(cases), 46)
+        self.assertTrue(all(not list(case) for case in cases))
+        for scenario in ("bad_stop_first", "bad_stop_payload", "bad_stop_last",
+                         "break", "false_start", "data_noise", "post_claim_error"):
+            self.assertTrue(any(scenario in case.attrib["name"] for case in cases))
+        evidence = json.loads(
+            (self.package / "evidence/uart-line-errors-hashes.json").read_text())
+        for name in ("test_uart_retry_preparation.py", "uart-retry-top.patch",
+                     "uart_retry_receiver.py"):
+            path = "docs/phase-2/" + name
+            self.assertEqual(evidence[path], hashlib.sha256((ROOT / path).read_bytes()).hexdigest())
 
     def test_admission_and_imports_outside_workspace(self):
         import amaranth

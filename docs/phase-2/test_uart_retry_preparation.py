@@ -4,6 +4,8 @@ import struct
 
 import pytest
 from amaranth.sim import Simulator
+from amaranth import Module
+from hardware.uart_rx import UartRx
 from hardware.wukong_top import ChurchWukongXC7A100T
 from hardware.test_phase2_guarded_llr import guarded_fixture, GUARD, CHANGE_CR1
 from hardware.boot_rom import encode_turing
@@ -55,7 +57,7 @@ def uart_retry_fixture(case="success"):
 @pytest.mark.parametrize("baud", [125000, 62500])
 @pytest.mark.parametrize("case", [
     "success", "delayed", "partial", "malformed", "no_read", "no_write",
-    "command_bytes", "excess_before_claim",
+    "command_bytes", "excess_before_claim", "bad_stop", "break", "data_noise",
 ])
 def test_uart_retry(case, baud):
     words = [0] * 16384
@@ -84,10 +86,18 @@ def test_uart_retry(case, baud):
             payload = b"srhfugbq"
         elif case == "excess_before_claim":
             payload = FRAME + b"x"
+        if case == "break":
+            ctx.set(top.uart_rx_pin, 0)
+            await ctx.tick().repeat(20 * (1000000 // baud))
+            ctx.set(top.uart_rx_pin, 1)
+            return
         for i, byte in enumerate(payload):
             if case == "delayed" and i == 17:
                 await ctx.tick().repeat(5000)
-            for bit in [0, *((byte >> n) & 1 for n in range(8)), 1]:
+            if case == "data_noise" and i == 10:
+                byte ^= 1
+            stop = 0 if case == "bad_stop" and i == 10 else 1
+            for bit in [0, *((byte >> n) & 1 for n in range(8)), stop]:
                 ctx.set(top.uart_rx_pin, bit)
                 await ctx.tick().repeat(1000000 // baud)
         ctx.set(top.uart_rx_pin, 1)
@@ -117,6 +127,9 @@ def test_uart_retry(case, baud):
                     "malformed": FaultType.INVALID_OP,
                     "command_bytes": FaultType.INVALID_OP,
                     "excess_before_claim": FaultType.INVALID_OP,
+                    "bad_stop": FaultType.INVALID_OP,
+                    "break": FaultType.INVALID_OP,
+                    "data_noise": FaultType.INVALID_OP,
                 }
                 assert case in expected, (case, cycle, ctx.get(core.fault), retired[-15:])
                 assert ctx.get(core.fault) == expected[case]
@@ -212,6 +225,127 @@ def test_receiver_boundaries(case):
                 await ctx.tick()
             ctx.set(rx.pop, 0)
             assert ctx.get(rx.data) == 0 and not ctx.get(rx.failed)
+
+    sim.add_testbench(bench)
+    sim.run()
+
+
+@pytest.mark.parametrize("baud", [125000, 62500])
+@pytest.mark.parametrize("case", [
+    "bad_stop_first", "bad_stop_payload", "bad_stop_last", "break",
+    "false_start", "data_noise", "post_claim_error",
+])
+def test_serial_pin_errors(case, baud):
+    """Digital sampling evidence, not analog noise or authenticated delivery."""
+    m = Module()
+    uart = m.submodules.uart = UartRx(clk_freq=1000000, baud=baud)
+    rx = m.submodules.receiver = DiagnosticReceiver()
+    m.d.comb += [rx.valid.eq(uart.valid), rx.byte.eq(uart.data),
+                 rx.error.eq(uart.error)]
+    sim = Simulator(m)
+    sim.add_clock(1e-6)
+    period = 1000000 // baud
+
+    async def bench(ctx):
+        errors = 0
+
+        async def level(bit, cycles):
+            nonlocal errors
+            ctx.set(uart.rx, bit)
+            for _ in range(cycles):
+                errors += ctx.get(uart.error)
+                await ctx.tick()
+
+        async def byte(value, stop=1, noise=False):
+            await level(0, period)
+            for n in range(8):
+                bit = (value >> n) & 1
+                if noise and n == 0:
+                    # A mid-bit pulse spans the synchronized sampling point.
+                    await level(bit, period // 4)
+                    await level(1 - bit, period // 2)
+                    await level(bit, period - 3 * (period // 4))
+                else:
+                    await level(bit, period)
+            await level(stop, period)
+
+        await level(1, period * 2)
+        if case == "false_start":
+            await level(0, 1)
+            await level(1, period * 12)
+            assert ctx.get(rx.count) == 0 and errors == 0
+            assert ctx.get(rx.status) == 0 and not ctx.get(rx.accepted)
+        if case == "break":
+            await level(0, period * 30)
+            await level(1, period * 12)
+        else:
+            bad_index = {"bad_stop_first": 0, "bad_stop_payload": 10,
+                         "bad_stop_last": len(FRAME) - 1}.get(case)
+            for i, value in enumerate(FRAME):
+                await byte(value, stop=int(i != bad_index),
+                           noise=case == "data_noise" and i == 10)
+            await level(1, period * 12)
+
+        if case in ("false_start", "post_claim_error"):
+            assert errors == 0 and ctx.get(rx.status) == 1
+            assert ctx.get(rx.data) == 0
+            ctx.set(rx.claim, 1)
+            await ctx.tick()
+            ctx.set(rx.claim, 0)
+            if case == "post_claim_error":
+                await level(0, period * 30)
+                await level(1, period * 12)
+                assert errors > 0
+            assert ctx.get(rx.accepted) and not ctx.get(rx.failed)
+            for word in PAYLOAD_WORDS:
+                assert ctx.get(rx.data) == word
+                ctx.set(rx.pop, 1)
+                await ctx.tick()
+            ctx.set(rx.pop, 0)
+            assert ctx.get(rx.data) == 0
+        else:
+            assert errors == 0 if case == "data_noise" else errors > 0
+            assert ctx.get(rx.failed) and ctx.get(rx.status) == 2
+            # Idle time and a fresh exact frame cannot repair/rearm rejection.
+            await level(1, 5000)
+            for value in FRAME:
+                await byte(value)
+            await level(1, period * 12)
+            ctx.set(rx.claim, 1)
+            ctx.set(rx.pop, 1)
+            await ctx.tick().repeat(10)
+            assert ctx.get(rx.status) == 2 and not ctx.get(rx.accepted)
+            assert ctx.get(rx.data) == 0 and ctx.get(rx.index) == 0
+
+    sim.add_testbench(bench)
+    sim.run()
+
+
+@pytest.mark.parametrize("ready", [False, True])
+@pytest.mark.parametrize("valid", [False, True])
+def test_error_wins_over_byte_and_claim(ready, valid):
+    rx = DiagnosticReceiver()
+    sim = Simulator(rx)
+    sim.add_clock(1e-6)
+
+    async def bench(ctx):
+        if ready:
+            for value in FRAME:
+                ctx.set(rx.valid, 1)
+                ctx.set(rx.byte, value)
+                await ctx.tick()
+        ctx.set(rx.valid, valid)
+        ctx.set(rx.byte, FRAME[0])
+        ctx.set(rx.error, 1)
+        ctx.set(rx.claim, 1)
+        assert ctx.get(rx.status) == 2
+        await ctx.tick()
+        ctx.set(rx.error, 0)
+        ctx.set(rx.valid, 0)
+        await ctx.tick().repeat(1000)
+        assert ctx.get(rx.failed) and not ctx.get(rx.accepted)
+        assert ctx.get(rx.status) == 2 and ctx.get(rx.data) == 0
+        assert ctx.get(rx.count) == (len(FRAME) if ready else 0)
 
     sim.add_testbench(bench)
     sim.run()

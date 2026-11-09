@@ -10,13 +10,15 @@ FRAME = b"URX1" + b"\x00\x14" + b"".join(
 class DiagnosticReceiver(Elaboratable):
     """Status: 0 pending, 1 validated, 2 failed.
 
-    A valid status read claims the frame. Extra bytes before that claim fail;
-    bytes after claim are ignored permanently. No timeout, retry, or reset
+    A valid status read claims the frame. Extra bytes or UART errors before
+    that claim fail; bytes/errors after claim are ignored permanently.
+    No timeout, retry, or reset
     recovery is provided. Data reads pop only after claim.
     """
     def __init__(self):
         self.valid = Signal()
         self.byte = Signal(8)
+        self.error = Signal()
         self.claim = Signal()
         self.pop = Signal()
         self.status = Signal(2)
@@ -33,13 +35,17 @@ class DiagnosticReceiver(Elaboratable):
         ready = self.count == len(FRAME)
         # Collision: a byte arriving on the claim cycle wins and rejects.
         overflow = self.valid & ready & ~self.accepted
+        reject = overflow | (self.error & ~self.accepted)
         m.d.comb += [
-            self.status.eq(Mux(self.failed | overflow, 2, Mux(ready, 1, 0))),
+            self.status.eq(Mux(self.failed | reject, 2, Mux(ready, 1, 0))),
             self.data.eq(Mux(self.accepted & ~self.failed & (self.index < 5),
                              words[self.index], 0)),
         ]
         with m.If(~self.failed & ~self.accepted):
-            with m.If(self.valid):
+            # A line error wins over both a matching byte and a status claim.
+            with m.If(self.error):
+                m.d.sync += self.failed.eq(1)
+            with m.Elif(self.valid):
                 with m.If(ready):
                     m.d.sync += self.failed.eq(1)
                 with m.Elif(self.byte != expected[self.count]):

@@ -17,7 +17,7 @@
          self.diagnostic_llr_stopped = Signal()
          self.clk_freq = clk_freq
          self.baud     = baud
-@@ -752,6 +753,16 @@
+@@ -752,6 +753,17 @@
          # Two-stage synchroniser is built into UartRx (rx_sync register).
          uart_rx = m.submodules.uart_rx = UartRx(clk_freq=self.clk_freq, baud=self.baud)
          m.d.comb += uart_rx.rx.eq(self.uart_rx_pin)
@@ -28,6 +28,7 @@
 +            m.d.comb += [
 +                diagnostic_rx.valid.eq(uart_rx.valid),
 +                diagnostic_rx.byte.eq(uart_rx.data),
++                diagnostic_rx.error.eq(uart_rx.error),
 +            ]
 +            if self.sim_mode:
 +                self.sim_diagnostic_rx = diagnostic_rx
