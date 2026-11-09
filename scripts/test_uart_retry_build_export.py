@@ -1,5 +1,6 @@
 """Offline package checks: no vendor executable, remote builder, or device."""
 import hashlib
+import ctypes
 import importlib.util
 import json
 import os
@@ -22,6 +23,13 @@ class RunnerProcessTests(unittest.TestCase):
     """Execute the frozen shell pipeline, never a vendor binary or board tool."""
 
     def setUp(self):
+        # Linux subreaping keeps deliberately orphaned grandchildren in this
+        # test's custody instead of relying on PID 1 to reap them.
+        self.libc = ctypes.CDLL(None, use_errno=True)
+        previous = ctypes.c_int()
+        self.assertEqual(self.libc.prctl(37, ctypes.byref(previous), 0, 0, 0), 0)
+        self.assertEqual(self.libc.prctl(36, 1, 0, 0, 0), 0)
+        self.addCleanup(self.restore_subreaper, previous.value)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -36,32 +44,43 @@ class RunnerProcessTests(unittest.TestCase):
             self.assertIsNotNone(target, name)
             (self.bin / name).symlink_to(target)
         self.write_tool("timeout", """
-import os, subprocess, sys
+import os, signal, subprocess, sys
 from pathlib import Path
+for sig in (signal.SIGINT, signal.SIGTERM):
+    signal.signal(sig, lambda number, frame: sys.exit(128 + number))
+Path('timeout.pid').write_text(str(os.getpid()))
 duration, tool, *args = sys.argv[1:]
 assert tool == 'vivado'
 phase = args[args.index('-source') + 1]
 assert duration == {'synth.tcl': '120m', 'route.tcl': '240m'}[phase]
 with open('timeout-calls', 'a') as f:
     f.write(duration + ' ' + phase + '\\n')
-result = subprocess.run([str(Path(__file__).with_name('vivado')), *args])
+# GNU timeout preserves the runner's shared-lock FD in the vendor child.
+# Use Popen.wait rather than run: run kills its child when a signal handler
+# raises SystemExit, which would hide the surviving-child lock case.
+child = subprocess.Popen([str(Path(__file__).with_name('vivado')), *args],
+                         pass_fds=(9,))
+status = child.wait()
 # Model GNU timeout's exit status without waiting hours. Vivado has already
 # emitted partial output, just as a killed build may have done.
 if os.environ.get('TIMEOUT_PHASE') == phase:
     print('FAKE_TIMEOUT ' + phase, flush=True)
     sys.exit(124)
-sys.exit(result.returncode)
+sys.exit(status)
 """)
         self.write_tool("vivado", """
-import os, subprocess, sys, time
+import os, signal, subprocess, sys, time
 from pathlib import Path
+for sig in (signal.SIGINT, signal.SIGTERM):
+    signal.signal(sig, lambda number, frame: sys.exit(128 + number))
+Path('vivado.pid').write_text(str(os.getpid()))
 phase = sys.argv[sys.argv.index('-source') + 1]
 with open('vivado-calls', 'a') as f:
     f.write(phase + '\\n')
 print('FAKE_VIVADO ' + phase, flush=True)
 if os.environ.get('HOLD_PHASE') == phase:
     Path('entered').touch()
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + 30
     while not Path('release').exists():
         if time.monotonic() > deadline:
             sys.exit(98)
@@ -113,15 +132,47 @@ if os.environ.get('FAIL_PHASE') == phase:
         self.addCleanup(self.stop, process)
         return process
 
+    def restore_subreaper(self, previous):
+        self.assertEqual(self.libc.prctl(36, previous, 0, 0, 0), 0)
+
     @staticmethod
-    def stop(process):
+    def group_pids(process):
+        members = set()
+        for path in Path("/proc").glob("[0-9]*/stat"):
+            try:
+                # comm may contain spaces or parentheses; fields after it are
+                # state, ppid, pgrp, ...
+                fields = path.read_text().rsplit(")", 1)[1].split()
+                if int(fields[2]) == process.pid:
+                    members.add(int(path.parent.name))
+            except FileNotFoundError:
+                pass
+        return members
+
+    def assert_group_reaped(self, process, remaining=frozenset()):
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                while os.waitpid(-process.pid, os.WNOHANG)[0]:
+                    pass
+            except ChildProcessError:
+                pass
+            members = self.group_pids(process)
+            if members == remaining:
+                return
+            self.assertLess(time.monotonic(), deadline,
+                            f"Unreaped test processes: {members}")
+            time.sleep(.02)
+
+    def stop(self, process):
         # Kill the whole process group, including fake tools/tee, on assertions
         # or harness timeouts; inherited lock descriptors must not leak.
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        process.communicate()
+        process.communicate(timeout=5)
+        self.assert_group_reaped(process)
 
     def finish(self, process):
         output, _ = process.communicate(timeout=20)
@@ -136,6 +187,74 @@ if os.environ.get('FAIL_PHASE') == phase:
         if status is not None:
             self.assertEqual(code, status, output)
         self.assertNotIn(SUCCESS, output)
+
+    def wait_for_hold(self, process, package):
+        deadline = time.monotonic() + 10
+        while not (package / "entered").exists():
+            self.assertIsNone(process.poll(), "Runner exited before fake tool held")
+            self.assertLess(time.monotonic(), deadline, "Fake tool did not start")
+            time.sleep(.02)
+        return tuple(int((package / name).read_text())
+                     for name in ("timeout.pid", "vivado.pid"))
+
+    def assert_lock_blocked(self, package):
+        result = self.run_package(package)
+        self.assert_failed(result)
+        self.assertIn("Another vendor build holds the lock", result[1])
+        for name in ("vivado-calls", "timeout-calls", "synthesis.log"):
+            self.assertFalse((package / name).exists(), name)
+
+    def assert_clean_retry(self, package):
+        code, output = self.run_package(package)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(output.splitlines().count(SUCCESS), 1)
+
+    def test_terminated_runner_keeps_lock_until_last_child_exits(self):
+        for phase in ("synth.tcl", "route.tcl"):
+            for termination in (signal.SIGTERM, signal.SIGKILL):
+                with self.subTest(phase=phase, termination=termination):
+                    package = self.extract(f"parent-{phase}-{termination}")
+                    clean = self.extract(f"retry-parent-{phase}-{termination}")
+                    process = self.start(package, HOLD_PHASE=phase)
+                    timeout_pid, vendor_pid = self.wait_for_hold(process, package)
+                    owned = self.group_pids(process)
+                    self.assertTrue({process.pid, timeout_pid, vendor_pid} <= owned)
+                    self.assert_lock_blocked(clean)
+                    os.kill(process.pid, termination)
+                    self.assertEqual(process.wait(timeout=5), -termination)
+                    # Parent death must NOT unlock a still-running vendor build.
+                    self.assertTrue({timeout_pid, vendor_pid} <= self.group_pids(process))
+                    self.assert_lock_blocked(clean)
+                    # Remove the wrapper and tee too: the fake vendor alone
+                    # must retain the inherited descriptor and exclude a build.
+                    for pid in owned - {process.pid, vendor_pid}:
+                        os.kill(pid, signal.SIGTERM)
+                    self.assert_group_reaped(process, remaining={vendor_pid})
+                    self.assert_lock_blocked(clean)
+                    os.kill(vendor_pid, signal.SIGTERM)
+                    self.assert_failed(self.finish(process), -termination)
+                    self.assert_group_reaped(process)
+                    for pid in owned:
+                        self.assertFalse(Path(f"/proc/{pid}").exists(), pid)
+                    self.assert_clean_retry(clean)
+
+    def test_interrupt_or_terminate_whole_build_group_releases_lock(self):
+        for phase in ("synth.tcl", "route.tcl"):
+            for interruption in (signal.SIGINT, signal.SIGTERM):
+                with self.subTest(phase=phase, interruption=interruption):
+                    package = self.extract(f"group-{phase}-{interruption}")
+                    clean = self.extract(f"retry-group-{phase}-{interruption}")
+                    process = self.start(package, HOLD_PHASE=phase)
+                    timeout_pid, vendor_pid = self.wait_for_hold(process, package)
+                    owned = self.group_pids(process)
+                    self.assertTrue({process.pid, timeout_pid, vendor_pid} <= owned)
+                    self.assert_lock_blocked(clean)
+                    os.killpg(process.pid, interruption)
+                    self.assert_failed(self.finish(process))
+                    self.assert_group_reaped(process)
+                    for pid in owned:
+                        self.assertFalse(Path(f"/proc/{pid}").exists(), pid)
+                    self.assert_clean_retry(clean)
 
     def test_success_control(self):
         code, output = self.run_package(self.package)
