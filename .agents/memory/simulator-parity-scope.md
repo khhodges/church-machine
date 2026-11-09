@@ -15,3 +15,20 @@ acceptance remains authoritative.
 **How to apply:** Treat major execution-model gaps as a stop/reconsider decision,
 not implicit implementation approval. Plan revision, investigation, corrections
 and physical operations have separate authorization boundaries.
+
+## Hardware-first review constraints
+
+The user's supplied review requires retained-GT checks on the retried CALL,
+including stale/wrong-GT negative cases; observe another eligible USER making
+progress during the delivery wait, not only after the happy-path demonstration.
+Finite test limits belong to the observer, never an elapsed-time USER resume
+or fault rule. Flashing requires a separate authorization and installation
+verification gate, with no execution from a partial transfer.
+
+**Why:** A completed Lazy CALL alone can hide stale authority or starvation;
+bounded testing must not alter indefinite-wait semantics.
+
+**How to apply:** Record relevant RTL/simulator differences without creating a
+simulator-alignment prerequisite. Physical evidence establishes installed
+behavior, but does not override the approved ISA or excuse a demonstrated RTL
+safety failure. Verify reported historical differences against current sources.
