@@ -36,3 +36,12 @@ ignored ZIP and test evidence; both the attachment and Library download failed.
 **How to apply:** Recover and verify the real file first. If rebuilding is
 necessary, retain truthful new evidence and publish the new checksum rather
 than repeating the inaccessible archive's old identity.
+
+Use `python3 -m zipfile -e` for manual build-package extraction on the
+operator's droplet; do not require `unzip`.
+
+**Why:** The operator confirmed the ZIP utility is not installed and explicitly
+required reusing the prior Python extraction approach.
+
+**How to apply:** Give Linux extraction/build commands separately from Windows
+PowerShell transfer commands, preserving a fresh extraction directory.
