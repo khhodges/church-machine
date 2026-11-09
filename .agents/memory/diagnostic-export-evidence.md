@@ -15,3 +15,14 @@ while proving only the older design, not the newly tested behavior.
 only the isolated export, verify the extracted package, and identify the
 superseded archive explicitly. Keep vendor builds and board operations behind
 their separate approval boundaries.
+
+For these isolated FPGA diagnostics, proceed to the next authorized handoff
+once actual technical blockers are resolved; optional qualification and
+regression work must not become additional release gates.
+
+**Why:** The user explicitly required forward progress rather than repeated
+optional checks delaying the manual build.
+
+**How to apply:** Distinguish a bounded diagnostic from general qualification.
+Keep essential package-integrity, timing/DRC, and separate board-operation
+approval boundaries, but do not expand scope before handing over build commands.
