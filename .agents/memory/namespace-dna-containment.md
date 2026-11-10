@@ -77,3 +77,9 @@ Use an endlessly stair-climbing stick figure for the Thread illustration.
 **Why:** The user requested this instead of the static person-and-arrows icon.
 **How to apply:** Treat the loop as an object-type illustration, never evidence
 that a Thread is executing; retain a reduced-motion still.
+
+Provide reciprocal top-line Switch buttons between Namespace Designer and
+Memory Glass, keeping the same Namespace selected.
+**Why:** The user requested direct back-and-forth comparison of those two views.
+**How to apply:** Retain unsaved designer edits while showing the saved layout;
+switching views must not save, bind, prepare, send, or substitute a Namespace.

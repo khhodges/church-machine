@@ -60,6 +60,14 @@
         load(false);
         if (!isActive()) root.switchView(VIEW); else syncHash();
     }
+    async function openDesigner(key) {
+        if (typeof key !== 'string' || !/^namespace:(legacy|ascending|phase1|copy:[a-f0-9]{32})$/.test(key))
+            throw Error('This is historical inspection. Select a saved Namespace to open its designer.');
+        if (!root.NamespaceDesignV1?.selectShared)
+            throw Error('The Namespace designer is not ready. Reload the IDE.');
+        await root.NamespaceDesignV1.selectShared(key);
+        root.switchView('namespace');
+    }
     async function openFromNamespace(query) {
         try {
             const response = await fetch('/api/development-image/open?' + query, {cache: 'no-store'});
@@ -129,7 +137,7 @@
         }
     });
 
-    root.DevelopmentImageView = {show, openFromNamespace, requestLoad,
+    root.DevelopmentImageView = {show, openDesigner, openFromNamespace, requestLoad,
         pendingLoad: () => pendingLoad, parseHash, routeFor, frameSrc,
         selection: () => selection};
 })(window);

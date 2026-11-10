@@ -1229,7 +1229,9 @@
 
     <div id="namespace" class="view">
         <div class="panel">
-            <div class="panel-title">Namespace Design</div>
+            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">Namespace Design
+                <button type="button" class="btn btn-sm" id="namespaceSwitchToGlass" onclick="DevelopmentImageView.show(NamespaceSelection.current())" title="Show the saved Namespace in Memory Glass; unsaved designer edits are retained" aria-label="Switch to Memory Glass">Switch → Memory Glass</button>
+            </div>
             <label for="namespaceDesignProfile">Namespace: </label>
             <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
                 <option value="phase1">Phase 1</option>
@@ -3731,7 +3733,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="breakpoint-inspector.js?v=sha256-72e74713d889"></script>
     <script src="design-simulation.js?v=sha256-35c7e05323f7"></script>
     <script src="namespace-selection.js?v=sha256-7bc7fff31bf4"></script>
-    <script src="development-image-view.js?v=sha256-1b9d9821da06"></script>
+    <script src="development-image-view.js?v=sha256-5bfae37b8756"></script>
     <script src="namespace-design-v1.js?v=sha256-b7b9abf13f9c"></script>
     <script src="namespace-ide-node.js?v=sha256-94708018f5d1"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>

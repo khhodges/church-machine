@@ -55,5 +55,20 @@ function run(hash){
     await t.win.DevelopmentImageView.openFromNamespace('profile=ascending&fingerprint=f');
     assert.deepEqual(t.calls.at(-1),['switch','development-image']);
     assert.equal(t.frame.attrs.src,'/development-image/?namespace=design%3Aabc');
-    console.log('PASS Development Image IDE view routing, selection and header integration');
+    // Switch back selects the exact design before navigating, never saves it.
+    const key='namespace:copy:'+'a'.repeat(32);
+    t.win.NamespaceDesignV1={selectShared:async selected=>{t.calls.push(['select',selected]);}};
+    await t.win.DevelopmentImageView.openDesigner(key);
+    assert.deepEqual(t.calls.slice(-2),[['select',key],['switch','namespace']]);
+    await assert.rejects(t.win.DevelopmentImageView.openDesigner('design:historical'),/historical/);
+    const before=t.calls.length;
+    t.win.NamespaceDesignV1.selectShared=async()=>{throw Error('Unsaved draft retained');};
+    await assert.rejects(t.win.DevelopmentImageView.openDesigner('namespace:ascending'),/Unsaved draft/);
+    assert.equal(t.calls.length,before,'failed selection must not navigate');
+    t.win.NamespaceSelection={current:()=>key,read:()=>key,remember:()=>{}};
+    t.win.DevelopmentImageView.show(t.win.NamespaceSelection.current());
+    assert.equal(t.frame.attrs.src,'/development-image/?namespace='+encodeURIComponent(key));
+    assert(html.includes('id="namespaceSwitchToGlass"'),'designer has a top-line Switch button');
+    assert(app.includes('aria-label="Switch to Namespace Designer"'),'Memory Glass has reciprocal Switch button');
+    console.log('PASS Development Image IDE routing and two-way Switch with exact selection and draft guards');
 })().catch(e=>{console.error(e);process.exit(1);});

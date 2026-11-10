@@ -208,6 +208,16 @@ export default function DevelopmentImage() {
     void beginSend();
   });
 
+  async function switchToDesigner() {
+    const entry=entries.find(item=>(item.selection_key || item.id)===namespace);
+    try {
+      const host=window.parent as Window & {DevelopmentImageView?: {openDesigner(key:string):Promise<void>}};
+      if (!entry?.selection_key || host === window || !host.DevelopmentImageView?.openDesigner)
+        throw Error("Select a saved Namespace inside the IDE to open its designer.");
+      await host.DevelopmentImageView.openDesigner(entry.selection_key);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+  }
+
   async function editSelectedObject() {
     if (!selected || !input || busy.current) return;
     const entry=entries.find(item=>(item.selection_key || item.id)===namespace);
@@ -323,7 +333,9 @@ export default function DevelopmentImage() {
 
       <div className="kiss-heading">
         <div><p className="kiss-subtitle">Review the bound Namespace layout, then send it to the FPGA.</p></div>
-        <span className="kiss-local">SAVED NAMESPACE</span>
+        <button type="button" className="kiss-primary" onClick={() => void switchToDesigner()}
+          disabled={loading || sending || !entries.find(entry=>(entry.selection_key || entry.id)===namespace)?.selection_key}
+          aria-label="Switch to Namespace Designer" title="Return to this Namespace designer without saving or sending">Switch → Namespace Designer</button>
       </div>
       {error && <p className="kiss-api-error" role="alert">{error} No saved data was changed. <a href={location.pathname}>Reload saved Namespaces</a></p>}
       {namespace.startsWith("latest:") && <button type="button" disabled={loading || sending || !!confirmation}
