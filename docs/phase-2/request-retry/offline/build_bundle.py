@@ -11,7 +11,8 @@ import tempfile
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parents[3]
+ROOT = next((p for p in HERE.parents if (p / ".git").exists()), HERE)
+GPL_SHA256 = "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
 INPUTS = {
     "attached_assets/capture_1794317160962.bin": "29042a6d710caff70688db0f6276a616937b4fc96d5b1503b8e18529776e8051",
     "attached_assets/events_1794317160963.jsonl": "210933e519861a252cc2aab7556353ade08416fe0bb1add2284c4bf86dfd79d3",
@@ -59,6 +60,10 @@ def build(output):
         "independent_decode.py": (HERE / "independent_decode.py").read_bytes(),
         "independent-reader.md": (HERE / "independent-reader.md").read_bytes(),
     }
+    for name in ("COPYING", "NOTICE.md", "SOURCE.md", "build_bundle.py", "test_replay.py"):
+        files[name] = (HERE / name).read_bytes()
+    if digest(files["COPYING"]) != GPL_SHA256:
+        raise ValueError("COPYING must be the full unmodified GNU GPL version 3")
     manifest = dict(schema="request-retry-offline-v2", original_inputs=INPUTS,
                     transformations={
                         "events.jsonl": "Replace opening port with [REDACTED]; canonical JSON key ordering only",
@@ -67,6 +72,23 @@ def build(output):
                     files={name: dict(bytes=len(data), sha256=digest(data))
                            for name, data in sorted(files.items())})
     files["manifest.json"] = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
+    return write_archive(output, files)
+
+
+def repack(directory, output):
+    """Rebuild the distributed source archive without repository-only inputs."""
+    from replay import verify_bundle
+    directory = directory.resolve()
+    verify_bundle(directory)
+    files = {p.name: p.read_bytes() for p in directory.iterdir()}
+    if digest(files["COPYING"]) != GPL_SHA256:
+        raise ValueError("COPYING must be the full unmodified GNU GPL version 3")
+    return write_archive(output.resolve(), files)
+
+
+def write_archive(output, files):
+    if output.exists():
+        raise ValueError("Output already exists; historical bundles are never overwritten")
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=output.parent) as temp:
         staging = Path(temp)
@@ -90,5 +112,7 @@ def build(output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=ROOT / "generated-artifacts/request-retry-offline")
+    parser.add_argument("--from-bundle", type=Path,
+                        help="Repack an extracted, verified bundle without original uploads")
     args = parser.parse_args()
-    print(build(args.out))
+    print(repack(args.from_bundle, args.out) if args.from_bundle else build(args.out))

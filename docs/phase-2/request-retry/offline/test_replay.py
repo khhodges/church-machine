@@ -65,6 +65,42 @@ class OfflineReplayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "already exists"):
             build_bundle.build(self.work / "first")
 
+    def test_compliance_materials_and_standalone_repack(self):
+        self.assertEqual(build_bundle.digest((self.bundle / "COPYING").read_bytes()),
+                         build_bundle.GPL_SHA256)
+        for name in ("COPYING", "NOTICE.md", "SOURCE.md", "build_bundle.py", "test_replay.py"):
+            self.assertEqual((self.bundle / name).read_bytes(),
+                             (build_bundle.HERE / name).read_bytes())
+        output = self.work / "standalone"
+        completed = subprocess.run(
+            [sys.executable, "-B", "-S", str(self.bundle / "build_bundle.py"),
+             "--from-bundle", str(self.bundle), "--out", str(output)],
+            cwd=self.work, capture_output=True, text=True)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(self.archive.read_bytes(),
+                         (output / "request-retry-offline.zip").read_bytes())
+        checksum = (output / "SHA256SUMS").read_text().split()[0]
+        self.assertEqual(checksum, build_bundle.digest(self.archive.read_bytes()))
+
+    def test_excluded_directories_and_symlinks_rejected(self):
+        unexpected = self.bundle / "vendor"
+        unexpected.mkdir()
+        try:
+            with self.assertRaisesRegex(ValueError, "Unexpected files"):
+                replay.verify_bundle(self.bundle)
+        finally:
+            unexpected.rmdir()
+        notice = self.bundle / "NOTICE.md"
+        data = notice.read_bytes()
+        notice.unlink()
+        notice.symlink_to(build_bundle.HERE / "NOTICE.md")
+        try:
+            with self.assertRaisesRegex(ValueError, "Symlink"):
+                replay.verify_bundle(self.bundle)
+        finally:
+            notice.unlink()
+            notice.write_bytes(data)
+
     def test_historical_inputs_are_pinned(self):
         for name, expected in build_bundle.INPUTS.items():
             self.assertEqual(build_bundle.digest((build_bundle.ROOT / name).read_bytes()), expected)

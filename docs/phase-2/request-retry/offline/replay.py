@@ -80,10 +80,12 @@ def verify_bundle(directory):
     require(manifest["schema"] == "request-retry-offline-v2", "Unsupported manifest")
     expected = {"capture.bin", "events.jsonl", "result.json", "session.py", "protocol.py",
                 "replay.py", "README.md", "physical-result.md", "REDISTRIBUTION.md",
-                "independent_decode.py", "independent-reader.md"}
+                "independent_decode.py", "independent-reader.md",
+                "COPYING", "NOTICE.md", "SOURCE.md", "build_bundle.py", "test_replay.py"}
     require(set(manifest["files"]) == expected, "Unexpected bundle inventory")
-    require({p.name for p in directory.iterdir() if p.is_file()} == expected | {"manifest.json"},
+    require({p.name for p in directory.iterdir()} == expected | {"manifest.json"},
             "Unexpected files in bundle")
+    require(not (directory / "manifest.json").is_symlink(), "Symlink not allowed: manifest.json")
     for name, record in manifest["files"].items():
         path = directory / name
         require(not path.is_symlink(), f"Symlink not allowed: {name}")

@@ -94,6 +94,12 @@ standard library is supplied by the evaluator's interpreter.
 
 ## Rebuild from the repository (maintainers only)
 
+The release includes the complete GPL text in `COPYING`, package-wide
+copyright, warranty and dated modification notices in `NOTICE.md`, and the
+source inventory and standalone rebuild instructions in `SOURCE.md`.
+Build and test sources are included; no separate source offer is needed.
+All these files are covered by the release manifest's size/hash checks.
+
 From the repository root:
 
 ```sh
