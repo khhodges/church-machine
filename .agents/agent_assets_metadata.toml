@@ -2110,3 +2110,17 @@ mtime_ms = 1794341919703
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/850291ab-a3a1-43e3-9c19-edc8202e7b4a/198c8227-10b8-4028-bad7-a528874f6a94"
 storage_version_token = "1794341950142782"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "uG_mKr-801BPWQTKk8SeZ"
+uri = "file://generated-artifacts/annotations/global-dot-names-boxed.png"
+type = "image"
+title = "Global dot-names boxed"
+description = "Yellow boxes mark the fully visible global names, including wrapped continuations. Text obscured by the Windows menu is not marked."
+logical_id = "b49d2c3f-030a-4ee0-a4fd-7917cff06746"
+content_hash = "sha256:6e56db70d4ee12f943e64b0c179798c41d409577db02bcdf464988ed443125f7"
+size = 110440
+mtime_ms = 1794347020938
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b49d2c3f-030a-4ee0-a4fd-7917cff06746/573b2050-3704-4576-abb7-0750de38d6be"
+storage_version_token = "1794347035581994"
+content_type = "image/png"

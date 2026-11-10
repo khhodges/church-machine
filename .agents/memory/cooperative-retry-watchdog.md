@@ -5,6 +5,14 @@ description: Fixed-watchdog diagnostic approval and evidence boundaries.
 
 ## Single starter bitstream demonstration goal
 
+Genesis approved a physical maintenance-enable input for whole-image replacement
+controls and a protected build-time SHA-256 allowlist of the two starter images.
+**Why:** Naming Genesis as the authority did not define how UART commands could
+exercise that authority; the user then explicitly approved this bounded mechanism.
+**How to apply:** UART and application code cannot modify the allowlist. Trust
+the maintenance operator while enabled; do not claim remote sender authentication.
+Pin assignment, vendor synthesis, transfer and physical programming remain separate.
+
 The user approved reset → load → validate → start for whole-Namespace image
 replacement on the separate experimental target.
 **Why:** Stopped transfer exceeds the enabled watchdog interval; a defined
