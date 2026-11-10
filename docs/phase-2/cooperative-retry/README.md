@@ -24,7 +24,38 @@ and the physical board are unchanged.
 - B's Thread GT is reloaded through SYSTEM's C-list before each dispatch;
   scratch CR5 is not assumed to survive CHANGE/LLR.
 
-## Evidence and limits
+## Current acceptance
+
+Both delayed-delivery cases now complete the full UART baseline and nonce
+challenge exchange with the matching host state machine. The one-second
+watchdog remains enabled throughout. Local UART uses 5,000 baud at a 20 kHz
+clock; delivery remains delayed by three seconds. The board export remains
+25 MHz / 57,600 baud.
+
+The 2,500-baud fixture is retained as an expected-expiry regression. At expiry,
+trace stall is asserted, UART owner is the diagnostic producer (7), and its
+report request is held; step halt, step mode, snapshot busy and recovery hold
+are all zero. This confirms report/trace bandwidth, not a hidden step halt, as
+the remaining cause. No hardware exemption, timer change, dropped trace event,
+or bypass of trace backpressure was introduced.
+
+Real timer expiry is also tested at the first, middle and last saved-word
+deadlines of an actual CHANGE. The test never forces internal timer signals.
+DMEM, Namespace, C-list and pet-name exported write enables stay low for
+100 cycles afterward, and the fixture memory stays unchanged during that
+period. This is bounded mid-CHANGE containment evidence, not all-instruction
+coverage or Boot recovery proof.
+
+The matching host drains RX during its three-second delay instead of sleeping,
+records all received bytes and attempted writes, refuses duplicate requests,
+and verifies CRC, nonce, progress, renewals and unchanged buffer/memory.
+Errors and short writes stop without reconnect or resend.
+
+Final local evidence is `generated-artifacts/cooperative-retry-final.xml`.
+Build-only export instructions are in [build-instructions.md](build-instructions.md).
+No vendor build, physical result, or installation approval is claimed.
+
+## Historical evidence and limits
 
 Earlier terminal-only local run: **10 passed in 96.93 seconds**, recorded in
 `generated-artifacts/cooperative-retry-local.xml`.
@@ -61,7 +92,7 @@ pending-loop self-CHANGEs. The second-USER fixture had completed five dispatches
 and five USER B progress-instruction retirements. Each fixture recorded one
 LLR completion and one retry retirement, with 13,163 watchdog ticks remaining.
 
-**Not build-ready.** Successful tests currently stop at the parent's terminal
+**Earlier candidate was not build-ready.** Those tests stopped at the parent's terminal
 stop event. The parent's UART observation protocol does not report B progress
 or watchdog renewal evidence, and its halted final state cannot continue
 renewing an always-enabled timer. Do not reuse the old responder as acceptance
@@ -73,7 +104,7 @@ expiry, every write destination's accepted-write boundary, or Boot fault
 recovery. The parent snapshot uses its historical held-fault diagnostic path;
 this is not a production watchdog integration or healthy-Thread recovery proof.
 
-### Continuing observation candidate — qualification failed
+### Earlier continuing observation candidate — qualification failed
 
 The current preparation adds UCV3 reports with renewal, USER B progress,
 pending-loop CHANGE, sticky fault, and remaining-tick fields. UCP3 challenges
@@ -82,7 +113,7 @@ SYSTEM's Thread capability and yields after the retry; SYSTEM's continuation
 then self-CHANGEs. The inherited terminal latch, forced step halt, and terminal
 snapshot request no longer stop this isolated profile.
 
-This is **not qualified**. The latest full-top run is
+That earlier candidate was **not qualified**. Its full-top run was
 `generated-artifacts/cooperative-retry-continuing.xml`: **1 passed, 2 failed**
 in 108.91 seconds. Both delayed scenarios still reach WATCHDOG at NIA `0x400C`
 during the extended observation: cycles 117,670 (all waiting) and 127,393
@@ -92,18 +123,19 @@ The seven unchanged timer tests passed in the preceding run
 
 Removing the additional forced step halt did not resolve the expiry.
 UART report traffic competes with the inherited instruction trace stream,
-whose backpressure halts execution; this is the next suspected cause, not
-a proven diagnosis. Do not bypass trace backpressure, disable the watchdog,
-or claim the complete challenge exchange passed. Capture the halt/trace/
-arbiter state at expiry before choosing a correction.
+whose backpressure halts execution; this was subsequently confirmed by the
+signal capture described above. The failed evidence is preserved.
 
-The new protocol has a decoder and pair verifier, but no qualified physical
-serial responder yet. Mid-instruction expiry qualification and build-only
-export also remain outstanding. Earlier failed candidates and XML files are
-preserved; the latest source snapshot is
+At that stage the serial responder and mid-instruction expiry tests were
+still outstanding. Earlier failed candidates and XML files are
+preserved; that source snapshot is
 `generated-artifacts/cooperative-retry-continuing`.
 
-No new vendor package, BIT, physical result, or installation approval exists.
+The current locally qualified source snapshot is
+`generated-artifacts/cooperative-retry-qualified`. The initial containment
+harness failures are preserved too: it needed the standard post-instruction
+settle cycles, had to exclude pre-watchdog Boot writes, and needed CHANGE's
+busy signal rather than the distinct SWITCH signal.
 
 ## Local commands
 

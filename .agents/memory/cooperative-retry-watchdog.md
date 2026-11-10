@@ -30,7 +30,17 @@ Observation must include the timing cost of UART arbitration and trace
 backpressure, not just removal of explicit terminal stops.
 **Why:** The inherited diagnostic has both a terminal latch and a separate
 forced step halt. Removing both still left watchdog expiry during the extended
-report exchange; trace backpressure is a suspected remaining contributor.
-**How to apply:** Measure actual halt and arbitration signals at expiry before
-changing the observation profile. Do not turn a suspected cause into a claim
-of qualified behavior or silently exempt reporting from the watchdog.
+report exchange. Signal capture then confirmed trace stall while the diagnostic
+report owned UART, with step halt and recovery hold off. The artificial 2,500
+baud fixture exhausted the interval; 5,000 baud allowed full observation
+without changing the one-second timer or bypassing backpressure.
+**How to apply:** Keep simulated UART throughput compatible with the observation
+budget, retain the slow-UART expected-fault case, and never pause or exempt the
+watchdog to make reporting pass.
+
+Mid-transition containment tests must distinguish pre-execution Boot writes
+and CHANGE's own busy signal from the separate SWITCH indication.
+**Why:** A baseline initially included writes before watchdog activation, and
+the SWITCH busy output falsely appeared to disprove mid-CHANGE expiry.
+**How to apply:** Calibrate deadlines from active-timer write cycles and observe
+the unit executing the tested instruction; use the normal issue/settle contract.

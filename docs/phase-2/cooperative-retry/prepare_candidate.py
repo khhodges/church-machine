@@ -42,6 +42,8 @@ def sources():
         "        self.iot_profile = iot_profile")
     anchor = "        # fetch_bounds_fault: active when nia_reg escapes the active code fence."
     integration = """        # Fixed diagnostic profile: no control capability, MMIO, or exemption.
+        self.sim_change_busy = u_change.change_busy
+        self.sim_pet_write = u_pet_name_mem.wr_en
         watchdog = m.submodules.execution_watchdog = self.sim_watchdog
         execution_started = Signal()
         with m.If(self.boot_complete):
@@ -127,6 +129,13 @@ def sources():
     top = replace_once(top, "diagnostic_rx.nia.eq(core.nia)",
                        "diagnostic_rx.nia.eq(core.retire_nia)")
     protocol = (HERE / "protocol.py").read_text()
+    top = replace_once(top, '        with m.FSM(name="trace_unit"):',
+        "        if self.sim_mode:\n"
+        "            self.sim_observation = dict(trace_stall=trace_stall,\n"
+        "                step_halted=step_halted, step_mode=step_mode,\n"
+        "                owner=tx_arb.owner, report_req=diagnostic_rx.tx_req,\n"
+        "                snapshot_busy=snapshot_busy, recovery_hold=recovery_hold)\n"
+        '        with m.FSM(name="trace_unit"):')
     return {"hardware/core.py": core, "hardware/wukong_top.py": top,
             "hardware/request_diagnostic.py": diagnostic,
             "hardware/request_protocol.py": protocol,

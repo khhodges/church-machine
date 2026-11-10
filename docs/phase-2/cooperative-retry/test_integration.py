@@ -18,6 +18,7 @@ from hardware.integrity32 import integrity32
 from hardware.uart_rx import UartRx
 from hardware.request_protocol import REQUEST, RESPONSE, WORDS, OFFSETS
 from hardware.request_protocol import REPORT_SIZE, decode_report, challenge, verify_pair
+from responder import Session
 
 spec = importlib.util.spec_from_file_location(
     "prior_uart_fixture", Path(__file__).resolve().parent.parent /
@@ -79,19 +80,19 @@ def cooperative_fixture(other_user):
     return mem
 
 
-@pytest.mark.parametrize("other_user", [False, True])
-def test_delayed_delivery_with_real_changes(other_user, record_property):
+@pytest.mark.parametrize("other_user,baud", [(False, 2500), (False, 5000), (True, 5000)])
+def test_delayed_delivery_with_real_changes(other_user, baud, record_property):
     words = [0] * 16384
     for addr, value in cooperative_fixture(other_user).items():
         words[addr // 4] = value
     top = ChurchWukongXC7A100T(
-        sim_mode=True, clk_freq=20000, baud=2500,
+        sim_mode=True, clk_freq=20000, baud=baud,
         sim_boot_image_words=words, expected_boot_guard=prior.GUARD,
         diagnostic_retry_return_stop=True, diagnostic_uart_receive=True,
         diagnostic_uart_request=True)
     module = Module()
     module.submodules.top = top
-    monitor = module.submodules.monitor = UartRx(clk_freq=20000, baud=2500)
+    monitor = module.submodules.monitor = UartRx(clk_freq=20000, baud=baud)
     module.d.comb += monitor.rx.eq(top.uart_tx_pin)
     sim = Simulator(module)
     sim.add_clock(1 / 20000)
@@ -109,27 +110,43 @@ def test_delayed_delivery_with_real_changes(other_user, record_property):
         report_start = None
         terminal = False
         nonce = 0x13572468
+        host = Session(nonce, other_user)
+        history = deque(maxlen=24)
+        last_state = None
         ctx.set(top.uart_rx_pin, 1)
         for cycle in range(180000):
+            state = {k: ctx.get(v) for k, v in top.sim_observation.items()}
+            if state != last_state:
+                history.append((cycle, hex(ctx.get(core.nia)), state))
+                last_state = state
+            if ctx.get(core.fault_valid) and baud == 2500:
+                assert ctx.get(core.fault) == FaultType.WATCHDOG
+                assert ctx.get(core.nia) == 0x400C
+                assert state == dict(trace_stall=1, step_halted=0, step_mode=0,
+                                     owner=7, report_req=1, snapshot_busy=0,
+                                     recovery_hold=0)
+                record_property("slow_uart_expiry", list(history))
+                return
             assert not ctx.get(core.fault_valid), (
                 other_user, cycle, hex(ctx.get(core.nia)), ctx.get(core.fault),
                 [hex(ctx.get(core.debug_cr_words[i][0])) for i in (1, 5, 12)],
-                changes, progress, core.sim_watchdog.period)
+                changes, progress, core.sim_watchdog.period, list(history))
             handoffs += ctx.get(core.llr_complete)
             if ctx.get(monitor.valid):
-                rx.append(ctx.get(monitor.data))
+                byte = ctx.get(monitor.data)
+                rx.append(byte)
+                for payload in host.feed(bytes([byte]), cycle / 20000):
+                    for b in payload:
+                        pending.extend((bit, 20000 // baud) for bit in
+                                       [0, *((b >> n) & 1 for n in range(8)), 1])
                 if rx.endswith(b"UCV3"):
                     report_start = len(rx) - 4
                 if report_start is not None and len(rx) - report_start == REPORT_SIZE:
                     reports.append(decode_report(bytes(rx[report_start:])))
                     report_start = None
-                    if len(reports) == 1:
-                        for byte in challenge(nonce):
-                            pending.extend((bit, 8) for bit in
-                                           [0, *((byte >> n) & 1 for n in range(8)), 1])
-                    else:
+                    if len(reports) == 2:
                         verify_pair(*reports, nonce, other_user)
-                        assert terminal
+                        assert terminal and host.done
                         record_property("cooperative_uart_reports", reports)
                         return
                 if rx.endswith(REQUEST):
@@ -145,12 +162,15 @@ def test_delayed_delivery_with_real_changes(other_user, record_property):
             if ctx.get(core.dmem_wr_en) and 0x5000 <= ctx.get(core.dmem_addr) < 0x5100:
                 assert sent
                 writes.append((ctx.get(core.dmem_addr), ctx.get(core.dmem_wr_data)))
-            if request_cycle is not None and cycle - request_cycle >= 60000 and not sent:
+            payloads = host.poll(cycle / 20000)
+            if payloads:
+                assert payloads == [RESPONSE] and not sent
+                assert cycle - request_cycle >= 60000
                 assert changes >= 2
                 assert (progress >= 2) if other_user else progress == 0
                 assert handoffs == 1 and retries == 0 and not writes
                 for byte in RESPONSE:
-                    pending.extend((bit, 8) for bit in
+                    pending.extend((bit, 20000 // baud) for bit in
                                    [0, *((byte >> n) & 1 for n in range(8)), 1])
                 sent = True
             if remaining == 0 and pending:

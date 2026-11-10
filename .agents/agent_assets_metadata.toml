@@ -1998,3 +1998,17 @@ mtime_ms = 1794278314152
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/64d954a9-f66c-40f2-b159-9df4d25bbfdf/212f8d17-880e-4c0b-a54f-fab352f28135"
 storage_version_token = "1794278387553122"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "GKWleC8bDX2teAfAWWl1r"
+uri = "file://generated-artifacts/cooperative-retry-build-only.zip"
+type = "unspecified"
+title = "Cooperative retry — verified build-only package"
+description = "Two isolated variants: USER B progress and all-USERs-waiting. Includes exported RTL, matching host responder, 21 passing local checks and manual build instructions. No BIT or programming authorization. SHA-256: 41c1c1105ebedb271d739697a004a754e8969c512d4b180b05a2bdd25f3327d4"
+logical_id = "e86fc3c8-140e-44d0-b6e8-9e1dce8bfbee"
+content_hash = "sha256:41c1c1105ebedb271d739697a004a754e8969c512d4b180b05a2bdd25f3327d4"
+size = 7331393
+mtime_ms = 1794321688319
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e86fc3c8-140e-44d0-b6e8-9e1dce8bfbee/befa4d8a-aa19-48b9-9fdf-010a471717c5"
+storage_version_token = "1794321732016320"
+content_type = "application/octet-stream"
