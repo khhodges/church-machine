@@ -4,7 +4,20 @@ expertMode = true
 integrations = ["resend:1.0.0"]
 
 [workflows]
-runButton = "Church Machine IDE"
+runButton = "Run Church Machine"
+
+[[workflows.workflow]]
+name = "Run Church Machine"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Church Machine IDE"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/church-machine-ide-introduction: web"
 
 [[workflows.workflow]]
 name = "Project"

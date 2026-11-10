@@ -23,6 +23,15 @@ instead of Flask.
 workflow, check which managed artifact owns `/`; preserve that artifact's base
 path and forward non-artifact routes to the primary service.
 
+The Run button must start both the primary Flask service and the Introduction
+development routing dependency, without starting unrelated test suites.
+**Why:** Flask alone rendered successfully in a local screenshot while the
+shared development domain returned 502. Starting the routing dependency restored
+both the landing page and simulator. Direct port-map changes were automatically
+replaced by the managed configuration.
+**How to apply:** Verify the shared development URL, not just a localhost
+screenshot. Preserve managed routing and include its dependency in the Run group.
+
 Do not infer that the root is a pnpm workspace from a nested artifact's
 `catalog:` declarations or an old pnpm lockfile. Publishing must use one
 consistent root dependency installation and lockfile.
