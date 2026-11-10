@@ -5,6 +5,16 @@ description: Fixed-watchdog diagnostic approval and evidence boundaries.
 
 ## Single starter bitstream demonstration goal
 
+The user approved reset → load → validate → start for whole-Namespace image
+replacement on the separate experimental target.
+**Why:** Stopped transfer exceeds the enabled watchdog interval; a defined
+execution reset boundary avoids a hidden pause or kick.
+**How to apply:** Keep execution and its watchdog in reset during replacement,
+start a fresh epoch only after admission, and leave failed uploads non-executing.
+The reset controller/transport must remain outside that reset domain. This does
+not authorize modifying the working board, automatic fault recovery, or using
+whole-image reset for individual side-by-side LUMP upgrades.
+
 The user set a four-week release target on 2026-11-10 (target 2026-12-08),
 prioritizing minimum duplicated effort and bitstreams with rapid progress.
 **Why:** The discussion must converge into a bounded release, not expand into

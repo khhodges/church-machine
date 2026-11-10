@@ -1,7 +1,8 @@
 # Starter runtime contract — initial implementation boundary
 
-Status: common requirements recorded; image-replacement control boundary needs
-an architectural decision. This is not a qualified hardware interface.
+Status: reset/load/validate/start approved by the user on 10 November 2026.
+An isolated control block and reset-domain tests are implemented; full-top
+UART/validator/core integration is not yet qualified.
 
 ## Preserved requirements
 
@@ -54,9 +55,9 @@ python3 -m pytest docs/phase-2/cooperative-retry/test_starter_upload_preflight.p
 Result: **3 passed**. These checks characterize the current obstacle; they do
 not mean the new loader or starter has passed acceptance.
 
-## Decision required: image replacement execution boundary
+## Approved image replacement execution boundary
 
-### Recommended for the bounded release: explicit reset/load/start lifecycle
+### Selected: explicit reset/load/start lifecycle
 
 On the separately authorized experimental target only, enter a dedicated
 hardware-controlled image-replacement state. Stop application execution and
@@ -66,14 +67,14 @@ The watchdog remains mandatory whenever application execution is active.
 
 This is an explicit new control boundary, not an implicit timer exemption,
 software watchdog kick or automatic fault recovery. Authorization, routing,
-reset scope, partial-transfer handling and startup must be specified and tested
-before implementation. On failed/partial upload, remain non-executing; do not
+reset scope, partial-transfer handling and startup must be tested before
+hardware qualification. On failed/partial upload, remain non-executing; do not
 promise restoration of overwritten application memory.
 
 This is not proposed for individual LUMP upgrades: those remain side by side
 with continued execution and ordinary watchdog renewal.
 
-### Alternative: SYSTEM remains executing during replacement
+### Not selected for this release: SYSTEM remains executing during replacement
 
 SYSTEM receives/stages the next image while continuing genuine transitions and
 watchdog renewals. It must execute from protected memory outside all replacement
@@ -97,5 +98,51 @@ bounded demonstration.
 6. Lazy delivery and side-by-side upgrades retain execution, old references and
    normal watchdog behavior throughout their respective publication boundaries.
 
-No architectural alternative in this document is implemented or approved merely
-by being listed.
+## Implemented control boundary
+
+`starter_lifecycle.py` implements held, loading, verifying, ready, running and
+failed states. A new authorized BEGIN increments the non-wrapping transaction
+epoch and immediately denies program writes. Data must arrive in contiguous
+word-index order, within the configured image size. FINISH is a separate beat
+after all words; extra, reordered or incomplete data cannot reach READY.
+
+Validation must name the current epoch. START requires both authorization and
+the same epoch, after successful validation. Abort/bad-data takes precedence
+over START. An exhausted epoch counter refuses a new BEGIN rather than wrapping.
+There is no automatic retry, recovery or startup after failed admission.
+
+The trusted decoder must serialize sessions; raw UART input must not directly
+drive authorization or validation-success signals. The verifier must check
+the received memory, expected identity and entry state for that epoch, not
+trust a host-supplied PASS. The module itself is neither that verifier nor
+an authentication mechanism.
+
+`test_starter_lifecycle.py` connects the controller to a separate execution
+clock/reset domain with the actual fixed-watchdog RTL. The controller lives
+outside its own reset domain to avoid reset self-deadlock. A test counter
+stands in for program commits; this is not yet a ChurchCore integration test.
+
+Verified locally: long loading beyond the UART transfer lower bound, execution
+held throughout loading/validation, restart with a fresh timer after an expired
+epoch, continued watchdog expiry for a non-yielding run, invalid/short/extra/
+reordered data, stale validation and start epochs, unauthorized control,
+and abort precedence. The source-level preflight remains a characterization of
+the old isolated top, not a claim that its UART routing conflict is fixed.
+
+Next integration gates are the protected command decoder, received-memory
+verifier, memory-port arbitration, boot initialization, and complete-top
+execution/reset behavior. No bitstream or board operation has been performed.
+
+Local verification on 10 November 2026:
+
+```sh
+python3 -m pytest \
+  docs/phase-2/cooperative-retry/test_starter_lifecycle.py \
+  docs/phase-2/cooperative-retry/test_starter_upload_preflight.py \
+  docs/phase-2/cooperative-retry/test_fixed_watchdog.py -q
+```
+
+Result: **24 passed**. This includes the full 16,384-word transfer geometry,
+but not actual UART bytes, executable content verification or ChurchCore
+startup. Validation-success inputs in these tests are controlled test stimuli,
+not evidence of a completed cryptographic validator.
