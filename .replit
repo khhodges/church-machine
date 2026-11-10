@@ -19,6 +19,10 @@ args = "Church Machine IDE"
 task = "workflow.run"
 args = "artifacts/church-machine-ide-introduction: web"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/development-image: web"
+
 [[workflows.workflow]]
 name = "Project"
 mode = "parallel"
