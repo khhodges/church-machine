@@ -4254,6 +4254,21 @@ function handleBootImageUpload(input) {
         });
 }
 
+// Lucide line geometry, matching the approved header without adding a runtime dependency.
+function _namespaceHeaderIcon(name) {
+    const paths = {
+        check: '<path d="m20 6-11 11-5-5"/>',
+        reload: '<path d="M3 11a9 9 0 1 1 2.7 6.4M3 4v7h7"/>',
+        copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+        arrow: '<path d="M5 12h14m-7-7 7 7-7 7"/>',
+        external: '<path d="M15 3h6v6m-11 5L21 3m-3 10v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+        attention: '<path d="m10.3 3.9-8.2 14.2A2 2 0 0 0 3.8 21h16.4a2 2 0 0 0 1.7-2.9L13.7 3.9a2 2 0 0 0-3.4 0ZM12 9v4m0 4h.01"/>',
+        plus: '<path d="M12 5v14M5 12h14"/>',
+        boot: '<path d="M9 10l5 5-5 5M4 4v7a4 4 0 0 0 4 4h12"/>'
+    };
+    return paths[name] ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>` : '';
+}
+
 function _namespaceDesignSourceNotice(state) {
     const rows = state && Array.isArray(state.abstractions) ? state.abstractions : [];
     const legacy = rows.some(row => row.slot === 0 && row.name === 'Boot.NS') &&
@@ -4271,6 +4286,8 @@ function _namespaceDesignSourceNotice(state) {
 
 function updateNamespace(useAscendingDesign) {
     const ascending = window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active;
+    if (window.NamespaceDesignV1 && window.NamespaceDesignV1.refreshHeader)
+        window.NamespaceDesignV1.refreshHeader();
     if (ascending && useAscendingDesign !== true) {
         window.NamespaceDesignV1.render();
         return;
@@ -4309,22 +4326,32 @@ function updateNamespace(useAscendingDesign) {
     const _cntGarbage = _nsSnapshot.counts.garbage;
     const _cntFree = _nsSnapshot.counts.free;
     const _statChip = (label, val, color, title) =>
-        `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 7px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);font-size:0.72rem;white-space:nowrap;" title="${title}"><span style="color:${color};font-weight:600;">${label}</span><span style="color:#ccc;">${val}</span></span>`;
-    let html = ascending ? '' : _namespaceDesignSourceNotice(window._nsState);
-    html += `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">`;
-    html += _statChip('Max',      _cntMax,      '#a0a0b0', 'Slot capacity of this Namespace design; not evidence of the active image');
-    html += _statChip('Assigned', _nsSnapshot.counts.assigned, '#a0c0e0', 'Approved assignments and explicit local drafts; not proof of image installation');
-    html += _statChip('Resident policy', _cntResident, '#4ec9b0', 'Selected policy or architectural object kind, not proof of installed bytes');
-    html += _statChip('Lazy policy',_cntLazy,     '#f0a040', 'Selected next-build policy, not observed hardware state');
-    html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
-    html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
-    html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
-    html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace rows only; built images and simulation remain unchanged">\u{1F4BE} Save Namespace Table</button>`;
-    html += `<button type="button" id="nsPrepareLoadBtn" onclick="event.stopPropagation();NamespaceDesignV1.prepareLoad()" style="background:#2a2410;color:#e9c46a;border:1px solid #6d603e;border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Open the selected saved Namespace in Prepare & Load FPGA in a new tab. Does not rebind or send.">Prepare &amp; Load FPGA</button>`;
-    html += `<button type="button" id="nsBindPlacementsBtn" onclick="event.stopPropagation();_nsBindPlacements(this)" title="Explicitly create local C-list bindings from saved placements; does not activate an image">BIND</button>`;
-    html += `<button type="button" id="nsAttentionBtn" onclick="event.stopPropagation();NamespaceAttention.open()" style="background:#2a2410;color:#c89b3c;border:1px solid rgba(200,155,60,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Read-only report of flagged issues in the saved Namespace">Needs attention</button>`;
-    html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Select a saved LUMP or name and add a non-executable design placement">+ Add to Namespace</button>`;
-    html += '</div>';
+        `<div title="${title}"><dt style="color:${color}">${label}</dt><dd>${val}</dd></div>`;
+    const _headerIcon = _namespaceHeaderIcon;
+    let html = '<div class="namespace-refined"><div class="nr-header nr-table-header">';
+    html += '<div class="nr-summary"><dl aria-label="Namespace design counts, not installed hardware state">';
+    html += _statChip('Max',      _cntMax,      '#a2b1c5', 'Slot capacity of this Namespace design; not evidence of the active image');
+    html += _statChip('Assigned', _nsSnapshot.counts.assigned, '#a2b1c5', 'Approved assignments and explicit local drafts; not proof of image installation');
+    html += _statChip('Resident policy', _cntResident, '#80cdb9', 'Selected policy or architectural object kind, not proof of installed bytes');
+    html += _statChip('Lazy policy',_cntLazy,     '#d9b47e', 'Selected next-build policy, not observed hardware state');
+    html += _statChip('Garbage',  _cntGarbage,  '#e49c9c', 'Cleared slots — GT cycle count bumped, content zeroed');
+    html += _statChip('Free',     _cntFree,     '#9ccaab', 'Slots available for allocation');
+    html += `</dl><button type="button" id="nsBoltDrag" class="ns-bolt-drag nr-boot" draggable="true" onclick="event.stopPropagation();alert('Drag Boot entry onto a Namespace row to choose the first abstraction invoked after boot.')" title="Drag onto a Namespace row to choose Boot.Thread.CR0 — the first abstraction invoked after boot">${_headerIcon('boot')}Boot entry</button></div>`;
+    html += '<div class="nr-actions"><div class="nr-action-group" role="group" aria-label="Binding and FPGA preparation">';
+    html += `<button type="button" class="nr-bind" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" title="Save Namespace rows only; built images and simulation remain unchanged">Save Namespace Table${_headerIcon('arrow')}</button>`;
+    html += `<button type="button" class="nr-prepare" id="nsPrepareLoadBtn" onclick="event.stopPropagation();NamespaceDesignV1.prepareLoad()" title="Open the selected saved Namespace in Prepare & Load FPGA. Does not rebind or send.">Prepare &amp; Load FPGA${_headerIcon('external')}</button>`;
+    html += `<button type="button" id="nsBindPlacementsBtn" onclick="event.stopPropagation();_nsBindPlacements(this)" ${ascending?'hidden':''} title="Explicitly create local C-list bindings from saved placements; does not activate an image">BIND</button>`;
+    html += '</div><div class="nr-action-group" role="group" aria-label="Inspect and edit Namespace">';
+    html += `<button type="button" class="nr-attention" id="nsAttentionBtn" onclick="event.stopPropagation();NamespaceAttention.open()" title="Read-only report of flagged issues in the saved Namespace">${_headerIcon('attention')}Needs attention</button>`;
+    html += `<button type="button" id="nsAddEntryBtn" onclick="event.stopPropagation();_nsTableAdd()" title="Select a saved LUMP or name and add a non-executable design placement">${_headerIcon('plus')}Add to Namespace</button></div></div>`;
+    html += `<div class="nr-bottom"><div class="nr-footer"><p class="nr-feedback">Design only · Binding does not activate a simulation or change an installed image.</p>
+        <details id="namespaceHeaderDetails"><summary>Design &amp; binding details</summary><div class="nr-help">
+        <p id="namespaceDesignEditingNotice"><strong>Save explicitly.</strong> ${ascending?'Bind Namespace Design saves the selected design and opens fresh C-list binding results.':'Save Namespace Table saves row edits only; BIND explicitly creates local C-list bindings.'} Only your view choice is remembered after reload; save edits explicitly to keep them.</p>
+        <p><strong>Binding is not activation.</strong> Unresolved or unauthenticated references remain blocked. Binding does not activate a simulation or change an installed image.</p>
+        <p><strong>FPGA transfer is separate.</strong> Prepare &amp; Load FPGA opens the selected saved Namespace for review. Opening it does not rebind or send to hardware.</p>
+        <p><strong>Counts describe the design.</strong> Policy and assignment counts are not evidence of installed bytes. Max includes the Namespace header slot.</p>
+        </div></details></div></div></div></div>`;
+    if (!ascending) html += _namespaceDesignSourceNotice(window._nsState);
     // Bank custody status deliberately projects no raw NS slot, address,
     // contents, or credential. It is a safe operational view only.
     try {

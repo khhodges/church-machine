@@ -125,6 +125,7 @@
     <link rel="stylesheet" href="styles-tools.css?v=20260831-wukong-download-layout1">
     <link rel="stylesheet" href="styles-select.css?v=20261015-select-standard2">
     <link rel="stylesheet" href="namespace-binding-windows.css?v=3">
+    <link rel="stylesheet" href="namespace-design-header.css?v=sha256-3268adf2bf50">
     <style>
         .app-loading {
             position: fixed; inset: 0; z-index: 99999;
@@ -1229,16 +1230,25 @@
 
     <div id="namespace" class="view">
         <div class="panel">
-            <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">Namespace Design
-                <button type="button" class="btn btn-sm" id="namespaceSwitchToGlass" onclick="DevelopmentImageView.show(NamespaceSelection.current())" title="Show the saved Namespace in Memory Glass; unsaved designer edits are retained" aria-label="Switch to Memory Glass">Switch → Memory Glass</button>
+            <div class="namespace-refined">
+                <div class="nr-header nr-static-header">
+                    <div class="nr-top">
+                        <h1>Namespace Design</h1>
+                        <button type="button" class="nr-glass" id="namespaceSwitchToGlass" onclick="DevelopmentImageView.show(NamespaceSelection.current())" title="Show the saved Namespace in Memory Glass; unsaved designer edits are retained" aria-label="Switch to Memory Glass">Switch → Memory Glass</button>
+                    </div>
+                    <div class="nr-selection">
+                        <div class="nr-picker">
+                            <label for="namespaceDesignProfile">Namespace</label>
+                            <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
+                                <option value="phase1">Phase 1</option>
+                                <option value="ascending" selected>New Layout</option>
+                                <option value="legacy">Original</option>
+                            </select>
+                        </div>
+                        <div id="namespaceHeaderStatus" class="nr-header-status" aria-live="polite"></div>
+                    </div>
+                </div>
             </div>
-            <label for="namespaceDesignProfile">Namespace: </label>
-            <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
-                <option value="phase1">Phase 1</option>
-                <option value="ascending" selected>New Layout</option>
-                <option value="legacy">Original</option>
-            </select>
-            <p id="namespaceDesignEditingNotice" role="note">Bind Namespace Design saves the selected design and opens fresh C-list binding results. Only your view choice is remembered after reload; save edits explicitly to keep them. Unresolved or unauthenticated references remain blocked. Binding does not activate a simulation or change an installed image.</p>
             <div id="namespaceTable"></div>
             <section id="bootCapacityPanel" aria-label="Boot capacity" style="padding:12px;border:1px solid #444;border-radius:6px;margin:10px 0;">
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -3725,7 +3735,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <link rel="stylesheet" href="namespace-inspector.css">
     <script src="namespace-inspector.js"></script>
     <script src="namespace-profile-names.js?v=sha256-6e13e7fb834d"></script>
-    <script src="app-memory.js?v=sha256-4396d1804f90"></script>
+    <script src="app-memory.js?v=sha256-156adc452454"></script>
     <script src="namespace-attention.js?v=sha256-1ea0c3d38823"></script>
     <script src="self-binding-inspection.js?v=sha256-dd957ab1a3b8"></script>
     <script src="namespace-binding-windows.js?v=sha256-49ea23bd9b20"></script>
@@ -3734,7 +3744,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="design-simulation.js?v=sha256-35c7e05323f7"></script>
     <script src="namespace-selection.js?v=sha256-7bc7fff31bf4"></script>
     <script src="development-image-view.js?v=sha256-5bfae37b8756"></script>
-    <script src="namespace-design-v1.js?v=sha256-b7b9abf13f9c"></script>
+    <script src="namespace-design-v1.js?v=sha256-742ce55e34a7"></script>
     <script src="namespace-ide-node.js?v=sha256-94708018f5d1"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>
     <script src="app-abstractions.js?v=sha256-2b7042544808"></script>

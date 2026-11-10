@@ -292,6 +292,7 @@
             selector.value=selectionKey().slice(10);
             selector.disabled=state.loading || state.saving;
         }
+        refreshHeader();
         if (!state.active) return;
         const host = document.getElementById('namespaceTable');
         if (!host) return;
@@ -340,22 +341,37 @@
         return item ? item.name : root.NamespaceProfileNames.label(state.profile);
     }
     function designStatus() {
+        const icon = typeof root._namespaceHeaderIcon === 'function' ? root._namespaceHeaderIcon : () => '';
         const origin = state.persisted === true
             ? 'Loaded from a saved design in this environment.'
             : state.persisted === false
                 ? 'No saved design file was found for this profile in this environment. These are generated defaults, not recovered user work.'
                 : 'Saved-state evidence is unavailable; this design is not confirmed saved.';
-        const label = state.dirty ? 'Unsaved local draft'
+        const label = state.loading ? 'Loading design…' : state.saving ? (state.bindingNow?'Binding…':'Saving…') : state.dirty ? 'Unsaved local draft'
             : state.persisted === true ? 'Saved design'
             : state.persisted === false ? 'Generated defaults — not saved' : 'Saved status unknown';
-        return `<div id="namespaceDesignStatus" role="status" style="margin:0 0 10px;padding:10px;border:1px solid #6b5320;border-radius:4px">
-            <button type="button" id="reloadNamespaceSaved" onclick="NamespaceDesignV1.reloadSaved()" ${state.loading || state.saving?'disabled':''}>Reload saved design</button>
-            <button type="button" id="duplicateNamespace" onclick="NamespaceDesignV1.duplicateNamespace()" ${state.loading || state.saving?'disabled':''}>Duplicate Namespace</button>
-            <strong>${esc(profileLabel())} · ${label}</strong>
-            ${state.designId?'<div>Independent copy · test/approval status is not inherited.</div>':''}
-            <div>${origin}${state.dirty ? ' Local changes have not been saved.' : ''}
-            ${state.dirty || state.persisted === false ? 'Save explicitly; binding remains a separate action.' : ''}
-            </div></div>`;
+        const status = state.loading || state.saving || state.persisted !== true ? 'unknown' : state.dirty ? 'draft' : 'saved';
+        const note = state.designId ? 'Independent copy · test/approval status is not inherited.'
+            : profileLabel().replace(/^[^—]*—\s*/, '');
+        return `<div id="namespaceDesignStatus" class="nr-state" role="status"
+                aria-label="${esc(profileLabel())} · ${label}"
+                title="${esc(origin)}${state.dirty?' Local changes have not been saved.':''}${state.dirty || state.persisted === false?' Save explicitly; binding remains a separate action.':''}">
+            <span class="nr-saved" data-status="${status}">${status==='saved'?icon('check'):''}${label}</span>
+            <span class="nr-state-note">${esc(note)}</span>
+            </div><div class="nr-file-actions" role="group" aria-label="Saved design actions">
+            <button type="button" id="reloadNamespaceSaved" onclick="NamespaceDesignV1.reloadSaved()" ${state.loading || state.saving?'disabled':''}>${icon('reload')}Reload saved design</button>
+            <button type="button" id="duplicateNamespace" onclick="NamespaceDesignV1.duplicateNamespace()" ${state.loading || state.saving?'disabled':''}>${icon('copy')}Duplicate Namespace</button></div>`;
+    }
+    function refreshHeader() {
+        const host = document.getElementById('namespaceHeaderStatus');
+        if (!host) return;
+        if (state.active) {
+            host.innerHTML = designStatus();
+        } else {
+            const ready = root._nsState && Array.isArray(root._nsState.abstractions) && !root._nsStateError;
+            const dirty = root._nsTableDirty || root._nsPrefetchDirty;
+            host.innerHTML = `<div class="nr-state" role="status"><span class="nr-saved" data-status="${dirty?'draft':'unknown'}">${dirty?'Unsaved local draft':ready?'Saved assignments':'Saved status unavailable'}</span><span class="nr-state-note">Original Namespace table</span></div>`;
+        }
     }
     function renderRows(html, host) {
         const d=state.document, p=state.projection;
@@ -390,7 +406,8 @@
         }
         html+='</tbody></table><p id="nsSaveLayoutNote" role="status"></p>';
         if(state.profile==='phase1') html+=`<p>${esc(profileLabel())}: slot 0 metadata · 1 self · 2 entry Thread · 8 UART · 9 ide.Mint (requested E) · 14 nstab (requested RW) · 15 pkverify (requested E). Requested rights are design intent, not granted capabilities.</p><label>Total slots (including metadata) <input type="number" min="16" max="4096" value="${slotCount()}" onchange="NamespaceDesignV1.capacity(this.value)" ${state.saving?'disabled':''}></label><p>${slotCount()*4} table words / ${slotCount()*16} bytes · CR15 table-only limit ${slotCount()*4-1}. Unfinished placements remain non-executable.</p>`;
-        host.innerHTML=designStatus()+html;
+        host.innerHTML=(document.getElementById('namespaceHeaderStatus')?'':designStatus())+html;
+        refreshHeader();
         const saveButton=host.querySelector('#nsSaveBtn');
         const legacyBind=host.querySelector('#nsBindPlacementsBtn');
         if(legacyBind) legacyBind.hidden=true;
@@ -399,6 +416,8 @@
         saveButton.title='Save this design and show fresh C-list binding results. Does not activate or change a running image.';
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
+        if(typeof root._namespaceHeaderIcon === 'function' && typeof saveButton.insertAdjacentHTML === 'function')
+            saveButton.insertAdjacentHTML('beforeend',root._namespaceHeaderIcon('arrow'));
         host.querySelector('#nsSaveLayoutNote').textContent=state.saving?'Saving selected Namespace…':state.error ||
             profileLabel()+' · API-only allocations · design only, not installed. '+(state.dirty?'Unsaved changes. ':'')+
             p.warnings.join('; ');
@@ -833,7 +852,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad,openObjectEditor,setMmio};
+    root.NamespaceDesignV1={state,render,refreshHeader,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad,openObjectEditor,setMmio};
     if(typeof document!=='undefined') {
         root.NamespaceDesignV1.selectShared=selectShared;
         root.NamespaceDesignV1.selectionKey=selectionKey;

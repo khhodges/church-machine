@@ -83,3 +83,13 @@ Memory Glass, keeping the same Namespace selected.
 **Why:** The user requested direct back-and-forth comparison of those two views.
 **How to apply:** Retain unsaved designer edits while showing the saved layout;
 switching views must not save, bind, prepare, send, or substitute a Namespace.
+
+The user approved the reorganized Namespace header and asked to apply it to
+the real IDE: selection and saved-state evidence together, a separate counts
+band, grouped actions, and expandable binding help. Retain the gold Switch
+control and the approved compact presentation when changing behavior.
+**Why:** The user explicitly selected the canvas design and said to use it and
+make it work; preview-only feedback is not a functional graduation.
+**How to apply:** Connect to the existing selected-design actions and preserve
+dirty-draft guards. Keep saving, binding, preparation, and hardware transfer
+distinct; no illustrative status or simulated success belongs in the live page.
