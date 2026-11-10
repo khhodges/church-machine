@@ -1,0 +1,3 @@
+@import './_styles-base.css';
+@import './_styles-toolbar.css';
+body{margin:0;padding:12px;background:#101622} #namespace{display:block} #namespace .panel{margin:0}
