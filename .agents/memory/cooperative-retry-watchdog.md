@@ -14,11 +14,24 @@ demonstrating a same-size-only LUMP upgrade.
 with one reusable hardware configuration. A second synthesis cannot count as
 proof of application-image replacement.
 
-**How to apply:** Establish all three outcomes on the same FPGA configuration.
-Distinguish exact image/LUMP changes from hardware changes. Same-size upgrade
-does not by itself authorize overwriting executing code; agree the upgrade's
-execution boundary before implementation. Physical programming remains an
-explicit operation, not an incidental test step.
+**How to apply:** Establish all three outcomes on the same new FPGA configuration.
+Distinguish exact image/LUMP changes from hardware changes. Physical programming
+remains an explicit operation, not an incidental test step.
+
+The user requires old and new development side by side: “never stop what
+already works.” Preserve the working hardware, source/build packages, saved
+Namespaces and LUMPs while developing the starter separately. Do not overwrite
+an executing old LUMP with the new revision or treat the earlier suggested
+application pause as accepted.
+
+**Why:** The user explicitly rejected disruption in response to the proposed
+upgrade pause.
+
+**How to apply:** Stage new revisions separately, retain old authority and active
+continuations, and establish a safe adoption boundary before redirecting calls.
+Do not infer that staging alone implements concurrent upgrade or grants permission
+to activate new code. Namespace image replacement is demonstrated on the new
+test setup, not by stopping the preserved working setup.
 
 The user approved a fixed, enabled watchdog with no software control access
 for the isolated delayed-delivery/cooperative-USER diagnostic.
