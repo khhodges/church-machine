@@ -1249,6 +1249,9 @@
                                 <option value="ascending" selected>New Layout</option>
                                 <option value="legacy">Original</option>
                             </select>
+                            <button type="button" id="namespaceApplicationInfoButton" class="nr-info" onclick="NamespaceDesignV1.showInformation(true)" aria-label="About the selected application" aria-haspopup="dialog" title="About the selected application">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v2"/></svg>
+                            </button>
                         </div>
                         <div id="namespaceHeaderStatus" class="nr-header-status" aria-live="polite"></div>
                     </div>
@@ -1260,7 +1263,7 @@
                     <form method="dialog"><button type="submit" aria-label="Close Namespace information" autofocus>Close</button></form>
                 </div>
                 <div id="namespaceInfoContent" aria-live="polite"></div>
-                <div class="ns-info-footer"><a href="/docs/namespace-as-an-application.md" target="_blank" rel="noopener">Open Markdown document</a></div>
+                <div class="ns-info-footer"><a id="namespaceInfoDocument" href="/docs/namespace-as-an-application.md" target="_blank" rel="noopener">Open Markdown document</a></div>
             </dialog>
             <div id="namespaceTable"></div>
             <section id="bootCapacityPanel" aria-label="Boot capacity" style="padding:12px;border:1px solid #444;border-radius:6px;margin:10px 0;">
@@ -3757,7 +3760,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="design-simulation.js?v=sha256-35c7e05323f7"></script>
     <script src="namespace-selection.js?v=sha256-7bc7fff31bf4"></script>
     <script src="development-image-view.js?v=sha256-5bfae37b8756"></script>
-    <script src="namespace-design-v1.js?v=sha256-2848034c89ba"></script>
+    <script src="namespace-design-v1.js?v=sha256-60b252f3cb8d"></script>
     <script src="namespace-ide-node.js?v=sha256-94708018f5d1"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>
     <script src="app-abstractions.js?v=sha256-2b7042544808"></script>

@@ -457,28 +457,51 @@
         if(!row || row.kind!=='lump') return;
         state.document.rows.forEach(r=>{r.boot=r===row;});changed();
     }
-    async function showInformation() {
+    async function showInformation(application = false) {
         const modal = document.getElementById('namespaceInfoDialog');
         const content = document.getElementById('namespaceInfoContent');
         if (modal.open) return;
+        const guides = {
+            'Cooperative Retry — USER B — Review': 'namespace-application-cooperative-user-b.md',
+            'Cooperative Retry — All Waiting — Review': 'namespace-application-cooperative-all-waiting.md'
+        };
+        const selector = document.getElementById('namespaceDesignProfile');
+        const selectedName = selector?.selectedOptions?.[0]?.textContent || 'Selected Namespace';
+        const filename = application ? guides[selectedName] : 'namespace-as-an-application.md';
+        const link = document.getElementById('namespaceInfoDocument');
+        document.getElementById('namespaceInfoTitle').textContent = application
+            ? selectedName : 'The Namespace as an application';
+        link.hidden = !filename;
+        if (filename) link.href = '/docs/' + filename;
+        else link.removeAttribute('href');
+        modal.dataset.trigger = application ? 'namespaceApplicationInfoButton' : 'namespaceInfoButton';
+        const requestId = modal.dataset.request = String(Number(modal.dataset.request || 0) + 1);
         content.textContent = 'Loading Namespace information…';
         // Native modal focus and Escape behavior belong to this dialog,
         // not to the editor or simulator's document-level shortcuts.
         if (!modal.dataset.keyboardBound) {
             modal.addEventListener('keydown', event => event.stopPropagation());
             modal.addEventListener('close', () => {
-                const trigger = document.getElementById('namespaceInfoButton');
+                const trigger = document.getElementById(modal.dataset.trigger);
                 if (trigger) trigger.focus({preventScroll:true});
             });
             modal.dataset.keyboardBound = 'true';
         }
         modal.showModal();
+        modal.scrollTop = 0;
+        if (!filename) {
+            content.textContent = 'An application guide has not been written for ' + selectedName +
+                '. Guides are currently available for Cooperative Retry — USER B — Review and Cooperative Retry — All Waiting — Review. No design data was changed.';
+            return;
+        }
         try {
-            const response = await fetch('/docs/namespace-as-an-application.md', {cache:'no-cache'});
+            const response = await fetch('/docs/' + filename, {cache:'no-cache'});
             if (!response.ok) throw Error(`Document request failed (HTTP ${response.status}).`);
             const markdown = await response.text();
+            if (modal.dataset.request !== requestId || !modal.open) return;
             content.innerHTML = root.renderMarkdown(markdown);
         } catch (error) {
+            if (modal.dataset.request !== requestId || !modal.open) return;
             content.textContent = 'Could not load Namespace information. ' + error.message +
                 ' No design data was changed. Close and reopen this popup to retry, or use the Markdown document link below.';
         }
