@@ -2012,3 +2012,17 @@ mtime_ms = 1794321688319
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e86fc3c8-140e-44d0-b6e8-9e1dce8bfbee/befa4d8a-aa19-48b9-9fdf-010a471717c5"
 storage_version_token = "1794321732016320"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "1qdgGW_2KLtgV3exa3BuR"
+uri = "file://docs/phase-2/cooperative-retry/release-publication-audit.md"
+type = "text"
+title = "Containment audit and release/publication plan"
+description = "Claim-by-claim audit, three-demo acceptance criteria, staged release plan, revised abstract and primary-source references."
+logical_id = "ffe4c322-5cc1-48ef-b887-a62c360602c8"
+content_hash = "sha256:6bd63a42ed6b5a0059902691a0b32205bdb570eb31f3d214605497cabd5ed228"
+size = 26121
+mtime_ms = 1794335866771
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ffe4c322-5cc1-48ef-b887-a62c360602c8/49d977da-e985-4002-abe9-e2459d4f5059"
+storage_version_token = "1794335906753559"
+content_type = "text/markdown"
