@@ -2444,3 +2444,28 @@
     text-overflow: ellipsis;
 }
 
+/* Match the reciprocal Memory Glass Switch control. */
+#namespaceSwitchToGlass {
+    background: #e4bf62;
+    border: 1px solid #e4bf62;
+    border-radius: 4px;
+    color: #192030;
+    padding: 7px 11px;
+    font: 650 13px/1.4 "Segoe UI", system-ui, sans-serif;
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+}
+#namespaceSwitchToGlass:hover:not(:disabled) {
+    background: #f0ce7d;
+    border-color: #f0ce7d;
+}
+#namespaceSwitchToGlass:focus-visible {
+    outline: 2px solid #e4bf62;
+    outline-offset: 3px;
+}
+#namespaceSwitchToGlass:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
