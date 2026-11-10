@@ -45,3 +45,12 @@ required reusing the prior Python extraction approach.
 
 **How to apply:** Give Linux extraction/build commands separately from Windows
 PowerShell transfer commands, preserving a fresh extraction directory.
+
+A capture script's “saved” message or an existing file does not establish a
+successful UART session; check write success, byte count, and snapshot CRC.
+
+**Why:** A finally block reported a saved capture after a closed-port write
+exception, leaving a zero-byte file. Reopening the UART yielded real evidence.
+
+**How to apply:** Treat empty captures as inconclusive and inspect host errors
+before diagnosing RTL. Do not infer why a serial handle closed without evidence.
