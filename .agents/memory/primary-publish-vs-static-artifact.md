@@ -36,6 +36,16 @@ screenshot. Preserve managed routing and include its dependencies in the Run gro
 Check embedded views too: a successful outer-page response does not establish
 that the Development Image iframe rendered.
 
+Distinguish Replit's “Nothing to preview yet” placeholder from an app blank
+page or HTTP failure.
+**Why:** The user still saw that workspace placeholder while all app routes
+responded and the embedded view rendered in an independent browser. Server
+checks alone did not reproduce the user's failure.
+**How to apply:** Use the screenshot to identify the workspace-level problem;
+present the existing registered artifact before changing more server settings.
+An accepted presentation request is not confirmation that the user's pane
+recovered.
+
 Do not infer that the root is a pnpm workspace from a nested artifact's
 `catalog:` declarations or an old pnpm lockfile. Publishing must use one
 consistent root dependency installation and lockfile.
