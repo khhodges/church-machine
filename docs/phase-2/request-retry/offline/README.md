@@ -15,6 +15,7 @@ directory, then run:
 ```sh
 cd request-retry-offline
 python3 -B replay.py
+python3 -B -S independent_decode.py
 ```
 
 On Windows, `py -3 -B replay.py` is equivalent. Only local files are read.
@@ -48,6 +49,8 @@ This nonce is diagnostic correlation data, not a credential.
 responder source, plus only its offline imports. The serial driver, CLI,
 random nonce generator and pyserial import are deliberately not distributed.
 `replay.py` is the new agreement checker. `README.md` is this guide.
+`independent_decode.py` and `independent-reader.md` add the separate wire
+cross-check and its specification/limitations in bundle schema v2.
 No BIT, vendor reports/checkpoints, signing material, pairing grants,
 environment variables, local directory names or unrelated uploads are copied.
 The raw binary is the pinned diagnostic RX capture, not redacted or truncated;
@@ -62,8 +65,12 @@ Original files and build-time flags are never rewritten.
 ## Evidence limits
 
 This reproduces the parser result for the bounded fixed five-word
-request/receive/retry and 128-byte post-claim challenge. It is not a separately
-authored protocol implementation or independent physical reproduction.
+request/receive/retry and 128-byte post-claim challenge. The original replay
+is not a separately authored protocol implementation. The v2 bundle also
+includes an independently authored standard-library reader:
+see [independent-reader.md](independent-reader.md) for its wire contract,
+pins, negative controls and limits. Both checks run during bundle creation.
+Neither is independent physical reproduction.
 Host events record send attempts/completions, not logic-analyzer TX.
 The board report supplies challenge-receipt evidence. Programming-success
 output and FPGA readback were not supplied; the named uploaded BIT hash

@@ -4,6 +4,10 @@ The tooling and evaluator guide are in [offline/README.md](offline/README.md).
 They package the exact retained raw capture and result, a port-label-sanitized
 event log, and the retained parser without its serial driver. The original
 [physical result](physical-result.md) and all historical evidence remain unchanged.
+New v2 bundles additionally run and include a separately authored standard-library
+[wire reader](offline/independent-reader.md), with no retained parser imports.
+Its CRC, payload, terminal and challenge checks are offline cross-checks of
+the same historical evidence, not another physical run.
 
 Build from the repository root:
 

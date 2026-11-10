@@ -56,8 +56,10 @@ def build(output):
         "replay.py": (HERE / "replay.py").read_bytes(),
         "README.md": (HERE / "README.md").read_bytes(),
         "REDISTRIBUTION.md": (HERE / "REDISTRIBUTION.md").read_bytes(),
+        "independent_decode.py": (HERE / "independent_decode.py").read_bytes(),
+        "independent-reader.md": (HERE / "independent-reader.md").read_bytes(),
     }
-    manifest = dict(schema="request-retry-offline-v1", original_inputs=INPUTS,
+    manifest = dict(schema="request-retry-offline-v2", original_inputs=INPUTS,
                     transformations={
                         "events.jsonl": "Replace opening port with [REDACTED]; canonical JSON key ordering only",
                         "session.py": "Verbatim Session class extracted from pinned responder; offline imports only",
@@ -71,6 +73,7 @@ def build(output):
         for name, data in files.items():
             (staging / name).write_bytes(data)
         subprocess.run([sys.executable, "-B", str(staging / "replay.py")], check=True)
+        subprocess.run([sys.executable, "-B", "-S", str(staging / "independent_decode.py")], check=True)
         output.mkdir()
         bundle = output / "request-retry-offline.zip"
         with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
