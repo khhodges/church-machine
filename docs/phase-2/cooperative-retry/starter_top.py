@@ -27,7 +27,8 @@ BOOT_GUARD = (46 << 9) | 419
 
 
 class StarterTop(Elaboratable):
-    def __init__(self, *, clock_hz=25_000_000, baud=57600, sim_mode=False):
+    def __init__(self, *, clock_hz=25_000_000, baud=57600, sim_mode=False,
+                 lump_records=None):
         self.clock_hz, self.baud, self.sim_mode = clock_hz, baud, sim_mode
         self.clk = Signal()
         # A physical input, synchronized below. No UART/MMIO assignment.
@@ -39,6 +40,10 @@ class StarterTop(Elaboratable):
         self.core = ChurchCore(expected_boot_guard=BOOT_GUARD, watchdog_clock_hz=clock_hz)
         self.verifier = ReceivedImageSHA256()
         self.diagnostic = RequestDiagnostic()
+        self.lump_receiver = None
+        if lump_records is not None:
+            from .combined_receiver import CombinedReceiver
+            self.lump_receiver = CombinedReceiver(lump_records, clock_hz=clock_hz)
         self.memory_write = Signal()
         self.memory_address = Signal(14)
         self.memory_data = Signal(32)
@@ -54,10 +59,13 @@ class StarterTop(Elaboratable):
         if not self.sim_mode:
             m.d.comb += ClockSignal("sync").eq(self.clk)
         ctl, core, tr, sha, diag = self.control, self.core, self.transport, self.verifier, self.diagnostic
+        lump = self.lump_receiver
         m.submodules.transport = tr
         m.submodules.verifier = ResetInserter(ctl.begin_accepted)(sha)
         m.submodules.core = DomainRenamer("execution")(core)
         m.submodules.diagnostic = DomainRenamer("execution")(diag)
+        if lump is not None:
+            m.submodules.lump_receiver = DomainRenamer("execution")(lump)
         m.d.comb += [
             ClockSignal("execution").eq(ClockSignal("sync")),
             ResetSignal("execution").eq(ctl.execution_reset),
@@ -72,7 +80,7 @@ class StarterTop(Elaboratable):
             rx.rx.eq(self.uart_rx_pin), self.uart_tx_pin.eq(tx.tx),
             tr.maintenance.eq(enable), tr.valid.eq(rx.valid & enable),
             tr.byte.eq(rx.data), tr.error.eq(rx.error & enable),
-            diag.valid.eq(rx.valid & ~enable & ~ctl.execution_reset),
+            diag.valid.eq(rx.valid & ~enable & ~ctl.execution_reset & Const(lump is None)),
             diag.byte.eq(rx.data), diag.error.eq(rx.error & ~enable),
             arb.req[0].eq(tr.tx_req), arb.data[0].eq(tr.tx_byte),
             arb.last[0].eq(tr.tx_last), tr.tx_ack.eq(arb.ack[0]),
@@ -82,6 +90,13 @@ class StarterTop(Elaboratable):
             arb.ready.eq(~tx.busy & ~tx.done),
             tx.start.eq(arb.tx_start), tx.data.eq(arb.tx_data),
         ]
+        if lump is not None:
+            m.d.comb += [
+                lump.valid.eq(rx.valid & ~enable & ~ctl.execution_reset),
+                lump.byte.eq(rx.data), lump.error.eq(rx.error & ~enable),
+                lump.epoch.eq(ctl.epoch), lump.running.eq(
+                    ~ctl.execution_reset & ~core.sim_watchdog.block_program_writes),
+            ]
         # BEGIN discards execution-owned diagnostic state, including a partial
         # report. Release its TX ownership; the byte already on the wire drains.
 
@@ -96,9 +111,12 @@ class StarterTop(Elaboratable):
                                core.clist_addr[2:16], core.dmem_addr[2:16]))),
             core.ns_rd_data.eq(Cat(rd.data, Const(0, 96))),
             core.clist_rd_data.eq(rd.data),
-            inspect.addr.eq(Mux(ctl.validate_request, sha.address, diag.mem_addr)),
+            inspect.addr.eq(Mux(ctl.validate_request, sha.address,
+                (0xa000 // 4 + lump.read_address) if lump is not None else diag.mem_addr)),
             sha.data.eq(inspect.data), diag.mem_data.eq(inspect.data),
         ]
+        if lump is not None:
+            m.d.comb += lump.read_data.eq(inspect.data)
         verifying = Signal()
         verify_epoch = Signal(32)
         verify_image = Signal()
@@ -153,9 +171,14 @@ class StarterTop(Elaboratable):
         mmio_data = Signal(32)
         with m.Switch(core.dmem_addr):
             with m.Case(0x4000001C):
-                m.d.comb += mmio_data.eq(diag.data)
+                m.d.comb += mmio_data.eq(lump.word if lump is not None else diag.data)
             with m.Case(0x40000020):
-                m.d.comb += mmio_data.eq(diag.status)
+                m.d.comb += mmio_data.eq(lump.state if lump is not None else diag.status)
+            if lump is not None:
+                with m.Case(0x40000024):
+                    m.d.comb += mmio_data.eq(lump.selector)
+                with m.Case(0x40000028):
+                    m.d.comb += mmio_data.eq(lump.transaction)
         mmio_valid, ram_valid = Signal(), Signal()
         mmio_latched = Signal(32)
         m.d.execution += [
@@ -165,8 +188,8 @@ class StarterTop(Elaboratable):
         m.d.comb += [
             core.dmem_rd_data.eq(Mux(mmio_valid, mmio_latched, rd.data)),
             core.dmem_rd_valid.eq(mmio_valid | ram_valid),
-            diag.claim.eq(read_mmio & (core.dmem_addr == 0x40000020)),
-            diag.pop.eq(read_mmio & (core.dmem_addr == 0x4000001C)),
+            diag.claim.eq(read_mmio & (core.dmem_addr == 0x40000020) & Const(lump is None)),
+            diag.pop.eq(read_mmio & (core.dmem_addr == 0x4000001C) & Const(lump is None)),
             diag.start.eq(diag.claim), diag.snapshot_complete.eq(1),
             diag.renew.eq(core.sim_watchdog.transition_complete),
             diag.watchdog_fault.eq(core.fault_valid),
@@ -187,14 +210,32 @@ class StarterTop(Elaboratable):
         # One write port: loader in reset, otherwise CPU arbitration exactly
         # NS > C-list > data. Verifier/observer have read-only ports.
         cpu_write = core.ns_wr_en | core.clist_wr_en | (core.dmem_wr_en & ~mmio)
+        staging_write = Signal()
+        if lump is not None:
+            m.d.comb += [
+                lump.memory_ready.eq(ctl.program_write_allowed & ~cpu_write &
+                                     ~core.sim_watchdog.block_program_writes),
+                staging_write.eq(lump.memory_write & lump.memory_ready),
+                lump.pop.eq(read_mmio & (core.dmem_addr == 0x4000001C)),
+                lump.commit.eq(core.dmem_wr_en & ctl.program_write_allowed &
+                    ~core.sim_watchdog.block_program_writes &
+                    (core.dmem_addr == 0x40000028) &
+                    (core.dmem_wr_data == lump.transaction)),
+            ]
         m.d.comb += [
             self.program_commit.eq(cpu_write & ctl.program_write_allowed &
                                    ~core.sim_watchdog.block_program_writes),
-            wr.en.eq(ctl.memory_write | self.program_commit),
-            wr.addr.eq(Mux(ctl.memory_write, ctl.memory_address, rd.addr)),
+            wr.en.eq(ctl.memory_write | self.program_commit | staging_write),
+            wr.addr.eq(Mux(ctl.memory_write, ctl.memory_address,
+                Mux(staging_write, 0xa000 // 4 + lump.memory_address, rd.addr)
+                if lump is not None else rd.addr)),
             wr.data.eq(Mux(ctl.memory_write, ctl.memory_data,
-                           Mux(core.ns_wr_en, core.ns_wr_data[:32],
-                               Mux(core.clist_wr_en, core.clist_wr_data, core.dmem_wr_data)))),
+                Mux(staging_write, lump.memory_data,
+                    Mux(core.ns_wr_en, core.ns_wr_data[:32],
+                        Mux(core.clist_wr_en, core.clist_wr_data, core.dmem_wr_data)))
+                if lump is not None else
+                    Mux(core.ns_wr_en, core.ns_wr_data[:32],
+                        Mux(core.clist_wr_en, core.clist_wr_data, core.dmem_wr_data)))),
             self.memory_write.eq(wr.en), self.memory_address.eq(wr.addr),
             self.memory_data.eq(wr.data),
         ]

@@ -9,7 +9,8 @@ from prepare_candidate import HERE, ROOT, PARENT, MANIFEST, sources
 
 RETAINED = ROOT / "generated-artifacts/starter-side-by-side-candidate"
 APPLICATIONS = ROOT / "generated-artifacts/cooperative-retry-build-only"
-ADDITIONS = ("starter_lifecycle.py", "starter_sha256.py", "starter_transport.py", "starter_top.py")
+ADDITIONS = ("starter_lifecycle.py", "starter_sha256.py", "starter_transport.py", "starter_top.py",
+             "combined_protocol.py", "combined_receiver.py")
 IMAGE_HASHES = {
     "all-waiting": "925fe029a47c8abc80c91ab7df80334d8015cae74fd116f41560174e6478e6d7",
     "user-b": "c55a7e0158fd2402cc492d43d58c7f376a12edc6ef2eb3c4a9508499d7b6d480",

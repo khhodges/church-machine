@@ -156,3 +156,4 @@
 - [Interrupted process fixtures](interrupted-process-fixtures.md) — Python run() kills children on SystemExit; model surviving children explicitly and retain reaping custody.
 - [Cooperative retry watchdog](cooperative-retry-watchdog.md) — fixed enabled diagnostic-only watchdog approval; terminal observation and scratch-capability boundaries.
 - [Offline evidence licensing](offline-evidence-licensing.md) — owner approved GPL-3.0 for tooling and historical evidence; optional commercial licensing, no publication instruction.
+- [Combined runtime approval](combined-runtime-approval.md) — expanded local RTL scope needs separate exact-image admission review; RETURN PC is not fetch-ready evidence.

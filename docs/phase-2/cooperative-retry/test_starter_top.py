@@ -23,8 +23,8 @@ DIVISOR = HZ // BAUD
 
 
 class Harness:
-    def __init__(self, *, hz=HZ, baud=BAUD):
-        self.top = top = StarterTop(clock_hz=hz, baud=baud, sim_mode=True)
+    def __init__(self, *, hz=HZ, baud=BAUD, top=None):
+        self.top = top = top if top is not None else StarterTop(clock_hz=hz, baud=baud, sim_mode=True)
         self.divisor = hz // baud
         self.hz = hz
         self.module = m = Module()
