@@ -26,8 +26,9 @@ addresses and a five-word payload into its loading contract.
    into the new test setup without synthesizing or programming a second
    bitstream. Record the unchanged FPGA configuration and both distinct image
    hashes. Do not use the preserved working setup as the replacement target.
-3. **Same-size LUMP upgrade:** stage old and new revisions side by side.
-   Check equal allocated size before adoption. Demonstrate a changed result
+3. **Side-by-side LUMP upgrade:** stage old and new revisions in separate
+   allocations; their sizes may differ. Check each allocation's bounds and
+   available memory before adoption. Demonstrate a changed result
    from the new revision without disguising a Namespace reload as a LUMP
    upgrade. Retain the old revision and its valid active continuations; never
    overwrite code still executing. Reusing a slot or redirecting capabilities
@@ -40,11 +41,12 @@ addresses and a five-word payload into its loading contract.
 - Namespace image installation on that same starter hardware configuration.
 - Side-by-side revision allocation and safe caller adoption, with old calls
   able to finish against their original revision.
-- Rejection of size mismatch and failed validation without damaging the old
-  working revision.
+- Rejection of insufficient memory, invalid bounds and failed validation
+  without damaging the old working revision.
 
-Same size does not make an in-place overwrite safe. This direction does not
-claim that concurrent revision adoption already exists.
+Equal size is not required for side-by-side revisions, and does not make an
+in-place overwrite safe. This direction does not claim that concurrent revision
+adoption already exists.
 
 Physical testing requires a separately identified test target. Neither building
 the candidate nor recording this direction authorizes replacing the working

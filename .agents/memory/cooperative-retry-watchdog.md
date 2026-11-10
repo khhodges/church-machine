@@ -8,7 +8,9 @@ description: Fixed-watchdog diagnostic approval and evidence boundaries.
 Use one of the two new cooperative Namespaces as the starter bitstream and
 demonstrate the other without creating a second bitstream. The user's three
 goals are proving Lazy Load, proving Namespace image replacement, and
-demonstrating a same-size-only LUMP upgrade.
+demonstrating a LUMP upgrade. The original same-size-only constraint was
+subsequently corrected: side-by-side LUMPs have independent allocations and
+need not have equal sizes.
 
 **Why:** The user explicitly replaced the two-bitstream demonstration direction
 with one reusable hardware configuration. A second synthesis cannot count as
@@ -32,6 +34,11 @@ continuations, and establish a safe adoption boundary before redirecting calls.
 Do not infer that staging alone implements concurrent upgrade or grants permission
 to activate new code. Namespace image replacement is demonstrated on the new
 test setup, not by stopping the preserved working setup.
+
+**Why:** The user explicitly corrected applying the same-size restriction to
+side-by-side LUMPs. Validate each allocation and total memory capacity, not
+equality between revision sizes. Equal size alone would not make an in-place
+overwrite safe either.
 
 The user approved a fixed, enabled watchdog with no software control access
 for the isolated delayed-delivery/cooperative-USER diagnostic.
