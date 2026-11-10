@@ -2780,9 +2780,12 @@ function switchView(viewId) {
         updateNamespace();
         if (typeof refreshBootCapacity === 'function') refreshBootCapacity();
         setTimeout(function() {
-            const top = document.getElementById('namespaceTable') ||
-                document.getElementById('bootCapacityPanel');
-            if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Start with the Namespace title and Switch control, not the table
+            // below them. Explicit #namespace&ns=... links scroll to their row
+            // separately after this default positioning.
+            if (currentView !== 'namespace') return;
+            if (el) el.scrollTop = 0;
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         }, 80);
     }
     if (viewId === 'memory')    renderMemoryView();

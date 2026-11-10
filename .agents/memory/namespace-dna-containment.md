@@ -93,3 +93,10 @@ make it work; preview-only feedback is not a functional graduation.
 **How to apply:** Connect to the existing selected-design actions and preserve
 dirty-draft guards. Keep saving, binding, preparation, and hardware transfer
 distinct; no illustrative status or simulated success belongs in the live page.
+
+Ordinary entry to Namespace must show its title and gold Switch button by
+default, not scroll past them to the table.
+**Why:** The user explicitly requested the complete header as the default view
+after approving its layout.
+**How to apply:** Start ordinary navigation at the top; retain intentional
+slot-targeted deep links and do not let delayed scrolling affect another view.
