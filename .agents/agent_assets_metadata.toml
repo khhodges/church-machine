@@ -1984,3 +1984,17 @@ mtime_ms = 1794261946324
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e3bed951-3db9-4f08-b4ac-09264771362c/c3beff92-9957-4395-baa2-c5a344f642ed"
 storage_version_token = "1794261952545271"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "Jm6iVTeyEQ9_pjnTc0cE9"
+uri = "file://generated-artifacts/request-retry-build-only.zip"
+type = "unspecified"
+title = "Request-and-load diagnostic — verified build-only package"
+description = "Exported RTL, exact tested sources, 35-case local evidence, automatic host responder, and guarded Vivado 2026.1 runner. SHA-256: 052ae91d5963902bc1c9a2815411e3a4241619049082e6d60c2209d947a296aa. No vendor build or programming performed."
+logical_id = "64d954a9-f66c-40f2-b159-9df4d25bbfdf"
+content_hash = "sha256:052ae91d5963902bc1c9a2815411e3a4241619049082e6d60c2209d947a296aa"
+size = 3645192
+mtime_ms = 1794278314152
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/64d954a9-f66c-40f2-b159-9df4d25bbfdf/212f8d17-880e-4c0b-a54f-fab352f28135"
+storage_version_token = "1794278387553122"
+content_type = "application/octet-stream"
