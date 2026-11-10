@@ -49,5 +49,9 @@ Agree cooperative scenarios through saved Namespace designs and readable code
 in the existing IDE before treating a diagnostic build as the shared design.
 **Why:** The user explicitly called this the right way to understand and agree
 the goal; isolated Python fixture images alone did not provide that shared view.
-**How to apply:** Keep the two scenarios independent. Mark review sources and
-unbound designs honestly; never imply they reproduce qualified FPGA bytes.
+**How to apply:** Keep the two scenarios independent. Create real saved LUMPs
+and exact assignments, not just rows plus source files: the user twice flagged
+missing Memory Glass data as an incomplete handoff. Mark remaining runtime
+qualification honestly; never imply new compiled designs reproduce the earlier
+qualified fixture bytes. Use locally owned leaves under the configured IDE node,
+not a new foreign hierarchy branch for the test names.

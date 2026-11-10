@@ -21,10 +21,21 @@ Use **Open File Catalog** and search `cooperative_retry` for readable code:
 | `user_b` | Increment progress, yield, repeat |
 | `payload` | Return the diagnostic success result |
 
-These are **source-backed review drafts**, not compiled/assigned LUMPs.
-The existing Namespace row action opens an assigned LUMP only; it deliberately
-does not fall back to standalone source. Until assignment is reviewed, use
-Open File Catalog to read these files. All five are present in that API.
+These now have **real compiler-produced, saved and assigned revision-1 LUMPs**.
+Their canonical names are `ide.CooperativePayload`, `ide.CooperativeUserA`,
+`ide.CooperativeUserB`, `ide.CooperativeSystemWaiting` and
+`ide.CooperativeSystemUserB`. The earlier `Cooperative.*` spelling denoted a
+foreign ownership branch; it was corrected locally without changing hierarchy
+settings. USER Thread and Receiver names also use local `ide.Cooperative…`
+identities. The Namespace row action can now inspect its exact assigned LUMP.
+All five standalone sources remain available in Open File Catalog.
+
+Read-back through the actual Memory Glass inspection service confirms artifact
+identity, revision, token, binary size, code size and C-list count for every
+LUMP. Resident layouts have word locations and extents; the Lazy payload has
+no resident address by design. Both inspection responses have no layout warnings.
+The two SYSTEM LUMPs contain 28/27 code words and 5/4 C-list entries respectively;
+USER A has 6/3, USER B 5/2, and Payload 3/1.
 
 Do not build/run these as equivalent to the qualified diagnostic. Normal
 compilation adds method tables/API metadata; the old fixed five-word transport

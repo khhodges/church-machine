@@ -2,7 +2,7 @@
 ; Successful retry sets DR12=13 and returns to USER A.
 ; This source is not the five-word diagnostic transport payload: the normal
 ; compiler emits an API/method table and must be reviewed before a new build.
-abstraction Cooperative.Payload {
+abstraction ide.CooperativePayload {
     capabilities { SELF E }
     method Run() {
         IADD DR12, DR0, #13

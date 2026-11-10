@@ -7,10 +7,10 @@
 ; The five writes below describe the exact old fixture's publication offsets.
 ; They are NOT a general installer for newly compiled LUMPs.
 ; REVIEW ONLY: source-backed design, not byte-identical to the qualified image.
-abstraction Cooperative.SystemUserB {
+abstraction ide.CooperativeSystemUserB {
     capabilities {
-        SELF E, Cooperative.UserB.Thread, Cooperative.UserA.Thread,
-        Cooperative.Payload W, Cooperative.Receiver R
+        SELF E, ide.CooperativeUserBThread, ide.CooperativeUserAThread,
+        ide.CooperativePayload W, ide.CooperativeReceiver R
     }
     method Run() {
         LOAD CR1, CR6, #2

@@ -32,8 +32,8 @@ def api(path, payload=None, method=None):
         request.add_header("X-Change-Confirmation", review["change_confirmation"]["id"])
         with CLIENT.open(request) as response:
             result = json.load(response)
-    if not result.get("ok"):
-        raise ValueError(result)
+    if result.get("ok") is False:
+        raise ValueError(result.get("error") or result.get("message") or "IDE request rejected")
     return result
 
 

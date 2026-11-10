@@ -5406,5 +5406,45 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "8ae681aa356c41995a8de7c8bf93a13493470c841334fe746c2553f203688682"
     }
+  },
+  {
+    "token": "e7e998ac",
+    "abstraction": "ide.CooperativePayload",
+    "filename": "ide.CooperativePayload.1.272d79da.lump",
+    "lump_version": 1,
+    "compiled_at": 1794328679.2774327,
+    "operation_id": "e03e5bffd7a44e1e92815c19309e953a"
+  },
+  {
+    "token": "3b91168e",
+    "abstraction": "ide.CooperativeUserA",
+    "filename": "ide.CooperativeUserA.1.1946691d.lump",
+    "lump_version": 1,
+    "compiled_at": 1794328688.6968777,
+    "operation_id": "0a836091559b4e01860034f95c17954c"
+  },
+  {
+    "token": "ae0d9dfd",
+    "abstraction": "ide.CooperativeUserB",
+    "filename": "ide.CooperativeUserB.1.b60fcecd.lump",
+    "lump_version": 1,
+    "compiled_at": 1794328691.8984656,
+    "operation_id": "54d13258a98947a2a3d9c761e899094d"
+  },
+  {
+    "token": "64649294",
+    "abstraction": "ide.CooperativeSystemWaiting",
+    "filename": "ide.CooperativeSystemWaiting.1.50162c5e.lump",
+    "lump_version": 1,
+    "compiled_at": 1794328694.941504,
+    "operation_id": "2abf2e03634f487db3e0bf3645dcde85"
+  },
+  {
+    "token": "e6b4f51a",
+    "abstraction": "ide.CooperativeSystemUserB",
+    "filename": "ide.CooperativeSystemUserB.1.e2064cc1.lump",
+    "lump_version": 1,
+    "compiled_at": 1794328697.1557386,
+    "operation_id": "073f6fd8c7e64584a7ebdc933cc19350"
   }
 ]

@@ -2,7 +2,21 @@
   "leases": {},
   "waiters": {
     "CapabilityTest": [],
-    "ide.AmoebaStartup": []
+    "ide.AmoebaStartup": [],
+    "ide.CooperativePayload": [
+      {
+        "owner_key": "Wail04bIpzk1FA7WsWEPJKYNd_u6MtdN",
+        "operation_id": "5c978ed420264ec5b1a6d8abad104679",
+        "requested_at": 1794328564.602248,
+        "expires_at": 1794328864.602248
+      },
+      {
+        "owner_key": "GPiie0LWVe4-VLAETL50rhktl1-BqlnA",
+        "operation_id": "ab54684ba00f4fd29f87a06c599517c5",
+        "requested_at": 1794328598.3710454,
+        "expires_at": 1794328898.3710454
+      }
+    ]
   },
   "messages": {}
 }

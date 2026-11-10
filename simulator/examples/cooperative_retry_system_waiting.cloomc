@@ -6,10 +6,10 @@
 ; MMIO exists only in diagnostic RTL. These five publication offsets describe
 ; the old fixture, not a general installer for the newly compiled source.
 ; REVIEW ONLY: not byte-identical to the qualified FPGA image.
-abstraction Cooperative.SystemWaiting {
+abstraction ide.CooperativeSystemWaiting {
     capabilities {
-        SELF E, Cooperative.UserA.Thread, Cooperative.Payload W,
-        Cooperative.Receiver R
+        SELF E, ide.CooperativeUserAThread, ide.CooperativePayload W,
+        ide.CooperativeReceiver R
     }
     method Run() {
         LOAD CR1, CR6, #1
