@@ -1,0 +1,46 @@
+; REVIEW DESIGN: SYSTEM and waiting USER A share ONE Namespace/FPGA image.
+; Companion scenario to SystemUserB, not an image that interacts with it.
+; There is no eligible USER B here. SYSTEM renews via real self-CHANGE.
+; No software watchdog kick, exemption, timer pause, or automatic resume.
+; Diagnostic Receiver status: 0=pending, 1=accepted/ready, 2=rejected.
+; MMIO exists only in diagnostic RTL. These five publication offsets describe
+; the old fixture, not a general installer for the newly compiled source.
+; REVIEW ONLY: not byte-identical to the qualified FPGA image.
+abstraction Cooperative.SystemWaiting {
+    capabilities {
+        SELF E, Cooperative.UserA.Thread, Cooperative.Payload W,
+        Cooperative.Receiver R
+    }
+    method Run() {
+        LOAD CR1, CR6, #1
+        LOAD CR3, CR6, #2
+        LOAD CR4, CR6, #3
+        CHANGE CR1
+    Pending:
+        DREAD DR7, CR4, #1
+        ISUB DR8, DR7, #1
+        BRANCHEQ Deliver
+        ISUB DR8, DR7, #2
+        BRANCHEQ Rejected
+        CHANGE CR12
+        BRANCH Pending
+    Rejected:
+        HARDFAULT "Cooperative diagnostic response rejected"
+    Deliver:
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #1
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #2
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #3
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #63
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #0
+        LOAD CR1, CR6, #1
+        CHANGE CR1
+    Observe:
+        CHANGE CR12
+        BRANCH Observe
+    }
+}

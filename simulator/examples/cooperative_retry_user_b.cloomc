@@ -1,0 +1,13 @@
+; REVIEW DESIGN — not the byte-identical FPGA diagnostic image.
+; Independent USER B Thread; DR11 belongs to its saved context.
+; One progress increment per dispatch, then ordinary voluntary yield.
+abstraction Cooperative.UserB {
+    capabilities { SELF E, Boot.Thread }
+    method Run() {
+    Progress:
+        IADD DR11, DR11, #1
+        LOAD CR1, CR6, #1
+        CHANGE CR1
+        BRANCH Progress
+    }
+}

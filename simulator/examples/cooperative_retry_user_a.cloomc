@@ -1,0 +1,15 @@
+; REVIEW DESIGN — not the byte-identical FPGA diagnostic image.
+; USER A runs in Cooperative.UserA.Thread, not in SYSTEM's Thread.
+; The absent Lazy payload blocks this CALL; completed LLR returns to SYSTEM.
+; Delivery must resume this same CALL once, not restart Run.
+; Thread-home/entry provisioning and diagnostic transport binding need review.
+abstraction Cooperative.UserA {
+    capabilities { SELF E, Cooperative.Payload E, Boot.Thread }
+    method Run() {
+        LOAD CR1, CR6, #1
+        CALL CR1, #0
+        ; CALL/LLR scratch registers are not retained scheduling authority.
+        LOAD CR1, CR6, #2
+        CHANGE CR1
+    }
+}

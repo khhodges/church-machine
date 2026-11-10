@@ -44,3 +44,10 @@ and CHANGE's own busy signal from the separate SWITCH indication.
 the SWITCH busy output falsely appeared to disprove mid-CHANGE expiry.
 **How to apply:** Calibrate deadlines from active-timer write cycles and observe
 the unit executing the tested instruction; use the normal issue/settle contract.
+
+Agree cooperative scenarios through saved Namespace designs and readable code
+in the existing IDE before treating a diagnostic build as the shared design.
+**Why:** The user explicitly called this the right way to understand and agree
+the goal; isolated Python fixture images alone did not provide that shared view.
+**How to apply:** Keep the two scenarios independent. Mark review sources and
+unbound designs honestly; never imply they reproduce qualified FPGA bytes.

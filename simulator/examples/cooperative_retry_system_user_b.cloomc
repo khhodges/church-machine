@@ -1,0 +1,50 @@
+; REVIEW DESIGN: SYSTEM, USER A and USER B share ONE Namespace/FPGA image.
+; Boot.Thread is SYSTEM. This is not a second interacting FPGA build.
+; One-second fixed watchdog belongs to the diagnostic hardware, not this code.
+; Receiver status: 0=pending, 1=accepted/ready, 2=rejected.
+; Ordinary status reads claim the single response; data reads pop five words.
+; This MMIO receiver exists only in the diagnostic RTL, not a general IDE UART.
+; The five writes below describe the exact old fixture's publication offsets.
+; They are NOT a general installer for newly compiled LUMPs.
+; REVIEW ONLY: source-backed design, not byte-identical to the qualified image.
+abstraction Cooperative.SystemUserB {
+    capabilities {
+        SELF E, Cooperative.UserB.Thread, Cooperative.UserA.Thread,
+        Cooperative.Payload W, Cooperative.Receiver R
+    }
+    method Run() {
+        LOAD CR1, CR6, #2
+        LOAD CR3, CR6, #3
+        LOAD CR4, CR6, #4
+        CHANGE CR1
+    Pending:
+        DREAD DR7, CR4, #1
+        ISUB DR8, DR7, #1
+        BRANCHEQ Deliver
+        ISUB DR8, DR7, #2
+        BRANCHEQ Rejected
+        ; Never choose waiting USER A. Reload B rather than trusting scratch CR5.
+        LOAD CR5, CR6, #1
+        CHANGE CR5
+        BRANCH Pending
+    Rejected:
+        HARDFAULT "Cooperative diagnostic response rejected"
+    Deliver:
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #1
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #2
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #3
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #63
+        ; Publish header last; resume USER A only after all five writes.
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, #0
+        LOAD CR1, CR6, #2
+        CHANGE CR1
+    Observe:
+        CHANGE CR12
+        BRANCH Observe
+    }
+}
