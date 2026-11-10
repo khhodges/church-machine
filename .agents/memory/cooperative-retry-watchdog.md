@@ -5,6 +5,14 @@ description: Fixed-watchdog diagnostic approval and evidence boundaries.
 
 ## Single starter bitstream demonstration goal
 
+The user set a four-week release target on 2026-11-10 (target 2026-12-08),
+prioritizing minimum duplicated effort and bitstreams with rapid progress.
+**Why:** The discussion must converge into a bounded release, not expand into
+an open-ended architecture programme.
+**How to apply:** Reuse completed manuscript/evidence/licensing work and target
+one reusable new starter configuration for the three proofs. Preserve safety
+and truthful evidence; the target date is not authority to waive acceptance.
+
 Use one of the two new cooperative Namespaces as the starter bitstream and
 demonstrate the other without creating a second bitstream. The user's three
 goals are proving Lazy Load, proving Namespace image replacement, and

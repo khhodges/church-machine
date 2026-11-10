@@ -2096,3 +2096,17 @@ mtime_ms = 1794338127595
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d0615486-9c9b-43b7-b22a-314729437eb7/fc253495-6261-470c-abfa-1cd59cd1fa2a"
 storage_version_token = "1794338161910433"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "o4ns1CZ-vdZ7GfTca8f7y"
+uri = "file://docs/phase-2/cooperative-retry/four-week-release-plan.md"
+type = "text"
+title = "Four-week release plan — 8 December 2026 target"
+description = "One reusable starter bitstream, three demonstrations, completed work reused, weekly gates and a bounded publication package."
+logical_id = "850291ab-a3a1-43e3-9c19-edc8202e7b4a"
+content_hash = "sha256:7bdb9c0d59d12504bbcb096babf94b028b4d55995c5a66a9e6862d56978909c6"
+size = 14107
+mtime_ms = 1794341919703
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/850291ab-a3a1-43e3-9c19-edc8202e7b4a/198c8227-10b8-4028-bad7-a528874f6a94"
+storage_version_token = "1794341950142782"
+content_type = "text/markdown"
