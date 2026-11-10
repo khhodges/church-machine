@@ -2026,3 +2026,31 @@ mtime_ms = 1794335866771
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ffe4c322-5cc1-48ef-b887-a62c360602c8/49d977da-e985-4002-abe9-e2459d4f5059"
 storage_version_token = "1794335906753559"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "R7I4WQKNenk56QP75a3iI"
+uri = "file://generated-artifacts/request-retry-offline/request-retry-offline.zip"
+type = "unspecified"
+title = "Offline FPGA evidence replay bundle"
+description = "Sanitized historical evidence, retained offline parser, SHA-256 manifest and replay guide. Archive SHA-256: de38788ce357d92cc580aee1c510d7b183a8fb90f2ef953fa6dc1ad965074bbb. No hardware access required."
+logical_id = "f2a903ef-3c04-447a-81d2-0cb66b74615a"
+content_hash = "sha256:de38788ce357d92cc580aee1c510d7b183a8fb90f2ef953fa6dc1ad965074bbb"
+size = 14806
+mtime_ms = 1794336174191
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f2a903ef-3c04-447a-81d2-0cb66b74615a/bcccc45e-7fa6-4b29-b0ab-a44f20f5500a"
+storage_version_token = "1794336201886625"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "lx-HOTH44svL2IEAViPH1"
+uri = "file://generated-artifacts/request-retry-offline/SHA256SUMS"
+type = "unspecified"
+title = "Replay bundle checksum"
+description = "SHA-256 checksum for verifying the ZIP before extraction."
+logical_id = "050f0c4a-457d-45cc-b752-6e529b505795"
+content_hash = "sha256:1e4eb9e84562f2fbd5bbd4372d63b34bde290723a1b22817ffd32d630aaadfa8"
+size = 92
+mtime_ms = 1794336174199
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/050f0c4a-457d-45cc-b752-6e529b505795/4e6a0c75-83db-4e64-a761-ac88e31ef936"
+storage_version_token = "1794336202614814"
+content_type = "application/octet-stream"
