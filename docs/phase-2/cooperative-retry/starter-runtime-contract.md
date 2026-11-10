@@ -23,6 +23,16 @@ passed; this is not vendor-build or physical acceptance.
 
 ## Concrete preflight findings
 
+### Local revision-adoption demonstration
+
+[Revision adoption](revision-adoption.md) provides a runnable isolated
+compiler/simulator proof of disjoint different-size allocations, explicit
+new-caller selection, protected old continuations and fail-closed rejection.
+It uses neither this lifecycle controller nor whole-image reset for adoption.
+Its host-owned compiler approvals and synchronous publication are local harness
+boundaries, not a replacement for the shared RTL/transport admission contract.
+Full-top and physical qualification remain unclaimed.
+
 The current isolated candidate inherits diagnostic UART routing that disables
 the ordinary command parser while the diagnostic receiver is enabled.
 Therefore its normal STOP/upload commands cannot simply be combined with the
