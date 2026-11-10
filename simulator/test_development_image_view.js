@@ -10,6 +10,7 @@ assert(html.indexOf('development-image-view.js')>html.indexOf('app-shell.js')&&h
 const view=html.slice(html.indexOf('<div id="development-image" class="view">'));
 assert(/^<div id="development-image" class="view">\s*<div class="panel">\s*<div class="panel-title">Development Image<\/div>\s*<iframe id="developmentImageFrame"/.test(view),'same panel title format as Namespace');
 assert(html.includes(`id="hamItem-development-image" onclick="switchView('development-image');closeHamburger()"`),'menu action in shell');
+assert(html.includes(`id="hamItem-memory-glass" onclick="DevelopmentImageView.show();closeHamburger()">Memory Map (Glass)</button>`),'Memory Glass menu preserves the selected Namespace through the shared view');
 const shell=fs.readFileSync(dir+'/app-shell.js','utf8');
 assert.equal(shell.split("'namespace-dna','development-image']").length-1,2,'hash route and default-view lists include the view');
 const ns=fs.readFileSync(dir+'/namespace-design-v1.js','utf8');
