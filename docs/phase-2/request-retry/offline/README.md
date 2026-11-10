@@ -76,12 +76,14 @@ mediation, formal security proof, production readiness or three-demonstration
 starter qualification is established. This does not authorize release,
 hardware operation, application replacement or revision adoption.
 
-License/redistribution inventory: Session, protocol, replay, guide and retained
-evidence are project materials. No top-level project license was found during
-packaging; **this bundle grants no new license or redistribution permission**.
-No third-party runtime code or vendor binary is included. Public redistribution
-requires the owner's licensing/rights decision; offline review is not release
-approval. Python's standard library is supplied by the evaluator's interpreter.
+License/redistribution: the rights holder explicitly authorized GPL-3.0 for
+the entire offline package, including Session, protocol, offline tooling,
+guide and retained evidence. See `REDISTRIBUTION.md` for the recorded decision,
+scope, exclusions and release requirements. GPL-compliant commercial use is
+permitted; an optional separate commercial license can cover permissions
+outside GPL-3.0. This is not a repository-wide license or an instruction to
+publish. No third-party runtime code or vendor binary is included. Python's
+standard library is supplied by the evaluator's interpreter.
 
 ## Rebuild from the repository (maintainers only)
 

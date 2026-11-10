@@ -55,6 +55,7 @@ def build(output):
         "session.py": session.encode(),
         "replay.py": (HERE / "replay.py").read_bytes(),
         "README.md": (HERE / "README.md").read_bytes(),
+        "REDISTRIBUTION.md": (HERE / "REDISTRIBUTION.md").read_bytes(),
     }
     manifest = dict(schema="request-retry-offline-v1", original_inputs=INPUTS,
                     transformations={

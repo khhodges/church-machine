@@ -53,6 +53,14 @@ class OfflineReplayTests(unittest.TestCase):
         second = build_bundle.build(self.work / "second")
         self.assertEqual(self.archive.read_bytes(), second.read_bytes())
 
+    def test_redistribution_notice_is_packaged_and_hashed(self):
+        name = "REDISTRIBUTION.md"
+        notice = (self.bundle / name).read_bytes()
+        self.assertEqual(notice, (build_bundle.HERE / name).read_bytes())
+        manifest = json.loads((self.bundle / "manifest.json").read_text())
+        self.assertEqual(manifest["files"][name],
+                         dict(bytes=len(notice), sha256=build_bundle.digest(notice)))
+
     def test_no_overwrite(self):
         with self.assertRaisesRegex(ValueError, "already exists"):
             build_bundle.build(self.work / "first")

@@ -79,7 +79,7 @@ def verify_bundle(directory):
     manifest = json.loads((directory / "manifest.json").read_text())
     require(manifest["schema"] == "request-retry-offline-v1", "Unsupported manifest")
     expected = {"capture.bin", "events.jsonl", "result.json", "session.py", "protocol.py",
-                "replay.py", "README.md", "physical-result.md"}
+                "replay.py", "README.md", "physical-result.md", "REDISTRIBUTION.md"}
     require(set(manifest["files"]) == expected, "Unexpected bundle inventory")
     require({p.name for p in directory.iterdir() if p.is_file()} == expected | {"manifest.json"},
             "Unexpected files in bundle")

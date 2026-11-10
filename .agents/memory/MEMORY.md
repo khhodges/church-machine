@@ -155,3 +155,4 @@
 - [Simulator parity scope](simulator-parity-scope.md) — one-image diagnosis before alignment investment; stop at the first incompatibility, not a full parity programme.
 - [Interrupted process fixtures](interrupted-process-fixtures.md) — Python run() kills children on SystemExit; model surviving children explicitly and retain reaping custody.
 - [Cooperative retry watchdog](cooperative-retry-watchdog.md) — fixed enabled diagnostic-only watchdog approval; terminal observation and scratch-capability boundaries.
+- [Offline evidence licensing](offline-evidence-licensing.md) — owner approved GPL-3.0 for tooling and historical evidence; optional commercial licensing, no publication instruction.
