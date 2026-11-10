@@ -2054,3 +2054,31 @@ mtime_ms = 1794336174199
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/050f0c4a-457d-45cc-b752-6e529b505795/4e6a0c75-83db-4e64-a761-ac88e31ef936"
 storage_version_token = "1794336202614814"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "2Oq5hDJRB9yYemzLa8tGx"
+uri = "file://docs/phase-2/cooperative-retry/containment-revised.docx"
+type = "word_document"
+title = "Revised containment research manuscript"
+description = "Editable Word document with sourced related work, bounded results, evidence-status table and audit correction ledger. Original preserved."
+logical_id = "2256785e-ea65-422c-b5d8-3588e730401c"
+content_hash = "sha256:cc38685b7eae9898baf457d803613595674f1aacd6e0f11a76225ffdb1116528"
+size = 28240
+mtime_ms = 1794336813440
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2256785e-ea65-422c-b5d8-3588e730401c/5a2c28b0-490a-45de-b61b-5b3445db40a0"
+storage_version_token = "1794336835079178"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "pTUtJdq-tAR25OWBAP9Oc"
+uri = "file://generated-artifacts/containment-paper/containment-revised.html"
+type = "html"
+title = "Read the revised manuscript"
+description = "Self-contained browser-readable review copy of the revised paper."
+logical_id = "08e2fe6d-ba4c-4504-b553-8bc3fbec4e42"
+content_hash = "sha256:a7a74ea938a1578a9c4843b65bb49a58c669af7643278043c89b35fb8ee78178"
+size = 43823
+mtime_ms = 1794336352404
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/08e2fe6d-ba4c-4504-b553-8bc3fbec4e42/9b68163a-e62e-4c95-afff-7847558db30f"
+storage_version_token = "1794336835739398"
+content_type = "text/html"
