@@ -457,6 +457,32 @@
         if(!row || row.kind!=='lump') return;
         state.document.rows.forEach(r=>{r.boot=r===row;});changed();
     }
+    async function showInformation() {
+        const modal = document.getElementById('namespaceInfoDialog');
+        const content = document.getElementById('namespaceInfoContent');
+        if (modal.open) return;
+        content.textContent = 'Loading Namespace information…';
+        // Native modal focus and Escape behavior belong to this dialog,
+        // not to the editor or simulator's document-level shortcuts.
+        if (!modal.dataset.keyboardBound) {
+            modal.addEventListener('keydown', event => event.stopPropagation());
+            modal.addEventListener('close', () => {
+                const trigger = document.getElementById('namespaceInfoButton');
+                if (trigger) trigger.focus({preventScroll:true});
+            });
+            modal.dataset.keyboardBound = 'true';
+        }
+        modal.showModal();
+        try {
+            const response = await fetch('/docs/namespace-as-an-application.md', {cache:'no-cache'});
+            if (!response.ok) throw Error(`Document request failed (HTTP ${response.status}).`);
+            const markdown = await response.text();
+            content.innerHTML = root.renderMarkdown(markdown);
+        } catch (error) {
+            content.textContent = 'Could not load Namespace information. ' + error.message +
+                ' No design data was changed. Close and reopen this popup to retry, or use the Markdown document link below.';
+        }
+    }
     function identity(slot) {
         root._nsShowIdentity(slot,state.document.rows.find(r=>r.slot===slot));
     }
@@ -852,7 +878,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,refreshHeader,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad,openObjectEditor,setMmio};
+    root.NamespaceDesignV1={state,render,refreshHeader,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad,openObjectEditor,setMmio,showInformation};
     if(typeof document!=='undefined') {
         root.NamespaceDesignV1.selectShared=selectShared;
         root.NamespaceDesignV1.selectionKey=selectionKey;

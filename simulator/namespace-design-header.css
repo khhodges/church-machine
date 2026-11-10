@@ -17,6 +17,24 @@
 #namespace .namespace-refined .nr-static-header { border-bottom: 0; border-radius: 5px 5px 0 0; }
 #namespace .namespace-refined .nr-table-header { border-top: 0; border-radius: 0 0 5px 5px; margin-bottom: 12px; }
 #namespace .namespace-refined .nr-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 16px 10px; }
+#namespace .namespace-refined .nr-title { display: flex; align-items: center; gap: 8px; }
+#namespace .namespace-refined button.nr-info { padding: 5px; min-height: 28px; width: 28px; border-color: transparent; background: transparent; color: var(--nr-gold); }
+#namespace .namespace-refined button.nr-info svg { width: 18px; height: 18px; }
+#namespaceInfoDialog { margin: auto; width: min(760px, calc(100vw - 32px)); max-height: 85dvh; padding: 0; background: #151e2d; color: #dde5ef; border: 1px solid #53627b; border-radius: 8px; overflow: auto; font: 14px/1.65 "Segoe UI", system-ui, sans-serif; }
+#namespaceInfoDialog::backdrop { background: #000b; }
+#namespaceInfoDialog .ns-info-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #304056; position: sticky; top: 0; background: #151e2d; }
+#namespaceInfoDialog .ns-info-top h2 { margin: 0; font-size: 17px; color: #e4bf62; }
+#namespaceInfoDialog button { padding: 6px 12px; background: #1b2739; color: #dde5ef; border: 1px solid #53627b; border-radius: 4px; cursor: pointer; }
+#namespaceInfoDialog :is(button,a):focus-visible { outline: 2px solid #e4bf62; outline-offset: 3px; }
+#namespaceInfoContent { padding: 16px 24px; overflow-wrap: anywhere; }
+#namespaceInfoContent h1 { display: none; }
+#namespaceInfoContent h2 { font-size: 17px; color: #e4bf62; margin: 20px 0 8px; }
+#namespaceInfoContent h3 { font-size: 15px; margin: 16px 0 8px; }
+#namespaceInfoContent p { margin: 0 0 12px; }
+#namespaceInfoContent :is(ul,ol) { padding-left: 22px; margin: 8px 0 16px; }
+#namespaceInfoContent li { margin-bottom: 8px; }
+#namespaceInfoDialog .ns-info-footer { padding: 12px 24px 18px; border-top: 1px solid #304056; }
+#namespaceInfoDialog a { color: #e4bf62; }
 #namespace .namespace-refined h1 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 650; letter-spacing: -.25px; color: var(--nr-text); text-transform: none; }
 #namespace .namespace-refined button, #namespace .namespace-refined select { font: inherit; }
 #namespace .namespace-refined button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; padding: 5px 10px; background: var(--nr-raised); color: var(--nr-text); border: 1px solid #41536d; border-radius: 4px; cursor: pointer; white-space: nowrap; transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
