@@ -3,6 +3,23 @@ name: Cooperative retry watchdog boundary
 description: Fixed-watchdog diagnostic approval and evidence boundaries.
 ---
 
+## Single starter bitstream demonstration goal
+
+Use one of the two new cooperative Namespaces as the starter bitstream and
+demonstrate the other without creating a second bitstream. The user's three
+goals are proving Lazy Load, proving Namespace image replacement, and
+demonstrating a same-size-only LUMP upgrade.
+
+**Why:** The user explicitly replaced the two-bitstream demonstration direction
+with one reusable hardware configuration. A second synthesis cannot count as
+proof of application-image replacement.
+
+**How to apply:** Establish all three outcomes on the same FPGA configuration.
+Distinguish exact image/LUMP changes from hardware changes. Same-size upgrade
+does not by itself authorize overwriting executing code; agree the upgrade's
+execution boundary before implementation. Physical programming remains an
+explicit operation, not an incidental test step.
+
 The user approved a fixed, enabled watchdog with no software control access
 for the isolated delayed-delivery/cooperative-USER diagnostic.
 **Why:** The successful UART parent had no integrated execution watchdog;
