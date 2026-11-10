@@ -1,0 +1,106 @@
+--- a/hardware/wukong_top.py
++++ b/hardware/wukong_top.py
+@@ -466,7 +466,8 @@
+                  upload_watchdog_limit=None, sim_upload_only=False,
+                  expected_boot_guard=None, sim_boot_image_words=None, runtime_image_words=None,
+                  clock_mode="direct", diagnostic_llr_stop=False,
+-                 diagnostic_retry_return_stop=False, diagnostic_uart_receive=False):
++                 diagnostic_retry_return_stop=False, diagnostic_uart_receive=False,
++                 diagnostic_uart_request=False):
+         if clock_mode not in ("direct", "mmcm-25mhz"):
+             raise ValueError("Unsupported board clock mode")
+         if clock_mode == "mmcm-25mhz" and (clk_freq != 25_000_000 or sim_upload_only):
+@@ -477,6 +478,9 @@
+         self.diagnostic_llr_stop = diagnostic_llr_stop
+         self.diagnostic_retry_return_stop = diagnostic_retry_return_stop
+         self.diagnostic_uart_receive = diagnostic_uart_receive
++        if diagnostic_uart_request and not (diagnostic_uart_receive and diagnostic_retry_return_stop):
++            raise ValueError("Request diagnostic requires receive and terminal-stop profiles")
++        self.diagnostic_uart_request = diagnostic_uart_request
+         self.diagnostic_llr_stopped = Signal()
+         self.clk_freq = clk_freq
+         self.baud     = baud
+@@ -755,8 +759,12 @@
+         m.d.comb += uart_rx.rx.eq(self.uart_rx_pin)
+         command_rx_valid = uart_rx.valid & Const(not self.diagnostic_uart_receive)
+         if self.diagnostic_uart_receive:
+-            from .uart_retry_receiver import DiagnosticReceiver
+-            diagnostic_rx = m.submodules.diagnostic_rx = DiagnosticReceiver()
++            if self.diagnostic_uart_request:
++                from .request_diagnostic import RequestDiagnostic
++                diagnostic_rx = m.submodules.diagnostic_rx = RequestDiagnostic()
++            else:
++                from .uart_retry_receiver import DiagnosticReceiver
++                diagnostic_rx = m.submodules.diagnostic_rx = DiagnosticReceiver()
+             m.d.comb += [
+                 diagnostic_rx.valid.eq(uart_rx.valid),
+                 diagnostic_rx.byte.eq(uart_rx.data),
+@@ -959,7 +967,7 @@
+         # A CPU write is a pulse, unlike the framed producers' held requests.
+         # Queue it while another packet owns UART; STATUS supplies backpressure.
+         console_tx = m.submodules.console_tx = SyncFIFOBuffered(width=8, depth=4)
+-        tx_arb = m.submodules.tx_arb = UartPacketArbiter(7)
++        tx_arb = m.submodules.tx_arb = UartPacketArbiter(8 if self.diagnostic_uart_request else 7)
+         m.d.comb += [
+             console_tx.w_en.eq(cm_tx_start),
+             console_tx.w_data.eq(core.dmem_wr_data[:8]),
+@@ -1050,13 +1058,20 @@
+             (snapshot_tx_req, snapshot_tx_byte, snapshot_tx_last),
+             (trace_tx_req, trace_tx_byte, trace_tx_last),
+         ]
++        # Keep snapshot/boot priorities and packet atomicity. Diagnostic request
++        # precedes the poll-loop trace stream so it cannot starve behind it.
++        if self.diagnostic_uart_request:
++            producers.insert(6, (diagnostic_rx.tx_req, diagnostic_rx.tx_byte,
++                                 diagnostic_rx.tx_last))
++            m.d.comb += diagnostic_rx.tx_ack.eq(tx_arb.ack[6])
+         for i, (req, data, last) in enumerate(producers):
+             m.d.comb += [tx_arb.req[i].eq(req), tx_arb.data[i].eq(data),
+                          tx_arb.last[i].eq(last)]
+         m.d.comb += [
+             tx_arb.ready.eq(tx_free), uart_tx.data.eq(tx_arb.tx_data),
+             uart_tx.start.eq(tx_arb.tx_start),
+-            trace_tx_ack.eq(tx_arb.ack[6]), snapshot_tx_ack.eq(tx_arb.ack[5]),
++            trace_tx_ack.eq(tx_arb.ack[7 if self.diagnostic_uart_request else 6]),
++            snapshot_tx_ack.eq(tx_arb.ack[5]),
+         ]
+ 
+         is_mmio_read = Signal()
+@@ -1099,6 +1114,26 @@
+                 diagnostic_rx.claim.eq(is_mmio_read & (core.dmem_addr == 0x40000020)),
+                 diagnostic_rx.pop.eq(is_mmio_read & (core.dmem_addr == 0x4000001C)),
+             ]
++            if self.diagnostic_uart_request:
++                # The first authorized SYSTEM status poll requests the one
++                # fixture object. Observation never grants memory authority.
++                m.d.comb += [
++                    diagnostic_rx.start.eq(diagnostic_rx.claim),
++                    diagnostic_rx.stopped.eq(self.diagnostic_llr_stopped),
++                    diagnostic_rx.snapshot_complete.eq(snapshot_complete),
++                    diagnostic_rx.mem_data.eq(snapshot_mem_rd.data),
++                    diagnostic_rx.write.eq(core.dmem_wr_en &
++                                           (core.dmem_addr >= 0x5000) &
++                                           (core.dmem_addr < 0x5100)),
++                    diagnostic_rx.write_addr.eq(core.dmem_addr),
++                    diagnostic_rx.handoff.eq(core.llr_complete),
++                    diagnostic_rx.retry.eq(core.retire_valid & ~core.fault_valid &
++                                           (core.retire_nia == 0x4008)),
++                    diagnostic_rx.retire.eq(core.retire_valid),
++                    diagnostic_rx.nia.eq(core.nia),
++                    diagnostic_rx.cr12.eq(core.debug_cr_words[12][0]),
++                    diagnostic_rx.dr12.eq(core.debug_dr_words[12]),
++                ]
+ 
+         diagnostic_response_valid = Signal()
+         diagnostic_response_data = Signal(32)
+@@ -1837,7 +1872,9 @@
+ 
+         m.d.comb += [
+             snap_mem_addr.eq(0),
+-            snapshot_mem_rd.addr.eq(snap_mem_addr),
++            snapshot_mem_rd.addr.eq(
++                Mux(diagnostic_rx.mem_active, diagnostic_rx.mem_addr, snap_mem_addr)
++                if self.diagnostic_uart_request else snap_mem_addr),
+             snap_payload_idx.eq(snap_bidx - 6),
+             snapshot_tx_req.eq(0),
+             snapshot_tx_byte.eq(0),

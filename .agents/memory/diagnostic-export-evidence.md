@@ -54,3 +54,14 @@ exception, leaving a zero-byte file. Reopening the UART yielded real evidence.
 
 **How to apply:** Treat empty captures as inconclusive and inspect host errors
 before diagnosing RTL. Do not infer why a serial handle closed without evidence.
+
+Physical post-claim immutability evidence must establish input arrival and
+fresh observation of the accepted buffer and installed memory, not just silence.
+
+**Why:** The successful UART candidate halted the core and disabled debug
+commands; a second input producing no output could not distinguish proper
+rejection from a dead link or unobserved buffer mutation.
+
+**How to apply:** Use read-only, challenge-correlated reporting in the next
+useful isolated candidate. Do not add recovery authority or spend a separate
+vendor build merely to repeat the successful transfer.
