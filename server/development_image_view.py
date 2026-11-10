@@ -138,7 +138,7 @@ def inspect(backend, identifier):
     rows = normalize_rows(rows)
     layout_rows = rows
     layout_source = "saved-locations"
-    from server.namespace_design_v1 import FORMAT, PHASE1_FORMAT, project
+    from server.namespace_design_v1 import FORMAT, PHASE1_FORMAT, project, digest
     if not record and document.get("format") in (FORMAT, PHASE1_FORMAT):
         # Same read-only allocation calculation as Namespace Table. This reads
         # exact hash-pinned selections; it does not link or create binding bytes.
@@ -179,7 +179,9 @@ def inspect(backend, identifier):
         add_lump_geometry(layout_rows, backend.LUMPS_DIR, image)
     return dict(ok=True, id=identifier, name=entry["name"], rows=rows,
                 layoutRows=layout_rows, layoutSource=layout_source,
-                fingerprint=entry["revision_id"], capacityWords=capacity or 16384,
+                fingerprint=entry["revision_id"],
+                designFingerprint=(digest(document) if not record and document.get("format") in (FORMAT, PHASE1_FORMAT) else None),
+                capacityWords=capacity or 16384,
                 capacitySource=capacity_source, image=prepared,
                 imageSha256=hashlib.sha256(image).hexdigest() if image is not None else None,
                 imageBytes=len(image) if image is not None else None,

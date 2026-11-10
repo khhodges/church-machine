@@ -64,3 +64,16 @@ after switching pages leaves focus owned by the previous iframe. The user
 reported returning to Testing despite fresh-load navigation checks passing.
 **How to apply:** Test the completed close event, not only the destination
 URL or a loaded-but-hidden iframe.
+
+Memory Glass's selected-object card must offer EDIT to the object's own design
+surface: MMIO mapping, exact assigned LUMP code, Namespace, or Thread.
+**Why:** The user requested direct editing from the inspected object instead of
+manually finding it again in another view.
+**How to apply:** Retain exact Namespace and assigned-revision identity, respect
+unsaved drafts, and keep historical inspection read-only. Opening an editor is
+not permission to save, bind, activate, or touch hardware.
+
+Use an endlessly stair-climbing stick figure for the Thread illustration.
+**Why:** The user requested this instead of the static person-and-arrows icon.
+**How to apply:** Treat the loop as an object-type illustration, never evidence
+that a Thread is executing; retain a reduced-motion still.

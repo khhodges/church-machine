@@ -1,5 +1,7 @@
 import "./_group.css";
 import "./_kiss.css";
+import threadClimber from "./assets/thread-climber.gif";
+import threadClimberStill from "./assets/thread-climber-still.png";
 import "../../../simulator/namespace-selection.js";
 import { useEffect, useRef, useState } from "react";
 import { notifyIde, acceptLoadRequest, loadRequestReady } from "./embedding";
@@ -205,6 +207,22 @@ export default function DevelopmentImage() {
     if (!sendAllowed(input)) { setSendStatus("Not sent — inspection only; this evidence is not approved for installation."); return; }
     void beginSend();
   });
+
+  async function editSelectedObject() {
+    if (!selected || !input || busy.current) return;
+    const entry=entries.find(item=>(item.selection_key || item.id)===namespace);
+    try {
+      if (view !== "saved" || !entry?.selection_key || entry.selection_key === "namespace:legacy")
+        throw Error("Select a saved editable Namespace before editing this object.");
+      const host=window.parent as Window & {NamespaceDesignV1?: {
+        openObjectEditor(key:string, fingerprint:string, slot:number):Promise<void>
+      }};
+      if (host === window || !host.NamespaceDesignV1?.openObjectEditor)
+        throw Error("Open Memory Glass inside the IDE to edit this object.");
+      if (!input.designFingerprint) throw Error("This historical object is read-only; select its saved Namespace to edit.");
+      await host.NamespaceDesignV1.openObjectEditor(entry.selection_key, input.designFingerprint, selected.slot);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+  }
 
   async function changeNamespace(value: string) {
     if (busy.current) return;
@@ -438,12 +456,13 @@ export default function DevelopmentImage() {
                       <path d="M34 18h36l18 18v64H34z" fill="#1d3040" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" />
                       <path d="M70 18v20h18M45 56h32M45 68h32M45 80h24" fill="none" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                       <circle cx="46" cy="94" r="3" fill={colorForSlot(selected.slot) ?? "#73d7c0"} />
-                    </svg> : <svg className="kiss-device-icon kiss-lump-icon" viewBox="0 0 120 120" role="img" aria-label={selectedIsNamespace ? "Namespace icon" : selectedIsThread ? "Thread icon" : selectedIsBoot ? "Boot entry icon" : "Namespace entry icon"}>
+                    </svg> : selectedIsThread ? <picture className="kiss-device-icon">
+                      <source media="(prefers-reduced-motion: reduce)" srcSet={threadClimberStill} />
+                      <img src={threadClimber} width="240" height="240" style={{width: "100%", height: "auto", display: "block"}}
+                        alt="Thread illustration: a stick figure climbing steps" title="Thread illustration — not live execution status" />
+                    </picture> : <svg className="kiss-device-icon kiss-lump-icon" viewBox="0 0 120 120" role="img" aria-label={selectedIsNamespace ? "Namespace icon" : selectedIsBoot ? "Boot entry icon" : "Namespace entry icon"}>
                       <circle cx="60" cy="60" r="43" fill="#172636" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" />
-                      {selectedIsThread ? <>
-                        <circle cx="60" cy="43" r="10" fill="none" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" />
-                        <path d="M38 83c2-14 10-21 22-21s20 7 22 21M28 51h12m40 0h12M34 45l6 6-6 6m52-12-6 6 6 6" fill="none" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                      </> : selectedIsNamespace ? <>
+                      {selectedIsNamespace ? <>
                         <path d="M36 42h48v39H36zM44 34h40v39M52 26h32v39" fill="#1d3040" stroke={colorForSlot(selected.slot) ?? "#73d7c0"} strokeWidth="3" strokeLinejoin="round" />
                         <path d="M47 53h25M47 63h25M47 73h17" stroke="#dce9e7" strokeWidth="3" strokeLinecap="round" />
                       </> : <>
@@ -453,6 +472,10 @@ export default function DevelopmentImage() {
                     </svg>}
                     <span className="kiss-device-kicker">{selectedIsMmio ? "SELECTED MMIO" : selectedIsLump ? "SELECTED LUMP" : selectedIsBoot ? "SELECTED BOOT ENTRY" : selectedIsThread ? "SELECTED THREAD" : "SELECTED NAMESPACE"}</span>
                     <strong>{selected.name.replace(/_DEV$/, "").replaceAll("_", " ")}</strong>
+                    <button className="kiss-primary" type="button" onClick={() => void editSelectedObject()}
+                      disabled={!input?.designFingerprint || view !== "saved" || !entries.find(entry => (entry.selection_key || entry.id) === namespace)?.selection_key || namespace === "namespace:legacy"}
+                      title={view !== "saved" ? "Switch to the saved Namespace to edit" : `Edit ${selected.name}`}
+                      aria-label={`Edit ${selected.name} in ${selectedIsLump ? "Code Edit" : selectedIsThread ? "Thread Designer" : selectedIsMmio ? "MMIO Designer" : "Namespace Designer"}`}>EDIT</button>
                     {selectedIsMmio ? <>
                       <span className="kiss-device-type">{selected.name.startsWith("LED") ? "Indicator output" : selected.name.startsWith("BTN") ? "Button input" : selected.name.startsWith("TIMER") ? "Timer peripheral" : selected.name.startsWith("UART") ? "Serial interface" : "Memory-mapped device"}</span>
                       <span className="kiss-device-location">Word address {displayLocation(selected.location)} · byte address {displayLocation(selected.location == null ? null : selected.location * 4)}</span>

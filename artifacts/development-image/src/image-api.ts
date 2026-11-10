@@ -25,7 +25,7 @@ export type PreparedImage = {
     revision?: number; sourceArtifact?: string; sourceHash?: string; binaryHash?: string}>;
 };
 export type Inspection = {
-  id: string; name: string; rows: Slot[]; fingerprint: string;
+  id: string; name: string; rows: Slot[]; fingerprint: string; designFingerprint?: string | null;
   layoutRows?: Slot[]; layoutSource?: string;
   capacityWords: number; capacitySource: string; image: PreparedImage | null;
   imageSha256: string | null; imageBytes: number | null;

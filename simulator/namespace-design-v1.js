@@ -548,15 +548,39 @@
     }
     const sourcePathValid = path => typeof path==='string' && path.length<=512 &&
         /^simulator\/(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.cloomc$/.test(path);
+    async function openObjectEditor(key, fingerprint, slot) {
+        if (!Number.isInteger(slot)) throw Error('Select a Namespace object to edit.');
+        await selectShared(key);
+        if (!state.active || !state.document || state.fingerprint !== fingerprint)
+            throw Error('The saved Namespace changed. Refresh Memory Glass before editing.');
+        const row=state.document.rows.find(item=>item.slot===slot);
+        if (!row) throw Error('The selected object is no longer in this Namespace.');
+        if (row.kind==='lump') return source(slot);
+        root.switchView('namespace');
+        if (row.kind==='namespace') return;
+        if (!['thread','mmio'].includes(row.kind)) throw Error('No designer exists for this object type.');
+        definitionTarget(row);
+    }
+    function setMmio(slot, field, value) {
+        const row=state.document.rows.find(item=>item.slot===slot);
+        if (!row || row.kind!=='mmio' || state.saving || !['address','limit','sequence'].includes(field)) return;
+        const text=String(value).trim();
+        const number=/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(text)?Number(text):NaN;
+        const max=field==='sequence'?511:0xffffffff;
+        if (!Number.isInteger(number) || number<0 || number>max) {
+            root.alert(`Enter a whole number from 0 to ${max} (decimal or hexadecimal).`); return;
+        }
+        row[field]=number; changed();
+    }
     function definitionTarget(row) {
         const status=state.dirty?'Current unsaved design':'Current Namespace design';
         let content=`<p>${esc(status)} · NS[${row.slot}] · ${esc(row.kind)}</p>`;
         if(row.kind==='mmio') {
-            content+=`<h4>MMIO target</h4><dl><dt>Address</dt><dd>${hex(row.address)}</dd>
-                <dt>Limit (word offset)</dt><dd>${esc(row.limit)}</dd>
-                <dt>Sequence</dt><dd>${esc(row.sequence)}</dd><dt>Policy</dt><dd>${esc(row.policy)}</dd></dl>
-                <p>This label targets the hardware mapping, not a compiled LUMP.
-                Opening it does not read or write the device.</p>`;
+            content+=`<h4>MMIO Designer</h4>
+                ${[['address','Address'],['limit','Limit (word offset)'],['sequence','Sequence']].map(([field,label])=>
+                    `<label style="display:block;margin:10px 0">${label} <input aria-label="${label}" value="${field==='address'?hex(row[field]):esc(row[field])}" ${state.saving?'disabled':''} onchange="NamespaceDesignV1.setMmio(${row.slot},'${field}',this.value)"></label>`).join('')}
+                <p>Policy: ${esc(row.policy)}. Changes affect this Namespace draft only. Save the Namespace to retain them.</p>
+                <p>Opening this designer does not read or write the device.</p>`;
         } else if(row.kind==='namespace') {
             content+=`<h4>Namespace table target</h4><p>${slotCount()} slots; four words per
                 entry. Metadata: ${metadata().map(hex).join(' · ')}.</p>
@@ -566,7 +590,7 @@
                         <td>${esc(r.kind)}</td><td>${esc(r.policy)}</td></tr>`).join('')}</tbody></table>
                 <p>This is the current design table, not a substituted manifest or a live-memory claim.</p>`;
         } else if(row.kind==='thread') {
-            content+=`<h4>Thread target</h4><p>Allocation: ${esc(row.words)} words.
+            content+=`<h4>Thread Designer</h4><p>Thread target · Allocation: ${esc(row.words)} words.
                 Sequence: ${esc(row.sequence)}. Policy: ${esc(row.policy)}.</p>
                 <label>Allocation (words) <select ${state.saving?'disabled':''} onchange="NamespaceDesignV1.threadSize(${row.slot},this.value)">
                 ${root.ThreadDesign.supportedBodyWords.map(words=>`<option value="${words}" ${row.words===words?'selected':''}>${words}</option>`).join('')}</select></label>
@@ -809,7 +833,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad};
+    root.NamespaceDesignV1={state,render,load,reloadSaved,save,edit,inspect,source,assigned,authoring,thread,threadSize,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery,prepareLoad,openObjectEditor,setMmio};
     if(typeof document!=='undefined') {
         root.NamespaceDesignV1.selectShared=selectShared;
         root.NamespaceDesignV1.selectionKey=selectionKey;
