@@ -37,7 +37,7 @@ export function notifyIde(message: Record<string, unknown>, win: Window = window
  * It never installs: it may only start prepare + target check, which ends at
  * the explicit runtime-replacement confirmation dialog.
  */
-export type LoadRequest = {type: "development-image:load"; namespace: string; requestId: string};
+export type LoadRequest = {type: "development-image:load"; namespace: string; requestId: string; action?: "prepare" | "load"};
 export function acceptLoadRequest(
   event: {origin: string; source: unknown; data: unknown},
   win: {parent: unknown; location: {origin: string}},
@@ -47,7 +47,9 @@ export function acceptLoadRequest(
   if (!data || data.type !== "development-image:load") return null;
   if (typeof data.namespace !== "string" || !data.namespace) return null;
   if (typeof data.requestId !== "string" || !data.requestId) return null;
-  return {type: data.type, namespace: data.namespace, requestId: data.requestId};
+  if (data.action !== undefined && data.action !== "prepare" && data.action !== "load") return null;
+  return {type: data.type, namespace: data.namespace, requestId: data.requestId,
+    ...(data.action ? {action:data.action} : {})};
 }
 /** The request runs only once, and only when the loaded inspection is that exact identity. */
 export function loadRequestReady(request: LoadRequest | null, loadedId: string | undefined, handled: Set<string>): boolean {

@@ -23,6 +23,11 @@ import { acceptLoadRequest, loadRequestReady } from "./embedding.ts";
   const parent = {}; const win = { parent, location: { origin: "https://ide.test" } };
   const ok = { origin: "https://ide.test", source: parent, data: { type: "development-image:load", namespace: "design:abc", requestId: "r1" } };
   assert.deepEqual(acceptLoadRequest(ok, win), ok.data);
+  for (const action of ["prepare", "load"]) {
+    const message = {...ok, data:{...ok.data, action}};
+    assert.deepEqual(acceptLoadRequest(message, win), message.data);
+  }
+  assert.equal(acceptLoadRequest({...ok, data:{...ok.data, action:"install"}}, win), null);
   assert.equal(acceptLoadRequest({ ...ok, origin: "https://evil.test" }, win), null, "cross-origin rejected");
   assert.equal(acceptLoadRequest({ ...ok, source: {} }, win), null, "non-parent source rejected");
   assert.equal(acceptLoadRequest({ ...ok, data: { ...ok.data, requestId: "" } }, win), null, "explicit request id required");

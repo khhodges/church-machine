@@ -73,6 +73,10 @@ assert.deepEqual([...doc.querySelectorAll('.nr-summary dd')].map(el=>el.textCont
 assert(doc.querySelector('#nsBindPlacementsBtn').hidden);
 assert(doc.querySelector('#nsBoltDrag').draggable);
 assert.equal(doc.querySelector('#namespaceHeaderDetails').open, false);
+assert.equal(doc.querySelector('#nsPrepareLoadBtn').textContent.trim(), 'Prepare');
+assert.equal(doc.querySelector('#nsLoadBtn').textContent.trim(), 'Load');
+assert.match(doc.querySelector('#nsPrepareLoadBtn').getAttribute('onclick'), /prepareLoad\('prepare'\)/);
+assert.match(doc.querySelector('#nsLoadBtn').getAttribute('onclick'), /prepareLoad\('load'\)/);
 assert.match(doc.querySelector('#namespaceHeaderDetails').textContent, /Binding is not activation/);
 assert.match(doc.querySelector('#namespaceDesignEditingNotice').textContent, /Bind Namespace Design saves/);
 assert.equal(doc.querySelector('#nsSaveBtn').closest('[role="group"]').getAttribute('aria-label'),

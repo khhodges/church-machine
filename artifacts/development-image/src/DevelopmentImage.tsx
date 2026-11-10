@@ -51,6 +51,7 @@ export default function DevelopmentImage() {
     loading ? "Loading the selected image. Please wait." :
     !input ? "Select an available development image first." :
     !sendAllowed(input) ? "This image is for inspection only and cannot be sent." :
+    !(builtImage || input.image) ? "Prepare this application image first. Nothing has been sent." :
     !connected ? connection.needsHelp
       ? "The connection has not recovered. Follow the connection help below."
       : "Checking the FPGA connection automatically. Sending will become available when it reconnects." : "";
@@ -205,7 +206,8 @@ export default function DevelopmentImage() {
     handledLoads.current.add(loadRequest.requestId);
     setLoadRequest(null);
     if (!sendAllowed(input)) { setSendStatus("Not sent — inspection only; this evidence is not approved for installation."); return; }
-    void beginSend();
+    if (loadRequest.action === "prepare") void prepareInspection();
+    else void beginSend(loadRequest.action === "load");
   });
 
   async function switchToDesigner() {
@@ -265,6 +267,7 @@ export default function DevelopmentImage() {
   async function prepareInspection() {
     if (busy.current || !input) return;
     busy.current = true; setSending(true);
+    setBuiltImage(null); setBuiltRows([]); setView("saved"); setReceipt(null);
     setSendStatus("Preparing latest compilations for inspection only. Nothing will be sent.");
     try {
       const image = await request<PreparedImage>("/api/development-image/prepare", {
@@ -274,16 +277,17 @@ export default function DevelopmentImage() {
       if (image.namespace_revision_id !== input.id) throw Error("Prepared Namespace identity changed.");
       requireLatestBuild(image);
       showBuilt(image);
-      setSendStatus("Built image ready for inspection. Nothing was sent; installation is not established.");
+      setSendStatus("Application image prepared. Use Load to review transfer into the existing FPGA; no bitstream was built and nothing was sent.");
     } catch (cause) { setSendStatus("Inspection preparation failed — " + (cause as Error).message); }
     finally { busy.current = false; setSending(false); }
   }
 
-  async function beginSend() {
+  async function beginSend(preparedOnly = false) {
     if (busy.current || !input || !sendAllowed(input)) return;
     busy.current = true; setSending(true); setSendStatus("");
     try {
-      let image = input.image;
+      let image = builtImage || input.image;
+      if (preparedOnly && !image) throw Error("Prepare this application image first. Load does not build an image.");
       if (!image && input.id.startsWith("design:")) {
         setSendStatus("Compiling the latest source of every LUMP and rebuilding bindings. Nothing has been sent.");
         image = await request<PreparedImage>("/api/development-image/prepare", {
@@ -294,6 +298,7 @@ export default function DevelopmentImage() {
           throw Error("Prepared Namespace identity changed. Nothing was sent.");
       }
       if (!image) throw Error(input.hardwareError || "No image is available for this selection.");
+      if (image.namespace_revision_id !== input.id) throw Error("The prepared image belongs to another Namespace. Prepare this selection again.");
       requireLatestBuild(image);
       if (image.memory_map) showBuilt(image);
       setSendStatus("Image prepared. Checking the connected FPGA; nothing has been sent.");
@@ -328,7 +333,7 @@ export default function DevelopmentImage() {
   return (
     <main className="kiss-workbench">
       <header className="kiss-top kiss-top-embedded">
-        <p className="kiss-preview">{input?.layoutSource === "latest-built-image" ? "Latest built image — not verified installed" : input?.image ? "Bound Namespace — image ready" : input?.layoutSource === "saved-design-layout" ? "Saved Namespace — image prepared on Send" : "Saved Namespace — FPGA image unavailable"}</p>
+        <p className="kiss-preview">{builtImage || input?.image ? "Application image prepared — not verified installed" : input?.layoutSource === "saved-design-layout" ? "Saved Namespace — Prepare before Load" : "Saved Namespace — FPGA image unavailable"}</p>
       </header>
 
       <div className="kiss-heading">
@@ -364,7 +369,7 @@ export default function DevelopmentImage() {
               <option value="saved">Saved design</option>
               <option value="built" disabled={!builtImage}>Built image — prepared, not installation evidence</option>
             </select>
-            <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare for inspection (no transfer)</button>
+            <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare application image</button>
           </div>
           <p className="kiss-meta">{slots.length} {view === "built" ? "built-image" : "saved"} rows · Select a name to inspect this view’s data.</p>
           <div className="kiss-slot-visual-row">
@@ -546,9 +551,9 @@ export default function DevelopmentImage() {
 
       </div>
       <footer className="kiss-send-footer">
-        <div><strong>Send the latest build to FPGA</strong><span>Compiles latest inputs and rebuilds bindings; explicit confirmation required.</span></div>
+        <div><strong>Load the prepared application into FPGA memory</strong><span>Keeps the existing bitstream. Exact image and latest inputs are rechecked before transfer; explicit confirmation required.</span></div>
         <span className="kiss-send-hint" tabIndex={sendUnavailable ? 0 : undefined} aria-label={sendUnavailable ? "Send build to FPGA unavailable" : undefined} aria-describedby={sendUnavailable ? "send-unavailable-reason" : undefined}>
-          <button type="button" className="kiss-primary kiss-send-button" disabled={!!sendUnavailable} onClick={() => void beginSend()}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Send build to FPGA"}</button>
+          <button type="button" className="kiss-primary kiss-send-button" disabled={!!sendUnavailable} onClick={() => void beginSend(true)}>{sending ? "Checking exact image…" : receipt ? "Build submitted" : "Load application image"}</button>
           {sendUnavailable && <span id="send-unavailable-reason" role="tooltip">{sendUnavailable}</span>}
         </span>
         {!sending && !receipt && input && sendAllowed(input) && !connected && (

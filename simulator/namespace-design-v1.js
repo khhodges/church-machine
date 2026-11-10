@@ -308,17 +308,17 @@
         // Supply design rows without projecting them into the live simulator.
         root.updateNamespace(true);
     }
-    function prepareLoad() {
+    function prepareLoad(action = 'prepare') {
         if (state.loading || state.saving) {
             root.alert('Wait for the Namespace operation to finish. Nothing was sent.');
             return;
         }
         if (state.active && (state.dirty || state.persisted !== true || !state.fingerprint)) {
-            root.alert('Bind Namespace Design to save your changes first, then open Prepare & Load FPGA. Nothing was changed or sent.');
+            root.alert('Bind Namespace Design to save your changes first, then Prepare the application image. Nothing was changed or sent.');
             return;
         }
         if (!state.active && (root._nsTableDirty || root._nsPrefetchDirty)) {
-            root.alert('Save the Namespace Table first, then open Prepare & Load FPGA. Nothing was changed or sent.');
+            root.alert('Save the Namespace Table first, then Prepare the application image. Nothing was changed or sent.');
             return;
         }
         const query = new URLSearchParams({profile: state.active ? state.profile : 'legacy'});
@@ -328,7 +328,7 @@
         }
         // The server resolves and checks the exact saved design; the IDE then
         // shows Development Image as its own view inside this shell.
-        if (root.DevelopmentImageView) root.DevelopmentImageView.openFromNamespace(query.toString());
+        if (root.DevelopmentImageView) root.DevelopmentImageView.openFromNamespace(query.toString(), action);
         else root.location.href = '/api/development-image/open?' + query.toString();
     }
     function snapshot() {

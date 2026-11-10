@@ -14,12 +14,13 @@
         const el = frame();
         if (!pendingLoad || !el || !el.contentWindow) return;
         el.contentWindow.postMessage({type: 'development-image:load',
-            namespace: pendingLoad.namespace, requestId: pendingLoad.requestId}, root.location.origin);
+            namespace: pendingLoad.namespace, requestId: pendingLoad.requestId,
+            ...(pendingLoad.action ? {action:pendingLoad.action} : {})}, root.location.origin);
     }
-    function requestLoad(namespace) {
+    function requestLoad(namespace, action) {
         if (typeof namespace !== 'string' || !namespace || namespace.startsWith('bitstream:')) return false;
         loadCounter += 1;
-        pendingLoad = {namespace, requestId: 'ba-' + Date.now().toString(36) + '-' + loadCounter};
+        pendingLoad = {namespace, requestId: 'ba-' + Date.now().toString(36) + '-' + loadCounter, action};
         show(namespace);
         deliverLoad();
         return true;
@@ -68,7 +69,7 @@
         await root.NamespaceDesignV1.selectShared(key);
         root.switchView('namespace');
     }
-    async function openFromNamespace(query) {
+    async function openFromNamespace(query, action) {
         try {
             const response = await fetch('/api/development-image/open?' + query, {cache: 'no-store'});
             if (!response.ok) {
@@ -78,7 +79,8 @@
             }
             const linked = new URL(response.url, root.location.href).searchParams.get('namespace');
             if (!linked) throw Error('The saved Namespace identity was not returned. Nothing was changed or sent.');
-            show(linked);
+            if (action === 'prepare' || action === 'load') requestLoad(linked, action);
+            else show(linked);
         } catch (error) {
             root.alert(error.message + ' Nothing was changed or sent.');
         }

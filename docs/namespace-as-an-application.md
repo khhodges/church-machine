@@ -34,7 +34,8 @@ The table lists each object's slot, saved revision where available, location, de
 3. **Choose the boot entry.** Drag Boot entry onto the intended row. This configures the first abstraction invoked by the entry Thread; changing the selection does not run it.
 4. **Bind Namespace Design.** In the new-layout designer, this saves the selected design and requests fresh C-list binding results. Review any errors. Binding does not activate a simulation or change an installed image. The Original view keeps Save Namespace Table and BIND as separate controls.
 5. **Inspect Memory Glass.** Switch to the saved Namespace's memory layout, select objects, and return to their editors. Unsaved designer changes are retained, but the saved-layout view does not pretend they have already been saved.
-6. **Prepare and review before transfer.** Prepare & Load FPGA opens the selected saved design's preparation view. Preparation and actual transfer are separate actions. An explicit hardware transfer can replace running memory and restart execution; inspect the confirmation before proceeding.
+6. **Prepare the application image.** Prepare opens the selected saved design's preparation view and builds its image from the latest compilations. It does not synthesize a bitstream or send anything to hardware.
+7. **Load the prepared image.** Load reviews the exact prepared image for transfer into the existing FPGA's runtime memory. If no image is prepared, prepare it first. The existing bitstream stays in place; hardware compatibility remains the programmer's responsibility. Transfer requires explicit confirmation and a board STOP acknowledgement. Changed inputs require preparation again rather than silently sending a different image.
 
 ## What the other controls do
 

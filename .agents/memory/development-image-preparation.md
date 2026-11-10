@@ -45,12 +45,19 @@ design to be prepared and sent; do not substitute the historical image as the
 upload target or turn the loading workflow into unrelated maintenance work.
 
 The user requested a one-button operation on Build Approval for loading the
-selected development image.
+selected development image; the Namespace Designer now has a separately
+approved Bind → Prepare → Load sequence.
 **Why:** Many competing build, install, UART, and download buttons obscured the
 actual task. Preparation and compatibility checks belong inside the loading flow.
-**How to apply:** Keep one primary loading action, with advanced maintenance
-separate and collapsed. Preserve explicit runtime-memory replacement confirmation;
+**How to apply:** Keep the existing Build Approval handoff available. In Namespace
+Designer, separate Prepare and Load: Prepare constructs application memory, not
+a bitstream; Load reviews that exact prepared image. Reuse the existing FPGA
+when compatible. Preserve explicit runtime-memory replacement confirmation;
 selection, navigation, and refresh alone must never initiate a load.
+
+**Why:** The user explicitly approved separate controls to avoid unnecessary
+bitstream creation when changing the application. Checking compatibility does
+not authorize synthesis, flashing, or a physical transfer.
 
 Development-image loading must not require a manually certified installed-BIT
 record or a fresh operator compatibility approval.
