@@ -221,7 +221,7 @@ External sources were consulted on 10 November 2026. Web versions can change; se
 
 ### Project evidence register
 
-Paths are relative to the project repository. These are retained internal evidence records, not asserted to be publicly downloadable. A redistribution-safe package is still required before external reproduction.
+Paths are relative to the project repository. These are retained internal evidence records, not asserted to be publicly downloadable. An offline reproduction package and a separately authored wire reader have since been prepared [P7, P8]. Owner-approved redistribution terms are recorded for that bounded package; GPL compliance materials remain in preparation. Neither package creation nor licensing approval constitutes publication or independent physical reproduction.
 
 - **[P1]** `docs/phase-2/cooperative-retry/release-publication-audit.md`, 10 November 2026. Claim corrections, selected source observations, evidence classes and release gates.
 - **[P2]** `docs/phase-2/request-retry/physical-result.md`, 10 November 2026. Capture replay, vendor-report checks and physical provenance limitations.
@@ -229,6 +229,8 @@ Paths are relative to the project repository. These are retained internal eviden
 - **[P4]** `docs/phase-2/cooperative-retry/build-result.md`. Local cooperative/watchdog suite and build-only handoff, not physical qualification.
 - **[P5]** `docs/phase-2/cooperative-retry/existing-bitstream-compatibility.md`. Two structurally accepted images, baseline incompatibility and STOP/upload boundary.
 - **[P6]** `docs/phase-2/cooperative-retry/starter-direction.md`. Separate starter and three-demonstration goals; a plan, not results.
+- **[P7]** `docs/phase-2/request-retry/offline-reproduction.md`. Offline reproduction package for the retained historical capture, not a new physical experiment.
+- **[P8]** `docs/phase-2/request-retry/offline/independent-reader.md`. Separately authored standard-library wire cross-check and its bounded results; not independent physical reproduction.
 
 ## Appendix A. Evidence-status ledger
 
@@ -260,7 +262,7 @@ Uploaded capture SHA-256:
 29042a6d710caff70688db0f6276a616937b4fc96d5b1503b8e18529776e8051
 ```
 
-Retained inputs named by the record: `attached_assets/capture_1794317160962.bin`, `attached_assets/events_1794317160963.jsonl` and `attached_assets/result_1794317160963.json`. The historical replay used the same retained parser, not an independently authored checker; host TX logs are not logic-analyzer captures. The board's nonce-correlated report supplies the corresponding receive observation.
+Retained inputs named by the record: `attached_assets/capture_1794317160962.bin`, `attached_assets/events_1794317160963.jsonl` and `attached_assets/result_1794317160963.json`. The historical replay used the same retained parser. A subsequent separately authored reader cross-checked the same capture [P8]; this is an additional offline check, not a new board run. Host TX logs are not logic-analyzer captures. The board's nonce-correlated report supplies the corresponding receive observation.
 
 ## Appendix C. Editorial change and attribution ledger
 

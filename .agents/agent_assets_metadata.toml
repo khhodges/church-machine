@@ -2017,14 +2017,14 @@ content_type = "application/octet-stream"
 id = "1qdgGW_2KLtgV3exa3BuR"
 uri = "file://docs/phase-2/cooperative-retry/release-publication-audit.md"
 type = "text"
-title = "Containment audit and release/publication plan"
-description = "Claim-by-claim audit, three-demo acceptance criteria, staged release plan, revised abstract and primary-source references."
+title = "Release and publication audit"
+description = "Claim corrections, evidence gates and the staged publication plan."
 logical_id = "ffe4c322-5cc1-48ef-b887-a62c360602c8"
 content_hash = "sha256:6bd63a42ed6b5a0059902691a0b32205bdb570eb31f3d214605497cabd5ed228"
 size = 26121
 mtime_ms = 1794335866771
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ffe4c322-5cc1-48ef-b887-a62c360602c8/49d977da-e985-4002-abe9-e2459d4f5059"
-storage_version_token = "1794335906753559"
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ffe4c322-5cc1-48ef-b887-a62c360602c8/2de22c53-8263-4bf8-aa6d-8064e0831f62"
+storage_version_token = "1794338163257100"
 content_type = "text/markdown"
 
 [[outputs]]
@@ -2059,14 +2059,14 @@ content_type = "application/octet-stream"
 id = "2Oq5hDJRB9yYemzLa8tGx"
 uri = "file://docs/phase-2/cooperative-retry/containment-revised.docx"
 type = "word_document"
-title = "Revised containment research manuscript"
-description = "Editable Word document with sourced related work, bounded results, evidence-status table and audit correction ledger. Original preserved."
+title = "Containment as Architecture — revised Word manuscript"
+description = "Updated for the merged offline reproduction package and independent wire reader; original upload preserved."
 logical_id = "2256785e-ea65-422c-b5d8-3588e730401c"
-content_hash = "sha256:cc38685b7eae9898baf457d803613595674f1aacd6e0f11a76225ffdb1116528"
-size = 28240
-mtime_ms = 1794336813440
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2256785e-ea65-422c-b5d8-3588e730401c/5a2c28b0-490a-45de-b61b-5b3445db40a0"
-storage_version_token = "1794336835079178"
+content_hash = "sha256:c8caed7406e6827cbbca8e34225d908ece61835fc6b7f3fe9d85a61de3999431"
+size = 28477
+mtime_ms = 1794338150635
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2256785e-ea65-422c-b5d8-3588e730401c/bde8409c-f5c2-424d-b1f2-a2e393fc8a1d"
+storage_version_token = "1794338162614912"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 [[outputs]]
@@ -2082,3 +2082,17 @@ mtime_ms = 1794336352404
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/08e2fe6d-ba4c-4504-b553-8bc3fbec4e42/9b68163a-e62e-4c95-afff-7847558db30f"
 storage_version_token = "1794336835739398"
 content_type = "text/html"
+
+[[outputs]]
+id = "sJ7sSu7KdPIN3v_U4X_O1"
+uri = "file://docs/phase-2/documents-2026-11-10.md"
+type = "text"
+title = "Today’s documents — index and lint results"
+description = "Links to the manuscript, publication plan, starter direction, evidence guides and Namespace help documents."
+logical_id = "d0615486-9c9b-43b7-b22a-314729437eb7"
+content_hash = "sha256:1852b6a2789401e9ecfdbea7fe64091dcf6e7836083b6c6f6151732f8bd1561a"
+size = 2789
+mtime_ms = 1794338127595
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d0615486-9c9b-43b7-b22a-314729437eb7/fc253495-6261-470c-abfa-1cd59cd1fa2a"
+storage_version_token = "1794338161910433"
+content_type = "text/markdown"
