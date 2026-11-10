@@ -25,3 +25,12 @@ preserved scheduling authority across CHANGE/LLR.
 LLR scratch use replaced it and CHANGE correctly rejected the resulting rights.
 **How to apply:** Reload through the software owner's actual C-list before
 dispatch. Never repair the capability by altering the runtime frame externally.
+
+Observation must include the timing cost of UART arbitration and trace
+backpressure, not just removal of explicit terminal stops.
+**Why:** The inherited diagnostic has both a terminal latch and a separate
+forced step halt. Removing both still left watchdog expiry during the extended
+report exchange; trace backpressure is a suspected remaining contributor.
+**How to apply:** Measure actual halt and arbitration signals at expiry before
+changing the observation profile. Do not turn a suspected cause into a claim
+of qualified behavior or silently exempt reporting from the watchdog.

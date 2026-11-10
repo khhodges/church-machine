@@ -37,13 +37,12 @@ def sources():
         "        if iot_profile or expected_boot_guard is None:\n"
         "            raise ValueError('Isolated watchdog candidate requires guarded full core')\n"
         "        self.watchdog_clock_hz = watchdog_clock_hz\n"
+        "        from .fixed_watchdog import FixedWatchdog\n"
+        "        self.sim_watchdog = FixedWatchdog(clock_hz=watchdog_clock_hz)\n"
         "        self.iot_profile = iot_profile")
     anchor = "        # fetch_bounds_fault: active when nia_reg escapes the active code fence."
     integration = """        # Fixed diagnostic profile: no control capability, MMIO, or exemption.
-        from .fixed_watchdog import FixedWatchdog
-        watchdog = m.submodules.execution_watchdog = FixedWatchdog(
-            clock_hz=self.watchdog_clock_hz)
-        self.sim_watchdog = watchdog
+        watchdog = m.submodules.execution_watchdog = self.sim_watchdog
         execution_started = Signal()
         with m.If(self.boot_complete):
             m.d.sync += execution_started.eq(1)
@@ -75,7 +74,62 @@ def sources():
     top = replace_once(top,
         "ChurchCore(expected_boot_guard=self.expected_boot_guard)",
         "ChurchCore(expected_boot_guard=self.expected_boot_guard, watchdog_clock_hz=self.clk_freq)")
+    # The old terminal flag is observation only now; it must never halt renewal.
+    top = replace_once(top, "~llr_stop & ~self.diagnostic_llr_stopped),",
+                       "~llr_stop),")
+    top = replace_once(top, "llr_stop | self.diagnostic_llr_stopped),",
+                       "llr_stop),")
+    top = replace_once(top, "with m.If(bp_hit | fault_halt | llr_stop | retry_stop):",
+                       "with m.If(bp_hit | fault_halt | llr_stop):")
+    top = replace_once(top,
+        "        with m.If(llr_stop | retry_stop):\n"
+        "            m.d.sync += [snapshot_pending.eq(1), snapshot_reason.eq(3)]",
+        "        with m.If(llr_stop):\n"
+        "            m.d.sync += [snapshot_pending.eq(1), snapshot_reason.eq(3)]")
+    top = replace_once(top,
+        "                    diagnostic_rx.snapshot_complete.eq(snapshot_complete),",
+        "                    diagnostic_rx.snapshot_complete.eq(1),\n"
+        "                    diagnostic_rx.renew.eq(core.sim_watchdog.transition_complete),\n"
+        "                    diagnostic_rx.watchdog_fault.eq(core.fault_valid),\n"
+        "                    diagnostic_rx.ticks.eq(core.sim_watchdog.remaining),")
+    diagnostic = (PARENT / "source-snapshot/hardware/request_diagnostic.py").read_text()
+    diagnostic = replace_once(diagnostic, "        self.retries = Signal(32)",
+        "        self.retries = Signal(32)\n"
+        "        self.renew = Signal()\n"
+        "        self.watchdog_fault = Signal()\n"
+        "        self.ticks = Signal(32)")
+    diagnostic = replace_once(diagnostic, "        started = Signal()", """        started = Signal()
+        renewals = Signal(32)
+        progress = Signal(32)
+        pending_changes = Signal(32)
+        fault_seen = Signal()
+        with m.If(self.renew):
+            m.d.sync += renewals.eq(renewals + 1)
+        with m.If(self.retire & (self.nia == 0x7008)):
+            m.d.sync += progress.eq(progress + 1)
+        with m.If(self.retire & (self.nia == 0x2028)):
+            m.d.sync += pending_changes.eq(pending_changes + 1)
+        with m.If(self.watchdog_fault):
+            m.d.sync += fault_seen.eq(1)
+""")
+    # Retire NIA is supplied separately below; ordinary core.nia can already
+    # point at the successor in a multi-cycle instruction.
+    diagnostic = replace_once(diagnostic, "range(25)", "range(30)")
+    diagnostic = replace_once(diagnostic, 'b"URV2"', 'b"UCV3"')
+    diagnostic = replace_once(diagnostic, 'b"URP2"', 'b"UCP3"')
+    diagnostic = replace_once(diagnostic,
+        "                m.d.sync += [read_index.eq(0), tx_index.eq(0), report_crc.eq(0xFFFF)]",
+        "                for field, source in zip(fields[25:],\n"
+        "                        [renewals, progress, pending_changes, fault_seen, self.ticks]):\n"
+        "                    m.d.sync += field.eq(source)\n"
+        "                m.d.sync += [read_index.eq(0), tx_index.eq(0), report_crc.eq(0xFFFF)]")
+    diagnostic = replace_once(diagnostic, "Array(fields[20:])", "Array(fields[20:25])")
+    top = replace_once(top, "diagnostic_rx.nia.eq(core.nia)",
+                       "diagnostic_rx.nia.eq(core.retire_nia)")
+    protocol = (HERE / "protocol.py").read_text()
     return {"hardware/core.py": core, "hardware/wukong_top.py": top,
+            "hardware/request_diagnostic.py": diagnostic,
+            "hardware/request_protocol.py": protocol,
             "hardware/fixed_watchdog.py": (HERE / "fixed_watchdog.py").read_text()}
 
 

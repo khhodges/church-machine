@@ -26,7 +26,7 @@ and the physical board are unchanged.
 
 ## Evidence and limits
 
-Final combined local run: **10 passed in 96.93 seconds**, recorded in
+Earlier terminal-only local run: **10 passed in 96.93 seconds**, recorded in
 `generated-artifacts/cooperative-retry-local.xml`.
 
 Passing evidence:
@@ -72,6 +72,36 @@ The 100-cycle write-suppression test does not qualify arbitrary mid-instruction
 expiry, every write destination's accepted-write boundary, or Boot fault
 recovery. The parent snapshot uses its historical held-fault diagnostic path;
 this is not a production watchdog integration or healthy-Thread recovery proof.
+
+### Continuing observation candidate — qualification failed
+
+The current preparation adds UCV3 reports with renewal, USER B progress,
+pending-loop CHANGE, sticky fault, and remaining-tick fields. UCP3 challenges
+check the accepted buffer and installed words again. USER A explicitly reloads
+SYSTEM's Thread capability and yields after the retry; SYSTEM's continuation
+then self-CHANGEs. The inherited terminal latch, forced step halt, and terminal
+snapshot request no longer stop this isolated profile.
+
+This is **not qualified**. The latest full-top run is
+`generated-artifacts/cooperative-retry-continuing.xml`: **1 passed, 2 failed**
+in 108.91 seconds. Both delayed scenarios still reach WATCHDOG at NIA `0x400C`
+during the extended observation: cycles 117,670 (all waiting) and 127,393
+(USER B). The unrenewed SYSTEM expiry/write-suppression case passes.
+The seven unchanged timer tests passed in the preceding run
+`generated-artifacts/cooperative-retry-observation-wired.xml`.
+
+Removing the additional forced step halt did not resolve the expiry.
+UART report traffic competes with the inherited instruction trace stream,
+whose backpressure halts execution; this is the next suspected cause, not
+a proven diagnosis. Do not bypass trace backpressure, disable the watchdog,
+or claim the complete challenge exchange passed. Capture the halt/trace/
+arbiter state at expiry before choosing a correction.
+
+The new protocol has a decoder and pair verifier, but no qualified physical
+serial responder yet. Mid-instruction expiry qualification and build-only
+export also remain outstanding. Earlier failed candidates and XML files are
+preserved; the latest source snapshot is
+`generated-artifacts/cooperative-retry-continuing`.
 
 No new vendor package, BIT, physical result, or installation approval exists.
 

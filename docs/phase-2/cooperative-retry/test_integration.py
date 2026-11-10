@@ -1,7 +1,7 @@
 """Full-top watchdog preflight using real instruction and UART pins.
 
 Includes USER B progress and the SYSTEM self-CHANGE waiting case.
-The success tests end at terminal retirement, not at a UART evidence exchange.
+Success includes a challenge-correlated UART exchange while execution continues.
 """
 import importlib.util
 from pathlib import Path
@@ -17,6 +17,7 @@ from hardware.hw_types import TuringOpcode as Op, CondCode
 from hardware.integrity32 import integrity32
 from hardware.uart_rx import UartRx
 from hardware.request_protocol import REQUEST, RESPONSE, WORDS, OFFSETS
+from hardware.request_protocol import REPORT_SIZE, decode_report, challenge, verify_pair
 
 spec = importlib.util.spec_from_file_location(
     "prior_uart_fixture", Path(__file__).resolve().parent.parent /
@@ -67,6 +68,14 @@ def cooperative_fixture(other_user):
     program.append(prior.CHANGE_CR1)
     for i, word in enumerate(program):
         mem[0x2010 + i * 4] = word
+    # USER A yields after its successful call; SYSTEM resumes after its return
+    # CHANGE and runs ordinary self-CHANGE forever while observation proceeds.
+    mem[0x4000 + 63 * 4] = 0x03A30002
+    mem[0x400C] = 0x070B0010  # LOAD CR1, CR6[1]; scratch CR1 is not preserved.
+    mem[0x4010] = prior.CHANGE_CR1
+    end = 0x2010 + len(program) * 4
+    mem[end] = 0x27060000
+    mem[end + 4] = encode_turing(Op.BRANCH, imm=-1)
     return mem
 
 
@@ -96,6 +105,10 @@ def test_delayed_delivery_with_real_changes(other_user, record_property):
         remaining = 0
         progress = changes = handoffs = retries = 0
         writes = []
+        reports = []
+        report_start = None
+        terminal = False
+        nonce = 0x13572468
         ctx.set(top.uart_rx_pin, 1)
         for cycle in range(180000):
             assert not ctx.get(core.fault_valid), (
@@ -105,6 +118,20 @@ def test_delayed_delivery_with_real_changes(other_user, record_property):
             handoffs += ctx.get(core.llr_complete)
             if ctx.get(monitor.valid):
                 rx.append(ctx.get(monitor.data))
+                if rx.endswith(b"UCV3"):
+                    report_start = len(rx) - 4
+                if report_start is not None and len(rx) - report_start == REPORT_SIZE:
+                    reports.append(decode_report(bytes(rx[report_start:])))
+                    report_start = None
+                    if len(reports) == 1:
+                        for byte in challenge(nonce):
+                            pending.extend((bit, 8) for bit in
+                                           [0, *((byte >> n) & 1 for n in range(8)), 1])
+                    else:
+                        verify_pair(*reports, nonce, other_user)
+                        assert terminal
+                        record_property("cooperative_uart_reports", reports)
+                        return
                 if rx.endswith(REQUEST):
                     assert request_cycle is None, "Duplicate request"
                     request_cycle = cycle
@@ -133,7 +160,8 @@ def test_delayed_delivery_with_real_changes(other_user, record_property):
                 remaining -= 1
             elif not pending:
                 ctx.set(top.uart_rx_pin, 1)
-            if ctx.get(top.diagnostic_llr_stopped):
+            if ctx.get(top.diagnostic_llr_stopped) and not terminal:
+                terminal = True
                 assert retries == handoffs == 1
                 assert writes == [(0x5000 + off * 4, word)
                                   for off, word in zip(OFFSETS, WORDS)]
@@ -146,11 +174,10 @@ def test_delayed_delivery_with_real_changes(other_user, record_property):
                     "llr_completions": handoffs, "retry_retirements": retries,
                     "writes": writes,
                     "watchdog_remaining": ctx.get(core.sim_watchdog.remaining),
-                    "scope": "ends at terminal stop; host observation not qualified",
+                    "scope": "terminal milestone; continue through UART challenge",
                 })
-                return
             await ctx.tick()
-        raise AssertionError("Delayed delivery did not reach retry terminal")
+        raise AssertionError(f"Observation incomplete: {len(reports)} reports, terminal={terminal}")
 
     sim.add_testbench(bench)
     sim.run()
