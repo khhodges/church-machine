@@ -2222,3 +2222,31 @@ mtime_ms = 1794408962055
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/94e189b9-af13-44ef-bd9b-9aca9c24e7c6/20d3809b-5173-466a-9483-c34b694f3ea5"
 storage_version_token = "1794408968963940"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "dSOR7YsSlrLbKEu41KU2G"
+uri = "file://generated-artifacts/church-machine-demonstration-20261111.zip"
+type = "unspecified"
+title = "Church Machine — final demonstration bundle"
+description = "Exact demonstrated BIT, four original host packages, vendor reports, provenance, diagnostic findings, operator evidence summary and SHA-256 checksums."
+logical_id = "b8ff9813-5a38-45a1-b465-cb47382b5ef2"
+content_hash = "sha256:5b49fed6056bfc4dfde41b882fd57c53dd310008bfc98893cce3e7b97698bfcd"
+size = 982565
+mtime_ms = 1794409491940
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b8ff9813-5a38-45a1-b465-cb47382b5ef2/9354ff50-1383-4de4-8e7f-54801ea5b324"
+storage_version_token = "1794409505591377"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "L1OKBtRZgDKj7ZzpvBWeI"
+uri = "file://generated-artifacts/church-machine-demonstration-20261111/START-HERE.txt"
+type = "text"
+title = "Demonstration results and handoff guide"
+description = "What passed on hardware, exact artifact identity, remaining evidence limits, and safe replay instructions."
+logical_id = "ed635d55-84bd-4b55-946b-e0a9c27251ff"
+content_hash = "sha256:902c15a0cb60d33fdf4bc4376b49b97b2252fbe5733ac4303926bbb1498f280d"
+size = 8199
+mtime_ms = 1794409491161
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ed635d55-84bd-4b55-946b-e0a9c27251ff/51750b57-4467-4387-8d46-195c91553def"
+storage_version_token = "1794409506455114"
+content_type = "text/plain"
