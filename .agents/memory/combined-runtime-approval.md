@@ -30,6 +30,20 @@ initialization loss, not physical behavior or unrelated configuration warnings.
 
 ## Subsequent vendor-build authorization
 
+Configuration-voltage warnings must be checked against the manufacturer's
+schematic, not inferred from ordinary user-I/O standards. Wukong V3 schematic
+QMTECH-XC7A100T_200T-Wukong-Board-V03-20240121 (ChinaQMTECH's
+QM_XC7A100T_WUKONG_BOARD repository, V3/Hardware) independently confirms the
+retained configuration-voltage declarations: sheet 1 shows VCCO_0 on 3V3 and
+sheet 2 shows CFGBVS_0/AB15 on 3V3.
+
+**Why:** A reduced experimental constraint file omitted board configuration
+metadata even though the underlying documented board wiring was compatible.
+
+**How to apply:** Correct repository inputs only with approval, preserve frozen
+evidence, and obtain fresh qualification for the changed package. Documentation
+does not identify or measure a physical target and does not authorize programming.
+
 After the exact-MMCM correction passed the operator's synthesized-checkpoint
 diagnostic, the user instructed proceeding with the corrected combined vendor
 build and supplied build-host access. This supersedes the earlier local-only
