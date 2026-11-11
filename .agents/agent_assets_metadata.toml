@@ -2306,3 +2306,31 @@ mtime_ms = 1794423411151
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/187d530a-9e65-45a8-be80-c61c5d6b5a49/dde258a6-624f-4ff9-a38c-27d5435d6c80"
 storage_version_token = "1794423430600379"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "hYhWbLVVQOBhvXRz5Oolp"
+uri = "file://generated-artifacts/W7-completeness-audit-20261111.txt"
+type = "text"
+title = "W7 completeness — evidence audit"
+description = "Recorded completion counts, recent evidence, remaining acceptance gaps and implications for the next Phase 2 build. Original workbook unchanged."
+logical_id = "6bfb4de9-ddd4-40f9-af2a-49d3037cbfb8"
+content_hash = "sha256:f1cc9cfd3ca3f26d143f09c1d4dc3b39bcdc91f53d980b6766a7420060759286"
+size = 5265
+mtime_ms = 1794430892015
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6bfb4de9-ddd4-40f9-af2a-49d3037cbfb8/5ffc631c-4839-45f6-ac37-b6fc9dce7a11"
+storage_version_token = "1794430904584749"
+content_type = "text/plain"
+
+[[outputs]]
+id = "QG-dtgXbFm6Ukl2eL5Kxu"
+uri = "file://generated-artifacts/W7-completeness-audit-20261111.csv"
+type = "table"
+title = "W7 completeness — 113-row audit companion"
+description = "Every completeness ID and original status, with documentary audit dispositions and relevant recent-evidence notes. No statuses promoted."
+logical_id = "ad1e3454-98de-4941-af7a-f3deddfa37d6"
+content_hash = "sha256:bb234bcaf671b28c537ba91938393edf26cbc759269bdcce32a046756ee4b698"
+size = 36119
+mtime_ms = 1794430892013
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ad1e3454-98de-4941-af7a-f3deddfa37d6/186d4ea8-a487-468c-9963-779f13430353"
+storage_version_token = "1794430905396786"
+content_type = "text/csv"
