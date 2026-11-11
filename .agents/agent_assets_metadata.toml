@@ -2152,3 +2152,17 @@ mtime_ms = 1794391218379
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/40b02989-a6ea-4570-af5e-a1b568408511/697302b8-7ffa-4043-9233-6127857845ca"
 storage_version_token = "1794391232024389"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "QBnIKTLBUpppmXvxhttRv"
+uri = "file://generated-artifacts/combined-vendor-mmcm-corrected-20261111/vendor/combined_starter.bit"
+type = "unspecified"
+title = "Combined starter — verified FPGA BIT"
+description = "Existing qualified vendor build for the second Wukong board. Volatile JTAG loading only; do not overwrite boot flash."
+logical_id = "f44ffd03-b2b6-4810-b33d-664e4fc3c233"
+content_hash = "sha256:df3ca62905b65c81890ab9067b933501fbac1c7477a8de60321c4380bb8229ab"
+size = 3825996
+mtime_ms = 1794403350015
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f44ffd03-b2b6-4810-b33d-664e4fc3c233/d2545ac7-161c-4549-84af-1c457ba7e0f5"
+storage_version_token = "1794405157641196"
+content_type = "application/octet-stream"
