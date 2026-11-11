@@ -16,6 +16,18 @@ properties. Final DRC did not include those earlier warnings.
 Resolve initialization evidence before recommending physical use; preserve the
 frozen package and do not silently weaken or reinterpret qualification gates.
 
+Duplicate vector `init` attributes on generated SHA output wires can produce
+Netlist 29-72 warnings even when the corresponding routed flip-flop INIT bits
+are correct. Do not infer either corruption or harmlessness from the warning
+alone.
+
+**Why:** Direct inspection of the exact routed checkpoint preserved all 768
+standard SHA-256 state bits across three engines despite those warnings.
+
+**How to apply:** Compare per-bit routed primitive INIT values to independently
+known constants and source declarations. This clears the particular suspected
+initialization loss, not physical behavior or unrelated configuration warnings.
+
 ## Subsequent vendor-build authorization
 
 After the exact-MMCM correction passed the operator's synthesized-checkpoint
