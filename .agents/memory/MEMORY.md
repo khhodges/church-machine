@@ -146,7 +146,7 @@
 - [FreeHandler template review](freehandler-template-review.md) — review C-list and Thread templates on prepared inventory; Namespace remains an IDE function.
 - [Development Image preparation](development-image-preparation.md) — new development builds must use the latest compilation of every LUMP kind, never stale saved bindings; transfer stays separate.
 - [Namespace DNA containment](namespace-dna-containment.md) — NS[1] encloses all slots; Metadata Slot[0] and Slot[1] form its text header.
-- [Bridge pairing restarts](bridge-pairing-restarts.md) — private installation-local grants; unchanged expiry; notify before active server restarts.
+- [Hardware control trust](hardware-control-trust-index.md) — bridge restart custody, frozen build/physical approval boundaries, and button-free server/board authentication.
 - [TypeScript test transpilation](typescript-test-transpilation.md) — the TypeScript CLI may work without the legacy JS compiler API; use esbuild for isolated helper tests.
 - [Lazy loading policy](lazy-loading-policy.md) — approved fetches by default; plus-marked later-version tests use new slots; include Resolve and Retirement.
 - [GT-construction port](gt-construction-port.md) — Mint-private DATA-write/capability-load direction; diagnostic addressability does not grant minting authority.
@@ -156,4 +156,3 @@
 - [Interrupted process fixtures](interrupted-process-fixtures.md) — Python run() kills children on SystemExit; model surviving children explicitly and retain reaping custody.
 - [Cooperative retry watchdog](cooperative-retry-watchdog.md) — fixed enabled diagnostic-only watchdog approval; terminal observation and scratch-capability boundaries.
 - [Offline evidence licensing](offline-evidence-licensing.md) — owner approved GPL-3.0 for tooling and historical evidence; optional commercial licensing, no publication instruction.
-- [Combined runtime approval](combined-runtime-approval.md) — expanded local RTL scope needs separate exact-image admission review; RETURN PC is not fetch-ready evidence.

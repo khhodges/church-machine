@@ -46,10 +46,12 @@ Two trust decisions must remain distinct:
 1. which controller may stop/replace/install; and
 2. which exact image or LUMP that controller/request is authorized to admit.
 
-Proposed transfer metadata: protocol/profile/layout version, operation,
-session/request, target identity, payload length and digest, destination
-allocation/Namespace, and approved entry configuration. Fields and encoding
-are not frozen until authorization and G1/G2 contracts are settled.
+The R1/R2/R7 whole-image control contract is specified in
+[button-free-control-contract.md](button-free-control-contract.md).
+Its authenticated descriptor binds protocol/profile/layout, operation,
+session/request, target, payload length/digest, allocation/Namespace and entry.
+G1/G2 still gate LUMP service operations; they do not authorize raw writes
+through the whole-image control path.
 
 CRC detects framing corruption; digest checks received content. Neither
 authenticates the sender. Do not accept a sender-selected destination merely
@@ -303,11 +305,19 @@ the IDE; manual capture-folder copying is not the delivered workflow.
 
 ## Decisions required before implementation freeze
 
-**D1 Remote control trust.** Recommend authenticated IDE/bridge sessions with
-board-verifiable anti-replay control and protected provisioning, not unauthenticated
-UART or unchecked Passcodes. Decide key/provisioning custody, recovery/revocation
-and hardware verifier feasibility before selecting the mechanism. Existing
-server authorization alone does not authenticate commands to the board.
+**D1 Remote control trust — decided, 11 November 2026.** The owner accepted
+per-board key custody by the IDE server and protected board maintenance logic.
+The browser/bridge relays no authority of its own. Use the normative
+[control/security contract](button-free-control-contract.md): HMAC-SHA-256,
+protected provisioning, cross-reset freshness, exact-image authorization,
+write-quiescent STOP and status-first reconnect. Server compromise is a control
+authority compromise; physical reprogramming/key extraction is outside this
+development threat model. Passcodes remain unchecked and the ISA is unchanged.
+This resolves the trust decision, not hardware qualification: protected key
+storage, durable boot-counter feasibility and verifier resource/timing evidence
+are mandatory gates. No suitable freshness source means remote control disabled,
+not a button bypass or server-only authentication. No credentials, provisioning,
+runtime changes, board commands, synthesis or flash are authorized by this decision.
 
 **D2 Memory envelope.** Recommend the two 64 KiB envelopes and 16 KiB staging
 target above, with 1,000 slots per Namespace still requiring explicit approval.
@@ -331,8 +341,9 @@ equipment before advertising automated acceptance.
 ## Exit and sequencing
 
 This review authorizes no execution changes. The next local implementation unit
-is R1/R2/R7's end-to-end replacement vertical slice after its trust contract is
-approved. In parallel close R4/R5/R6 hardware-interface and budget dependencies
+is R1/R2/R7's end-to-end replacement vertical slice under the decided trust
+contract, after separate implementation authorization and freshness/storage
+feasibility review. In parallel close R4/R5/R6 hardware-interface and budget dependencies
 BEFORE freezing the next BIT. Then integrate upgrades, second Namespace and full
 services on that same general profile; do not synthesize an early slice that
 omits required interfaces and call it the full Phase 2 build.
