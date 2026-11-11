@@ -2059,14 +2059,14 @@ content_type = "application/octet-stream"
 id = "2Oq5hDJRB9yYemzLa8tGx"
 uri = "file://docs/phase-2/cooperative-retry/containment-revised.docx"
 type = "word_document"
-title = "Containment as Architecture — revised Word manuscript"
-description = "Updated for the merged offline reproduction package and independent wire reader; original upload preserved."
+title = "Updated manuscript — editable Word document"
+description = "Editable version of the revised manuscript, including §6.5, updated abstract, future work, and evidence register."
 logical_id = "2256785e-ea65-422c-b5d8-3588e730401c"
-content_hash = "sha256:c8caed7406e6827cbbca8e34225d908ece61835fc6b7f3fe9d85a61de3999431"
-size = 28477
-mtime_ms = 1794338150635
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2256785e-ea65-422c-b5d8-3588e730401c/bde8409c-f5c2-424d-b1f2-a2e393fc8a1d"
-storage_version_token = "1794338162614912"
+content_hash = "sha256:2d8383920d0a3a344993e4d2d1e5fb7b28d9fe0de17fab72df7ed328ecb4a873"
+size = 31382
+mtime_ms = 1794410959075
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2256785e-ea65-422c-b5d8-3588e730401c/dbff6e01-3b56-4cd9-8ab0-5aad05129d06"
+storage_version_token = "1794411004138899"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 [[outputs]]
@@ -2250,3 +2250,17 @@ mtime_ms = 1794409491161
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ed635d55-84bd-4b55-946b-e0a9c27251ff/51750b57-4467-4387-8d46-195c91553def"
 storage_version_token = "1794409506455114"
 content_type = "text/plain"
+
+[[outputs]]
+id = "8qH3yo2X2Jbyvp-8nGdFQ"
+uri = "file://generated-artifacts/containment-paper/containment-revised.pdf"
+type = "pdf"
+title = "Containment as Architecture — updated manuscript"
+description = "17-page PDF incorporating the three operator-reported hardware demonstrations, explicit provenance limits, and remaining rejection and qualification obligations."
+logical_id = "e16090fa-0189-4104-8300-601f9ec2f3a8"
+content_hash = "sha256:09d218a482e6b2066b26c7435eda6f249c5393c90ac62c2c8b8a5f8efc0460b2"
+size = 240956
+mtime_ms = 1794410971827
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e16090fa-0189-4104-8300-601f9ec2f3a8/1303244b-669e-4e71-9d44-c0c03e0c1c6f"
+storage_version_token = "1794411003432386"
+content_type = "application/pdf"
