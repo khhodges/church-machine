@@ -21,8 +21,9 @@ def command(op, length=0):
 
 
 class Observer:
-    def __init__(self, link):
+    def __init__(self, link, decoder=decode_observer):
         self.link, self.sequence = link, None
+        self.decoder = decoder
 
     def read(self, deadline):
         if self.sequence is None:
@@ -38,7 +39,7 @@ class Observer:
                 raise ValueError("Cannot align UCV4 observer stream")
         else:
             frame = self.link.exact(138, deadline)
-        report = decode_observer(frame)
+        report = self.decoder(frame)
         if self.sequence is not None and report["sequence"] != (self.sequence + 1) & 0xffffffff:
             raise ValueError("Observer sequence gap or reset")
         self.sequence = report["sequence"]

@@ -25,16 +25,16 @@ def command(op, epoch, length=0):
     return b"CSI1" + struct.pack(">BBHII", op, 0, 0, epoch, length)
 
 
-def decode_observer(frame):
+def decode_observer(frame, *, image_hash=IMAGE_HASH, epoch=1):
     if len(frame) != 138 or frame[:4] != b"UCV4":
         raise ValueError("Unexpected observer framing")
     if binascii.crc_hqx(frame[:-2], 0xffff) != int.from_bytes(frame[-2:], "big"):
         raise ValueError("Observer CRC mismatch")
-    if frame[8:40].hex() != IMAGE_HASH or frame[40:72].hex() != INPUT_HASH:
+    if frame[8:40].hex() != image_hash or frame[40:72].hex() != INPUT_HASH:
         raise ValueError("Observer image/input identity mismatch")
     result = dict(zip(FIELDS, struct.unpack(">16I", frame[72:-2])))
     result["sequence"] = int.from_bytes(frame[4:8], "big")
-    if result["epoch"] != 1 or result["fault_seen"]:
+    if result["epoch"] != epoch or result["fault_seen"]:
         raise ValueError("Observer reports unexpected epoch or a fault: " + str(result))
     return result
 

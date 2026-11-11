@@ -2208,3 +2208,17 @@ mtime_ms = 1794408492015
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a163b723-710b-4988-889d-8757bd364f02/73577806-1e6f-47fe-9ea0-0af5ec23fb25"
 storage_version_token = "1794408497730871"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "XcFTilCGkmt-La3Nhiur5"
+uri = "file://generated-artifacts/combined-com4-replacement-20261111.zip"
+type = "unspecified"
+title = "COM4 — whole-image replacement test"
+description = "Replaces current application RAM with the approved USER B image at epoch 2. Requires held KEY1/SW3. No FPGA programming or boot-flash writes."
+logical_id = "94e189b9-af13-44ef-bd9b-9aca9c24e7c6"
+content_hash = "sha256:1a4769a9f142cb2b0bdd33bded971da02d5a5d55ee1fe274a32a478495080c5b"
+size = 13930
+mtime_ms = 1794408962055
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/94e189b9-af13-44ef-bd9b-9aca9c24e7c6/20d3809b-5173-466a-9483-c34b694f3ea5"
+storage_version_token = "1794408968963940"
+content_type = "application/octet-stream"
