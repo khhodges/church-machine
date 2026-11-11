@@ -12,5 +12,7 @@ set_property -dict { PACKAGE_PIN E3 IOSTANDARD LVCMOS33 } [get_ports uart_tx_pin
 ## Asynchronous external inputs enter the retained synchronizers.
 set_false_path -from [get_ports maintenance_n]
 set_false_path -from [get_ports uart_rx_pin]
+## UART TX is asynchronous to the off-board receiver, not a synchronous bus.
+set_false_path -to [get_ports uart_tx_pin]
 ## MMCM generated clock is derived by Vivado. Do not override it with 50 MHz.
 ## Keep NSTD-1/UCIO-1 at Error. No unconstrained debug/LED ports.

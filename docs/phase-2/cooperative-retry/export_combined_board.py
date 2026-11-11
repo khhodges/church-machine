@@ -9,6 +9,7 @@ from prepare_candidate import ROOT, HERE
 from prepare_combined import prepare
 from prepare_starter import digest
 
+QUALIFIED_RUNTIME = "a6e6223126248bf4ac07edabe891f3cfd123ce0865d5bcc5d06b8fe2c08de8d7"
 
 def export(output):
     output = Path(output).resolve()
@@ -16,9 +17,19 @@ def export(output):
         raise ValueError("Choose a fresh child of generated-artifacts")
     source = prepare(output / "source")
     runtime = json.loads((source / "combined-source-manifest.json").read_text())
+    if runtime["sourceConfigurationSha256"] != QUALIFIED_RUNTIME:
+        raise ValueError("Runtime differs from UART-qualified identity; requalification required")
     shutil.copyfile(HERE / "combined_board.py", source / "hardware/combined_board.py")
     shutil.copyfile(HERE / "combined-board.xdc", output / "board.xdc")
     shutil.copyfile(HERE / "generate_combined_board.py", output / "generate.py")
+    for src, dest in [
+        ("combined_package.py", "combined_package.py"),
+        ("build_combined_vendor.py", "build_vendor.py"),
+        ("combined-vendor.tcl", "build.tcl"),
+        ("combined-vendor-checks.tcl", "checks.tcl"),
+        ("combined-vendor-build.md", "README.md"),
+    ]:
+        shutil.copyfile(HERE / src, output / dest)
     files = {
         p.relative_to(output).as_posix(): digest(p)
         for p in sorted(output.rglob("*"))
@@ -38,6 +49,10 @@ def export(output):
                         "resetsTransport": False},
         "vendorBuild": False, "physicalTest": False,
         "programmingAuthorized": False, "bitstreamSha256": None,
+        "qualification": {
+            "runtime": "local UART qualification only",
+            "boardWrapper": "unqualified until separate vendor and physical evidence",
+        },
     }
     (output / "board-source-manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n")

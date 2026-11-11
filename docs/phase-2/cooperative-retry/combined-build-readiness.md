@@ -1,8 +1,8 @@
 # Combined starter: build-readiness check
 
 Date: 11 November 2026  
-Status: **isolated pushbutton board wrapper and RTLIL export verified locally;
-vendor build not yet run**.
+Status: **frozen combined vendor package and local Verilog conversion verified;
+vendor build not authorized or run**.
 No ISA, executable application, qualified runtime-body or working-board changes.
 
 ## Verified in this check
@@ -89,12 +89,62 @@ test, timing check or physical pushbutton demonstration.
 - Runtime source identity remains
   `a6e6223126248bf4ac07edabe891f3cfd123ce0865d5bcc5d06b8fe2c08de8d7`.
 
-## Remaining steps
+## Frozen vendor package — local preparation result
 
-The package is a source/RTLIL export, not a vendor-build script or BIT.
-Prepare the vendor conversion/build and fail-closed clock/constraint checks
-against this exact wrapper, then obtain vendor-build authorization and confirm
-build-host access. Confirm experimental-board identity before any physical work.
+The exporter now includes RTLIL-to-Verilog conversion, a local-only,
+authorization-gated Vivado driver, fixed-part vendor Tcl, and fail-closed
+clock/pin/timing/DRC checks. See [package instructions](combined-vendor-build.md).
+The old diagnostic top is not used. Functional/CDC attributes survive conversion;
+absolute source locations are omitted so fresh export directories reproduce RTL.
+
+Local frozen output: `generated-artifacts/combined-vendor-final-4019`
+(generated output is intentionally excluded from Git; use the committed exporter
+and instructions to reproduce it).
+
+- Board source identity:
+  `8efe2afefc707c20f5307eb280c02341823084d5c11a2df16f0da89fb2f4e1d0`
+- RTLIL identity:
+  `5e6fe852c9769f9142942e0598f101d8b98c6581ca44efc238a4ce69e8943778`
+- Verilog identity:
+  `64d21092a115b428e29b169e73ca613267d490caf0f37830cce3e2ce8ddc9850`
+- Qualified runtime identity remains:
+  `a6e6223126248bf4ac07edabe891f3cfd123ce0865d5bcc5d06b8fe2c08de8d7`
+- Local toolchain: Python 3.12.11, Amaranth 0.5.9, Yosys 0.51
+  (`c4b5190229616f7ebf8197f43990b4429de3e420`).
+
+Validation:
+
+```sh
+python3 -m pytest docs/phase-2/cooperative-retry/test_combined_vendor_package.py -q
+# 60 passed: fresh-package reproducibility, frozen input/RTL tamper rejection,
+# profile and authorization rejection, modeled Tcl clock/pin/timing/DRC gates,
+# BUFGCTRL expansion and explicit enforcement of Vivado DRC policy.
+
+cd generated-artifacts/combined-vendor-final-4019/source
+python3 -m pytest \
+  /home/runner/workspace/docs/phase-2/cooperative-retry/test_combined_board.py -q
+# 2 passed: held maintenance behavior and unchanged runtime/pin/clock profile.
+```
+
+The Tcl tests exercise real gate procedures against modeled query results, not
+Vivado or physical clock behavior. They do not certify vendor command/property
+compatibility. No vendor timing/DRC success receipts or BIT exist yet. The build
+will create those only after authorization and successful routed checks, binding
+their hashes to the exact package, converted RTL, toolchain and BIT. Missing or
+unrecognized evidence is a failure, never an inferred pass.
+
+The final package incorporates the retained Artix-7 clock-check evidence:
+Vivado may expand BUFGCE into BUFGCTRL. Both forms are checked; the expanded
+form must retain synchronous arm-0 enable, the BUFGCE legacy identity and
+the required inactive-input constants. The build explicitly enables NSTD-1
+and UCIO-1 and sets their severity to Error rather than assuming the
+post-synthesis default is Error.
+
+## Remaining authorization and qualification steps
+
+Obtain explicit exact-package vendor-build authorization and establish the
+authorized toolchain/build environment separately. No remote host was contacted.
+Confirm experimental-board identity before any physical work.
 Disposition the outstanding transaction
 boundary and execution-stop delivery checks before final candidate freeze.
 Those checks are not claimed complete here.
