@@ -66,6 +66,28 @@ evidence retention and effects on unrelated work separately.
 This note records the agreed direction, not an implemented feature, a new
 checker ABI, or evidence that existing implementations have passed all tests.
 
+## Addendum: safeguards for later implementation
+
+These refinements do not change the decision or make deferred work a release
+requirement. The existing approved fault contract remains authoritative.
+
+1. **Inspect evidence, not suspect authority.** Examine only facts captured by
+   the trusted handoff, including recorded token bits as inert data when
+   available. Never use the suspect GT to authorize diagnostic access. Missing
+   evidence remains unknown; do not reconstruct it by accessing the suspect target.
+2. **Use separate diagnostic grants.** Inspect service state through the
+   checker's own owner-granted, scoped, read-only authority where supported,
+   never through authority inherited from the caller or failed execution.
+3. **Broken invariants mean stay stopped.** A detected unsafe partial update or
+   broken service invariant keeps affected work stopped pending correction;
+   it does not trigger cleanup or repair. Judge intermediate states against the
+   service's defined invariants rather than assuming every partial update is
+   corruption. Passing a check still grants no reactivation authority.
+4. **Test non-use of hostile GTs.** Verify that the checker never uses a suspect
+   GT to authorize access, including a token whose use would cause a device
+   side effect. Retain this negative test alongside checker-failure and
+   evidence-preservation tests.
+
 ## References
 
 - [Approved Boot fault-entry contract](boot-fault-rtl-contract.md)
