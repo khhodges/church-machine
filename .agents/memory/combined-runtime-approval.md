@@ -79,6 +79,16 @@ UART-granted authority. A momentary button must not silently become a toggle.
 on early release. The selection authorizes isolated board integration, not
 vendor builds, device programming or physical-target selection.
 
+The manufacturer's Wukong V3 schematic calls the M6 maintenance button
+KEY1, but its switch reference is **SW3**. SW2 is KEY0; SW1 is PROG_B.
+
+**Why:** KEY numbering and switch reference numbering differ. Calling it
+"button 1" can lead the operator to the configuration-reset switch.
+
+**How to apply:** Specify KEY1 / SW3 when giving physical instructions.
+Confirm the physical label/photo when a BEGIN command receives no acknowledgment;
+do not assume a button mismatch or retry without evidence.
+
 The user approved implementing bounded RTL LUMP admission, SYSTEM-owned
 publication and application-controlled side-by-side adoption after the prior
 adoption work proved to be simulator-only.
