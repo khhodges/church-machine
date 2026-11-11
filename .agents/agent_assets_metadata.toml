@@ -2180,3 +2180,17 @@ mtime_ms = 1794406275351
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/69593e85-e7a2-4907-aa8b-fd2f6dbfbe92/705af001-f384-45b6-a658-310ad99f53ff"
 storage_version_token = "1794406299599858"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "y6QH7AOx0htOHBBtbyNnE"
+uri = "file://generated-artifacts/combined-com4-lazy-old-20261111.zip"
+type = "unspecified"
+title = "COM4 — first complete-LUMP Lazy Load test"
+description = "Approved 64-word old LUMP and one-shot test. Uses the running epoch-1 application; keep all buttons released. No reset, FPGA programming or flash writes."
+logical_id = "f381b5e1-47b9-40d0-b8c2-a58973954ed1"
+content_hash = "sha256:c99bd5cb58c995f72dcec06667a4fc9c8f829c73d0fddf221060c0573765416d"
+size = 7673
+mtime_ms = 1794408114687
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f381b5e1-47b9-40d0-b8c2-a58973954ed1/4e723eb9-216d-4d9b-88c8-35df579ae4c0"
+storage_version_token = "1794408122948367"
+content_type = "application/octet-stream"
