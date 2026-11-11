@@ -1,4 +1,5 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
+- [Guarded GT review boundary](guarded-gt-review-boundary.md) — TRY is review-only; DREAD scope and opcode choice are recommendations, not implementation or release approval.
 - [Notebook export memory](notebook-export-memory.md) — keep repeated export strings local; notebook capture limits can reset state after successful file writes.
 - [Mint compiler upgrade scope](mint-compiler-upgrade-scope.md) — focused current-ISA/Mint checks gate the upgrade, not unrelated legacy cleanup; baseline is not new-ABI acceptance.
 - [Runtime fault investigations](runtime-fault-change-approval.md) — explicit approval before NS21 fixes; linked replay guidance avoids false downstream faults.

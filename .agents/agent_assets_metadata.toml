@@ -2124,3 +2124,17 @@ mtime_ms = 1794347020938
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b49d2c3f-030a-4ee0-a4fd-7917cff06746/573b2050-3704-4576-abb7-0750de38d6be"
 storage_version_token = "1794347035581994"
 content_type = "image/png"
+
+[[outputs]]
+id = "qxMKgvWADGY7eMwivVIXb"
+uri = "file://docs/isa-try-proposal.md"
+type = "text"
+title = "ISA proposal — guarded GT use (.TRY)"
+description = "Review-only proposal: ordinary-memory DREAD.TRY, preserved ARM conditions, precise rejection semantics, encoding decision and acceptance criteria."
+logical_id = "5e18a0b0-9cc5-4582-874a-c41eefe24d09"
+content_hash = "sha256:6a59c88471ab8928d11815d891d3b81dc26f86fb8ad2b1cfc5229d4dab260d78"
+size = 12325
+mtime_ms = 1794386030763
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5e18a0b0-9cc5-4582-874a-c41eefe24d09/9c5ff358-0b66-46b4-a0d3-bbf95d08b693"
+storage_version_token = "1794386055292526"
+content_type = "text/markdown"
