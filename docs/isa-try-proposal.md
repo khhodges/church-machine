@@ -1,7 +1,13 @@
 # ISA change proposal: explicit guarded GT use
 
-**Status: DRAFT FOR REVIEW — NOT APPROVED OR IMPLEMENTED**  
+**Status: SUPERSEDED — NO ISA CHANGE; HISTORICAL REVIEW ONLY**  
 **Date: 11 November 2026**
+
+**Final decision:** Keep the ISA, capability enforcement and hard-fault path
+unchanged. Do not pursue `.TRY` or AFB ISA extensions. Customized Amoeba
+post-fault checks are deferred software abstractions, not a release prerequisite.
+Preserve fault evidence for prompt correction; no automatic recovery or rollback.
+The proposal below is retained only as review history.
 
 This document proposes one bounded ISA extension. It does not amend the master
 ISA, allocate an opcode, authorize implementation, or change saved programs,

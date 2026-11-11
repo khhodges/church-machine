@@ -1,5 +1,4 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
-- [Guarded GT review boundary](guarded-gt-review-boundary.md) — TRY/AFB remain proposals; expose faults for fast correction, contain attacks, never add automatic recovery or rollback.
 - [Notebook export memory](notebook-export-memory.md) — keep repeated export strings local; notebook capture limits can reset state after successful file writes.
 - [Mint compiler upgrade scope](mint-compiler-upgrade-scope.md) — focused current-ISA/Mint checks gate the upgrade, not unrelated legacy cleanup; baseline is not new-ABI acceptance.
 - [Runtime fault investigations](runtime-fault-change-approval.md) — explicit approval before NS21 fixes; linked replay guidance avoids false downstream faults.
@@ -11,7 +10,7 @@
 - [IDE product goal](ide-product-goal.md) — approved UI details define behavior; security stays internal; simplify affected code rather than adding competing state or approval gates.
 - [Spreadsheet preview caches](spreadsheet-preview-caches.md) — deliver cached formula results with the tracker; blank counts made aggregate status columns misleading.
 - [IDE interaction rules](ide-interaction-index.md) — header layout, touch refresh, dialog keyboard ownership, visible binding progress and resize evidence.
-- [ISA review decisions](isa-review-index.md) — scope, compatibility, encoding checks, conformance fixtures, instruction commentary and scheduling.
+- [ISA review decisions](isa-review-index.md) — no TRY/AFB ISA changes; deferred Amoeba policy, scope, encoding, compatibility and conformance rules.
 - [Primary ISA/FPGA goal](isa-fpga-primary-release-goal.md) — align approved red-ISA through simulator and exact bitstream to physical acceptance; B.1.1+ is provisional.
 - [ISA history authority](isa-history-authority.md) — unique historical paragraphs remain evidence, not new normative decisions.
 - [Refresh provenance validation](refresh-provenance-validation.md) — generic refresh and legacy generation use distinct evidence schemas; preserve full localized-byte checks for both.

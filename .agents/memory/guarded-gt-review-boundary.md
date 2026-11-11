@@ -1,7 +1,24 @@
 ---
 name: Guarded GT use review boundary
-description: TRY and service-owned AFB remain proposals; fast fault correction and attack containment govern their design.
+description: Final decision is no ISA changes; TRY/AFB are historical and smarter Amoeba checks are deferred software.
 ---
+
+## Final decision
+
+The user explicitly confirmed: "NO ISA changes." Preserve capability enforcement
+and the existing hard-fault path. Do not pursue TRY or AFB ISA extensions.
+Customized Amoeba fault checks are deferred software abstractions, not a current
+release prerequisite.
+
+**Why:** Hard fault is the right security backstop; expose faults in testing
+and fix causes quickly rather than add automatic recovery or rollback.
+
+**How to apply:** Treat all exploratory proposals below as historical. Do not
+start Amoeba policy implementation or revive an ISA extension without a new
+request. This decision does not claim that existing implementations have passed
+all protection or fault-containment requirements.
+
+## Historical discussion
 
 The user requested an ISA change proposal for review after discussing hostile
 API GTs and ARM-style conditions. Treat guarded use as proposed, not approved.

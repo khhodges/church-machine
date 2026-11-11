@@ -4,6 +4,7 @@ description: User decisions on scope, compatibility, encoding validation and fau
 ---
 
 - [ISA boundary](isa-implementation-boundary.md): observable architecture, not implementation mechanisms.
+- [GT fault-policy decision](guarded-gt-review-boundary.md): no TRY/AFB ISA changes; hard fault stays; customized Amoeba checks are deferred software.
 - [Abstract GT uses](abstract-gt-use-decisions.md): explicitly accepted roles, without adopting conflicting historical encodings.
 - [Namespace capacity](namespace-capacity-review.md): configurable slot count; 64 slots is not an ISA restriction.
 - [Hardwired recovery and security](hardwired-recovery-security-authority.md): reserved CR13, hardwired recovery/CR15, first CHANGE prerequisite and SecurityRegulator M authority.
