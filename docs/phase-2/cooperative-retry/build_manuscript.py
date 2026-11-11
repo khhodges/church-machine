@@ -14,6 +14,7 @@ ORIGINAL_HASH = "f826ecbafdfdb81ce38bb9605e07732b8e524e92d420e1896e319cdae45c72d
 SOURCE = HERE / "containment-revised.md"
 DOCX = HERE / "containment-revised.docx"
 HTML = ROOT / "generated-artifacts/containment-paper/containment-revised.html"
+PDF = HTML.with_suffix(".pdf")
 
 CSS = """
 html { background: #eceff2; color: #17212b; }
@@ -36,7 +37,13 @@ blockquote { border-left: 3px solid #284a62; margin-left: 0; padding-left: 24px;
 @media(max-width:700px) { body { margin: 0; padding: 24px; font-size: 16px; }
 table { font-size: 12px; } th,td { padding: 6px; } }
 @media print { html { background: white; } body { margin: 0; padding: 0; max-width: none; }
-h2,h3 { break-after: avoid; } tr { break-inside: avoid; } }
+h2,h3 { break-after: avoid; } tr { break-inside: avoid; }
+body { font-size: 10.5pt; line-height: 1.45; }
+h1.title { font-size: 26pt; } h2 { font-size: 17pt; margin-top: 24pt; }
+h3 { font-size: 13pt; } table { font-size: 8.5pt; } th,td { padding: 5pt; }
+p { orphans: 3; widows: 3; } }
+@page { size: A4; margin: 20mm 18mm;
+  @bottom-center { content: counter(page); font: 9pt sans-serif; color: #52606d; } }
 """
 
 
@@ -69,10 +76,22 @@ def main():
         body = "\n".join(paragraphs)
         for heading in re.findall(r"^#{2,3} (.+)$", text, re.M):
             assert heading in body, f"Missing DOCX heading: {heading}"
-        for marker in ("302,212", "5.519", "157.87", "Appendix C", "References"):
+        for marker in ("302,212", "5.519", "157.87", "Appendix C", "References",
+                       "6.5 Operator-reported", "17 → 29 → 17", "physicalTest=false",
+                       "CFGBVS-1", "5.008", "[P9]"):
             assert marker in body, f"Missing exported content: {marker}"
+    with tempfile.TemporaryDirectory() as profile:
+        subprocess.run([
+            "chromium", "--headless", "--no-sandbox", "--disable-gpu",
+            "--no-pdf-header-footer", f"--user-data-dir={profile}",
+            f"--print-to-pdf={PDF}", HTML.as_uri(),
+        ], check=True, timeout=60, capture_output=True)
+    pdf_text = subprocess.check_output(["pdftotext", str(PDF), "-"], text=True)
+    for marker in ("6.5 Operator-reported", "17 → 29 → 17", "physicalTest=false",
+                   "CFGBVS-1", "Appendix C", "[P9]"):
+        assert marker in pdf_text, f"Missing PDF content: {marker}"
     assert digest(ORIGINAL) == ORIGINAL_HASH, "Original was modified."
-    print(f"PASS: original preserved; references and DOCX structure checked\n{DOCX}\n{HTML}")
+    print(f"PASS: original preserved; references, DOCX structure and PDF content checked\n{DOCX}\n{HTML}\n{PDF}")
 
 
 if __name__ == "__main__":

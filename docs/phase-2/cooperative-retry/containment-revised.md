@@ -1,16 +1,16 @@
 ---
 title: "Containment as Architecture"
-subtitle: "Capability-Mediated LUMPs and a Bounded FPGA Loading Experiment"
+subtitle: "Capability-Mediated LUMPs and Bounded FPGA Loading, Adoption and Replacement Experiments"
 author: "Kenneth Hamer-Hodges · SIPantic"
-date: "10 November 2026 · Revised manuscript for author review"
+date: "11 November 2026 · Revised manuscript for author review"
 lang: en-GB
 ---
 
-**Review status.** This is a separate editorial revision of the supplied draft, not a publication, release approval, or new experimental report. Authorship is retained from the original; the revised wording awaits the author's approval. Historical result records are cited as records, not represented as independently repeated experiments. No hardware operation was performed for this revision.
+**Review status.** This is a separate editorial revision of the supplied draft, not a publication or release approval. Authorship is retained from the original; the revised wording awaits the author's approval. It incorporates the 11 November operator-reported demonstrations alongside the historical result records, without representing either as independently repeated experiments. No hardware operation was performed for this revision.
 
 ## Abstract
 
-The Church Machine explores an execution architecture in which capability-bearing objects describe code, execution state and application Namespaces through a common LUMP model. Its architectural thesis is that explicit authority should govern application access and remain explicit across loading and execution-state transitions. The declared direct capability environment is enumerable, but effective authority also depends on callable services, returned grants and delegation. We therefore state containment conditionally: unauthorized accesses must not commit under a specified grant configuration, trusted computing base and complete mediation model. A retained Artix-7 diagnostic record reports a request for a fixed absent five-word body, external delivery, SYSTEM publication and resumption of the original CALL. A challenge-correlated observation reports unchanged accepted and installed words after repeated and altered input. These observations support a bounded loading path, not a general authenticated LUMP loader, independent attestation of the installed bitstream, or arbitrary-adversary containment. Separate local cooperative-scheduling tests and prepared application images are distinguished from that physical result. We compare the proposal with CHERI, CHERIoT, seL4, W7 and historical capability architectures, and identify the remaining obligations for continuation consumption, revocation, publication, application replacement and revision adoption.
+The Church Machine explores an execution architecture in which capability-bearing objects describe code, execution state and application Namespaces through a common LUMP model. Its architectural thesis is that explicit authority should govern application access and remain explicit across loading and execution-state transitions. The declared direct capability environment is enumerable, but effective authority also depends on callable services, returned grants and delegation. We therefore state containment conditionally: unauthorized accesses must not commit under a specified grant configuration, trusted computing base and complete mediation model. A retained Artix-7 diagnostic record reports a request for a fixed absent five-word body, external delivery, SYSTEM publication and resumption of the original CALL, with challenge-correlated post-claim stability. Later operator-supplied console evidence from a second Wukong V3 board records complete 64-word LUMP delivery and publication, side-by-side 64-word/256-word revision execution (17 → 29 → 17), and 64 KiB application-image replacement with no FPGA programming command issued during replacement. These observations support bounded loading, revision-adoption, and image-replacement paths, not a general authenticated LUMP loader or arbitrary-adversary containment. The later evidence is operator-attested and host-CRC-checked, without raw captures available for independent re-decoding, BIT readback or silicon-DNA attestation. Its positive paths do not establish rejection of invalid inputs or production qualification; build warnings remain. Local tests are distinguished from physical observations. We compare the proposal with CHERI, CHERIoT, seL4, W7 and historical capability architectures, and identify the remaining obligations for continuation consumption, revocation, publication and safe lifecycle transitions.
 
 **Keywords:** capability architecture; object capabilities; FPGA; loading; continuations; experimental evidence.
 
@@ -20,9 +20,9 @@ Containment is a question about which effects a computation can cause, not simpl
 
 The Church Machine's research proposition is narrower: integrate capability-mediated execution, explicitly described object environments, suspended computation and object loading using one object model, the LUMP. Capability-Limited Object-Oriented Machine Code (CLOOMC) is the project's execution vocabulary. The intended benefit is a consistent account of authority across changes in code residency and execution context, rather than reliance on conventions that disappear below a language runtime.
 
-The paper contributes (i) a scoped account of that architectural proposal and its security obligations; (ii) an analysis of retained evidence for a fixed-body FPGA request/delivery/retry experiment; and (iii) a falsifiable evaluation agenda for complete-LUMP loading, application-image replacement and side-by-side revision adoption. It does not claim the first capability computer, a proof of the implementation, or a demonstrated solution to AI alignment.
+The paper contributes (i) a scoped account of that architectural proposal and its security obligations; (ii) an analysis of retained evidence for a fixed-body FPGA request/delivery/retry experiment and later operator-reported complete-LUMP loading, application-image replacement and side-by-side revision adoption; and (iii) a falsifiable evaluation agenda for the remaining rejection, concurrency and lifecycle obligations. It does not claim the first capability computer, a proof of the implementation, or a demonstrated solution to AI alignment.
 
-The source audit [P1] distinguishes architectural proposals, identifiable implementations, local tests, physical observations, checked formal proofs and release qualification. We retain those distinctions throughout. A successful test is not called a proof. The historical diagnostic, current source tree, saved review designs and future starter are different experimental subjects.
+The source audit [P1] distinguishes architectural proposals, identifiable implementations, local tests, physical observations, checked formal proofs and release qualification. We retain those distinctions throughout. A successful test is not called a proof. The historical diagnostic, current source tree, saved review designs and later combined starter are different experimental subjects.
 
 ## 2. Threat model and security claim
 
@@ -106,13 +106,13 @@ A complete-LUMP loader would need to bind received bytes to an authorized expect
 
 CRC, parity and ECC address specified corruption patterns; none substitutes for adversarial provenance checks. A cryptographic seal additionally depends on protected keys and a correct verification path. Three separate questions remain: can software insert unauthorized capabilities, can unauthorized executable bytes be admitted, and which accidental or adversarial faults are detected?
 
-The five-word fixture is not canonical LUMP admission. The proposed full-loader tests include wrong identity, altered bytes, incorrect length/bounds, stale generation, truncation, repeated delivery, unauthorized destination and exhaustion. Rejection must not publish partially valid executable state or widen grants.
+The five-word fixture is not canonical LUMP admission. The later complete-LUMP positive-path observations (§6.5) do not discharge the general loader's rejection obligations. The proposed full-loader tests include wrong identity, altered bytes, incorrect length/bounds, stale epoch or generation, wrong phase, truncation, repeated delivery, unauthorized destination and exhaustion. Rejection must not publish partially valid executable state or widen grants. The historical post-claim challenge (§6.2) is not coverage of these pre-publication rejection cases.
 
 ## 6. Experimental method and retained results
 
 ### 6.1 Method and provenance
 
-This manuscript synthesizes the 10 November 2026 result record [P2] and its diagnostic description [P3]. It does not report a new board run. The recorded method replays a 302,212-byte physical RX capture through the retained Session parser, using the event log's actual receive chunk boundaries. It compares verification events and generated transmissions with the log and reconciles receive/transmit totals. Reconstructed baseline, post-claim report and terminal snapshot match the retained result JSON.
+This manuscript synthesizes the 10 November 2026 result record [P2], its diagnostic description [P3], and the separate 11 November operator-reported demonstrations [P9]. No new board run was performed for this editorial revision. For the historical result [P2], the recorded method replays a 302,212-byte physical RX capture through the retained Session parser, using the event log's actual receive chunk boundaries. It compares verification events and generated transmissions with the log and reconciles receive/transmit totals. Reconstructed baseline, post-claim report and terminal snapshot match the retained result JSON. The later record [P9] has a different provenance: console evidence rather than raw captures available for independent re-decoding (§6.5).
 
 The record identifies an uploaded Artix-7 diagnostic BIT and a matching prepared manifest. Receipt hashes cover the uploaded BIT, timing, precise-slack, DRC and route-status files. Synthesis and routed checkpoints were not supplied. Crucially, programming-success output and FPGA readback were also not supplied: the uploaded BIT hash is not independent proof of installed silicon identity. The physical capture is consistent with the named diagnostic, with this provenance limitation.
 
@@ -149,7 +149,25 @@ Two saved review Namespaces independently produced structurally accepted 65,536-
 
 The historical vendor-report record gives setup slack +5.519 ns, hold slack +0.070 ns and pulse-width slack +7.000 ns, with zero failing endpoints. It records 43,954 fully routed routable nets, no routing errors and one RTSTAT-10 warning covering 55 nets without routable loads [P2]. These are build-report observations, not independent board measurements or an area comparison.
 
-No end-to-end latency distribution, sustained throughput, LUT/FF/BRAM comparison, power measurement, multi-run failure rate or mean time between failures is established by the reviewed result records. Local test durations are not hardware performance measurements. The 20-byte fixture and 64 KiB prepared images describe different subjects and must not be combined into an apparent loader capacity result.
+No end-to-end latency distribution, sustained throughput, LUT/FF/BRAM comparison, power measurement, multi-run failure rate or mean time between failures is established by the reviewed result records. Local test durations are not hardware performance measurements. The historical 20-byte fixture and the prepared images [P5] describe different subjects. The later 64 KiB transfers [P9] are separately reported observations, not an inferred capacity of the historical loader or a maximum-capacity result.
+
+### 6.5 Operator-reported complete-LUMP, adoption and replacement demonstrations
+
+On 11 November 2026, operator-supplied console evidence records three bounded demonstrations on the operator's second Wukong V3 board [P9]. Following volatile JTAG programming of the combined starter, an initial 65,536-byte All Waiting upload reached LOADING → VERIFYING → READY → RUNNING at epoch 1. Renewals advanced from 0 to 18,103 with `fault_seen` remaining 0. The following stages then ran without a further reported FPGA reload.
+
+| Stage | Recorded observations | Bounded interpretation |
+|---|---|---|
+| Complete old-LUMP loading | 64-word LUMP; publications 0 → 1; receiver EMPTY → CONSUMED; no fault | Complete delivery and SYSTEM publication. Completed results remained zero: this stage alone does not prove a completed old call. |
+| Different-size side-by-side adoption | Old 64-word revision retained; new 256-word revision delivered; results 17 → 29 → 17; caller observation PCs 37136 → 38416 → 37136; no fault | Old/new/old execution of coexisting revisions in this fixture, not general live-state migration or safe retirement. |
+| Whole-image replacement | 65,536-byte USER B image; epoch 1 → 2; prior admission/result state cleared; progress 0 → 9514 → 18981; renewals 0 → 19029 → 37964; no fault | Application-image replacement and subsequent progress. The host issued no FPGA programming command during replacement; this is not zero-downtime replacement. |
+
+The exact supplied BIT has SHA-256 `df3ca62905b65c81890ab9067b933501fbac1c7477a8de60321c4380bb8229ab`. The accompanying Vivado 2026.1 reports give final setup/hold slack +5.008/+0.090 ns. These identify the supplied artifact and its build reports, not independently attested installed silicon. The operator initially used configuration reset, restoring the earlier stored build; the combined BIT was subsequently reloaded before the successful sequence reported here.
+
+**Provenance.** The findings are operator-supplied console output; the host tools checked UART CRCs and image/input identities during those runs. “Raw UART capture files have not been uploaded for independent re-decoding” [P9]. The earlier raw capture [P2] does not fill that gap for these later runs. CRC checks support transport integrity, not authentication of the installed BIT or board. “The JTAG cable identifier is not the physical board's silicon identity”; board selection was operator-confirmed, and “no live DNA attestation or BIT readback is included in these UART reports” [P9].
+
+**Positive-path scope.** The three accepting paths were observed in these fixtures. No hardware proof is claimed for stale-epoch rejection, malformed/wrong-phase LUMP rejection, concurrent LUMP loading while USER B progresses, endurance, power-cycle persistence or boot-flash installation. Nor do these observations establish the remaining identity, bounds and destination rejection obligations in §5.2. Concurrent loading during progress is a separate untested behavior, not itself a rejection test. Advancing renewal counters and the absence of a reported fault do not establish exhaustive watchdog or containment properties.
+
+**Build qualification.** The build log retains 100 Netlist 29-72 critical warnings concerning INIT properties. Inspection of the exact routed checkpoint confirmed the required initialization of all 24 SHA state words / 768 bits; this addresses the specific suspected initialization loss, not every synthesis concern. CFGBVS-1 remains because configuration-voltage declarations were omitted. The manufacturer's schematic supports 3.3 V configuration wiring, but no constraint correction or replacement build was made. The vendor receipt intentionally still says `physicalTest=false` and `programmingAuthorized=false`: it records the earlier vendor-only build, not these later operator trials. The manifest label “qualified runtime identity” names an identified runtime; it must not be read as qualification of the FPGA build, the physical result or a production release. Artifact hashes likewise establish identity, not qualification.
 
 ## 7. Related work and historical positioning
 
@@ -163,7 +181,7 @@ CHERI explicitly supplies fine-grained memory protection and scalable compartmen
 | Compartment boundary | CHERI compartmentalization; CHERIoT protected compartments [1, 2] | LUMP/C-list and execution-context integration |
 | Lifetime handling | CHERIoT revocation machinery and reuse protocol [2] | Generation checks plus unresolved global lifecycle obligations |
 | Assurance | seL4 has configuration-dependent machine-checked results [3] | No comparable checked whole-machine proof supplied |
-| Dynamic body delivery | Not evaluated by this paper for the comparison systems | One fixed-body request/delivery/retry observation |
+| Dynamic body delivery | Not evaluated by this paper for the comparison systems | Historical fixed-body retry plus operator-reported bounded complete-LUMP, adoption and replacement paths |
 | Comparative cost | Published evaluations use their own workloads [1, 2] | No controlled cross-system benchmark here |
 
 The possible contribution is a particular integration of object identity, execution state and loading. No superiority in security, performance or revocation overhead follows without equivalent threat models and measurements.
@@ -186,23 +204,23 @@ Church's 1936 undecidability publication is documented in the Princeton archive 
 
 ## 8. Limitations and evaluation agenda
 
-The current strongest empirical statement is fixed-body loading and retry with a bounded post-claim observation. It does not establish general authenticated loading, all token types and permission combinations, complete mediation, consume/restore atomicity, comprehensive revocation, fault-injection resistance, or production upgrade safety.
+The empirical record now includes historical fixed-body loading and retry with a bounded post-claim observation [P2], and operator-reported complete-LUMP publication, different-size old/new/old execution and application-image replacement without a host FPGA programming command [P9]. The latter three positive paths have moved from proposed demonstrations [P6] to observed hardware results at the provenance level specified in §6.5. They do not establish general authenticated loading, all token types and permission combinations, complete mediation, consume/restore atomicity, comprehensive revocation, fault-injection resistance, or production upgrade safety.
 
-Three separate demonstrations are proposed for a future isolated starter on one FPGA configuration [P1, P6]:
+The remaining obligations for those three demonstration areas are:
 
-1. **Complete-LUMP loading without widening authority.** Delay delivery while another eligible USER progresses; record request identity, validation, publication and original CALL completion. Exercise the negative cases in §5.2.
-2. **Application replacement without a new bitstream.** Replace the application memory image, retain old/new image hashes and one BIT identity, and record target identity, STOP/upload acknowledgements and runtime outcomes. The current installer requires STOP. This is not zero-downtime replacement; the existing working setup must remain preserved separately.
-3. **Different-size revisions side by side.** Allocate distinct old/new revisions, preserve existing users of the old one, and explicitly authorize selection of the new revision for new work. Start with a stateless or explicitly initialized interface, not general live-state migration.
+1. **Loading rejection and concurrent progress.** Delivery and publication were observed, but the accepting path is not proof that authority cannot widen. Exercise the negative cases in §5.2, including wrong identity, stale epoch, malformed/wrong-phase input and invalid bounds. Separately delay delivery while another eligible USER progresses and record original CALL completion.
+2. **Replacement failure boundaries and provenance.** Positive All Waiting → USER B replacement was observed. Establish behavior under interrupted or rejected transfers and stale control traffic; retain independently decodable raw captures and stronger installed-configuration/board evidence. The installer requires a stopped/held transfer boundary. This is not zero-downtime replacement; the existing working setup must remain preserved separately.
+3. **Adoption failure, lifetime and retirement.** Different-size old/new/old execution was observed, not general live-state migration. Exercise insufficient capacity, invalid candidates, stale references and interruption around selection; establish when old allocations can safely be retired.
 
-For the third demonstration, capacity includes both bodies, staging, Threads, Namespace metadata and validation buffers. A size difference is not itself a reason to reject a revision. Failure cases must cover validation, insufficient memory, stale references and interruption around adoption; retirement waits until active and permitted references no longer require the old allocation.
+For adoption, capacity includes both bodies, staging, Threads, Namespace metadata and validation buffers. A size difference is not itself a reason to reject a revision. Retirement waits until active and permitted references no longer require the old allocation.
 
-Each experiment needs its own acceptance matrix and a frozen source/image manifest. Tests should report latency and memory costs as well as correctness, identify what remains stopped after a failed transfer, and avoid promising rollback that is not implemented. None of these demonstrations is reported as completed here. A new physical operation, release or outreach requires separate authorization.
+Further experiments need their own acceptance matrices and frozen source/image manifests. Tests should report latency and memory costs as well as correctness, identify what remains stopped after a failed transfer, and avoid promising rollback that is not implemented. Endurance, power-cycle persistence and boot-flash installation remain untested on hardware in this evidence set. The build warnings and qualification limitations in §6.5 remain open. No rejection, concurrency or production-qualification result is inferred from successful positive paths. A new physical operation, release or outreach requires separate authorization.
 
 ## 9. Conclusion
 
-An explicit capability environment can make an architectural boundary easier to inspect, but it is not a complete inventory of effective authority. A common model for code, execution state and Namespaces provides a research direction for keeping authority explicit during loading and adoption. The retained Artix-7 experiment supplies a concrete, bounded result: a fixed absent body was requested, delivered, published and used by the resumed CALL, with challenge-correlated post-claim stability.
+An explicit capability environment can make an architectural boundary easier to inspect, but it is not a complete inventory of effective authority. A common model for code, execution state and Namespaces provides a research direction for keeping authority explicit during loading and adoption. The retained Artix-7 experiment records a fixed absent body requested, delivered, published and used by the resumed CALL, with challenge-correlated post-claim stability. Later operator-supplied console evidence records complete-LUMP publication, different-size revision execution (17 → 29 → 17), and 64 KiB image replacement without a host FPGA programming command. These are bounded positive-path results, with the raw-capture, installed-identity and build-qualification limitations stated in §6.5.
 
-The next scientific step is not a stronger universal claim. It is evidence for complete-LUMP admission, mediation coverage and safe state transitions on identified configurations, with the assumptions and failure cases made reproducible.
+The next scientific step is not a stronger universal claim. It is independently reproducible evidence for rejection behavior, mediation coverage, concurrent progress and safe lifecycle transitions on identified configurations.
 
 ## References
 
@@ -231,6 +249,7 @@ Paths are relative to the project repository. These are retained internal eviden
 - **[P6]** `docs/phase-2/cooperative-retry/starter-direction.md`. Separate starter and three-demonstration goals; a plan, not results.
 - **[P7]** `docs/phase-2/request-retry/offline-reproduction.md`. Offline reproduction package for the retained historical capture, not a new physical experiment.
 - **[P8]** `docs/phase-2/request-retry/offline/independent-reader.md`. Separately authored standard-library wire cross-check and its bounded results; not independent physical reproduction.
+- **[P9]** `docs/phase-2/cooperative-retry/demonstration-handoff-20261111.txt`, 11 November 2026. Operator-reported second-board complete-LUMP, adoption and image-replacement results; exact artifact identities, vendor warnings and evidence limits. Frozen handoff: `church-machine-demonstration-20261111.zip`, SHA-256 `5b49fed6056bfc4dfde41b882fd57c53dd310008bfc98893cce3e7b97698bfcd`. Its `START-HERE.txt` is the evidence summary; raw UART captures for these runs are not included. Archive checks establish file integrity, not independent physical verification.
 
 ## Appendix A. Evidence-status ledger
 
@@ -242,12 +261,15 @@ Paths are relative to the project repository. These are retained internal eviden
 | Fixed-body request/delivery/retry | Physical record [P2] | Five words; installed BIT independently unconfirmed |
 | Post-claim stability | Physical record [P2] | One 128-byte challenge and observed state |
 | Receiver/host negative cases | Retained local evidence [P3] | Not all physically exercised |
-| Cooperative progress / watchdog | Retained local evidence [P4] | Not demonstrated on hardware by this record |
+| Cooperative progress / watchdog | Local tests [P4]; later operator-reported progress/renewal counters [P9] | Counter progress does not establish watchdog expiry or exhaustive transition behavior |
 | Saved Namespace preparation | Structural output evidence [P5] | Not execution or transport compatibility |
 | General authenticated LUMP loading | Proposed [P1] | Authorized identity and general validator remain required |
 | Atomic retained-instance consumption | Proposed [P1] | No checked proof or physical demonstration supplied |
 | Global revocation / safe reuse | Open assurance obligation [P1] | Caches, frames, in-flight effects and wrap require treatment |
-| One-BIT three-demonstration starter | Planned [P6] | Not release-qualified |
+| Complete 64-word LUMP delivery/publication | Operator-reported hardware evidence [P9] | Loading stage alone did not complete the old call; general rejection obligations remain |
+| Side-by-side 64/256-word adoption | Operator-reported hardware evidence [P9] | 17 → 29 → 17 in one fixture; not general migration or safe retirement |
+| 64 KiB application-image replacement | Operator-reported hardware evidence [P9] | All Waiting → USER B, epoch 1 → 2; no host programming command during replacement; no zero-downtime claim |
+| One-BIT three-demonstration starter | Positive paths operator-reported [P9], superseding plan status [P6] | No raw capture re-decoding, BIT readback or DNA attestation; warnings retained; not release-qualified |
 
 ## Appendix B. Physical-evidence identifiers
 
@@ -278,7 +300,7 @@ This ledger maps all publication-blocking corrections A–K in [P1] to the revis
 | F: automatic global revocation | Defined as conditional invalidation with open lifecycle obligations, §3.4 |
 | G: one-shot Thread | Separated reusable Thread from retained continuation instance, §4 |
 | H: enter or read, never both | Qualified by caller, region and execution context, §3.3 |
-| I: general Lazy Load | Replaced by fixed-frame five-word result and provenance limit, §§5–6 |
+| I: general Lazy Load | Historical fixed-frame result and later bounded operator-reported positive paths; no general loader assurance, §§5–6 |
 | J: integrity equals unforgeability | Separated capability provenance, executable identity and fault detection, §5.2 |
 | K: solved safety/reliability/trust | Limited interpretation; no MTBF inference or arbitrary Genesis authority, §§2.3, 3.2, 6.4 |
 

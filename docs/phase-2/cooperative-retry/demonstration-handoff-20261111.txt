@@ -1,0 +1,150 @@
+CHURCH MACHINE -- ISOLATED FPGA DEMONSTRATION
+Evidence summary, 11 November 2026
+
+RESULT
+The operator's second Wukong V3 board demonstrated:
+1. Complete 64-word LUMP delivery and SYSTEM publication.
+2. Side-by-side 64-word / 256-word revision adoption: 17 -> 29 -> 17.
+3. Replacement of the 64 KiB application image without FPGA reprogramming.
+
+These are bounded demonstration results, not full production qualification.
+Physical findings below come from operator-supplied console output. The
+host tools checked UART CRCs and image/input identities during those runs.
+Raw UART capture files have not been uploaded for independent re-decoding.
+No hardware commands are performed by opening or unpacking this bundle.
+
+EXACT FPGA BIT
+File: bitstream/combined_starter.bit
+SHA-256:
+df3ca62905b65c81890ab9067b933501fbac1c7477a8de60321c4380bb8229ab
+Part: xc7a100tfgg676-2
+Input/execution clocks: 50 MHz / 25 MHz
+UART: 57600 baud, 8N1; operator used COM4.
+
+Vendor build: Vivado 2026.1.
+Final setup slack: +5.008 ns; hold slack: +0.090 ns.
+Clock/pin/setup/hold/DRC gates passed; checked internal timing categories
+reported zero violations. The final DRC had no Error/Critical Warning,
+but retained CFGBVS-1 (missing configuration-voltage declarations).
+
+Board source identity:
+fd2aa07cc4163a3318446c050b19156ad6c5c29b94d68ecb3115e77e1875c17b
+Verilog SHA-256:
+64d21092a115b428e29b169e73ca613267d490caf0f37830cce3e2ce8ddc9850
+Qualified runtime identity:
+a6e6223126248bf4ac07edabe891f3cfd123ce0865d5bcc5d06b8fe2c08de8d7
+
+HARDWARE EVIDENCE
+
+A. Configuration and initial application upload
+Vivado reported startup HIGH after loading combined_starter.bit via JTAG.
+The observed initial UART packet was 43 53 00 00 00 00 00 00:
+HELD, image selector 0, epoch 0.
+The initial uploader transferred 65536 bytes of the approved All Waiting image.
+Statuses: LOADING -> VERIFYING -> READY -> RUNNING, image 0, epoch 1.
+Observer sequence 1 -> 2; renewals 0 -> 18103; fault_seen remained 0.
+Capture folder reported by the operator: capture-20261111-093219.
+
+B. Complete old-LUMP loading
+Before: epoch 1, phase 0, transaction 0, publications 0, receiver EMPTY.
+After: phase 1, transaction 1, publications 1, receiver CONSUMED (6).
+Confirmation sequences: 2838, 2839; renewals: 51102334, 51120347.
+No fault. Completed results remained zero as designed: old RETURN waits
+for the new revision. This stage alone does not prove a completed old call.
+Capture folder: lazy-capture-20261111-094529.
+
+C. Different-size side-by-side adoption
+Only the approved 256-word new LUMP was sent; the 64-word old LUMP remained.
+After: epoch 1, phase 2, transaction 2, publications 3, receiver CONSUMED.
+Results: 17, 29, 17; caller observation PCs: 37136, 38416, 37136.
+Confirmation sequences: 4475, 4476; renewals: 80589340, 80607789.
+No fault. These observations establish old/new/old execution for this fixture.
+Capture folder: adoption-capture-20261111-095258.
+
+D. Whole-image replacement
+Preflight sequences 6072/6073 retained the exact successful adoption result.
+The loader accepted 65536 bytes of the approved USER B image, image selector 1.
+Statuses: LOADING -> VERIFYING -> READY -> RUNNING at epoch 2.
+Observer sequences restarted at 1, 2, 3. Prior phase, transaction,
+publications, receiver and result/PC state were cleared.
+USER B progress: 0 -> 9514 -> 18981.
+Watchdog renewals: 0 -> 19029 -> 37964.
+No fault. The host issued no FPGA programming command during replacement.
+Capture folder: replacement-capture-20261111-100013.
+
+WARNINGS AND BOUNDARIES
+- The build log retains 100 Netlist 29-72 critical warnings about INIT
+  properties. Direct inspection of the exact routed checkpoint confirmed all
+  24 SHA state words / 768 bits match the required initialization constants.
+  This addresses the specific suspected state-initialization loss, not every
+  possible synthesis concern. The diagnostic reports are included unchanged.
+- CFGBVS-1 remains in the original BIT's evidence. The manufacturer's V3
+  schematic shows VCCO_0 and CFGBVS_0 on 3V3, supporting CFGBVS=VCCO and
+  CONFIG_VOLTAGE=3.3. Those declarations were omitted from this experimental
+  constraint file. No source correction or replacement build was made here.
+- The vendor receipt intentionally still says physicalTest=false and
+  programmingAuthorized=false: it records the earlier vendor-only build.
+  It has not been rewritten to incorporate later operator trials.
+- The initial attempt used configuration reset and restored the stored
+  earlier build. The combined BIT was subsequently reloaded. The successful
+  application upload, old-LUMP delivery, adoption and replacement followed
+  without a further reported FPGA reload.
+- KEY1 is SW3 (M6), not SW1. SW1 is PROG_B/configuration reset.
+- The JTAG cable identifier is not the physical board's silicon identity.
+  Board selection was operator-confirmed; no live DNA attestation or BIT
+  readback is included in these UART reports.
+- No hardware proof is claimed here for stale-epoch rejection, malformed/
+  wrong-phase LUMP rejection, LUMP loading while USER B progresses, long
+  endurance, power-cycle persistence, or boot-flash installation.
+- The physical replacement direction was All Waiting -> USER B. The older
+  local RTL sequence exercised USER B -> All Waiting. Do not conflate them.
+
+BUNDLE CONTENTS
+- bitstream/: the exact demonstrated BIT.
+- host-packages/: all four original delivered ZIPs, preserved byte-for-byte.
+- vendor/: receipt, gates, timing/clock/I/O/utilization/DRC reports and build log.
+- provenance/: frozen board/runtime manifests and RTL export receipt.
+- diagnostics/: initialization/voltage findings, register export, verification
+  results and diagnostic console evidence.
+- START-HERE.txt: this evidence summary and replay guidance.
+- operator-evidence/: sanitized copies of the two uploaded text logs
+  (programming and replacement). Windows profile paths are redacted.
+  Earlier run outputs are summarized above from the operator's chat messages;
+  they are not reconstructed raw UART files.
+- SHA256SUMS.txt: checksums of every other regular file in the bundle.
+
+NOT INCLUDED
+Raw UART captures still held on the operator's computer:
+  capture-20261111-093219/log.txt and uart-rx.bin
+  lazy-capture-20261111-094529/log.txt and uart-rx.bin
+  adoption-capture-20261111-095258/log.txt and uart-rx.bin
+  replacement-capture-20261111-100013/log.txt and uart-rx.bin
+The large synthesis/routed DCPs and vendor authorization file remain retained
+in the workspace; their hashes are in the unchanged vendor receipt.
+Reference PDFs/screenshots are not redistributed; diagnostic documents name
+their source URLs. No secrets, SSH credentials or live connection grants
+are part of this bundle.
+
+REPLAY GUIDE -- NOT AN INSTRUCTION TO RESTART THE CURRENT BOARD
+The last observed state is USER B running at epoch 2. Do not run the epoch-0
+or epoch-1 packages against it. No further commands are required now.
+
+For a separately authorized fresh demonstration on the intended second board:
+1. Stop serial bridge programs and load this BIT using Vivado Program Device
+   (volatile JTAG), NOT Program Configuration Memory Device.
+2. Initial upload package: All Waiting -> epoch 1. Hold KEY1/SW3 through START.
+3. Lazy-old package: phase 0 -> 1. All buttons released.
+4. Adoption package: phase 1 -> 2; results 17,29,17. All buttons released.
+5. Replacement package: USER B -> epoch 2. Hold KEY1/SW3 through START.
+Use each package's README, --check, and explicit confirmation prompt.
+Windows commands use py -3.13. Keep the exact shipped helpers with each ZIP;
+do not mix their versions. The first ZIP has a nested folder; find the folder
+containing its .py before running. Later ZIPs place files at the archive root.
+Each package refuses unexpected baseline state and never automatically retries.
+On failure, stop and preserve evidence rather than resetting or retrying.
+
+VALIDATION OF THE HANDOFF
+The assembler verifies the frozen source inputs and all 13 vendor-receipt
+hashes, all four original host-ZIP hashes, their nested checksums, approved
+payload hashes, and every final ZIP member against SHA256SUMS.txt.
+This is archive/integrity validation, not a new hardware or vendor build.

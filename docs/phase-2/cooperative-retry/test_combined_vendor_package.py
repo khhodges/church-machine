@@ -207,6 +207,23 @@ def test_complete_board_evidence_passes():
     assert result.returncode == 0, result.stderr
 
 
+def test_validated_mmcm_is_not_an_execution_register():
+    result = tcl(BOARD_MODEL + "\nlappend registers mm\ncheck_board")
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("mutation", [
+    "set execution_registers {r1}",
+    "lappend registers other_clock_cell",
+    "lappend execution_registers unknown_register",
+    "set registers {mm}; set execution_registers {}",
+    "set props(mm,CLKOUT0_DIVIDE_F) 20",
+])
+def test_mmcm_exception_does_not_hide_bad_coverage(mutation):
+    result = tcl(BOARD_MODEL + "\nlappend registers mm\n" + mutation + "\ncheck_board")
+    assert result.returncode != 0
+
+
 @pytest.mark.parametrize("mutation", [
     "set props(clk,PACKAGE_PIN) M20",
     "set props(maintenance_n,PULLUP) 0",
