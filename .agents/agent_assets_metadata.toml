@@ -2334,3 +2334,17 @@ mtime_ms = 1794430892013
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ad1e3454-98de-4941-af7a-f3deddfa37d6/186d4ea8-a487-468c-9963-779f13430353"
 storage_version_token = "1794430905396786"
 content_type = "text/csv"
+
+[[outputs]]
+id = "lhBHzA4RF9N2VL1Sdl3V8"
+uri = "file://generated-artifacts/CTMM_W7_Progress_2026-11-11.xlsx"
+type = "table"
+title = "W7 progress workbook — 11 November 2026"
+description = "Updated workbook opens with achieved milestones, includes 14 requirement evidence updates and refreshed gate summaries, and preserves historical claims and full-closure statuses. Formula results verified."
+logical_id = "0da7a3c3-29b4-4c0b-ad36-8ba5e02b1f42"
+content_hash = "sha256:295bc5ac6679314d18ccacbd0bc55e19f76e2bf11fae9473719245aa87b52fa6"
+size = 91033
+mtime_ms = 1794431304037
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/0da7a3c3-29b4-4c0b-ad36-8ba5e02b1f42/a7a2281b-e814-4e4e-8159-dd5dfa2044b4"
+storage_version_token = "1794431320759340"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

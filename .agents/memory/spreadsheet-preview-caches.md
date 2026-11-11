@@ -15,3 +15,13 @@ Complete and Blocked item counts look like contradictory status labels.
 reads. Use the tracker cache refresh utility after edits; do not rebuild original
 threat sheets or change item statuses to fix a presentation defect. Label
 aggregate status columns as item counts, not the status of an entire area.
+
+Report achieved engineering milestones separately from full requirement closure.
+
+**Why:** The user challenged an audit that led with an unchanged low completion
+percentage despite three new hardware demonstrations. Broad security rows can
+remain open while their achieved sub-milestones are substantial.
+
+**How to apply:** Lead the workbook with dated, evidence-classified milestones;
+append supporting evidence to existing requirements without manufacturing PASS
+verdicts. Preserve historical candidate identities and show remaining boundaries.
