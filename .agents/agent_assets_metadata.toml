@@ -2348,3 +2348,31 @@ mtime_ms = 1794431304037
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/0da7a3c3-29b4-4c0b-ad36-8ba5e02b1f42/a7a2281b-e814-4e4e-8159-dd5dfa2044b4"
 storage_version_token = "1794431320759340"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "kRZ4Xhnlmk0Yjgw4GM1rG"
+uri = "file://generated-artifacts/Phase2-Development-Implementation-Scope.docx"
+type = "word_document"
+title = "Phase 2 — implementation scope"
+description = "Nine implementation streams, concrete change surfaces, memory budget, acceptance gates and decisions required before the next vendor build."
+logical_id = "4593383f-112b-4473-81f5-19c242bfadb9"
+content_hash = "sha256:144385cbf2b6886deccd969df51c5f680a1613df8c73f7dd8d7f56767b6a5fe2"
+size = 17360
+mtime_ms = 1794432012357
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/4593383f-112b-4473-81f5-19c242bfadb9/f595dd72-ae28-47d3-addd-1bd6584536f7"
+storage_version_token = "1794432033759869"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "QxLNDYnKM2yuQfLEbh35A"
+uri = "file://generated-artifacts/Phase2-Implementation-Scope-Map.xlsx"
+type = "table"
+title = "Phase 2 — W7 and acceptance routing"
+description = "All 113 W7 requirements and 89 Phase 2 scenario groups retained. Proposed implementation-area links are explicitly distinguished from verified subcase coverage."
+logical_id = "1f5bad67-1d3e-4926-8bbd-7ea801e007dd"
+content_hash = "sha256:659636d4a0b745e11c996f607bb11d4e9cb3efd382683f51ff13f3e7641d56df"
+size = 34913
+mtime_ms = 1794432008429
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1f5bad67-1d3e-4926-8bbd-7ea801e007dd/59d135dd-4333-4d41-9a04-72fb837eea23"
+storage_version_token = "1794432034385173"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
