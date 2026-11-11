@@ -14,6 +14,11 @@ original DR1–DR6 were saved before injection. T1 transmits only DR1–DR5
 
 ## Authority and scope
 
+The [development capacity review's exact criterion mapping](development-implementation-scope.md#exact-affected-acceptance-criteria)
+identifies the memory, root-addressing, SD and Ethernet dependencies for affected
+cases below and their W7 workbook rows. Its resource estimates are not test
+results and do not change case IDs, gates or closure status.
+
 - [Unified lifecycle](../lazy-lifecycle-unified.md) owns F.1–F.38 and the current
   FPGA/software interface. The summaries here do not replace its full assertions.
 - [Block inventories](compact-block-inventory.md), [SD storage](sd-storage-abstraction.md)
