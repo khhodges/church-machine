@@ -5,6 +5,19 @@ description: Development builds must use the latest compilation of every include
 
 ## Governing development-build rule (2026-11-05)
 
+For the Phase 2 development platform, all operational workflows must be
+automated by the IDE, including loading/upgrades, second-Namespace installation,
+build/programming orchestration, acceptance tests and evidence collection.
+
+**Why:** The user explicitly required “all automated by the IDE” when reviewing
+the next build. Shipping scripts with manual operator handoffs is not delivery.
+
+**How to apply:** One deliberate action orchestrates the approved substeps;
+retain role permissions and destructive-operation consent. Report unavailable
+tool/board connections as blockers. No normal board-button timing, manual
+capture upload or shell-command sequence. Physical power/cabling requires
+appropriate controllable equipment or an explicit remaining manual boundary.
+
 The user requires: “the development image must be built from the latest copy
 of each and every LUMP of any kind.” Every included LUMP uses its latest
 compilation, including system, application, Thread and Namespace LUMPs and
