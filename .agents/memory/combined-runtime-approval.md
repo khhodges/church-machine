@@ -3,6 +3,34 @@ name: Combined runtime approval boundary
 description: Expanded local RTL scope and the separate exact-image admission gate.
 ---
 
+## Vendor receipts versus initialization evidence
+
+A passing routed DRC/timing receipt does not clear earlier synthesis or netlist
+critical warnings about dropped initialization properties.
+
+**Why:** Vivado emitted a successful BIT and receipt while reporting Netlist
+29-72 warnings that multi-bit initialization values were invalid for scalar
+properties. Final DRC did not include those earlier warnings.
+
+**How to apply:** Report build-gate success separately from functional readiness.
+Resolve initialization evidence before recommending physical use; preserve the
+frozen package and do not silently weaken or reinterpret qualification gates.
+
+## Subsequent vendor-build authorization
+
+After the exact-MMCM correction passed the operator's synthesized-checkpoint
+diagnostic, the user instructed proceeding with the corrected combined vendor
+build and supplied build-host access. This supersedes the earlier local-only
+restriction for that corrected build, not for arbitrary runtime/image changes.
+
+**Why:** Build qualification is the next approved step; physical qualification
+and the preserved working system remain separate.
+
+**How to apply:** Bind authorization to the disclosed corrected package,
+Verilog and verified toolchain. Preserve approved runtime/image bytes, run one
+build at a time, and keep all timing/DRC gates. No board access, programming or
+physical activation is authorized by this build approval.
+
 Vivado can include the MMCM in `all_registers` but omit it from
 `all_registers -clock` for its generated execution clock.
 
