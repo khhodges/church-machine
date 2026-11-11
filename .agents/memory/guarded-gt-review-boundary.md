@@ -32,3 +32,20 @@ is safe to reuse. Service-owned establishment after CALL is the current review
 direction, not approval of an encoding, catchable-fault set, nested-call
 unwinding mechanism or implementation. Caller-selected CALL.AFB was an earlier
 assistant suggestion, not an accepted requirement.
+
+## Accepted direction: Amoeba Fault Policy
+
+The user explicitly agreed to retaining the ISA and hard-fault path unchanged
+and exploring trusted, bounded service-specific checks after containment.
+This supersedes pursuing TRY or AFB as the preferred solution, not their
+historical review records.
+
+**Why:** The goal is fast fault diagnosis/correction and preventing unauthorized
+effects, not automatic recovery or rollback.
+
+**How to apply:** Scope a software-level post-fault policy using the existing
+trusted fault handoff. Preserve original evidence, do not resume/retry the failed
+work, and do not treat passing checks as activation authority. Owner-selected
+checks must have limited authority; unknown results leave affected work stopped.
+Agreement to this direction does not settle the checker ABI or authorize
+hardware changes.
