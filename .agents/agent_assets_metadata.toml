@@ -2166,3 +2166,17 @@ mtime_ms = 1794403350015
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f44ffd03-b2b6-4810-b33d-664e4fc3c233/d2545ac7-161c-4549-84af-1c457ba7e0f5"
 storage_version_token = "1794405157641196"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "M3IQvZj7kJW_A4redm5vQ"
+uri = "file://generated-artifacts/combined-com4-initial-upload-20261111.zip"
+type = "unspecified"
+title = "COM4 initial application-upload package"
+description = "Exact approved RAM image, one-shot Windows Python uploader, instructions and checksums. No FPGA rebuild or boot-flash writes."
+logical_id = "69593e85-e7a2-4907-aa8b-fd2f6dbfbe92"
+content_hash = "sha256:29671c145de15c44a8750497578ab042104581d534194b35f89122efd18d3484"
+size = 6417
+mtime_ms = 1794406275351
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/69593e85-e7a2-4907-aa8b-fd2f6dbfbe92/705af001-f384-45b6-a658-310ad99f53ff"
+storage_version_token = "1794406299599858"
+content_type = "application/octet-stream"
