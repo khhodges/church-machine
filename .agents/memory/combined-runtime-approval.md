@@ -3,6 +3,16 @@ name: Combined runtime approval boundary
 description: Expanded local RTL scope and the separate exact-image admission gate.
 ---
 
+Vivado can include the MMCM in `all_registers` but omit it from
+`all_registers -clock` for its generated execution clock.
+
+**Why:** A real synthesized candidate's entire coverage difference was its
+clock-generator cell, not an unclocked execution register.
+
+**How to apply:** Exclude only the exact independently validated MMCM from
+execution-register coverage; retain every real register check and reject empty
+coverage. Never globally exempt clock-like names or use counts alone.
+
 The user chose an onboard pushbutton for physical maintenance enable on the
 isolated combined starter, accepting a sustained hold through upload,
 verification and START. This is maintenance authority, not a reset or Thread

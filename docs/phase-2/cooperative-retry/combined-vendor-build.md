@@ -62,6 +62,9 @@ is not promised (vendor headers/toolchain may vary); each BIT gets its own hash.
   MMCM output → BUFGCE; LOCKED → CE. The derived execution clock is 40 ns
   (25 MHz) and every retained register must use it.
 - Check both synthesized and routed connectivity. No NSTD-1/UCIO-1 downgrade.
+  Vivado may include the MMCM itself in `all_registers`. Exclude only the exact
+  independently validated MMCM cell from execution-register coverage; all
+  remaining registers must still belong to the 25 MHz execution clock.
   Recognize Vivado's BUFGCTRL expansion only with the legacy BUFGCE identity,
   synchronous arm-0 enable and verified constants disabling the other arm.
   Explicitly enable NSTD-1/UCIO-1 and set both to Error at each stage; do not
@@ -84,3 +87,21 @@ for review rather than weakening checks. Vendor success is not physical proof
 of clock startup, button behavior, UART timing, or the three application flows.
 Board identification, access, transfer, programming and physical demonstrations
 remain separately authorized. Nothing here changes the working system.
+
+### Clock-coverage diagnostic finding
+
+The operator's synthesized-checkpoint report listed 19,560 total objects and
+19,559 execution-clock objects. Exact set comparison found only `clock25/mmcm`
+in the difference and no unexpected execution-clock objects. This identified
+a checker classification error, not an uncovered execution register.
+
+The repository checker now excludes that exact previously validated MMCM,
+without changing RTL, ISA, clock rates or any other gate. Forty focused local
+Tcl-model tests passed, including missing real registers, unknown extra cells,
+empty coverage and invalid MMCM parameters. These tests do not substitute for
+Vivado checkpoint revalidation or final routed timing/DRC acceptance.
+
+Keep the failed frozen package unchanged. A diagnostic-only checkpoint query
+may test the correction without resynthesis; it must not write a BIT or a
+release-success receipt. The next qualified build must bind the corrected
+checker into a fresh package and corresponding authorization.

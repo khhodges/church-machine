@@ -111,6 +111,11 @@ proc check_board {} {
     near [get_property PERIOD $execution] 40.0 execution_period
     if {![get_property IS_GENERATED $execution]} { error "Execution clock not derived from MMCM" }
     set registers [lsort [all_registers]]
+    # Vivado includes the MMCM in all_registers, although it is clock-generation
+    # infrastructure, not an execution register. Exclude only the exact MMCM
+    # already validated above (part, parameters, input/feedback/output wiring).
+    set mm_index [lsearch -exact $registers $mm]
+    if {$mm_index >= 0} { set registers [lreplace $registers $mm_index $mm_index] }
     if {[llength $registers] == 0 ||
         $registers ne [lsort [all_registers -clock $execution]]} {
         error "Sequential logic is missing the 25 MHz execution clock"
