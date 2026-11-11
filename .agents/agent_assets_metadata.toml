@@ -2278,3 +2278,17 @@ mtime_ms = 1794422768527
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3818715e-3ced-44bb-a9ff-c911c34a1669/b87fe741-4346-40a0-84d4-c8d84e65717e"
 storage_version_token = "1794422777146756"
 content_type = "text/plain"
+
+[[outputs]]
+id = "oc79eSXqb9capfSs2d-s6"
+uri = "file://generated-artifacts/public-milestone-20261111/church-machine-frozen-source-20261111.zip"
+type = "unspecified"
+title = "Frozen source and RTL — milestone supplement"
+description = "142 manifest-verified source, RTL and provenance files plus internal checksums. Complements the unchanged demonstration bundle; not yet uploaded to GitHub."
+logical_id = "c3618f9e-e7d0-400a-8314-67700e83228e"
+content_hash = "sha256:f9d129766808967e0d7f56271f9ed3cf91a213f38eef509daf095750e9a172ba"
+size = 1320128
+mtime_ms = 1794422854611
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/c3618f9e-e7d0-400a-8314-67700e83228e/d4f1fe58-9264-457b-896f-fd7a5f74193c"
+storage_version_token = "1794422923759002"
+content_type = "application/octet-stream"
