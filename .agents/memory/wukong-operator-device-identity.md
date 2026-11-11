@@ -3,6 +3,17 @@ name: Wukong operator device identity
 description: Confirmed continuity of the physical board and its configured control-routing UID.
 ---
 
+The user selected “the second one the same as last time” for the combined
+starter's hardware trial, after being offered volatile JTAG loading rather
+than boot-flash replacement.
+
+**Why:** The existing second-board identity already establishes the intended
+target; repeatedly asking which board is unnecessary.
+
+**How to apply:** Use the second-board identity below and verify the live
+connection before programming. Preserve the first board and boot flash.
+Do not infer a remote programming connection from the vendor build host.
+
 Remember the user's selected Wukong UID across browser sessions and share that
 selection between the Target panel and Connect bridge.
 **Why:** The user explicitly reported the blank Target UID as unwanted forgetting.
