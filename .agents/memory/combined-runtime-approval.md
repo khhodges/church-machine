@@ -3,6 +3,18 @@ name: Combined runtime approval boundary
 description: Expanded local RTL scope and the separate exact-image admission gate.
 ---
 
+The user chose an onboard pushbutton for physical maintenance enable on the
+isolated combined starter, accepting a sustained hold through upload,
+verification and START. This is maintenance authority, not a reset or Thread
+scheduler action; the existing working system remains untouched.
+
+**Why:** The approved whole-image loader requires a physical enable rather than
+UART-granted authority. A momentary button must not silently become a toggle.
+
+**How to apply:** Preserve pressed/held maintenance semantics and fail closed
+on early release. The selection authorizes isolated board integration, not
+vendor builds, device programming or physical-target selection.
+
 The user approved implementing bounded RTL LUMP admission, SYSTEM-owned
 publication and application-controlled side-by-side adoption after the prior
 adoption work proved to be simulator-only.
