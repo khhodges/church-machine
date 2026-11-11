@@ -2292,3 +2292,17 @@ mtime_ms = 1794422854611
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/c3618f9e-e7d0-400a-8314-67700e83228e/d4f1fe58-9264-457b-896f-fd7a5f74193c"
 storage_version_token = "1794422923759002"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "4bjUQMc0plQV_R33jSljZ"
+uri = "file://generated-artifacts/github-milestone-assets-20261111.zip"
+type = "unspecified"
+title = "GitHub milestone — assets for manual upload"
+description = "Extract and upload the eight enclosed files to the draft release. Includes the frozen demonstration and source archives, manuscript, patch, preflight record and checksums."
+logical_id = "187d530a-9e65-45a8-be80-c61c5d6b5a49"
+content_hash = "sha256:090fd0c365244f62a7476598cfc19b903a8e2882cffe35e4615a011a335f3e2c"
+size = 2463470
+mtime_ms = 1794423411151
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/187d530a-9e65-45a8-be80-c61c5d6b5a49/dde258a6-624f-4ff9-a38c-27d5435d6c80"
+storage_version_token = "1794423430600379"
+content_type = "application/octet-stream"

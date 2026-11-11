@@ -14,6 +14,15 @@ Test release asset upload separately from metadata creation: binary upload
 requests returned HTTP 400 even though release creation worked. Keep incomplete
 releases in draft and report asset-upload failures rather than claiming completion.
 
+If a direct GitHub remote fails through askpass, prefer an already-configured
+secure Git-provider proxy remote for the same verified repository; do not
+extract credentials or rewrite credential-bearing URLs.
+
+**Why:** The direct remote failed authentication while the existing proxy
+successfully pushed the scoped branch and annotated tag. Both CLI and direct
+release-upload API requests still failed, including a plain checksum file.
+Source-control success does not imply release-upload access.
+
 Always explicitly select the intended GitHub repository for backup checks.
 
 **Why:** The default `gh` repository selection can differ from Git `origin`
