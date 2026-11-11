@@ -56,6 +56,15 @@ board. Use the distinct commissioned UID above for the second board;
 do not reuse the handoff launcher's hardcoded identity on the new board.
 Programming success alone does not prove exact artifact identity or startup.
 
+On 2026-11-11 the user selected “the second board on record” as the experimental
+target for combined-starter physical qualification.
+**Why:** This identifies the intended separate target without selecting the
+original working board.
+**How to apply:** Use the second board's recorded identity for planning, then
+confirm live physical identity only after access is authorized. Target selection
+does not grant access or programming approval; successful exact-package vendor
+evidence and separate explicit physical-operation authorization remain required.
+
 Use unfiltered bridge telemetry for physical Step qualification.
 
 On 2026-11-09 the operator confirmed that the supplied Amoeba retry BIT and
