@@ -2264,3 +2264,17 @@ mtime_ms = 1794410971827
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e16090fa-0189-4104-8300-601f9ec2f3a8/1303244b-669e-4e71-9d44-c0c03e0c1c6f"
 storage_version_token = "1794411003432386"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "eOMP0WjdXZfKG5LSdOlGg"
+uri = "file://generated-artifacts/github-milestone-proposal-20261111.txt"
+type = "text"
+title = "GitHub milestone — publication proposal"
+description = "Exact 20-file source delta, proposed branch and tag, release assets and hashes, draft release wording, exclusions and publication gates. Nothing pushed."
+logical_id = "3818715e-3ced-44bb-a9ff-c911c34a1669"
+content_hash = "sha256:97b3c179383b10ce34c4e74b716dc5bc2272095c6e393a787c9d696333080baa"
+size = 6965
+mtime_ms = 1794422768527
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3818715e-3ced-44bb-a9ff-c911c34a1669/b87fe741-4346-40a0-84d4-c8d84e65717e"
+storage_version_token = "1794422777146756"
+content_type = "text/plain"
