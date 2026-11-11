@@ -2194,3 +2194,17 @@ mtime_ms = 1794408114687
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f381b5e1-47b9-40d0-b8c2-a58973954ed1/4e723eb9-216d-4d9b-88c8-35df579ae4c0"
 storage_version_token = "1794408122948367"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "5tHNQTerrNGjUvXdP0CZy"
+uri = "file://generated-artifacts/combined-com4-adoption-20261111.zip"
+type = "unspecified"
+title = "COM4 — 256-word revision-adoption test"
+description = "Exact approved new LUMP with phase-1 preflight and old/new/old result checks. Keep all buttons released; no reset, FPGA programming or flash writes."
+logical_id = "a163b723-710b-4988-889d-8757bd364f02"
+content_hash = "sha256:f02270edbcaeead1c9a78c4181e008ea466b2e532541ccde3d69068000f4d882"
+size = 10190
+mtime_ms = 1794408492015
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a163b723-710b-4988-889d-8757bd364f02/73577806-1e6f-47fe-9ea0-0af5ec23fb25"
+storage_version_token = "1794408497730871"
+content_type = "application/octet-stream"
