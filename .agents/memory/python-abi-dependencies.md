@@ -22,3 +22,12 @@ interpreter selected.
 **How to apply:** For isolated package checks, align PYTHONPATH with that
 interpreter's installed site-packages. Do not change the serving workflow to
 accommodate a test-only packaging tool.
+
+Prepared RTL snapshots must run from their own directory with inherited Python
+package paths preserved.
+
+**Why:** Replacing PYTHONPATH hid installed pytest; running from the workspace
+root then selected production `hardware` ahead of the prepared snapshot.
+
+**How to apply:** Change into the isolated output and prepend it to the existing
+PYTHONPATH before invoking tests by absolute path.

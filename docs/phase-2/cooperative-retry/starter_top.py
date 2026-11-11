@@ -28,7 +28,7 @@ BOOT_GUARD = (46 << 9) | 419
 
 class StarterTop(Elaboratable):
     def __init__(self, *, clock_hz=25_000_000, baud=57600, sim_mode=False,
-                 lump_records=None):
+                 lump_records=None, caller_records=None):
         self.clock_hz, self.baud, self.sim_mode = clock_hz, baud, sim_mode
         self.clk = Signal()
         # A physical input, synchronized below. No UART/MMIO assignment.
@@ -41,9 +41,13 @@ class StarterTop(Elaboratable):
         self.verifier = ReceivedImageSHA256()
         self.diagnostic = RequestDiagnostic()
         self.lump_receiver = None
+        self.observer = None
         if lump_records is not None:
             from .combined_receiver import CombinedReceiver
+            from .combined_observer import CombinedObserver
             self.lump_receiver = CombinedReceiver(lump_records, clock_hz=clock_hz)
+            self.observer = CombinedObserver(lump_records, caller_records or [],
+                                             clock_hz=clock_hz)
         self.memory_write = Signal()
         self.memory_address = Signal(14)
         self.memory_data = Signal(32)
@@ -66,6 +70,7 @@ class StarterTop(Elaboratable):
         m.submodules.diagnostic = DomainRenamer("execution")(diag)
         if lump is not None:
             m.submodules.lump_receiver = DomainRenamer("execution")(lump)
+            m.submodules.observer = DomainRenamer("execution")(self.observer)
         m.d.comb += [
             ClockSignal("execution").eq(ClockSignal("sync")),
             ResetSignal("execution").eq(ctl.execution_reset),
@@ -84,9 +89,11 @@ class StarterTop(Elaboratable):
             diag.byte.eq(rx.data), diag.error.eq(rx.error & ~enable),
             arb.req[0].eq(tr.tx_req), arb.data[0].eq(tr.tx_byte),
             arb.last[0].eq(tr.tx_last), tr.tx_ack.eq(arb.ack[0]),
-            arb.req[1].eq(diag.tx_req & ~ctl.execution_reset),
-            arb.data[1].eq(diag.tx_byte), arb.last[1].eq(diag.tx_last),
-            diag.tx_ack.eq(arb.ack[1]),
+            arb.req[1].eq((self.observer.tx_req if lump is not None else diag.tx_req) &
+                          ~ctl.execution_reset),
+            arb.data[1].eq(self.observer.tx_byte if lump is not None else diag.tx_byte),
+            arb.last[1].eq(self.observer.tx_last if lump is not None else diag.tx_last),
+            (self.observer.tx_ack if lump is not None else diag.tx_ack).eq(arb.ack[1]),
             arb.ready.eq(~tx.busy & ~tx.done),
             tx.start.eq(arb.tx_start), tx.data.eq(arb.tx_data),
         ]
@@ -239,4 +246,17 @@ class StarterTop(Elaboratable):
             self.memory_write.eq(wr.en), self.memory_address.eq(wr.addr),
             self.memory_data.eq(wr.data),
         ]
+        if lump is not None:
+            obs = self.observer
+            m.d.comb += [
+                obs.epoch.eq(self.admitted_epoch), obs.image_digest.eq(self.admitted_digest),
+                obs.phase.eq(lump.phase), obs.transaction.eq(lump.transaction),
+                obs.receiver_state.eq(lump.state),
+                obs.retire.eq(core.retire_valid & ~ctl.execution_reset),
+                obs.nia.eq(core.retire_nia), obs.result.eq(core.debug_dr_words[1]),
+                obs.fault.eq(core.fault_valid), obs.renew.eq(core.sim_watchdog.transition_complete),
+                obs.ticks.eq(core.sim_watchdog.remaining),
+                obs.write.eq(self.program_commit),
+                obs.address.eq(self.memory_address << 2), obs.data.eq(self.memory_data),
+            ]
         return m
