@@ -351,6 +351,8 @@ export default function DevelopmentImage() {
 
       <div className="kiss-layout kiss-layout-single">
         <section className="kiss-panel" aria-labelledby="kiss-namespace-title">
+          <div className="kiss-slot-visual-row">
+          <div className="kiss-slot-column">
           <div className="kiss-panel-head"><h2 id="kiss-namespace-title"><span className="kiss-step">01</span>Namespace Table</h2><span className="kiss-status">{view === "built" ? "Built-image allocations" : "Saved inputs"}</span></div>
           <div className="kiss-selector">
             <label htmlFor="kiss-namespace">Namespace</label>
@@ -372,7 +374,6 @@ export default function DevelopmentImage() {
             <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare application image</button>
           </div>
           <p className="kiss-meta">{slots.length} {view === "built" ? "built-image" : "saved"} rows · Select a name to inspect this view’s data.</p>
-          <div className="kiss-slot-visual-row">
           <div className="kiss-table-scroll" tabIndex={0} role="region" aria-label={`${namespace} saved slot table`}>
             <table>
               <thead><tr><th scope="col">Slot</th><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Policy</th><th scope="col">Rev.</th></tr></thead>
@@ -387,6 +388,7 @@ export default function DevelopmentImage() {
                 </tr>;
               })}</tbody>
             </table>
+          </div>
           </div>
           <section className="kiss-water-map" aria-labelledby="kiss-water-title">
                 <div className="kiss-water-heading">
