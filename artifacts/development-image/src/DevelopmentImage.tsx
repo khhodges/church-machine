@@ -337,7 +337,27 @@ export default function DevelopmentImage() {
       </header>
 
       <div className="kiss-heading">
-        <div><p className="kiss-subtitle">Review the bound Namespace layout, then send it to the FPGA.</p></div>
+        <div className="kiss-heading-controls">
+          <div className="kiss-selector kiss-heading-selector">
+            <label htmlFor="kiss-namespace">Namespace</label>
+            <select id="kiss-namespace" value={namespace} disabled={sending || !!confirmation} onChange={event => changeNamespace(event.target.value)}>
+              {!namespace && <option value="">Select a saved Namespace</option>}
+              <optgroup label="Namespaces">
+                {entries.filter(entry=>entry.selection_key).map(entry => <option key={entry.selection_key} value={entry.selection_key}>{entry.name}</option>)}
+              </optgroup>
+              {!entries.find(entry=>entry.selection_key===namespace) && namespace &&
+                <option value={namespace}>{entries.find(entry=>entry.id===namespace)?.name} · Historical inspection</option>}
+            </select>
+          </div>
+          <div className="kiss-selector kiss-heading-selector">
+            <label htmlFor="memory-view">Memory view</label>
+            <select id="memory-view" value={view} onChange={event => {setView(event.target.value as "saved" | "built"); setSelectedSlot(null);}}>
+              <option value="saved">Saved design</option>
+              <option value="built" disabled={!builtImage}>Built image — prepared, not installation evidence</option>
+            </select>
+            <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare application image</button>
+          </div>
+        </div>
         <button type="button" className="kiss-primary" onClick={() => void switchToDesigner()}
           disabled={loading || sending || !entries.find(entry=>(entry.selection_key || entry.id)===namespace)?.selection_key}
           aria-label="Switch to Namespace Designer" title="Return to this Namespace designer without saving or sending">Switch → Namespace Designer</button>
@@ -354,25 +374,6 @@ export default function DevelopmentImage() {
           <div className="kiss-slot-visual-row">
           <div className="kiss-slot-column">
           <div className="kiss-panel-head"><h2 id="kiss-namespace-title"><span className="kiss-step">01</span>Namespace Table</h2><span className="kiss-status">{view === "built" ? "Built-image allocations" : "Saved inputs"}</span></div>
-          <div className="kiss-selector">
-            <label htmlFor="kiss-namespace">Namespace</label>
-            <select id="kiss-namespace" value={namespace} disabled={sending || !!confirmation} onChange={event => changeNamespace(event.target.value)}>
-              {!namespace && <option value="">Select a saved Namespace</option>}
-              <optgroup label="Namespaces">
-                {entries.filter(entry=>entry.selection_key).map(entry => <option key={entry.selection_key} value={entry.selection_key}>{entry.name}</option>)}
-              </optgroup>
-              {!entries.find(entry=>entry.selection_key===namespace) && namespace &&
-                <option value={namespace}>{entries.find(entry=>entry.id===namespace)?.name} · Historical inspection</option>}
-            </select>
-          </div>
-          <div className="kiss-selector">
-            <label htmlFor="memory-view">Memory view</label>
-            <select id="memory-view" value={view} onChange={event => {setView(event.target.value as "saved" | "built"); setSelectedSlot(null);}}>
-              <option value="saved">Saved design</option>
-              <option value="built" disabled={!builtImage}>Built image — prepared, not installation evidence</option>
-            </select>
-            <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare application image</button>
-          </div>
           <p className="kiss-meta">{slots.length} {view === "built" ? "built-image" : "saved"} rows · Select a name to inspect this view’s data.</p>
           <div className="kiss-table-scroll" tabIndex={0} role="region" aria-label={`${namespace} saved slot table`}>
             <table>
