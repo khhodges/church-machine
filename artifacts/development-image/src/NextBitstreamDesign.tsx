@@ -5,6 +5,8 @@ import type { CatalogEntry } from "./image-api";
 import { latestChoices } from "./latest-image";
 import { checkDraft, REGION_LABELS } from "./next-bitstream";
 import type { DraftInputs, DraftRegionKey } from "./next-bitstream";
+import NamespacePicker from "./NamespacePicker";
+import { readPlanningDraft, rememberPlanningDraft } from "./next-bitstream-draft";
 
 const COLORS: Record<DraftRegionKey, string> = {namespaceA: "#73d7c0", namespaceB: "#b8a1ee", lumpZone: "#e9c46a"};
 const EMPTY: DraftInputs = {total: "", namespaceA: "", namespaceB: "", lumpZone: ""};
@@ -16,9 +18,11 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
   const [catalogError, setCatalogError] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogRefresh, setCatalogRefresh] = useState(0);
-  const [refA, setRefA] = useState("");
-  const [refB, setRefB] = useState("");
-  const [draft, setDraft] = useState<DraftInputs>(EMPTY);
+  const [initialDraft] = useState(readPlanningDraft);
+  const [refA, setRefA] = useState(initialDraft.refA);
+  const [refB, setRefB] = useState(initialDraft.refB);
+  const [draft, setDraft] = useState<DraftInputs>(initialDraft.draft);
+  useEffect(() => { rememberPlanningDraft({refA, refB, draft}); }, [refA, refB, draft]);
   const [selected, setSelected] = useState<DraftRegionKey | null>(null);
   const [error, setError] = useState("");
 
@@ -68,17 +72,13 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
         <div className="kiss-heading-controls">
           <div className="kiss-selector kiss-heading-selector">
             <label htmlFor="nb-ref-a">Namespace A</label>
-            <select id="nb-ref-a" value={refA} onChange={e => setRefA(e.target.value)} disabled={catalogLoading}>
-              <option value="">Unassigned</option>
-              {entries.map(entry => <option key={entry.selection_key} value={entry.selection_key}>{entry.name}</option>)}
-            </select>
+            <NamespacePicker id="nb-ref-a" label="Namespace A" value={refA} onChange={setRefA}
+              loading={catalogLoading} options={entries.map(entry => ({value: entry.selection_key!, label: entry.name}))} />
           </div>
           <div className="kiss-selector kiss-heading-selector">
             <label htmlFor="nb-ref-b">Namespace B</label>
-            <select id="nb-ref-b" value={refB} onChange={e => setRefB(e.target.value)} disabled={catalogLoading}>
-              <option value="">Unassigned</option>
-              {entries.map(entry => <option key={entry.selection_key} value={entry.selection_key}>{entry.name}</option>)}
-            </select>
+            <NamespacePicker id="nb-ref-b" label="Namespace B" value={refB} onChange={setRefB}
+              loading={catalogLoading} options={entries.map(entry => ({value: entry.selection_key!, label: entry.name}))} />
           </div>
         </div>
         <button type="button" className="kiss-primary" onClick={() => void switchToDesigner()} disabled={!returnKey}

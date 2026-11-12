@@ -38,3 +38,22 @@ assert(dev.includes('"Switch to Next Bitstream Design"') && dev.includes("onSwit
 assert(next.includes("DevelopmentImageView.openDesigner") && next.includes('aria-label="Switch to Namespace Designer"'), "next view returns to designer");
 for (const banned of ["/prepare", "uart-install", "installExact", "prepareExact", "/hardware/", "method:"]) assert(!next.includes(banned), "no mutation/hardware: " + banned);
 console.log("PASS next-bitstream draft geometry and switch loop");
+
+// An IDE navigation may replace the iframe: draft authority stays in tab memory.
+const draftCode = await transform(readFileSync(new URL("./next-bitstream-draft.ts", import.meta.url), "utf8"), {loader: "ts", format: "esm"});
+const draftModule = await import(`data:text/javascript;base64,${Buffer.from(draftCode.code).toString("base64")}`);
+const host = {document: {getElementById: () => ({})}};
+globalThis.window = {parent: host};
+assert.equal(draftModule.readPlanningDraft().refA, "");
+const retained = {refA: "namespace:phase1", refB: "namespace:legacy",
+  draft: {total: "1000", namespaceA: "100", namespaceB: "100", lumpZone: "800"}};
+draftModule.rememberPlanningDraft(retained);
+globalThis.window = {parent: host}; // new embedded frame, same IDE tab
+assert.deepEqual(draftModule.readPlanningDraft(), retained);
+const copy = draftModule.readPlanningDraft();
+copy.draft.total = "2";
+assert.equal(draftModule.readPlanningDraft().draft.total, "1000");
+globalThis.window = {parent: {document: {getElementById: () => ({})}}};
+assert.equal(draftModule.readPlanningDraft().refA, "", "new tab starts without a draft");
+delete globalThis.window;
+console.log("PASS planning references and geometry survive iframe replacement only");
