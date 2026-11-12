@@ -1,3 +1,4 @@
+- [Next bitstream design scope](next-bitstream-design-scope.md) — separate two-Namespace/common-LUMP planning workspace; three-view Switch loop, no hardware authorization.
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
 - [Notebook export memory](notebook-export-memory.md) — keep repeated export strings local; notebook capture limits can reset state after successful file writes.
 - [Mint compiler upgrade scope](mint-compiler-upgrade-scope.md) — focused current-ISA/Mint checks gate the upgrade, not unrelated legacy cleanup; baseline is not new-ABI acceptance.

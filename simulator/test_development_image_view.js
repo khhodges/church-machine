@@ -69,6 +69,8 @@ function run(hash){
     t.win.DevelopmentImageView.show(t.win.NamespaceSelection.current());
     assert.equal(t.frame.attrs.src,'/development-image/?namespace='+encodeURIComponent(key));
     assert(html.includes('id="namespaceSwitchToGlass"'),'designer has a top-line Switch button');
-    assert(app.includes('aria-label="Switch to Namespace Designer"'),'Memory Glass has reciprocal Switch button');
+    assert(app.includes('"Switch to Next Bitstream Design"')&&app.includes('openDesigner(entry.selection_key)'),'Memory Glass Switch goes to Next Bitstream Design (standalone fallback: designer)');
+    const nb=fs.readFileSync(dir+'/../artifacts/development-image/src/NextBitstreamDesign.tsx','utf8');
+    assert(nb.includes('aria-label="Switch to Namespace Designer"')&&nb.includes('DevelopmentImageView.openDesigner(returnKey)'),'Next Bitstream Design Switch closes the loop to the designer');
     console.log('PASS Development Image IDE routing and two-way Switch with exact selection and draft guards');
 })().catch(e=>{console.error(e);process.exit(1);});

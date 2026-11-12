@@ -15,7 +15,7 @@ import {inspectChoice, latestChoices, sourceId} from "./latest-image";
 import {builtSlots, byteToWord, containingRegion} from "./memory-map";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
-export default function DevelopmentImage() {
+export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: string) => void} = {}) {
   const [entries, setEntries] = useState<CatalogEntry[]>([]);
   const [namespace, setNamespace] = useState("");
   const [refresh, setRefresh] = useState(0);
@@ -216,7 +216,8 @@ export default function DevelopmentImage() {
       const host=window.parent as Window & {DevelopmentImageView?: {openDesigner(key:string):Promise<void>}};
       if (!entry?.selection_key || host === window || !host.DevelopmentImageView?.openDesigner)
         throw Error("Select a saved Namespace inside the IDE to open its designer.");
-      await host.DevelopmentImageView.openDesigner(entry.selection_key);
+      if (onSwitch) onSwitch(entry.selection_key);
+      else await host.DevelopmentImageView.openDesigner(entry.selection_key);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
   }
 
@@ -360,7 +361,7 @@ export default function DevelopmentImage() {
         </div>
         <button type="button" className="kiss-primary" onClick={() => void switchToDesigner()}
           disabled={loading || sending || !entries.find(entry=>(entry.selection_key || entry.id)===namespace)?.selection_key}
-          aria-label="Switch to Namespace Designer" title="Return to this Namespace designer without saving or sending">Switch → Namespace Designer</button>
+          aria-label={onSwitch ? "Switch to Next Bitstream Design" : "Switch to Namespace Designer"} title={onSwitch ? "Open the next-bitstream planning workspace without saving or sending" : "Return to this Namespace designer without saving or sending"}>{onSwitch ? "Switch → Next Bitstream Design" : "Switch → Namespace Designer"}</button>
       </div>
       {error && <p className="kiss-api-error" role="alert">{error} No saved data was changed. <a href={location.pathname}>Reload saved Namespaces</a></p>}
       {namespace.startsWith("latest:") && <button type="button" disabled={loading || sending || !!confirmation}
