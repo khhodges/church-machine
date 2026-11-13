@@ -11,6 +11,21 @@
     state.designId = '';
     let copies = [];
     let copiesLoaded = false;
+    let copiesRequest = null;
+    function loadCopies() {
+        if (copiesLoaded) return Promise.resolve();
+        if (!copiesRequest) {
+            copiesRequest = (async () => {
+                const response = await fetch('/api/namespace/design-copies', {cache:'no-store'});
+                const result = await response.json();
+                if (!response.ok || !result.ok || !Array.isArray(result.copies))
+                    throw Error(result.error || 'Saved Namespace list unavailable');
+                copies = result.copies;
+                copiesLoaded = true;
+            })().finally(() => { copiesRequest = null; });
+        }
+        return copiesRequest;
+    }
     const designQuery = () => state.designId ? '&design=' + encodeURIComponent(state.designId) : '';
     state.profile = 'ascending';
     const profileKey = 'church_namespace_design_profile';
@@ -48,12 +63,7 @@
             throw Error('This is historical inspection, not an editable Namespace.');
         const value=key.slice(10);
         if (value.startsWith('copy:')) {
-            if (!copiesLoaded) {
-                const response=await fetch('/api/namespace/design-copies',{cache:'no-store'});
-                const result=await response.json();
-                if(!response.ok || !result.ok) throw Error(result.error || 'Namespace list unavailable');
-                copies=result.copies; copiesLoaded=true;
-            }
+            await loadCopies();
             const item=copies.find(c=>c.id===value.slice(5));
             if (!item) throw Error('The selected Namespace is unavailable.');
             state.active=true;
@@ -139,12 +149,7 @@
         if (state.loading) return;
         state.loading = true;
         try {
-            if (!copiesLoaded) {
-                const response = await fetch('/api/namespace/design-copies', {cache:'no-store'});
-                const result = await response.json();
-                if (!response.ok || !result.ok) throw Error(result.error || 'Saved Namespace list unavailable');
-                copies = result.copies; copiesLoaded = true;
-            }
+            await loadCopies();
             accept(await request('GET'));
         }
         catch (e) { state.error = e.message; }
@@ -924,6 +929,12 @@
                 });
         });
         const initialize = () => {
+            // The catalog belongs to every profile, including Original, which
+            // does not call load() for an ascending design document.
+            loadCopies().then(syncNamespacePicker).catch(error=>{
+                root.alert('Could not load saved Namespace choices: '+error.message+
+                    '. No saved data was changed. Reopen the IDE to retry.');
+            });
             const selected=root.NamespaceSelection?.current();
             if (selected && selected!==selectionKey()) {
                 selectShared(selected).catch(error=>{state.error=error.message;render();});
