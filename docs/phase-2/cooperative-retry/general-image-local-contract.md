@@ -139,3 +139,39 @@ Evidence and source/test receipt are in
 `generated-artifacts/boot2-explicit-boot-guard/boot2-replay.json` and
 `generated-artifacts/boot2-explicit-boot-guard/general-image-check.json`.
 The earlier 46/419 observation remains historical evidence.
+
+## Seal-fault diagnosis
+
+A local decoded-byte replay reproduced the same SEAL fault at cycle 246 and
+NIA 0x101c with unchanged image SHA. Only UART serial decoding was replaced
+by a byte driver; transport, received RAM, SHA, boot and core remained real RTL.
+This is not additional UART-pin or physical evidence.
+
+The retained decoder treats word `0x17040021` as an indexed CALL through
+implicit CR6, row DR0+1, method DR0+1. DR0 was zero. The earlier
+`CALL CR0, CR8[0x0021]` text is the prepared disassembler's display, not the
+actual retained decoder's operand interpretation.
+
+At the CALL, CR6's base was 0x13f4 with inclusive limit 2. The core read row 1
+at 0x13f8 and obtained E-GT `0x4a00000a`, selecting `ide.CapabilityTest` at
+NS[10], version zero. It then read descriptor addresses 0xa0, 0xa4 and 0xa8:
+location, authority and stored integrity were all zero. No preceding runtime
+write touched that descriptor. The expected integrity of (0, 0) is
+`0xdeadbeef`, not zero, so the Namespace gate correctly raised SEAL.
+
+The image builder marks Lazy rows unresolved and leaves their descriptors
+empty. The retained CALL Lazy path instead requires a valid, sealed descriptor
+and allocated LUMP header with code-word count zero; only then can it reach
+the code-not-resident handoff. The failure is a prepared-image/retained-runtime
+Lazy representation mismatch, not transfer corruption or a shifted descriptor
+read.
+
+The smallest correction to assess is preparing the retained runtime's valid
+absent-LUMP representation for selected Lazy entries, with explicit bounded
+allocation and a zero-code header. Merely writing a seal into an empty slot
+would not supply that contract and is not a fix. No image-generation, RTL,
+GT, or hardware correction was made during diagnosis. Lazy delivery/publication
+compatibility remains unproved.
+
+Diagnostic script and bus/register evidence:
+`generated-artifacts/boot2-seal-diagnosis/probe.py` and `evidence.json`.
