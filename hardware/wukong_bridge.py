@@ -9,6 +9,10 @@ Usage
 
 What it does
 ------------
+Default auto mode passively detects UCV4 and monitors it in the console only.
+Unknown protocols stop without writes. The legacy behavior below requires
+explicit --protocol legacy; never select it for a UCV4 combined image.
+
 Reads bytes from the UART (57600 8N1):
   • ASCII bytes (bit-7 clear) are printed to stdout as CM program output.
   • 0xAA-prefixed 12-byte trace packets are parsed and POSTed to
@@ -45,6 +49,7 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 import argparse
 import base64
 import hashlib
+import json
 from concurrent.futures import ThreadPoolExecutor
 import os
 import queue
@@ -305,7 +310,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 27
+BRIDGE_VERSION    = 28
 # Hold a complete bounded acceptance run while HTTPS catches up. This does
 # not promise unlimited recording; any overflow must be explicitly reported.
 TRACE_BACKLOG_CAPACITY = 8192
@@ -2222,6 +2227,131 @@ def _connect_pairing(ide, uid, code=None):
     return True
 
 
+UCV4_MAGIC = b'UCV4'
+UCV4_SIZE = 138
+UCV4_FIELDS = (
+    'epoch', 'phase', 'transaction', 'receiver_state', 'publications',
+    'result_count', 'result0', 'result1', 'result2', 'pc0', 'pc1', 'pc2',
+    'progress', 'renewals', 'fault_seen', 'ticks',
+)
+UCV4_IMAGES = {
+    '1d2417387397d64640ab976322232158db60de8b61483fd52a27b010eac302eb': 'USER B',
+    'bfd60b47f5346768a81a53276876634f8b87b52d05f4ffa9a986a232d6ffc3d7': 'All Waiting',
+}
+UCV4_INPUTS = '9ba8059e092d284b7ba8da89fa7b5d3faf609284bee6ce3cdf561c69731d982b'
+
+
+def decode_ucv4(frame):
+    """Decode integrity-checked telemetry, never firmware attestation."""
+    import binascii
+    if len(frame) != UCV4_SIZE or frame[:4] != UCV4_MAGIC:
+        raise ValueError('Invalid UCV4 frame length/magic')
+    if binascii.crc_hqx(frame[:-2], 0xffff) != int.from_bytes(frame[-2:], 'big'):
+        raise ValueError('UCV4 CRC mismatch')
+    report = dict(zip(UCV4_FIELDS, struct.unpack('>16I', frame[72:-2])))
+    report.update(sequence=int.from_bytes(frame[4:8], 'big'),
+                  image_sha256=frame[8:40].hex(),
+                  inputs_sha256=frame[40:72].hex())
+    report['image_label'] = UCV4_IMAGES.get(report['image_sha256'], 'Unknown image')
+    report['known_inputs'] = report['inputs_sha256'] == UCV4_INPUTS
+    return report
+
+
+class UCV4Stream:
+    """Bounded resynchronization; invalid frames never become legacy events."""
+    def __init__(self):
+        self.buffer = bytearray()
+        self.bad_crc = 0
+
+    def feed(self, data):
+        self.buffer.extend(data)
+        reports = []
+        while True:
+            offset = self.buffer.find(UCV4_MAGIC)
+            if offset < 0:
+                self.buffer[:] = self.buffer[-3:]
+                break
+            del self.buffer[:offset]
+            if len(self.buffer) < UCV4_SIZE:
+                break
+            try:
+                report = decode_ucv4(bytes(self.buffer[:UCV4_SIZE]))
+            except ValueError:
+                self.bad_crc += 1
+                del self.buffer[0]
+                continue
+            del self.buffer[:UCV4_SIZE]
+            reports.append(report)
+        return reports
+
+
+def select_bridge_protocol(ser, requested, clock=time.monotonic):
+    """Auto mode is passive and never falls back to legacy based on noise."""
+    if requested != 'auto':
+        return requested, b''
+    deadline = clock() + 3
+    buffered = bytearray()
+    while clock() < deadline:
+        buffered.extend(read_available_serial(ser))
+        if UCV4_MAGIC in buffered:
+            return 'ucv4', bytes(buffered)
+        if len(buffered) > 16384:
+            del buffered[:-16384]
+    raise ValueError(
+        'No UCV4 header detected during passive probe. No commands were sent. '
+        'Use --protocol legacy ONLY after independently confirming a legacy '
+        'bitstream; do not select it to work around an unreadable stream.')
+
+
+def monitor_ucv4(ser, initial=b'', out=print, clock=time.monotonic):
+    """Console-only observer: no HTTP command polling, UART writes or recovery."""
+    out('[UCV4 READ ONLY] Console monitoring only; IDE control is disconnected. '
+        'No Halt, Run, reset, snapshot request, upload or automatic reconnect.')
+    out('[UCV4] CRC verifies packet integrity, not sender/bitstream authenticity. '
+        'Image names are digest labels; unknown identities remain visible.')
+    stream = UCV4Stream()
+    previous = None
+    last_valid = clock()
+    last_notice = last_valid
+    last_print = float('-inf')
+    chunk = initial
+    try:
+        while True:
+            old_bad = stream.bad_crc
+            reports = stream.feed(chunk)
+            if stream.bad_crc != old_bad:
+                out('[UCV4] CRC failure; discarded invalid candidate, no control action.')
+            for report in reports:
+                now = clock()
+                last_valid = now
+                identity = ('epoch', 'image_sha256', 'inputs_sha256')
+                boundary = previous is None or any(
+                    report[k] != previous[k] for k in identity)
+                sequence_ok = (not boundary and report['sequence'] ==
+                               (previous['sequence'] + 1) & 0xffffffff)
+                if boundary:
+                    out('[UCV4] New observation identity: ' + json.dumps({
+                        k: report[k] for k in (*identity, 'image_label', 'known_inputs')
+                    }, sort_keys=True))
+                elif not sequence_ok:
+                    out('[UCV4] Sequence gap/repeat/reset; no continuity claim.')
+                changed_fault = previous is None or report['fault_seen'] != previous['fault_seen']
+                if boundary or not sequence_ok or changed_fault or now - last_print >= 1:
+                    out('[UCV4] ' + json.dumps(report, sort_keys=True))
+                    last_print = now
+                previous = report
+            now = clock()
+            if now - last_valid >= 5 and now - last_notice >= 5:
+                out('[UCV4] STALE: no CRC-valid packet for five seconds; '
+                    'current board state unknown. No automatic recovery.')
+                last_notice = now
+            chunk = read_available_serial(ser)
+    except KeyboardInterrupt:
+        out('[UCV4] Monitor stopped. No board command sent.')
+    finally:
+        ser.close()
+
+
 def main():
     if serial is None:
         print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
@@ -2235,6 +2365,9 @@ def main():
                         help='Serial port (default: auto-detect; COMx on Windows, '
                              '/dev/ttyUSB* on Linux)')
     parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
+    parser.add_argument('--protocol', choices=('auto', 'ucv4', 'legacy'), default='auto',
+                        help='auto passively detects UCV4 (read-only); legacy control '
+                             'requires explicit selection of a confirmed legacy bitstream')
     parser.add_argument('--ide', default='http://localhost:5000', help='IDE base URL')
     parser.add_argument('--pair-code', help='Single-use connection code created by the IDE')
     parser.add_argument(
@@ -2259,6 +2392,8 @@ def main():
                         help='Run after each boot sentinel instead of sending automatic '
                              'Halt. Does not bypass faults or breakpoints.')
     args = parser.parse_args()
+    if args.protocol != 'legacy' and (args.free_run or args.phase1_golden or args.calls_only):
+        parser.error('Legacy control/trace options require --protocol legacy')
     if args.calls_only and not args.phase1_golden:
         parser.error('--calls-only requires --phase1-golden')
 
@@ -2345,6 +2480,37 @@ def main():
     if church_only:
         print('[trace] church-only filter enabled — bare Turing RESULTs suppressed')
 
+    # Open with control lines deasserted before any passive protocol probe.
+    try:
+        if args.protocol == 'legacy':
+            ser = serial.Serial(port, args.baud, timeout=0.05)
+        else:
+            ser = serial.Serial(port=None, baudrate=args.baud, timeout=0.05)
+            ser.dtr = False
+            ser.rts = False
+            ser.port = port
+            ser.open()
+    except serial.SerialException as e:
+        print(f'ERROR opening {port}: {e}', file=sys.stderr)
+        return 1
+    try:
+        protocol, initial = select_bridge_protocol(ser, args.protocol)
+    except (ValueError, serial.SerialException) as e:
+        ser.close()
+        print(str(e), file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        ser.close()
+        return 0
+    if protocol == 'ucv4':
+        try:
+            monitor_ucv4(ser, initial)
+        except serial.SerialException as e:
+            print(f'[UCV4] Serial read failed; monitor stopped: {e}. '
+                  'No automatic reconnect or board command.', file=sys.stderr)
+            return 1
+        return 0
+
     # Compute the expected N_INIT from the current boot_rom.py tables once at
     # startup.  Used to validate the N_INIT byte that the board sends after the
     # sentinel magic byte (0xBB for old/stale bitstreams, 0xBC for current ones).
@@ -2355,12 +2521,6 @@ def main():
     else:
         print(f'Boot sentinel: expecting N_INIT={expected_n_init} '
               f'(0x{expected_n_init & 0xFF:02X}) from board')
-
-    try:
-        ser = serial.Serial(port, args.baud, timeout=0.05)
-    except serial.SerialException as e:
-        print(f'ERROR opening {port}: {e}', file=sys.stderr)
-        sys.exit(1)
 
     # Attach flush: discard OS-buffered partial stream so we don't start
     # decoding in the middle of a packet the board sent before we attached.

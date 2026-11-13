@@ -362,7 +362,8 @@ def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
     monkeypatch.setattr(bridge, '_find_serial_port',
                         lambda preferred=None: '/dev/ttyUSB1')
     monkeypatch.setattr(sys, 'argv', [
-        'wukong_bridge.py', '--port=/dev/ttyUSB0', '--ide=http://ide.test',
+        'wukong_bridge.py', '--protocol=legacy',
+        '--port=/dev/ttyUSB0', '--ide=http://ide.test',
     ])
 
     bridge.main()

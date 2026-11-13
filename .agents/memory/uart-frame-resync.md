@@ -33,3 +33,14 @@ bridge had interpreted their payload bytes as boot sentinels and fault traces.
 changing baud or interpreting legacy fault reports. Detect incompatible
 protocols before any automatic UART writes. A reported application digest is
 not attestation of the exact programmed FPGA bitstream.
+
+Read-only combined-runtime observation must not establish a legacy control
+session merely because saved bridge authentication succeeds.
+
+**Why:** Pairing authenticates the PC bridge to the IDE; it does not establish
+wire-protocol compatibility or authorize interpreting observer bytes as
+instruction/fault evidence.
+
+**How to apply:** Keep passive observation separate from command polling and
+legacy trace ingestion. Any future IDE observer display must preserve that
+separation and must not imply that Boot2 transfer has been validated.
