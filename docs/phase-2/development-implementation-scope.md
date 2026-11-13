@@ -220,6 +220,21 @@ resident binaries are not yet selected, so workload fit is blocked, not passed.
 
 ### Peripheral and pin/controller dependency plan
 
+**Schematic review update (11 November 2026):** the retained V3 manufacturer
+schematic resolves the legacy-map conflict: UART remains E3/F3, Ethernet is
+separately wired **GMII**, and J9 is an onboard microSD socket. See
+[the V3 pin/controller and equipment review](wukong-v3-sd-ethernet-plan.md)
+for the collision-free proposed map and bank supplies. On 13 November the owner
+confirmed V3, microSD slot, a SanDisk 32 GB Ultra SDHC card, router connection
+and manual power control. The proposal selects SPI SDHC and a full-duplex
+10/100/1000 GMII/MII controller architecture; physical card fit, link speed and
+power-interruption behavior remain acceptance checks, not measured results.
+Its explicit CDC/controller allowances revise the conservative
+planning total from 124 to **128/135 BRAM36**, leaving seven tiles; the earlier
+tables below/above remain the original inventory, not updated fit evidence.
+The legacy RGMII entries below describe the issue discovered, not V3 wiring
+assignments. No runtime or build change is authorized.
+
 | Interface | Evidence / available implementation | Dependency to close before RTL freeze |
 |---|---|---|
 | Clock, maintenance, UART | Frozen wrapper exports only `clk M21`, `maintenance_n M6`, RX F3, TX E3, all LVCMOS33; 50 MHz input → 25 MHz execution | Preserve demonstrated mapping unless explicitly revised; maintenance trust handled separately. Update strict four-port vendor check when approved ports change |

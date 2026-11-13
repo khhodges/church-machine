@@ -5,6 +5,24 @@ description: Correct FPGA pin assignments for QMTECH Wukong V3 board — hardwar
 
 # QMTECH Wukong V3 (XC7A100T-2FGG676C) Correct Pins
 
+## Target-revision boundary
+
+The owner explicitly confirmed **V3** and **Micro SD slot** on 2026-11-13.
+**Why:** An earlier V2 manual filename caused ambiguity; the subsequent
+explicit board identification supersedes that filename.
+**How to apply:** Use the V3 schematic for the proposed onboard microSD and
+Ethernet plan. Do not request the V2 manual to identify this target again.
+Do not infer an inserted card, unmodified physical wiring, or permission to
+erase storage or access hardware.
+
+The owner supplied a SanDisk 32GB Ultra 100MBs SDHC card description, a router
+as Ethernet peer, and manual power control on 2026-11-13.
+**Why:** The development equipment plan must not assume a gigabit-only peer,
+automatic power switching, or the advertised card speed over SPI.
+**How to apply:** Plan multi-speed full-duplex Ethernet and operator-assisted
+power tests. Verify microSD form factor and card identity before physical use;
+the supplied product description does not specify an exact SKU or grant writes.
+
 **Source:** Hardware-confirmed on real board via counter-blink diagnostic test.
 
 ## Pin Table
