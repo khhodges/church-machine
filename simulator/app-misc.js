@@ -1471,6 +1471,9 @@ window.addEventListener('pagehide', () => { if (typeof activeUserTabId !== 'unde
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
+    // The early storage guard displays an actionable notice. Do not start an
+    // editor whose draft/settings persistence is unavailable in this iframe.
+    if (window.churchBrowserStorageBlocked) return;
     // Boot Image Designer Step 1 (Task #214): if the project has a saved
     // boot config, prefetch it BEFORE init() so the simulator's first reset
     // already sees the programmer-chosen lump sizes. When no config exists
@@ -1494,6 +1497,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(err => { console.warn('[bootConfig] prefetch failed:', err); });
     _bootCfgReady.finally(() => {
         window.init();
+        const startupStatus = document.getElementById('ide-startup-status');
+        if (startupStatus) startupStatus.remove();
         // Delay SSE so networkidle can fire in tests (EventSource stays open forever,
         // which blocks waitForLoadState('networkidle') if opened synchronously).
         setTimeout(startDeviceEventStream, 3000);
@@ -1524,6 +1529,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const _asmEd = document.getElementById('asmEditor');
         // Do not override browser Ctrl/Command shortcuts in the editor.
         // Find, save, open, and C-List remain available through the UI.
+    }).catch(err => {
+        console.error('[IDE startup]', err);
+        const startupStatus = document.getElementById('ide-startup-status');
+        if (startupStatus) {
+            const explanation = document.createElement('p');
+            explanation.textContent = 'IDE startup could not finish: ' + (err.message || String(err)) +
+                '. Your saved drafts have not been reset. Use the new-tab link below.';
+            startupStatus.prepend(explanation);
+        }
     });
 });
 

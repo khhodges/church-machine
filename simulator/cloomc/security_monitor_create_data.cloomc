@@ -1,0 +1,54 @@
+; Isolated native SecurityMonitor.Create component, not a public monitor.
+; DATA specialization of GTvars: slot DR2, version DR3; Inform/RW/B=0 fixed.
+; Caller is trusted Mint; it owns generation selection and lifecycle checks.
+; Private imports: ConstructionWord W (one word), MControl W (M I/O word).
+; Entry M state: CR6.M and CR14.M as established by current CALL microcode.
+; This full-word M-control write preserves both and authorizes CR7 once.
+; Result CR1, Status DR1. Clobbers DR4/DR6; preserves DR5.
+; Clears CR7/CR8 and scratch. No other active M grants at this private entry.
+; Evidence includes direct entry and native CALL/RETURN. Not public authorization.
+abstraction ide.SecurityMonitorCreateData {
+passkey required;
+capabilities { SELF E, ide.ConstructionWord W, ide.MControl W }
+method Create(slot: U32, version: U32) -> Inform[RW] {
+    .pet Slot DR2
+    .pet Version DR3
+    .pet PackedWord DR4
+    .pet Work DR6
+    .pet Status DR1
+    .pet ConstructionWord CR7
+    .pet MControl CR8
+    .pet Result CR1
+    IADD Status, DR0, #0
+    BFEXT Work, Slot, #16, #16
+    MCMP Work, #0
+    BRANCHNE bad_fields
+    MCMP Slot, #0
+    BRANCHEQ bad_fields
+    BFEXT Work, Version, #9, #23
+    MCMP Work, #0
+    BRANCHNE bad_fields
+    ; Inform=1, DATA domain, RW=3, B=0: prefix 0x32000000.
+    IADD PackedWord, DR0, #50
+    SHL PackedWord, PackedWord, #24
+    SHL Work, Version, #16
+    IADD PackedWord, PackedWord, Work
+    IADD PackedWord, PackedWord, Slot
+    LOAD ConstructionWord, CR6, #1
+    LOAD MControl, CR6, #2
+    DWRITE PackedWord, ConstructionWord, #0, DR0
+    ; Hardware M-control mask 0x40C0: preserve CR6/CR14, add CR7.
+    ; This is hardware register state, not a token permission bit.
+    IADD Work, DR0, #259
+    SHL Work, Work, #6
+    DWRITE Work, MControl, #0, DR0
+    LOAD Result, ConstructionWord, #0
+    DWRITE DR0, ConstructionWord, #0, DR0
+    LOAD ConstructionWord, NULL
+    LOAD MControl, NULL
+    IADD Status, DR0, #1
+    RETURNAL #2
+bad_fields:
+    HARDFAULT "SecurityMonitor.Create: DATA GTvars outside encoded range"
+}
+}

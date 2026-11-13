@@ -1,5 +1,39 @@
 # Mint-private GT-construction port
 
+## Current construction clarification
+
+SecurityMonitor provides **Create(GTvars)**: pack a DATA word, then read it
+back as a GT using the monitor's M-bit ownership and the existing ISA rules.
+A separate GTMint device is not a prerequisite for this path. The dedicated
+port/GT.M proposals retained below are historical, not additional authorization
+requirements for this clarified implementation.
+
+The [native DATA component evidence](../phase-1/native-queue-m-conformance.md)
+uses one private W-only word, native DWRITE, an authorized M-control write and
+native LOAD. No permanent L alias or host constructor supplies the result.
+This is not full monitor authentication, queue lifecycle proof or FPGA approval.
+
+## ISA authority correction — 2026-11-11
+
+M semantics are defined by the
+[master ISA, A.1–A.2](../phase-1/01-isa/instruction-set.md#a1-common-contract-and-notation).
+They are not a new design decision for the memory queues:
+
+- M belongs to hardware register state, not the GT and not a software lease.
+- Boot retains its defined exception.
+- CALL/RETURN establish CR6.M for C-list access with the unchanged E GT;
+  ordinary C-list LOADs do not consume that exception.
+- Other authorized M uses consume the relevant M on use, on success or
+  failure; this does not authorize clearing unrelated M state.
+- LOADM's source-register M overrides the source L requirement only. Identity,
+  generation, integrity, bounds and protected-register checks remain. The
+  exact loaded result is returned with CR1.M clear.
+
+The earlier request to decide M authorization/lifetime again was mistaken.
+Use these rules to assess implementation, rather than asking the user to
+redesign them. Historical port proposals below are subordinate to the master
+ISA; an incomplete device implementation is not an undefined M rule.
+
 ## Approved direction
 
 The user agreed to proceed with a dedicated hardware-address port that accepts
@@ -124,6 +158,29 @@ writes, NULL results, and same-edge transition/access ordering require precise
 rules before integration. No partially validated LOAD may publish a CR value.
 
 ## Remaining interface and verification work
+
+**Queue implementation direction, 2026-11-11:** the user selected resolving this
+interface before continuing the new isolated native memory queues, rather than
+using the historical result-memory mechanism. This does not revoke the bounded
+historical demonstration below or authorize RTL/FPGA changes.
+
+### Corrected issue: implementation conformance, not M authorization design
+
+**User clarification, 2026-11-11:** “M is hardware only used in Boot,
+CR6 CALL/Return, and single instructions authorized by a resident GT.”
+
+Do not frame M as a software permission lasting for a monitor invocation.
+The proposed blanket clearing of GT.M and pending results at every CALL/RETURN
+was not approved and is withdrawn. The pending-result lifetime already approved
+above remains unchanged; the cancelled lifetime question supplies no approval.
+
+The user further confirmed that the ISA already defines M. The question above
+about deciding resident-GT/hardware authorization is therefore withdrawn too.
+Read and apply the master ISA's A.1 lifetime/scope and A.2 LOADM rules.
+DWRITE supplies proposed GT bits; it does not itself grant construction
+authority. Establish whether the implementation performs the already-defined
+authorized instruction and consumption correctly, without a host-service
+substitute. Do not infer a new software lease or change Boot/CR6 behavior.
 
 **Testing scope — latest user direction:** Use the existing CREATE/DESTROY
 lifecycle as the shortest bounded testable route, excluding Passcodes. This

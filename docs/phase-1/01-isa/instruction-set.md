@@ -2102,11 +2102,27 @@ questions. It is review evidence, not an implementation claim.
 
 ### A.7 MintM — Golden Token construction
 
+**Construction-path clarification:** SecurityMonitor offers
+`Create(GTvars)`. It packs the supplied GT variables into a DATA word, then
+uses its M-bit ownership to read that word back as a GT. Native packing and
+M-authorized readback are the specified mechanism, not a host constructor,
+an always-readable L alias or a prerequisite for a separate GTMint device.
+The existing M rules govern that readback. The earlier open-mechanism wording
+below must not be used to reopen those rules or block this path.
+Mint still owns allocation and version changes; construction does not perform
+either. Broader type-specific argument policies discussed below remain distinct
+from this resolved mechanism.
+
 **User-directed extension:** Phase I M-bit limitations that prevent this
 operation are to be corrected, rather than preserved as architectural
 restrictions or worked around with ordinary writable scratch storage.
+In the clarified path, the private construction word is read under monitor M;
+it is not the rejected workaround of granting ordinary L access to writable
+result storage.
 This records the required direction; the exact ISA delta and implementation
-are not established or qualified by this appendix.
+were not established by the initial appendix. The subsequent clarification
+above resolves the construction mechanism; qualification still needs execution
+evidence.
 
 ```text
 MintM(Ctype, Permissions, Slot) -> GT

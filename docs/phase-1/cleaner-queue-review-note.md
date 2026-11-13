@@ -7,6 +7,36 @@ submitted reviewer notes and subsequent qualifications into the
 Document review is complete; implementation mechanisms and proof obligations
 are not. No tests or safety acceptance are claimed by this note.
 
+## Subsequent general-queue review disposition
+
+See the [readable CLOOMC queue contract](readable-cloomc-memory-queues.md)
+for the subsequent review and the
+[executed native FIFO/TRANSFER profile](native-memory-queue-profile.md).
+
+- **Accepted:** immutable capacity, discipline, admissibility and mode;
+  producer/consumer separation; private reservation/staging/publication;
+  FreeHandler lifecycle eligibility distinct from GT validity and queue custody.
+- **Qualified:** “Stage is surrender” is a postcondition requiring proof, not
+  a property supplied by an ordinary GT store or a method name. Include saved
+  Thread state and custody-recovery authority, not only current registers.
+- **Strengthened:** cancellation faults after staging **or** irreversible
+  version/release changes, even if staging has not occurred.
+- **Clarified:** ReserveRelease checks the old generation; authorized Mint
+  advances once and StageReleased carries the new generation.
+- **Qualified:** FIFO orders publication, not necessarily reservation; it
+  implies neither fairness nor bounded latency. LIFO is an extension only.
+- **Qualified:** impossible-full faults require the fully provisioned pool's
+  single-owner proof, not merely membership in the general GTQueue abstraction.
+- **Qualified:** SHARE permits retention; request/response need not always share.
+- **Added obligation:** lifecycle eligibility and queue publication need a joint
+  ownership-transition proof; separately correct updates do not compose
+  atomically by assertion.
+
+The earlier component checks did not resolve native scheduling, materialization
+or surrender. The full isolated profile now executes those mechanisms using
+SecurityMonitor.Create and native cooperative scheduling. Its closed-graph
+copy/commit proof is not a claim of universal surrender or preemptive safety.
+
 ## P1 — Cleaner retained GT (§7): mechanism required before acceptance
 
 **Incorporated.** Publish-then-clear is prohibited. The Cleaner must surrender

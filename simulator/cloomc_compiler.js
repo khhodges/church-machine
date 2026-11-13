@@ -776,6 +776,7 @@ class CLOOMCCompiler {
                     for (const statement of m.body) {
                         const text = statement.text.replace(/;.*$/, '').trim();
                         if (!text || /^[A-Za-z_]\w*:$/.test(text)) continue;
+                        if (/^\.pet\s+[A-Za-z_]\w*\s+(?:CR(?:[0-9]|1[01])|DR(?:[0-9]|1[0-5]))$/i.test(text)) continue;
                         if ((!this._nativeMnemonic(text) && !/^HARDFAULT\s+"/i.test(text)) || /^(?:RETURN)\s+\S/i.test(text))
                             throw new Error('Typed ABI bodies require native instructions and explicit registers; use RETURNAL for return masks. Unsupported: ' + text);
                     }
@@ -2687,14 +2688,21 @@ class CLOOMCCompiler {
     _compileStatement(stmt, code, locals, rom, capNames, labels, labelRefs, errors, manifest, method) {
         const text = stmt.text.trim().replace(/;$/, '');
         if (!text || text.startsWith('//')) return;
-        const crAlias = /^\.pet\s+([A-Za-z_]\w*)\s+CR([0-9]|1[01])$/i.exec(text);
-        if (crAlias) {
+        const registerAlias = /^\.pet\s+([A-Za-z_]\w*)\s+(CR(?:[0-9]|1[01])|DR(?:[0-9]|1[0-5]))$/i.exec(text);
+        if (registerAlias) {
             if (!this._methodCRAliases) this._methodCRAliases = new WeakMap();
             let aliases = this._methodCRAliases.get(labels);
-            if (!aliases) this._methodCRAliases.set(labels, aliases = {});
-            if (Object.hasOwn(aliases, crAlias[1])) {
-                errors.push({line: stmt.lineNum, message: `Duplicate CR alias: ${crAlias[1]}`});
-            } else aliases[crAlias[1]] = Number(crAlias[2]);
+            if (!aliases) this._methodCRAliases.set(labels, aliases = Object.create(null));
+            const name = registerAlias[1];
+            if (/^(?:CR\d+|DR\d+|NULL)$/i.test(name) || this._nativeMnemonic(name)) {
+                errors.push({line: stmt.lineNum, message: `Reserved register alias: ${name}`});
+            } else if (Object.hasOwn(aliases, name)) {
+                errors.push({line: stmt.lineNum, message: `Duplicate register alias: ${name}`});
+            } else aliases[name] = registerAlias[2].toUpperCase();
+            return;
+        }
+        if (/^\.pet\b/i.test(text)) {
+            errors.push({line: stmt.lineNum, message: 'Use .pet Name CR0..CR11 or .pet Name DR0..DR15 inside a method.'});
             return;
         }
 
@@ -2811,9 +2819,15 @@ class CLOOMCCompiler {
                 return;
             }
 
-            let asmText = text;
+            const aliases = this._methodCRAliases && this._methodCRAliases.get(labels);
+            // Lower only complete operand identifiers, never quoted text,
+            // dotted capability names, labels or mnemonics. The assembler's
+            // indexed-memory parser expects literal DR tokens.
+            let asmText = text.replace(/^(\S+)(.*)$/, (_, mnemonic, operands) =>
+                mnemonic + operands.replace(/"(?:\\.|[^"\\])*"|(?<![\w.])[A-Za-z_][\w.]*/g,
+                    token => Object.hasOwn(aliases || {}, token) ? aliases[token] : token));
             const namedLoad = nativeInstruction.opcode === 'LOAD'
-                ? text.match(/^[A-Za-z][A-Za-z0-9]*\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_.]*)$/i)
+                ? asmText.match(/^[A-Za-z][A-Za-z0-9]*\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_.]*)$/i)
                 : null;
             if (namedLoad && namedLoad[2].toUpperCase() !== 'NULL') {
                 const capName = namedLoad[2];
@@ -2848,9 +2862,8 @@ class CLOOMCCompiler {
             if (typeof asmObj.setLocalClistSlots === 'function') {
                 asmObj.setLocalClistSlots(rom);
             }
-            const aliases = this._methodCRAliases && this._methodCRAliases.get(labels);
             const aliasPrefix = Object.entries(aliases || {}).map(
-                ([name, index]) => `.pet ${name} CR${index}`).join('\n');
+                ([name, register]) => `.pet ${name} ${register}`).join('\n');
             const asmResult = asmObj.assemble(aliasPrefix ? `${aliasPrefix}\n${asmText}` : asmText);
             if (asmResult.errors && asmResult.errors.length > 0) {
                 for (const error of asmResult.errors) {

@@ -1,7 +1,28 @@
 ---
-name: Mint-private GT-construction port
-description: Approved Phase 2 direction and the boundary between minting authority and diagnostic access
+name: SecurityMonitor GT construction
+description: Current Create(GTvars) clarification and subordinate historical port proposals
 ---
+
+## Current authority
+
+SecurityMonitor offers `Create(GTvars)`: it packs a data word and, using its
+M-bit ownership, reads that word back as a GT.
+
+**Why:** The user explicitly supplied this construction mechanism after the
+agent incorrectly treated the unfinished MintM appendix as a blocker. M rules
+are already defined in the ISA; asking the user to locate a superseding section
+was not useful.
+
+**How to apply:** Implement native packing and M-authorized readback inside
+SecurityMonitor. Do not require a separate GTMint device, invent an opcode or
+substitute an always-readable L alias or host GT-construction callback. Keep
+monitor authority private. This resolves the construction path, not queue
+surrender, lifecycle authorization, general type policy or FPGA deployment.
+
+## Historical port proposals
+
+The following records preserve prior discussions, not additional prerequisites
+for the clarified SecurityMonitor construction path.
 
 The user agreed to proceed with a dedicated hardware port accepting DATA writes
 and capability LOADs, privately held by Mint, to simplify GT result materialization.
@@ -108,3 +129,18 @@ deferred; Genesis directed unchecked Passcodes for Phase 2.
 **How to apply:** Keep dedicated GTMint GT.M work distinct from that deferral.
 Do not require a general Pass Bit design before continuing the GTMint contract,
 and do not represent unchecked Passcodes as authentication.
+
+On 2026-11-11 the user clarified: “M is hardware only used in Boot,
+CR6 CALL/Return, and single instructions authorized by a resident GT.”
+
+**Why:** A proposed monitor-invocation lifetime incorrectly framed M as a
+software-held service permission; the user requested an instruction-level
+restatement instead. Blanket GT.M/pending-result clearing at every CALL/RETURN
+was proposed, not approved, and withdrawn.
+
+**How to apply:** The user then explicitly corrected that the ISA already
+defines everything concerning M. Do not reopen M authorization or lifetime as
+a queue-design decision. Consult the master ISA's approved A.1/A.2 rules and
+audit conformance; missing implementation is not missing architectural approval.
+Earlier GTMint proposals do not override the master ISA. Keep pending-result
+custody separate from instruction authorization; do not invent a software lease.

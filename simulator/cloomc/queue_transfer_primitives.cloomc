@@ -1,0 +1,65 @@
+; Isolated native COMPONENTS, not a FIFO/TRANSFER allocator or Cleaner Thread.
+; No publication, version changes, scheduling, or surrender claim.
+; Never bind into a live inventory as a completed queue service.
+abstraction ide.QueueTransferPrimitives {
+passkey required;
+capabilities { SELF E }
+
+; Private invocation only. CR2 is the authorized complete DATA RW block,
+; DR2 its provisioned word count. The caller must validate exact bounds/class.
+; CR1 passkey is unused in this disposable component, not authentication.
+; Clobbers DR1, DR4; uses CR2 W. Stops at RETURN in component evidence.
+method ClearBlock(block: Inform[RW], words: U32) -> Void {
+    .pet WorkingBlock CR2
+    .pet SizeWords DR2
+    .pet Offset DR4
+    .pet Status DR1
+    IADD Status, DR0, #0
+    MCMP SizeWords, #0
+    BRANCHEQ invalid_size
+    IADD Offset, DR0, #0
+clear_next_word:
+    DWRITE DR0, WorkingBlock, #0, Offset
+    IADD Offset, Offset, #1
+    MCMP Offset, SizeWords
+    BRANCHLO clear_next_word
+    LOAD WorkingBlock, NULL
+    IADD Status, DR0, #1
+    RETURNAL #0
+invalid_size:
+    HARDFAULT "Cleaner component: zero SizeWords"
+}
+
+; Private invocation-owned reservation record, already serialized by caller.
+; QueueState words: 0 phase (UNUSED=0, RESERVED=1, STAGED=2, PUBLISHED=3);
+; 1 irreversible-release latch; 2 reserved count.
+; Component only: no caller authorization, lock acquisition or recovery.
+; Cancel is allowed ONLY while RESERVED and irreversible-release latch is 0.
+; The caller sets that latch BEFORE any destructive/version mutation.
+; Clobbers DR1, DR4, DR5; CR2 RW. Interrupted cancellation is fail-stop.
+method CancelUnusedReservation(state: Inform[RW]) -> Void {
+    .pet QueueState CR2
+    .pet Phase DR4
+    .pet ReservedCount DR5
+    .pet Status DR1
+    IADD Status, DR0, #0
+    DREAD Phase, QueueState, #0, DR0
+    MCMP Phase, #1
+    BRANCHNE cannot_cancel
+    DREAD Phase, QueueState, #1, DR0
+    MCMP Phase, #0
+    BRANCHNE cannot_cancel
+    DREAD ReservedCount, QueueState, #2, DR0
+    MCMP ReservedCount, #0
+    BRANCHEQ cannot_cancel
+    ; Mark unusable before returning capacity; interruption can strand capacity.
+    DWRITE DR0, QueueState, #0, DR0
+    ISUB ReservedCount, ReservedCount, #1
+    DWRITE ReservedCount, QueueState, #2, DR0
+    LOAD QueueState, NULL
+    IADD Status, DR0, #1
+    RETURNAL #0
+cannot_cancel:
+    HARDFAULT "GTQueue component: cancellation after staging or irreversible release is forbidden"
+}
+}

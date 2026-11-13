@@ -122,7 +122,7 @@ const before = Array.from(f.s.memory.slice(f.thread.baseWord, f.thread.baseWord 
 const app = f.gt(23, 'EB');
 assert.deepEqual(f.run('FreeThread', app), {gt: f.objectGTs[7], status: 0, fault: null});
 const after = Array.from(f.s.memory.slice(f.thread.baseWord, f.thread.baseWord + 512));
-assert.equal(after[501], app, 'application supplied through API reaches saved CR1');
+assert.equal(after[501], (app & 0x7fffffff) >>> 0, 'SAVE clears B only in saved CR1');
 assert.deepEqual(after.map((w, i) => w !== before[i] ? i : -1).filter(i => i >= 0), [501],
     'only saved CR1 changes; Amoeba CR0, protected frames, stack and heap remain untouched');
 assert.deepEqual(f.run('FreeThread', app), {gt: 0, status: 1, fault: null});
@@ -138,9 +138,10 @@ const fresh = fixture();
 assert.deepEqual(fresh.run('Release', fresh.objectGTs[7]), {gt: 0, status: 3, fault: null});
 assert(fresh.run('FreeThread').fault, 'NULL application must fault, not issue a Thread');
 const denied = fixture();
-assert(denied.run('FreeThread', denied.gt(23, 'E')).fault, 'SAVE requires source transfer authority');
-assert.equal(denied.s.memory[STATE + 35], 0, 'failed binding does not mark Thread issued');
-assert.equal(denied.s.memory[denied.thread.baseWord + 501], 0);
+assert.equal(denied.run('FreeThread', denied.gt(23, 'E')).status, 0,
+    'destination S authorizes SAVE even when source B is clear');
+assert.equal(denied.s.memory[STATE + 35], 1);
+assert.equal(denied.s.memory[denied.thread.baseWord + 501], denied.gt(23, 'E'));
 const noWrite = fixture();
 noWrite.s.memory[INVENTORY + 63] = noWrite.gt(noWrite.thread.slot, '');
 assert(noWrite.run('FreeThread', noWrite.gt(23, 'EB')).fault,

@@ -11,6 +11,12 @@ Dijkstra message queues carrying Golden Tokens (GTs).
 [review disposition](cleaner-queue-review-note.md). Mechanisms marked pending
 below must be resolved and verified before implementation acceptance.
 
+The [readable native queue contract and evidence boundary](readable-cloomc-memory-queues.md)
+defines the reusable GTQueue interfaces and qualifies the later attached review.
+The [executed native profile](native-memory-queue-profile.md) now implements the
+isolated two-block FIFO/TRANSFER allocator, with explicit cooperative scheduling
+and private-capability preconditions. It does not authorize live installation.
+
 **Delivery scope:** This developing software belongs in the full development/test
 layout described by the [two-layout full-image reload contract](namespace-layouts-and-full-image-reload.md),
 not automatically in the minimal FPGA resident baseline.

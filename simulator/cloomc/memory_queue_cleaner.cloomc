@@ -1,0 +1,22 @@
+; Independently provisioned Cleaner Thread entry, not a Mint callback.
+; Empty Receive sets its ready flag to zero while serialized. CHANGE then
+; suspends this Thread; publication sets ready=1 under the same guard.
+abstraction ide.MemoryQueueCleaner {
+passkey required;
+capabilities {
+    SELF E, ide.MemoryQueueFreeHandler E, ide.CleanerConfig R,
+    ide.QueueScheduler.Thread
+}
+method Run() -> Void {
+    .pet FreeHandler CR0
+    .pet InvocationConfig CR3
+    .pet Scheduler CR2
+cleaner_loop:
+    LOAD InvocationConfig, CR6, #2
+    LOAD FreeHandler, CR6, #1
+    CALL FreeHandler, #7
+    LOAD Scheduler, CR6, #3
+    CHANGE Scheduler
+    BRANCH cleaner_loop
+}
+}

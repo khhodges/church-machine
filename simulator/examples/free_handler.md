@@ -22,8 +22,9 @@ The inventory is three 64-word, two 128-word and one 256-word data objects,
 one 64-entry C-list, and one 512-word Thread. The application capability goes
 into the new Thread's **saved CR1**, not CR0. Its offline-primed CR0 and
 protected continuation identify Amoeba. FreeThread never starts the Thread.
-The input application GT must pass ordinary SAVE transfer/B checks; the API
-does not grant missing authority.
+The input application GT is the SAVE value, not write authority. The private
+ThreadSetup S grant authorizes the write; SAVE clears B in the stored copy
+only. The API does not grant missing destination authority.
 
 DR1: 0 success; 1 empty; 2 foreign target; 3 target not issued.
 Private-state corruption hard-faults. The public methods retain their functional
@@ -137,6 +138,10 @@ All six methods have executable bodies. Five distribute the prepared
 inventory; Release validates by exact GT comparison and quarantines all eight
 objects in each registered block regardless of kind.
 It does not revoke outstanding copies or replenish the free methods.
+
+The separate [readable FIFO/TRANSFER contract](../../docs/phase-1/readable-cloomc-memory-queues.md)
+does not replace this quarantine-only example. Its isolated native components
+are not yet an allocator, background refill service, or Thread activation path.
 
 State retains the agreed ring representation. Because no refill exists, each
 free ring is consumed in its initial order exactly once; its tail stays zero.

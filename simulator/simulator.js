@@ -6979,6 +6979,21 @@ class ChurchSimulator {
     }
 
     _execLoad(d) {
+        // ISA A.1/A.2: non-Boot, non-CR6 M is single-use, including
+        // failed uses. Latch authorization before consuming it so the
+        // header and payload checks use one instruction's accepted authority.
+        // Direct NULL discard uses no source authority. SWITCH's isolated
+        // destination path has its own admission/consumption contract.
+        const source = this.cr[d.crSrc];
+        const sourceMAuthorized = !!source && source.m === 1;
+        if (d.imm !== 0x4000 && d.crDst < 12 && this.bootComplete &&
+                d.crSrc !== 6 && sourceMAuthorized) {
+            source.m = 0;
+        }
+        return this._execLoadAccepted(d, sourceMAuthorized);
+    }
+
+    _execLoadAccepted(d, sourceMAuthorized) {
         if (d.imm === 0x4000) {
             // Negative-zero operand is direct NULL, not an indexed read.
             if (d.crDst === 6 || d.crDst >= 12) {
@@ -7001,7 +7016,7 @@ class ChurchSimulator {
         const _loadOldGT = this.cr[d.crDst].word0 >>> 0;  // captured for LOAD_SHADOW before any _writeCR
         // LOAD's metadata and row accesses share L authority. Register M
         // permits the operation without rewriting the GT (notably E-only CR6).
-        const loadPerm = this.cr[d.crSrc].m === 1 ? null : 'L';
+        const loadPerm = sourceMAuthorized ? null : 'L';
         if (clistGT === 0) {
             this.fault('NULL_CAP', `LOAD: CR${d.crSrc} is NULL`);
             return null;
@@ -7034,6 +7049,18 @@ class ChurchSimulator {
             return null;
         }
         let slotGT = this.memory[clistLoc + d.imm] || 0;
+        if (sourceMAuthorized && d.crSrc !== 6 && d.crDst < 12 &&
+                ChurchSimulator.isNullGT(slotGT)) {
+            // ISA A.2: an authorized LOADM of stored NULL is a successful
+            // discard, not a request to invent or lazily resolve authority.
+            this._clearCR(d.crDst);
+            if (this.halted) return null;
+            this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, _loadOldGT);
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, 0);
+            return {pc: this.pc - 1, instr: d,
+                desc: `LOAD CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] -> NULL`};
+        }
         slotGT = this._resolveDeclaredSlot(slotGT, d.imm, clistLoc + d.imm, 'LOAD');
         if (slotGT === null) return null;
         if (ChurchSimulator.isNullGT(slotGT)) {
@@ -7271,6 +7298,15 @@ class ChurchSimulator {
         // falls through without consulting W1/W3 as a state discriminator.
         // ─────────────────────────────────────────────────────────────────────
 
+        if (sourceMAuthorized && d.crSrc !== 6 && this.bootComplete) {
+            // M waives source L only. It must not materialize an Inform
+            // capability whose generation/integrity is already invalid.
+            const targetCheck = this.mLoad(slotGT, null);
+            if (!targetCheck.ok) {
+                this.fault(targetCheck.fault, `LOAD: result: ${targetCheck.message}`);
+                return null;
+            }
+        }
         if (!this.validateMAC(entry)) {
             this.fault('SEAL', `LOAD: entry ${targetIdx} seal failed`);
             return null;
@@ -7286,71 +7322,49 @@ class ChurchSimulator {
     }
 
     _execSave(d) {
+        // CR6's automatically established execution-context M grants LOAD,
+        // not S authority. Ordinary destination M is a one-instruction grant.
+        const destinationMAuthorized = d.crSrc !== 6 &&
+            this.cr[d.crSrc] && this.cr[d.crSrc].m === 1;
+        const sourceMAuthorized = d.crDst >= 12 &&
+            this.cr[d.crDst] && this.cr[d.crDst].m === 1;
+        if (this.bootComplete) {
+            if (destinationMAuthorized) this.cr[d.crSrc].m = 0;
+            if (sourceMAuthorized) this.cr[d.crDst].m = 0;
+        }
+        return this._execSaveAccepted(d, destinationMAuthorized, sourceMAuthorized);
+    }
+
+    _execSaveAccepted(d, destinationMAuthorized, sourceMAuthorized) {
         d = this._resolveCompactIndex(d);
         if (!d) return null;
         // ISA rule: row 0 of every c-list is the resident identity credential.
-        // This must fault before any operand, M-bit, permission, Namespace, or
-        // memory path can mask the violation.
+        // This fault takes precedence over operand/permission checks; an
+        // already accepted single-use M grant remains consumed.
         if (d.imm === 0) {
             this.fault('IMMUTABLE_SELF_CAP',
                 `SAVE: CR${d.crSrc} c-list row 0 is the immutable SELF capability`);
             return null;
         }
         // M is the explicit authority for reading an isolated register.  Keep
-        // ordinary SAVE behavior unchanged; CR12–CR15 require M at acceptance
-        // and consume it only once the c-list write has completed.
+        // CR12–CR15 require M at acceptance. Token bits do not substitute
+        // for this register-operand authority.
         const isolatedSource = d.crDst >= 12 && d.crDst <= 15;
-        const sourceMAuthorized = isolatedSource && this.cr[d.crDst].m === 1;
         if (isolatedSource && !this.mElevation && !sourceMAuthorized) {
             this.fault('PERM_L',
                 `SAVE: source CR${d.crDst} had M=0 when the instruction was accepted`);
             return null;
         }
         const srcGT = this.cr[d.crDst].word0;
-        if (srcGT === 0) {
-            this.fault('NULL_CAP', `SAVE: CR${d.crDst} is NULL`);
-            return null;
-        }
-        // Defence-in-depth: reject malformed GT words that were placed directly
-        // into a CR (e.g. by a boot bug or a future vulnerability), bypassing
-        // createGT().  parseGT() sets the 'malformed' flag for any GT whose
-        // permission bits violate isDomainPure or isSinglePerm — catch it here
-        // before the GT propagates into any C-List slot in memory.
+        // Source is a value. Validation of stored authority occurs when used,
+        // not as a source admission policy for destination-authorized SAVE.
         const srcGTParsed = this.parseGT(srcGT);
-        if (srcGTParsed.malformed) {
-            this.auditLog.push({
-                gate: 'malformedGT',
-                desc: `malformedGT: ${srcGTParsed.malformedReason}`,
-                reason: srcGTParsed.malformedReason,
-                label: `CR${d.crDst}`,
-                nsIndex: null,
-                requiredPerm: null,
-                checks: { malformed: { pass: false } },
-                b: 0, f: 0,
-                result: 'fault',
-            });
-            this.fault('DOMAIN_PURITY',
-                `SAVE: CR${d.crDst} contains malformed GT — ${srcGTParsed.malformedReason}`,
-                { malformedReason: srcGTParsed.malformedReason });
-            return null;
-        }
-        // Resolve the destination C-list NS index before calling mSave so that
-        // the Far-bit (F=1) policy is enforced symmetrically with CALL/LOAD.
-        // A SAVE that would write a capability into a Far-namespace C-list slot
-        // must fault with F_BIT — previously targetIdx=null made that check
-        // unreachable for every SAVE instruction (bug).
         const clistGT = this.cr[d.crSrc].word0;
-        const clistTargetIdx = (clistGT !== 0) ? this.parseGT(clistGT).index : null;
-        // The accepted source M bit is the passkey for exporting an isolated
-        // register's GT. It bypasses mSave's ordinary B/F transfer gates, while
-        // the destination c-list must still independently authorize S.
-        const saveCheck = this.mSave(
-            srcGT, clistTargetIdx, d.crDst, undefined, undefined,
-            sourceMAuthorized);
-        if (!saveCheck.ok) {
-            this.fault(saveCheck.fault, `SAVE: CR${d.crDst}: ${saveCheck.message}`);
-            return null;
-        }
+        // ISA A.3: the source GT is the value, not write authority. Do not
+        // use legacy mSave's source-B/generation/F admission here. Destination
+        // validation below remains mandatory, whether S or accepted M is used.
+        const saveCheck = {parsed: srcGTParsed};
+        const savePerm = destinationMAuthorized ? null : 'S';
         const savedCap = this.lastCapability;
         if (clistGT === 0) {
             this.fault('NULL_CAP', `SAVE: CR${d.crSrc} C-List is NULL`);
@@ -7366,7 +7380,7 @@ class ChurchSimulator {
             // Resolving c-list geometry is part of SAVE's S authority, not a
             // Turing data read. Keep the same S gate as the eventual row write:
             // requiring R here rejects domain-pure S-only views.
-            const hdrRead = this._capRead(d.crSrc, lumpBase, 'S', `SAVE CR${d.crSrc} lump-hdr`);
+            const hdrRead = this._capRead(d.crSrc, lumpBase, savePerm, `SAVE CR${d.crSrc} lump-hdr`);
             if (!hdrRead.ok) { this.fault(hdrRead.fault, hdrRead.message); return null; }
             const hdr = this.parseLumpHeader(hdrRead.value);
             clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
@@ -7378,7 +7392,7 @@ class ChurchSimulator {
         }
         const saveAbsAddr = clistLoc + d.imm;
         const saveClistRange = { base: clistLoc, upperBound: (clistLoc + clistSize - 1) >>> 0 };
-        const clistCheck = this.mLoad(clistGT, 'S', d.crSrc, saveAbsAddr, saveClistRange);
+        const clistCheck = this.mLoad(clistGT, savePerm, d.crSrc, saveAbsAddr, saveClistRange);
         if (!clistCheck.ok) {
             this.fault(clistCheck.fault, `SAVE: CR${d.crSrc}: ${clistCheck.message}`);
             return null;
@@ -7412,7 +7426,7 @@ class ChurchSimulator {
             }
         }
 
-        this._writeRuntimeWord(clistLoc + d.imm, srcGT);
+        this._writeRuntimeWord(clistLoc + d.imm, (srcGT & 0x7FFFFFFF) >>> 0);
         if (isolatedSource && !this.mElevation) {
             this.cr[d.crDst].m = 0;
         }
@@ -7421,7 +7435,7 @@ class ChurchSimulator {
         if (!this.nsClistMap[clistIdx]) {
             this.nsClistMap[clistIdx] = [];
         }
-        if (!this.nsClistMap[clistIdx].includes(srcParsed.index)) {
+        if (!ChurchSimulator.isNullGT(srcGT) && !this.nsClistMap[clistIdx].includes(srcParsed.index)) {
             this.nsClistMap[clistIdx].push(srcParsed.index);
         }
         const label = this.nsLabels[srcParsed.index] || 'entry_'+srcParsed.index;

@@ -59,8 +59,9 @@ function reject(s, fault, sourceReg = 1) {
     assert.equal(s.halted, true);
     assert.ok(captured, 'real pre-recovery fault evidence');
     assert.deepEqual(s.memory.slice(BASE, CELL + 2), before, 'no c-list/header/neighbor write');
-    assert.deepEqual(captured.crSnapshot[sourceReg], source, 'source GT and M preserved');
-    assert.deepEqual(captured.crSnapshot[8], view, 'c-list view unchanged');
+    assert.deepEqual(captured.crSnapshot[sourceReg],
+        sourceReg >= 12 ? {...source, m: 0} : source, 'source GT retained; used isolated M consumed');
+    assert.deepEqual(captured.crSnapshot[8], {...view, m: 0}, 'destination GT retained; used M consumed');
     assert.equal(s.pc, pc, 'faulting SAVE did not retire');
 }
 
@@ -76,7 +77,7 @@ test('assembled non-CR6 S-only SAVE retires and L-only LOAD reads back the exact
     assert.ok(saved, JSON.stringify(s.faultLog.at(-1)));
     assert.equal(saved.instr.opcode, 1);
     assert.equal(s.pc, 1);
-    assert.equal(s.memory[CELL], source.word0);
+    assert.equal(s.memory[CELL], (source.word0 & 0x7fffffff) >>> 0);
     assert.deepEqual(s.memory.slice(BASE, CELL), before, 'SELF and all other words preserved');
     assert.deepEqual(s.cr[1], source);
     assert.deepEqual(s.cr[8], view);
@@ -85,7 +86,7 @@ test('assembled non-CR6 S-only SAVE retires and L-only LOAD reads back the exact
     assert.equal(reads[0].checks.range.address, BASE);
     assert.equal(reads[1].checks.range.address, CELL);
     assert.ok(s.step());
-    assert.equal(s.cr[2].word0, source.word0);
+    assert.equal(s.cr[2].word0, (source.word0 & 0x7fffffff) >>> 0);
     assert.equal(s.pc, 2);
     assert.equal(s.faultLog.length, 0);
 });
@@ -101,9 +102,9 @@ test('LS GT round-trips and authorizes both SAVE and LOAD through the same regis
     assert.equal(parsed.permissions.E, 0);
     const before = s.memory.slice(BASE, CELL);
     assert.ok(s.step());
-    assert.equal(s.memory[CELL], source);
+    assert.equal(s.memory[CELL], (source & 0x7fffffff) >>> 0);
     assert.ok(s.step());
-    assert.equal(s.cr[2].word0, source);
+    assert.equal(s.cr[2].word0, (source & 0x7fffffff) >>> 0);
     assert.equal(s.cr[8].word0, token);
     assert.deepEqual(s.memory.slice(BASE, CELL), before);
     assert.equal(s.faultLog.length, 0);
@@ -130,17 +131,20 @@ for (const rights of ['R', 'E', 'L']) {
         assert.match(s.faultLog.at(-1).message, /lacks S permission/);
     });
 }
-test('ordinary B=0 export remains denied, even with source register M', () => {
+test('ordinary B=0 value is saved without source M authorization', () => {
     for (const m of [0, 1]) {
         const s = fixture();
         install(s, 1, SLOT.object, 'E');
         s.cr[1].m = m;
-        reject(s, 'BIND');
+        const source = {...s.cr[1]};
+        assert.ok(s.step());
+        assert.equal(s.memory[CELL], source.word0);
+        assert.deepEqual(s.cr[1], source);
     }
 });
 for (const reg of [1, 8]) {
     for (const failure of ['E-with-L', 'E-with-S', 'generation', 'seal', 'bounds', 'null']) {
-        test(`${reg === 1 ? 'exported GT' : 'c-list view'} rejects ${failure}`, () => {
+        test(`${reg === 1 ? 'source value is not admission-gated by' : 'c-list view rejects'} ${failure}`, () => {
             const s = fixture(), slot = reg === 1 ? SLOT.object : SLOT.list;
             // dom selects the meaning of the payload; mixed domains have no raw
             // encoding. E combined with L or S is a malformed Church payload.
@@ -153,8 +157,15 @@ for (const reg of [1, 8]) {
             if (failure === 'seal') s.memory[s._nsSlotBase(slot) + 2] ^= 1;
             if (failure === 'bounds') s.cr[reg].word0 = gt(s, s.nsCount, reg === 1 ? 'EB' : 'S');
             if (failure === 'null') s.cr[reg].word0 = 0;
-            reject(s, { 'E-with-L': 'DOMAIN_PURITY', 'E-with-S': 'DOMAIN_PURITY',
-                generation: 'VERSION', seal: 'SEAL', bounds: 'BOUNDS', null: 'NULL_CAP' }[failure]);
+            if (reg === 1) {
+                const source = {...s.cr[1]};
+                assert.ok(s.step(), 'source token is data, not write authority');
+                assert.equal(s.memory[CELL], (source.word0 & 0x7fffffff) >>> 0);
+                assert.deepEqual(s.cr[1], source);
+            } else {
+                reject(s, { 'E-with-L': 'DOMAIN_PURITY', 'E-with-S': 'DOMAIN_PURITY',
+                    generation: 'VERSION', seal: 'SEAL', bounds: 'BOUNDS', null: 'NULL_CAP' }[failure]);
+            }
         });
     }
 }
@@ -178,13 +189,42 @@ test('computed SELF row zero wins even over missing source M', () => {
     s.dr[3] = 1;
     reject(s, 'IMMUTABLE_SELF_CAP', 13);
 });
-test('c-list register M does not replace destination S permission', () => {
+test('destination M replaces only S and is consumed', () => {
     const s = fixture();
     install(s, 8, SLOT.list, 'E');
     s.cr[8].m = 1;
+    const source = s.cr[1].word0, target = s.cr[8].word0;
+    assert.ok(s.step());
+    assert.equal(s.cr[8].m, 0);
+    assert.equal(s.cr[8].word0, target);
+    assert.equal(s.cr[1].word0, source);
+    assert.equal(s.memory[CELL], (source & 0x7fffffff) >>> 0);
+    s.pc = 0;
     reject(s, 'PERMISSION');
 });
-test('isolated source requires M, consumes it on success only, and still needs destination S', () => {
+test('destination M is consumed on failed uses without publishing a write', () => {
+    for (const failure of ['bounds', 'generation', 'null', 'SELF']) {
+        const s = fixture(failure === 'SELF' ? 'SAVE CR1, CR8, DR3' :
+            failure === 'bounds' ? 'SAVE CR1, CR8, #2' : 'SAVE CR1, CR8, #1');
+        install(s, 8, SLOT.list, 'E');
+        s.cr[8].m = 1;
+        if (failure === 'generation') s.cr[8].word0 = gt(s, SLOT.list, 'E', 1);
+        if (failure === 'null') s.cr[8].word0 = 0;
+        reject(s, {bounds:'BOUNDS', generation:'VERSION', null:'NULL_CAP',
+            SELF:'IMMUTABLE_SELF_CAP'}[failure]);
+    }
+});
+test('skipped SAVE retains M and stored/source B', () => {
+    const s = fixture('SAVEEQ CR1, CR8, #1');
+    s.flags.Z = false;
+    s.cr[8].m = 1;
+    const before = s.memory[CELL], source = s.cr[1].word0;
+    assert.ok(s.step());
+    assert.equal(s.cr[8].m, 1);
+    assert.equal(s.memory[CELL], before);
+    assert.equal(s.cr[1].word0, source);
+});
+test('isolated source M is consumed on success or failure; destination independently authorizes', () => {
     for (const [m, rights, fault] of [[0, 'S', 'PERM_L'], [1, 'E', 'PERMISSION'], [1, 'S', null]]) {
         const s = fixture('SAVE CR13, CR8, #1');
         install(s, 13, SLOT.object, 'E'); // B=0, existing isolated-M export rule

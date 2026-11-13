@@ -1,0 +1,68 @@
+; Disposable native scheduling profile for the queue acceptance fixture.
+; Three workers: two producers and the independent Cleaner. IRQ preemption
+; is not part of this cooperative profile. Every handoff is native CHANGE.
+; State words: P0 ready/done at 0/1, P1 ready/done at 2/3,
+; Cleaner ready/done at 4/5, next scan cursor at 6.
+; Publication sets Cleaner ready under the queue's serialization;
+; empty receive clears it under the same serialization, before yielding.
+; No host Wait/Signal/Scheduler callback is used.
+abstraction ide.MemoryQueueScheduler {
+passkey required;
+capabilities {
+    SELF E, ide.QueueScheduleState RW,
+    ide.QueueProducer0.Thread, ide.QueueProducer1.Thread, ide.QueueCleaner.Thread
+}
+method Run() -> Void {
+    .pet ScheduleState CR7
+    .pet NextThread CR1
+    .pet Cursor DR2
+    .pet Scanned DR3
+    .pet Ready DR4
+    .pet Offset DR6
+    .pet NextCursor DR7
+schedule_next:
+    LOAD ScheduleState, CR6, #1
+    DREAD Cursor, ScheduleState, #6, DR0
+    MCMP Cursor, #3
+    BRANCHHS bad_state
+    IADD Scanned, DR0, #0
+scan_worker:
+    SHL Offset, Cursor, #1
+    DREAD Ready, ScheduleState, #0, Offset
+    MCMP Ready, #1
+    BRANCHEQ dispatch_worker
+    MCMP Ready, #0
+    BRANCHNE bad_state
+    IADD Cursor, Cursor, #1
+    MCMP Cursor, #3
+    BRANCHLO scan_count
+    IADD Cursor, DR0, #0
+scan_count:
+    IADD Scanned, Scanned, #1
+    MCMP Scanned, #3
+    BRANCHLO scan_worker
+    ; Only the finite acceptance driver may declare both producers done.
+    DREAD Ready, ScheduleState, #1, DR0
+    MCMP Ready, #1
+    BRANCHNE no_runnable_worker
+    DREAD Ready, ScheduleState, #3, DR0
+    MCMP Ready, #1
+    BRANCHNE no_runnable_worker
+    HALT
+dispatch_worker:
+    IADD NextCursor, Cursor, #1
+    MCMP NextCursor, #3
+    BRANCHLO save_cursor
+    IADD NextCursor, DR0, #0
+save_cursor:
+    DWRITE NextCursor, ScheduleState, #6, DR0
+    IADD Offset, Cursor, #2
+    LOAD NextThread, CR6, Offset
+    CHANGE NextThread
+    BRANCH schedule_next
+bad_state:
+    HARDFAULT "Queue scheduler: invalid private scheduling state"
+no_runnable_worker:
+    HARDFAULT "Queue scheduler: unfinished fixture has no runnable worker"
+}
+}

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Church Machine IDE — Capability-Based Secure Computing</title>
+    <script src="/simulator/browser-storage-guard.js?v=sha256-ed0b49edcae8"></script>
     <script src="/simulator/browser_diagnostics.js?v=sha256-269c2a52ac49"></script>
     <script src="/simulator/bridge-connection.js?v=sha256-eddf9a8bd2ab"></script>
     <script src="/simulator/change-confirmation.js?v=sha256-fcea2f7fdf7a"></script>
@@ -411,6 +412,10 @@
     </style>
 </head>
 <body>
+    <section id="ide-startup-status" role="status" style="position:fixed;top:35%;left:10%;right:10%;z-index:10000;padding:24px;background:#202034;color:#eee;border:1px solid #666;border-radius:8px;font:16px/1.6 system-ui">
+        Loading IDE configuration and editor…
+        <p style="margin-bottom:0;font-size:14px">If the embedded preview cannot finish loading, <a href="/simulator/" target="_blank" rel="noopener noreferrer" style="color:#ffcc66">open the IDE in a new tab</a>. No draft reset is required.</p>
+    </section>
     <div id="appLoading" class="app-loading">
         <div class="app-loading-inner">
             <div class="app-loading-logo">λ</div>
@@ -3706,7 +3711,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="idx1-execution-envelope.js?v=sha256-7ad15452a167"></script>
     <script src="idx1-memory.js?v=sha256-fc8ce715b2ad"></script>
     <script src="idx1-runtime.js?v=sha256-3e0e984dc488"></script>
-    <script src="simulator.js?v=sha256-185af753be2d"></script>
+    <script src="simulator.js?v=sha256-d3382c48ec58"></script>
     <script src="namespace-runtime-view.js?v=sha256-5b2eb46866dc"></script>
     <script src="boot-fault-entry.js?v=sha256-eeac76c38dae"></script>
     <script src="namespace-runtime-core.js?v=sha256-8dd5da2aa3a5"></script>
@@ -3794,7 +3799,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-source-library.js?v=sha256-3277a7eecc9e"></script>
     <script src="app-editor-view-switcher.js?v=sha256-0890f98dcbf5"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>
-    <script src="app-misc.js?v=sha256-9abd30e6ef6e"></script>
+    <script src="app-misc.js?v=sha256-c11231438ca3"></script>
     <script src="app-popup-lifecycle.js?v=sha256-a941609f5804"></script>
     <script src="asm-instruction-picker.js?v=sha256-8142019ea042"></script>
     <script src="asm-method-popup.js?v=sha256-48ab5c1c34d7"></script>

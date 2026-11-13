@@ -1,0 +1,721 @@
+; Private native two-block FIFO/TRANSFER DATA profile.
+; This body is not installed in the catalog. Only the isolated Mint endpoints
+; and Cleaner hold its E grant. In particular, its internal helper methods are
+; NOT public APIs. Actor authority is a known immutable Config R capability,
+; not an integer supplied by a caller. Each Mint endpoint keeps its Config
+; private and cannot start a second invocation while its first is reserved.
+;
+; Cooperative profile: native CHANGE is the only scheduling boundary.
+; No CHANGE occurs while Busy is held. A fault leaves the pool fail-closed.
+; Busy=actor+1; clearing Busy after all writes is the publication boundary.
+; Capacity=2, DATA size=8 words, slots=22/23, FIFO and TRANSFER are fixed.
+; Config R words: actor, yield-after-reserve, DATA base, size, first slot, capacity.
+;
+; QueueState offsets:
+; 0 Busy; 1..3 actor invocation active;
+; 4 clean ready,5 reserved,6 staged,7 head,8 tail;
+; 9 released ready,10 reserved,11 staged,12 head,13 tail;
+; 16..17 clean publication ring;18..19 released publication ring;
+; 20..21 clean entry phase;22..23 released entry phase;
+; 24..25 release owner;26..27 release block;28..29 irreversible latch;
+; 30..31 producer reservation index;32..33 block version;
+; 34..35 block lifecycle;36..37 producer old version.
+; 48..50 serialized scalar helper results (slot/version/block index).
+; CALL preserves DR4..DR15: helpers return Actor in DR1, and the validated
+; scalar tuple through this private, guard-owned scratch. Never GT authority.
+; Entry phases FREE=0 RESERVED=1 STAGED=2 PUBLISHED=3.
+; Lifecycle READY=0 LIVE=1 RESERVED=2 DIRTY=3 CLEANING=4 RETIRED=5.
+; QueueEntries: 64 words, cc=8; rows clean=1/2, released=3/4,
+; private validation cells=5/6/7. Row zero remains SELF.
+; All methods preserve DR5. Scalars other than DR5 are scratch unless noted.
+abstraction ide.MemoryQueueFreeHandler {
+passkey required;
+capabilities {
+    SELF E, ide.QueueState RW, ide.QueueEntries LS, ide.QueueWords R,
+    ide.Namespace R, ide.QueueScheduleState RW,
+    ide.Producer0Config R, ide.Producer1Config R, ide.CleanerConfig R,
+    ide.QueueScheduler.Thread
+}
+
+; Config CR3, SizeWords DR2 -> WorkingBlock CR1, Status DR1.
+method Acquire() -> Inform[RW] {
+    .pet QueueState CR7
+    .pet QueueEntries CR8
+    .pet CleanQueue CR8
+    .pet WorkingBlock CR1
+    .pet SizeWords DR2
+    .pet Actor DR4
+    .pet Head DR6
+    .pet ReadyCount DR10
+    .pet Status DR1
+    IADD Status, DR0, #0
+    MCMP SizeWords, #8
+    BRANCHNE acquire_bad
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHHS acquire_bad
+    CALL CR0, #9
+    DREAD DR6, QueueState, #1, Actor
+    MCMP DR6, #0
+    BRANCHNE acquire_bad
+    DREAD ReadyCount, QueueState, #4, DR0
+    MCMP ReadyCount, #0
+    BRANCHEQ acquire_empty
+    MCMP ReadyCount, #2
+    BRANCHHI acquire_bad
+    DREAD Head, QueueState, #7, DR0
+    DREAD DR2, QueueState, #16, Head
+    MCMP DR2, #2
+    BRANCHHS acquire_bad
+    DREAD DR6, QueueState, #20, DR2
+    MCMP DR6, #3
+    BRANCHNE acquire_bad
+    LOAD QueueEntries, CR6, #2
+    IADD DR14, DR2, #1
+    LOAD CR2, CleanQueue, DR14
+    CALL CR0, #11
+    DREAD DR7, QueueState, #48, DR0
+    DREAD DR8, QueueState, #49, DR0
+    DREAD DR9, QueueState, #50, DR0
+    ; ValidateInput leaves block index DR9, version DR8; DR2 is preserved.
+    DREAD DR6, QueueState, #32, DR9
+    MCMP DR6, DR8
+    BRANCHNE acquire_bad
+    MCMP DR8, #511
+    BRANCHHS acquire_bad
+    DREAD DR6, QueueState, #34, DR9
+    MCMP DR6, #0
+    BRANCHNE acquire_bad
+    IADD DR14, Actor, #5
+    LOAD WorkingBlock, QueueEntries, DR14
+    LOAD CR11, NULL
+    SAVE CR11, QueueEntries, DR14
+    IADD DR14, DR2, #1
+    SAVE CR11, QueueEntries, DR14
+    DWRITE DR0, QueueState, #20, DR2
+    DREAD Head, QueueState, #7, DR0
+    IADD Head, Head, #1
+    BFEXT Head, Head, #0, #1
+    DWRITE Head, QueueState, #7, DR0
+    DREAD ReadyCount, QueueState, #4, DR0
+    ISUB ReadyCount, ReadyCount, #1
+    DWRITE ReadyCount, QueueState, #4, DR0
+    IADD DR6, DR0, #1
+    DWRITE DR6, QueueState, #34, DR9
+    DWRITE DR0, QueueState, #0, DR0
+    IADD Status, DR0, #1
+    RETURNAL #2
+acquire_empty:
+    HARDFAULT "Mint.CREATE: clean DATA inventory exhausted"
+acquire_bad:
+    HARDFAULT "FreeHandler.Acquire: invalid class, invocation or queue state"
+}
+
+; Config CR3, old WorkingBlock CR2. No caller-selected reservation handle.
+method ReserveRelease() -> Void {
+    .pet QueueState CR7
+    .pet Actor DR4
+    .pet ReservedCount DR10
+    .pet Status DR1
+    IADD Status, DR0, #0
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHHS reserve_bad
+    CALL CR0, #9
+    DREAD DR6, QueueState, #1, Actor
+    MCMP DR6, #0
+    BRANCHNE reserve_bad
+    CALL CR0, #11
+    DREAD DR7, QueueState, #48, DR0
+    DREAD DR8, QueueState, #49, DR0
+    DREAD DR9, QueueState, #50, DR0
+    DREAD DR6, QueueState, #32, DR9
+    MCMP DR6, DR8
+    BRANCHNE reserve_bad
+    DREAD DR6, QueueState, #34, DR9
+    MCMP DR6, #1
+    BRANCHNE reserve_bad
+    DREAD DR10, QueueState, #9, DR0
+    MCMP DR10, #2
+    BRANCHHI reserve_bad
+    DREAD DR11, QueueState, #10, DR0
+    MCMP DR11, #2
+    BRANCHHI reserve_bad
+    IADD DR10, DR10, DR11
+    DREAD DR11, QueueState, #11, DR0
+    MCMP DR11, #2
+    BRANCHHI reserve_bad
+    IADD DR10, DR10, DR11
+    MCMP DR10, #2
+    BRANCHHS impossible_full
+    IADD DR2, DR0, #0
+reserve_scan:
+    DREAD DR6, QueueState, #22, DR2
+    MCMP DR6, #0
+    BRANCHEQ reserve_found
+    IADD DR2, DR2, #1
+    MCMP DR2, #2
+    BRANCHLO reserve_scan
+    BRANCH reserve_bad
+reserve_found:
+    DWRITE Actor, QueueState, #24, DR2
+    DWRITE DR9, QueueState, #26, DR2
+    DWRITE DR0, QueueState, #28, DR2
+    DWRITE DR2, QueueState, #30, Actor
+    DWRITE DR8, QueueState, #36, Actor
+    IADD DR6, DR0, #1
+    DWRITE DR6, QueueState, #22, DR2
+    DWRITE DR6, QueueState, #1, Actor
+    IADD DR6, DR0, #2
+    DWRITE DR6, QueueState, #34, DR9
+    DREAD ReservedCount, QueueState, #10, DR0
+    IADD ReservedCount, ReservedCount, #1
+    DWRITE ReservedCount, QueueState, #10, DR0
+    DWRITE DR0, QueueState, #0, DR0
+    IADD Status, DR0, #1
+    RETURNAL #4
+impossible_full:
+    HARDFAULT "Released queue full: fully provisioned DATA single-owner invariant failed"
+reserve_bad:
+    HARDFAULT "FreeHandler.ReserveRelease: stale, duplicate or invalid DATA release"
+}
+
+; Revalidate old generation while serialized; return Slot DR2/OldVersion DR3.
+; Return deliberately retains Busy for Mint's same-scope Namespace update.
+method BeginInvalidate() -> Void {
+    .pet QueueState CR7
+    .pet Actor DR4
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHHS invalidate_bad
+    CALL CR0, #9
+    DREAD DR6, QueueState, #1, Actor
+    MCMP DR6, #1
+    BRANCHNE invalidate_bad
+    DREAD DR2, QueueState, #30, Actor
+    MCMP DR2, #2
+    BRANCHHS invalidate_bad
+    DREAD DR6, QueueState, #22, DR2
+    MCMP DR6, #1
+    BRANCHNE invalidate_bad
+    DREAD DR6, QueueState, #24, DR2
+    MCMP DR6, Actor
+    BRANCHNE invalidate_bad
+    DREAD DR6, QueueState, #28, DR2
+    MCMP DR6, #0
+    BRANCHNE invalidate_bad
+    LOAD CR8, CR6, #2
+    IADD DR14, Actor, #5
+    LOAD CR2, CR8, DR14
+    CALL CR0, #11
+    DREAD DR7, QueueState, #48, DR0
+    DREAD DR8, QueueState, #49, DR0
+    DREAD DR9, QueueState, #50, DR0
+    DREAD DR6, QueueState, #36, Actor
+    MCMP DR6, DR8
+    BRANCHNE invalidate_bad
+    DREAD DR6, QueueState, #32, DR9
+    MCMP DR6, DR8
+    BRANCHNE invalidate_bad
+    DREAD DR6, QueueState, #26, DR2
+    MCMP DR6, DR9
+    BRANCHNE invalidate_bad
+    DREAD DR6, QueueState, #34, DR9
+    MCMP DR6, #2
+    BRANCHNE invalidate_bad
+    IADD DR6, DR0, #1
+    DWRITE DR6, QueueState, #28, DR2
+    IADD DR2, DR7, #0
+    IADD DR3, DR8, #0
+    IADD DR1, DR0, #1
+    RETURNAL #0
+invalidate_bad:
+    HARDFAULT "FreeHandler.BeginInvalidate: release ownership or old generation changed"
+}
+
+; New GT CR1 from SecurityMonitor. Store, remove every constructed working
+; copy and validation cell, then mark STAGED. Busy remains owned until commit.
+method StageReleased() -> Void {
+    .pet QueueState CR7
+    .pet QueueEntries CR8
+    .pet ReleasedQueue CR8
+    .pet Actor DR4
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHHS stage_bad
+    CALL CR0, #10
+    DREAD DR6, QueueState, #1, Actor
+    MCMP DR6, #1
+    BRANCHNE stage_bad
+    DREAD DR2, QueueState, #30, Actor
+    MCMP DR2, #2
+    BRANCHHS stage_bad
+    DREAD DR6, QueueState, #22, DR2
+    MCMP DR6, #1
+    BRANCHNE stage_bad
+    DREAD DR6, QueueState, #28, DR2
+    MCMP DR6, #1
+    BRANCHNE stage_bad
+    DREAD DR6, QueueState, #24, DR2
+    MCMP DR6, Actor
+    BRANCHNE stage_bad
+    LOAD QueueEntries, CR6, #2
+    IADD DR14, Actor, #5
+    SAVE CR1, QueueEntries, DR14
+    LOAD CR2, QueueEntries, DR14
+    CALL CR0, #11
+    DREAD DR7, QueueState, #48, DR0
+    DREAD DR8, QueueState, #49, DR0
+    DREAD DR9, QueueState, #50, DR0
+    DREAD DR6, QueueState, #26, DR2
+    MCMP DR6, DR9
+    BRANCHNE stage_bad
+    DREAD DR6, QueueState, #36, Actor
+    IADD DR6, DR6, #1
+    MCMP DR6, DR8
+    BRANCHNE stage_bad
+    MCMP DR8, #511
+    BRANCHHS stage_bad
+    IADD DR14, DR2, #3
+    SAVE CR1, ReleasedQueue, DR14
+    LOAD CR1, NULL
+    LOAD CR2, NULL
+    IADD DR14, Actor, #5
+    SAVE CR1, QueueEntries, DR14
+    DWRITE DR8, QueueState, #32, DR9
+    DREAD DR6, QueueState, #10, DR0
+    MCMP DR6, #0
+    BRANCHEQ stage_bad
+    ISUB DR6, DR6, #1
+    DWRITE DR6, QueueState, #10, DR0
+    DREAD DR6, QueueState, #11, DR0
+    IADD DR6, DR6, #1
+    DWRITE DR6, QueueState, #11, DR0
+    IADD DR6, DR0, #2
+    DWRITE DR6, QueueState, #22, DR2
+    IADD DR1, DR0, #1
+    RETURNAL #0
+stage_bad:
+    HARDFAULT "FreeHandler.StageReleased: incomplete or mismatched versioned transfer"
+}
+
+; Never reload the staged payload here. FIFO append order is commit order,
+; independent of the reservation index. Wakeup precedes the unlock boundary.
+method CommitRelease() -> Void {
+    .pet QueueState CR7
+    .pet Actor DR4
+    .pet Tail DR6
+    .pet ReadyCount DR10
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHHS commit_bad
+    CALL CR0, #10
+    DREAD DR6, QueueState, #1, Actor
+    MCMP DR6, #1
+    BRANCHNE commit_bad
+    DREAD DR2, QueueState, #30, Actor
+    MCMP DR2, #2
+    BRANCHHS commit_bad
+    DREAD DR6, QueueState, #24, DR2
+    MCMP DR6, Actor
+    BRANCHNE commit_bad
+    DREAD DR6, QueueState, #22, DR2
+    MCMP DR6, #2
+    BRANCHNE commit_bad
+    DREAD DR6, QueueState, #28, DR2
+    MCMP DR6, #1
+    BRANCHNE commit_bad
+    DREAD DR9, QueueState, #26, DR2
+    DREAD Tail, QueueState, #13, DR0
+    DWRITE DR2, QueueState, #18, Tail
+    IADD Tail, Tail, #1
+    BFEXT Tail, Tail, #0, #1
+    DWRITE Tail, QueueState, #13, DR0
+    DREAD ReadyCount, QueueState, #9, DR0
+    IADD ReadyCount, ReadyCount, #1
+    DWRITE ReadyCount, QueueState, #9, DR0
+    DREAD DR6, QueueState, #11, DR0
+    MCMP DR6, #0
+    BRANCHEQ commit_bad
+    ISUB DR6, DR6, #1
+    DWRITE DR6, QueueState, #11, DR0
+    IADD DR6, DR0, #3
+    DWRITE DR6, QueueState, #22, DR2
+    DWRITE DR6, QueueState, #34, DR9
+    DWRITE DR0, QueueState, #1, Actor
+    LOAD CR8, CR6, #5
+    IADD DR6, DR0, #1
+    DWRITE DR6, CR8, #4, DR0
+    DWRITE DR0, QueueState, #0, DR0
+    IADD DR1, DR0, #1
+    RETURNAL #0
+commit_bad:
+    HARDFAULT "GTQueue.CommitSend: transfer is not complete or not owned"
+}
+
+method CancelReservation() -> Void {
+    .pet QueueState CR7
+    .pet Actor DR4
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHHS cancel_bad
+    LOAD QueueState, CR6, #1
+    DREAD DR6, QueueState, #0, DR0
+    MCMP DR6, #0
+    BRANCHNE cancel_owned_guard
+    CALL CR0, #9
+    BRANCH cancel_check
+cancel_owned_guard:
+    CALL CR0, #10
+cancel_check:
+    DREAD DR6, QueueState, #1, Actor
+    MCMP DR6, #1
+    BRANCHNE cancel_bad
+    DREAD DR2, QueueState, #30, Actor
+    MCMP DR2, #2
+    BRANCHHS cancel_bad
+    DREAD DR6, QueueState, #24, DR2
+    MCMP DR6, Actor
+    BRANCHNE cancel_bad
+    DREAD DR6, QueueState, #22, DR2
+    MCMP DR6, #1
+    BRANCHNE cancel_bad
+    DREAD DR6, QueueState, #28, DR2
+    MCMP DR6, #0
+    BRANCHNE cancel_bad
+    DREAD DR9, QueueState, #26, DR2
+    LOAD CR8, CR6, #2
+    IADD DR14, Actor, #5
+    LOAD CR2, CR8, DR14
+    LOAD CR11, NULL
+    SAVE CR11, CR8, DR14
+    DWRITE DR0, QueueState, #22, DR2
+    DWRITE DR0, QueueState, #1, Actor
+    IADD DR6, DR0, #1
+    DWRITE DR6, QueueState, #34, DR9
+    DREAD DR6, QueueState, #10, DR0
+    MCMP DR6, #0
+    BRANCHEQ cancel_bad
+    ISUB DR6, DR6, #1
+    DWRITE DR6, QueueState, #10, DR0
+    DWRITE DR0, QueueState, #0, DR0
+    IADD DR1, DR0, #1
+    RETURNAL #4
+cancel_bad:
+    HARDFAULT "GTQueue.CancelReservation: staging or irreversible release forbids cancellation"
+}
+
+; Conservative existing Mint policy: last issued version 510, retired 511.
+method Retire() -> Void {
+    .pet QueueState CR7
+    .pet Actor DR4
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHHS retire_bad
+    CALL CR0, #10
+    DREAD DR6, QueueState, #1, Actor
+    MCMP DR6, #1
+    BRANCHNE retire_bad
+    DREAD DR2, QueueState, #30, Actor
+    MCMP DR2, #2
+    BRANCHHS retire_bad
+    DREAD DR6, QueueState, #22, DR2
+    MCMP DR6, #1
+    BRANCHNE retire_bad
+    DREAD DR6, QueueState, #28, DR2
+    MCMP DR6, #1
+    BRANCHNE retire_bad
+    DREAD DR6, QueueState, #36, Actor
+    MCMP DR6, #510
+    BRANCHLO retire_bad
+    DREAD DR9, QueueState, #26, DR2
+    IADD DR10, DR9, #22
+    SHL DR10, DR10, #2
+    DREAD DR11, CR3, #6, DR0
+    ISUB DR11, DR11, #4
+    ISUB DR10, DR11, DR10
+    LOAD CR10, CR6, #4
+    DREAD DR6, CR10, #0, DR10
+    MCMP DR6, #0
+    BRANCHNE retire_bad
+    DREAD DR6, CR10, #2, DR10
+    MCMP DR6, #0
+    BRANCHNE retire_bad
+    DREAD DR6, CR10, #1, DR10
+    BFEXT DR6, DR6, #21, #9
+    MCMP DR6, #511
+    BRANCHNE retire_bad
+    DWRITE DR6, QueueState, #32, DR9
+    IADD DR6, DR0, #5
+    DWRITE DR6, QueueState, #34, DR9
+    DWRITE DR0, QueueState, #22, DR2
+    DWRITE DR0, QueueState, #1, Actor
+    DREAD DR6, QueueState, #10, DR0
+    MCMP DR6, #0
+    BRANCHEQ retire_bad
+    ISUB DR6, DR6, #1
+    DWRITE DR6, QueueState, #10, DR0
+    LOAD CR8, CR6, #2
+    IADD DR14, Actor, #5
+    LOAD CR11, NULL
+    SAVE CR11, CR8, DR14
+    DWRITE DR0, QueueState, #0, DR0
+    IADD DR1, DR0, #2
+    RETURNAL #0
+retire_bad:
+    HARDFAULT "FreeHandler.Retire: terminal descriptor was not invalidated"
+}
+
+; The independent Cleaner owns this method via its private Config.
+; It yields between clear writes with no queue lock held.
+method CleanOne() -> Void {
+    .pet QueueState CR7
+    .pet QueueEntries CR8
+    .pet WorkingBlock CR1
+    .pet Actor DR4
+    .pet Offset DR6
+    .pet SizeWords DR8
+    .pet Status DR1
+    IADD Status, DR0, #0
+    LOAD CR0, CR6, #0
+    CALL CR0, #8
+    IADD Actor, DR1, #0
+    MCMP Actor, #2
+    BRANCHNE clean_bad
+    CALL CR0, #9
+    DREAD DR6, QueueState, #3, DR0
+    MCMP DR6, #0
+    BRANCHNE clean_bad
+    DREAD DR6, QueueState, #9, DR0
+    MCMP DR6, #0
+    BRANCHEQ clean_wait
+    MCMP DR6, #2
+    BRANCHHI clean_bad
+    DREAD DR6, QueueState, #12, DR0
+    DREAD DR2, QueueState, #18, DR6
+    MCMP DR2, #2
+    BRANCHHS clean_bad
+    DREAD DR6, QueueState, #22, DR2
+    MCMP DR6, #3
+    BRANCHNE clean_bad
+    LOAD QueueEntries, CR6, #2
+    IADD DR14, DR2, #3
+    LOAD CR2, QueueEntries, DR14
+    CALL CR0, #11
+    DREAD DR7, QueueState, #48, DR0
+    DREAD DR8, QueueState, #49, DR0
+    DREAD DR9, QueueState, #50, DR0
+    DREAD DR6, QueueState, #26, DR2
+    MCMP DR6, DR9
+    BRANCHNE clean_bad
+    DREAD DR6, QueueState, #32, DR9
+    MCMP DR6, DR8
+    BRANCHNE clean_bad
+    DREAD DR6, QueueState, #34, DR9
+    MCMP DR6, #3
+    BRANCHNE clean_bad
+    IADD DR14, Actor, #5
+    LOAD WorkingBlock, QueueEntries, DR14
+    LOAD CR11, NULL
+    SAVE CR11, QueueEntries, DR14
+    IADD DR14, DR2, #3
+    SAVE CR11, QueueEntries, DR14
+    LOAD CR2, NULL
+    DWRITE DR0, QueueState, #22, DR2
+    DREAD DR6, QueueState, #12, DR0
+    IADD DR6, DR6, #1
+    BFEXT DR6, DR6, #0, #1
+    DWRITE DR6, QueueState, #12, DR0
+    DREAD DR6, QueueState, #9, DR0
+    ISUB DR6, DR6, #1
+    DWRITE DR6, QueueState, #9, DR0
+    IADD DR6, DR0, #4
+    DWRITE DR6, QueueState, #34, DR9
+    IADD DR6, DR0, #1
+    DWRITE DR6, QueueState, #3, DR0
+    DWRITE DR0, QueueState, #0, DR0
+    IADD Offset, DR0, #0
+    IADD SizeWords, DR0, #8
+clear_word:
+    DWRITE DR0, WorkingBlock, #0, Offset
+    ; Native suspension retains only the Cleaner's own working authority.
+    LOAD CR2, CR6, #9
+    CHANGE CR2
+    IADD Offset, Offset, #1
+    MCMP Offset, SizeWords
+    BRANCHLO clear_word
+    ; Resume publication under serialization, without rereading the payload.
+    LOAD CR0, CR6, #0
+    CALL CR0, #9
+    DREAD DR6, QueueState, #34, DR9
+    MCMP DR6, #4
+    BRANCHNE clean_bad
+    IADD DR2, DR0, #0
+clean_find_free:
+    DREAD DR6, QueueState, #20, DR2
+    MCMP DR6, #0
+    BRANCHEQ clean_reserve
+    IADD DR2, DR2, #1
+    MCMP DR2, #2
+    BRANCHLO clean_find_free
+    BRANCH clean_bad
+clean_reserve:
+    IADD DR6, DR0, #1
+    DWRITE DR6, QueueState, #20, DR2
+    DREAD DR6, QueueState, #5, DR0
+    IADD DR6, DR6, #1
+    DWRITE DR6, QueueState, #5, DR0
+    LOAD QueueEntries, CR6, #2
+    IADD DR14, DR2, #1
+    SAVE WorkingBlock, QueueEntries, DR14
+    LOAD WorkingBlock, NULL
+    DREAD DR6, QueueState, #5, DR0
+    ISUB DR6, DR6, #1
+    DWRITE DR6, QueueState, #5, DR0
+    DREAD DR6, QueueState, #6, DR0
+    IADD DR6, DR6, #1
+    DWRITE DR6, QueueState, #6, DR0
+    IADD DR6, DR0, #2
+    DWRITE DR6, QueueState, #20, DR2
+    DREAD DR6, QueueState, #8, DR0
+    DWRITE DR2, QueueState, #16, DR6
+    IADD DR6, DR6, #1
+    BFEXT DR6, DR6, #0, #1
+    DWRITE DR6, QueueState, #8, DR0
+    DREAD DR6, QueueState, #4, DR0
+    IADD DR6, DR6, #1
+    DWRITE DR6, QueueState, #4, DR0
+    DREAD DR6, QueueState, #6, DR0
+    ISUB DR6, DR6, #1
+    DWRITE DR6, QueueState, #6, DR0
+    IADD DR6, DR0, #3
+    DWRITE DR6, QueueState, #20, DR2
+    DWRITE DR0, QueueState, #34, DR9
+    DWRITE DR0, QueueState, #3, DR0
+    DWRITE DR0, QueueState, #0, DR0
+    IADD Status, DR0, #1
+    RETURNAL #0
+clean_wait:
+    LOAD CR8, CR6, #5
+    DWRITE DR0, CR8, #4, DR0
+    DWRITE DR0, QueueState, #0, DR0
+    IADD Status, DR0, #0
+    RETURNAL #0
+clean_bad:
+    HARDFAULT "Cleaner: queue ownership, lifecycle or capacity invariant failed"
+}
+
+; INTERNAL HELPERS: E authority to this whole abstraction is private.
+; Keeping inputs here must never be exposed as a public monitor/API.
+method GetActor() -> Void {
+    .pet Actor DR4
+    .pet Capacity DR6
+    IADD Actor, DR0, #0
+actor_scan:
+    IADD DR10, Actor, #6
+    LOAD CR9, CR6, DR10
+    TPERM CR3, EXACT, CR9
+    BRANCHEQ actor_found
+    IADD Actor, Actor, #1
+    MCMP Actor, #3
+    BRANCHLO actor_scan
+    HARDFAULT "FreeHandler: private invocation capability not recognized"
+actor_found:
+    DREAD DR6, CR3, #0, DR0
+    MCMP DR6, Actor
+    BRANCHNE actor_bad
+    DREAD DR6, CR3, #3, DR0
+    MCMP DR6, #8
+    BRANCHNE actor_bad
+    DREAD DR6, CR3, #4, DR0
+    MCMP DR6, #22
+    BRANCHNE actor_bad
+    DREAD Capacity, CR3, #5, DR0
+    MCMP Capacity, #2
+    BRANCHNE actor_bad
+    IADD DR1, Actor, #0
+    RETURNAL #4095
+actor_bad:
+    HARDFAULT "FreeHandler: immutable DATA profile does not match"
+}
+method Enter() -> Void {
+    LOAD CR7, CR6, #1
+    DREAD DR6, CR7, #0, DR0
+    MCMP DR6, #0
+    BRANCHNE busy_fault
+    IADD DR6, DR4, #1
+    DWRITE DR6, CR7, #0, DR0
+    RETURNAL #4095
+busy_fault:
+    HARDFAULT "FreeHandler: pool is busy or fault-stranded"
+}
+method Owned() -> Void {
+    LOAD CR7, CR6, #1
+    DREAD DR6, CR7, #0, DR0
+    IADD DR10, DR4, #1
+    MCMP DR6, DR10
+    BRANCHNE owner_fault
+    RETURNAL #4095
+owner_fault:
+    HARDFAULT "FreeHandler: invocation does not own the serialized transition"
+}
+; Input CR2; Config CR3; Actor DR4. Preserve DR2 and DR5.
+; Output Slot DR7, Version DR8, BlockIndex DR9. Check actual GT fields,
+; current Namespace generation, complete class bounds and exact placement.
+method ValidateInput() -> Void {
+    LOAD CR8, CR6, #2
+    LOAD CR9, CR6, #3
+    IADD DR14, DR4, #5
+    SAVE CR2, CR8, DR14
+    DREAD DR6, CR9, #56, DR14
+    BFEXT DR7, DR6, #25, #7
+    MCMP DR7, #25
+    BRANCHNE input_bad
+    BFEXT DR7, DR6, #0, #16
+    MCMP DR7, #22
+    BRANCHLO input_bad
+    MCMP DR7, #23
+    BRANCHHI input_bad
+    BFEXT DR8, DR6, #16, #9
+    ISUB DR9, DR7, #22
+    LOAD CR10, CR6, #4
+    SHL DR10, DR7, #2
+    DREAD DR11, CR3, #6, DR0
+    ISUB DR11, DR11, #4
+    ISUB DR10, DR11, DR10
+    DREAD DR11, CR10, #1, DR10
+    BFEXT DR12, DR11, #21, #9
+    MCMP DR12, DR8
+    BRANCHNE input_bad
+    BFEXT DR12, DR11, #0, #21
+    MCMP DR12, #7
+    BRANCHNE input_bad
+    DREAD DR11, CR10, #0, DR10
+    DREAD DR12, CR3, #2, DR0
+    SHL DR13, DR9, #3
+    IADD DR12, DR12, DR13
+    MCMP DR11, DR12
+    BRANCHNE input_bad
+    LOAD CR2, CR8, DR14
+    DWRITE DR7, CR7, #48, DR0
+    DWRITE DR8, CR7, #49, DR0
+    DWRITE DR9, CR7, #50, DR0
+    RETURNAL #4095
+input_bad:
+    HARDFAULT "FreeHandler: GT is not a current complete DATA block in this pool"
+}
+}

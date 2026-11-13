@@ -214,13 +214,13 @@ test('CR6 test scope LOAD materializes B=0 result; no invocation/publication nee
     assert.equal(s.memory[OBJECT], 0xaabbccdd);
 });
 
-test('B=0 result still fails ordinary SAVE export', () => {
+test('B=0 does not authorize SAVE through an L-only destination', () => {
     const s = fixture();
     assert.ok(store(s, gt(s, SLOT.object, 'RW')));
     scopeForProbe(s);
     assert.ok(load(s, 6));
     assert.equal(s._execSave({crSrc: 6, crDst: 1, imm: 1}), null);
-    assert.equal(s.faultLog.at(-1).type, 'BIND');
+    assert.equal(s.faultLog.at(-1).type, 'PERMISSION');
 });
 
 test('CR6 row bounds, malformed and NULL result GTs remain rejected', () => {

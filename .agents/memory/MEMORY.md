@@ -1,6 +1,6 @@
 - [Next bitstream design scope](next-bitstream-design-scope.md) — separate two-Namespace/common-LUMP planning workspace; three-view Switch loop, no hardware authorization.
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
-- [Notebook export memory](notebook-export-memory.md) — keep repeated export strings local; notebook capture limits can reset state after successful file writes.
+- [Tooling and exports](tooling-lessons-index.md) — notebook capture limits, spreadsheet formula caches, Python ABI and TypeScript test compilation.
 - [Mint compiler upgrade scope](mint-compiler-upgrade-scope.md) — focused current-ISA/Mint checks gate the upgrade, not unrelated legacy cleanup; baseline is not new-ABI acceptance.
 - [Runtime fault investigations](runtime-fault-change-approval.md) — explicit approval before NS21 fixes; linked replay guidance avoids false downstream faults.
 - [Mint DESTROY scope](mint-destroy-scope.md) — releases the Namespace slot and object memory; does not collect or erase GT copies.
@@ -9,7 +9,6 @@
 - [Nonzero-version probes](nonzero-version-layout-probes.md) — zero versions hide descriptor-layout mismatches; test version comparisons and limits independently.
 - [CHANGE operand authority](change-programmer-access.md) — indexed CR6 lookup is now explicitly approved for the simulator; still one Thread GT, no scratch LOAD, no FPGA approval.
 - [IDE product goal](ide-product-goal.md) — approved UI details define behavior; security stays internal; simplify affected code rather than adding competing state or approval gates.
-- [Spreadsheet preview caches](spreadsheet-preview-caches.md) — deliver cached formula results with the tracker; blank counts made aggregate status columns misleading.
 - [IDE interaction rules](ide-interaction-index.md) — header layout, touch refresh, dialog keyboard ownership, visible binding progress and resize evidence.
 - [ISA review decisions](isa-review-index.md) — no TRY/AFB ISA changes; deferred Amoeba policy, scope, encoding, compatibility and conformance rules.
 - [Primary ISA/FPGA goal](isa-fpga-primary-release-goal.md) — align approved red-ISA through simulator and exact bitstream to physical acceptance; B.1.1+ is provisional.
@@ -140,7 +139,6 @@
 - [Reboot authority evidence](reboot-authority-evidence.md) — skipped-instruction telemetry is not a grant; distinguish live reset, persistent homes, and exact-image replay.
 - [Boot fault decisions](boot-fault-index.md) — immediate-only reference lifetime, save-error classification, source stability and scheduler validation.
 - [Thread strip visibility](thread-strip-visibility.md) — all views retain configured membership; missing runtime is not missing configuration or authority to activate.
-- [Python ABI dependencies](python-abi-dependencies.md) — check the serving interpreter when installing SDKs; package installation and `python3` can use different versions.
 - [GitHub source-control access](github-source-control-access.md) — connector lookup may fail while secure `gh` works; verify binary release uploads separately.
 - [Readable Mint calls](mint-readable-call-approval.md) — bounded compiler implementation authorized; saved artifacts, live bindings and hardware remain outside approval.
 - [Hardware progress watch](hardware-progress-watch.md) — programmable GT + offset monitoring of the stash counter across free-run and fault recovery.
@@ -148,12 +146,13 @@
 - [Development Image preparation](development-image-preparation.md) — new development builds must use the latest compilation of every LUMP kind, never stale saved bindings; transfer stays separate.
 - [Namespace DNA containment](namespace-dna-containment.md) — NS[1] encloses all slots; Metadata Slot[0] and Slot[1] form its text header.
 - [Hardware control trust](hardware-control-trust-index.md) — bridge restart custody, frozen build/physical approval boundaries, and button-free server/board authentication.
-- [TypeScript test transpilation](typescript-test-transpilation.md) — the TypeScript CLI may work without the legacy JS compiler API; use esbuild for isolated helper tests.
 - [Lazy loading policy](lazy-loading-policy.md) — approved fetches by default; plus-marked later-version tests use new slots; include Resolve and Retirement.
-- [GT-construction port](gt-construction-port.md) — Mint-private DATA-write/capability-load direction; diagnostic addressability does not grant minting authority.
+- [SecurityMonitor GT construction](gt-construction-port.md) — Create(GTvars) packs DATA then reads it as a GT under monitor M; older port proposals are not prerequisites.
 - [Pass Bit and caller identity](pass-bit-caller-identity.md) — private passcodes remain valid; recorded caller E-GT identity must include Namespace ID.
 - [Wukong LED feedback](wukong-led-feedback.md) — two-bit CHANGE counter with overriding Hard Fault indication; physical deployment remains separate.
 - [Simulator parity scope](simulator-parity-scope.md) — one-image diagnosis before alignment investment; stop at the first incompatibility, not a full parity programme.
 - [Interrupted process fixtures](interrupted-process-fixtures.md) — Python run() kills children on SystemExit; model surviving children explicitly and retain reaping custody.
 - [Cooperative retry watchdog](cooperative-retry-watchdog.md) — fixed enabled diagnostic-only watchdog approval; terminal observation and scratch-capability boundaries.
 - [Offline evidence licensing](offline-evidence-licensing.md) — owner approved GPL-3.0 for tooling and historical evidence; optional commercial licensing, no publication instruction.
+- [Native memory queue delivery](native-memory-queue-delivery.md) — native CLOOMC service execution is required; host fixtures and documentation cannot substitute for the allocator.
+- [Embedded browser storage](embedded-browser-storage.md) — standalone page success does not prove iframe startup; never replace durable drafts with silent temporary storage.
