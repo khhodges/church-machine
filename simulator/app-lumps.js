@@ -1,3 +1,57 @@
+// Toolbar navigation uses the same exact-artifact opening and draft guards as
+// the saved-LUMP catalog. Fetching choices never changes the current editor.
+async function refreshEditorSavedLumps() {
+    const menu = document.getElementById('editorSavedLumpPicker');
+    const choices = document.getElementById('editorSavedLumpChoices');
+    const error = document.getElementById('editorSavedLumpError');
+    if (!menu || menu._loading) return;
+    menu._loading = true;
+    error.hidden = true;
+    choices.textContent = 'Reading saved LUMPs…';
+    try {
+        const response = await fetch('/api/lumps/list', {cache: 'no-store'});
+        if (!response.ok) throw Error('Saved LUMP list returned HTTP ' + response.status);
+        const rows = await response.json();
+        if (!Array.isArray(rows)) throw Error('Saved LUMP list is malformed.');
+        const latest = new Map();
+        for (const row of rows) {
+            if (row.archived === true || row.current === false || !row.abstraction ||
+                !row.token || !row.filename || !row.binary_hash) continue;
+            const old = latest.get(row.abstraction);
+            if (!old || Number(row.lump_version) > Number(old.lump_version))
+                latest.set(row.abstraction, row);
+        }
+        choices.replaceChildren();
+        for (const row of [...latest.values()].sort((a,b)=>a.abstraction.localeCompare(b.abstraction))) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-sm';
+            button.textContent = row.abstraction + ' · v' + row.lump_version;
+            button.onclick = async () => {
+                error.hidden = true;
+                choices.querySelectorAll('button').forEach(b => { b.disabled = true; });
+                try {
+                    await openLumpInEditor(row.token, {exactSavedArtifact: {
+                        token: row.token, filename: row.filename, binary_hash: row.binary_hash,
+                        lump_version: row.lump_version, abstraction: row.abstraction
+                    }});
+                    menu.open = false;
+                } catch (cause) {
+                    error.textContent = cause.message || String(cause);
+                    error.hidden = false;
+                } finally {
+                    choices.querySelectorAll('button').forEach(b => { b.disabled = false; });
+                }
+            };
+            choices.appendChild(button);
+        }
+        if (!latest.size) choices.textContent = 'No saved LUMPs available.';
+    } catch (cause) {
+        choices.textContent = '';
+        error.textContent = (cause.message || String(cause)) + ' Close and reopen this menu to retry.';
+        error.hidden = false;
+    } finally { menu._loading = false; }
+}
 // Collision-free identity for all per-LUMP UI, editor, and persisted state.
 // encodeURIComponent is reversible and preserves punctuation and case, unlike
 // the historical alphanumeric-only normalization.

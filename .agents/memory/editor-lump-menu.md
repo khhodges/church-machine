@@ -4,6 +4,7 @@ description: User expects a LUMP dropdown in the editor toolbar, separate from t
 ---
 The editor menu row must retain the LUMP dropdown the user says was added on
 2026-11-12; the language selector is not a substitute.
+The user confirmed this selects different saved LUMPs, not revisions or types.
 
 **Why:** The user reported its disappearance as an unwanted rollback.
 

@@ -1,3 +1,9 @@
+.editor-saved-lump-picker { position: relative; color: #ddd; font-size: 12px; }
+.editor-saved-lump-picker summary { cursor: pointer; padding: 6px 9px; border: 1px solid #45516b; border-radius: 4px; background: #192438; }
+.editor-saved-lump-picker[open] { min-width: 230px; }
+#editorSavedLumpChoices { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow: auto; }
+#editorSavedLumpChoices button { text-align: left; white-space: normal; padding: 7px; }
+#editorSavedLumpError { color: #ffb4a8; max-width: 300px; white-space: normal; }
 /* Narrow headers keep navigation on the left and board/settings on the right.
    display:contents preserves the existing controls and their visibility logic. */
 @media (max-width: 700px) {
