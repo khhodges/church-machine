@@ -9,6 +9,17 @@ GTs are runtime structures. Do not evaluate them in advance or infer and enforce
 
 **How to apply:** Do not introduce compiler, linker, loader, admission, or preflight gates based on inferred GT purpose or protection policy. Apply the specified machine checks when the relevant operation executes, not speculative semantic evaluation beforehand. This instruction supersedes earlier agent-derived recommendations for advance GT-policy enforcement.
 
+The user reiterated during Namespace build troubleshooting: “The IDE does not
+need to prove GT settings they are check at runtime.”
+
+**Why:** Explaining an existing preflight rejection does not justify requiring
+the programmer to restore actors or service abstractions merely to satisfy an
+IDE prediction of future GT use.
+
+**How to apply:** Distinguish mechanical image construction constraints from
+runtime GT validation. Do not call a predictive GT check a necessary structural
+requirement or claim its removal is implemented when it has only been discussed.
+
 POLA persistence does not apply to dynamic changes. Dynamic reads and writes are governed only by the ISA rules for the capability covering each word: type, permissions, and bounds. Do not add a separate persisted POLA state, automatically save dynamic mutations, or rewrite an existing header because protected content changed.
 
 **Why:** Dynamic state is machine execution state, not a new static policy artifact. Treating it as POLA-persisted state adds authority and lifecycle semantics outside the ISA and incorrectly couples content mutation to header or repository mutation.
