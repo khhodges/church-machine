@@ -1,6 +1,8 @@
 """Build a new development image from latest sources and current compilation.
 
 Binding is private to the build. No activation, installation or publication occurs.
+Standalone callers use server.offline_preparation.prepare_saved_design rather
+than importing server.app (which intentionally starts the live services).
 UART installation separately checks authorization, exact digest, physical
 target, installed BIT evidence, STOP and explicit replacement consent.
 """

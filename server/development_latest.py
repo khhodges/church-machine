@@ -2,6 +2,8 @@
 
 Never publish revisions or rewrite the selected saved Namespace. Historical
 replays do not call this module. Missing/broken newest inputs never fall back.
+Standalone callers obtain the backend from server.offline_preparation.offline_backend;
+the live server module must not be imported just to access compiler helpers.
 """
 import copy
 import hashlib

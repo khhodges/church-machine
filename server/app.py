@@ -1,4 +1,7 @@
 import os
+# Set only by the private offline backend loader, before module execution.
+# This is not an environment option or an HTTP authentication bypass.
+_OFFLINE_PREPARATION = globals().get("_OFFLINE_PREPARATION", False)
 import re
 import sys
 import io
@@ -1358,7 +1361,8 @@ db_path = (
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-db.init_app(app)
+if not _OFFLINE_PREPARATION:
+    db.init_app(app)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIMULATOR_DIR = os.path.join(BASE_DIR, "simulator")
@@ -10381,7 +10385,8 @@ def download_fpga_package():
 
 
 BITSTREAM_DIR = os.path.join(BASE_DIR, "bitstreams")
-os.makedirs(BITSTREAM_DIR, exist_ok=True)
+if not _OFFLINE_PREPARATION:
+    os.makedirs(BITSTREAM_DIR, exist_ok=True)
 
 BITSTREAM_FILES = {
     "wukong-xc7a100t": "church_wukong_xc7a100t.bit",
@@ -11912,7 +11917,8 @@ def _build_lazy_lumps():
     words[63]  = 0            # c-list slot 0 — NULL GT (caller supplies at runtime)
     LAZY_LUMPS['dead0003'] = _struct.pack('>64I', *words)
 
-_build_lazy_lumps()
+if not _OFFLINE_PREPARATION:
+    _build_lazy_lumps()
 
 # ── Bundled lump loader ──────────────────────────────────────────────────────────
 # Scans server/lumps/*.lump and pre-loads every binary into LAZY_LUMPS at startup.
@@ -12071,7 +12077,8 @@ def _derive_ns_state_entries():
         print(f"[ns-state] _derive_ns_state_entries failed: {_exc}", flush=True)
         return []
 
-_load_bundled_lumps()
+if not _OFFLINE_PREPARATION:
+    _load_bundled_lumps()
 
 # ── Boot Abstraction lump (NS slot 6, "Boot.Abstr") ───────────────────────────────
 # The boot lump is baked directly into boot-image.bin rather than stored as a
@@ -12640,7 +12647,8 @@ def _load_boot_abstr_lump():
     except Exception as exc:
         print(f'[boot] Failed to extract Boot.Abstr lump: {exc}', flush=True)
 
-_load_boot_abstr_lump()
+if not _OFFLINE_PREPARATION:
+    _load_boot_abstr_lump()
 
 
 def _load_boot_ns_lump():
@@ -12745,7 +12753,8 @@ def _load_boot_ns_lump():
         _BOOT_NS_META.pop("authority_error", None)
 
 
-_load_boot_ns_lump()
+if not _OFFLINE_PREPARATION:
+    _load_boot_ns_lump()
 
 # ── Mum Tunnel Library fallback ─────────────────────────────────────────────────
 def _fetch_lump_from_library(token_hex):
@@ -21557,7 +21566,13 @@ LAUNCH_TESTS_SEED = [
      False),
 ]
 
-with app.app_context():
+def _initialize_live_services():
+    """Initialize database and background services only for the live server."""
+    global Project, TutorialProgress, Device, FaultEvent, NiaTrace, LaunchTest
+    global CallhomeLog, UartLog, BuildRecord, BOARD_TYPES, PROFILE_NAMES
+    global _callhome_log, _uart_log, _scheduler, _wukong_listener
+    global _on_wukong_callhome, _wukong_lump_lookup
+    global _sa_text
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from server.models import register_models, BOARD_TYPES, PROFILE_NAMES
@@ -21957,6 +21972,10 @@ with app.app_context():
             _wukong_listener.start()
         except Exception as _wudp_exc:
             logging.warning("Wukong UDP listener could not start: %s", _wudp_exc)
+
+if not _OFFLINE_PREPARATION:
+    with app.app_context():
+        _initialize_live_services()
 
 def _free_port(port):
     """Kill any process holding the given port using /proc/net/tcp."""
@@ -29048,17 +29067,18 @@ def _describe_protected_change_audit(payload, _display_lines):
     return [], []
 
 
-_install_change_confirmation(
-    app, _change_confirmation_paths, _namespace_commit_guard,
-    describe=_describe_protected_change,
-    describe_audit=_describe_protected_change_audit,
-    store_path=os.path.join(
-        os.path.dirname(__file__), ".change-reviews",
-        hashlib.sha256(os.path.realpath(LUMPS_DIR).encode()).hexdigest() + ".sqlite"),
-    recovery_pending=lambda: any(os.path.lexists(os.path.join(LUMPS_DIR, name))
-                                 for name in (
-                                     _LUMP_TRANSITION_JOURNAL,
-                                     _NavanaAdmissionService.JOURNAL_NAME)))
+if not _OFFLINE_PREPARATION:
+    _install_change_confirmation(
+        app, _change_confirmation_paths, _namespace_commit_guard,
+        describe=_describe_protected_change,
+        describe_audit=_describe_protected_change_audit,
+        store_path=os.path.join(
+            os.path.dirname(__file__), ".change-reviews",
+            hashlib.sha256(os.path.realpath(LUMPS_DIR).encode()).hexdigest() + ".sqlite"),
+        recovery_pending=lambda: any(os.path.lexists(os.path.join(LUMPS_DIR, name))
+                                     for name in (
+                                         _LUMP_TRANSITION_JOURNAL,
+                                         _NavanaAdmissionService.JOURNAL_NAME)))
 
 
 if __name__ == "__main__":
