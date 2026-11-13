@@ -57,6 +57,20 @@ Keep the operator's goal focused on loading the new development image.
 design to be prepared and sent; do not substitute the historical image as the
 upload target or turn the loading workflow into unrelated maintenance work.
 
+The user approved a focused general-image loader correction and one-image
+Boot2 compatibility check, not an expanding approval-authority project.
+Programmer selection under existing maintenance authorization may replace the
+demonstration's per-image allowlist for this local work; SHA is transfer
+consistency, not sender authentication. Runtime GT checks remain authoritative.
+
+**Why:** After calling the supporting projects distractions, the user said
+“Proceed” to the smallest loader change and checking the next incompatibility.
+The signed-manifest review recommendation is not a new prerequisite.
+
+**How to apply:** Keep historical demonstration evidence separate, stop at the
+first real incompatibility, and do not infer vendor-build or physical-operation
+authorization. Do not turn this approval into a broader Lazy protocol redesign.
+
 The user requested a one-button operation on Build Approval for loading the
 selected development image; the Namespace Designer now has a separately
 approved Bind → Prepare → Load sequence.

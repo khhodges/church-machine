@@ -28,14 +28,17 @@ BOOT_GUARD = (46 << 9) | 419
 
 class StarterTop(Elaboratable):
     def __init__(self, *, clock_hz=25_000_000, baud=57600, sim_mode=False,
-                 lump_records=None, caller_records=None):
+                  lump_records=None, caller_records=None, general_image=False):
+        if general_image and lump_records is not None:
+            raise ValueError("General images cannot use the fixed demonstration CLP1 receiver")
+        self.general_image = general_image
         self.clock_hz, self.baud, self.sim_mode = clock_hz, baud, sim_mode
         self.clk = Signal()
         # A physical input, synchronized below. No UART/MMIO assignment.
         self.maintenance_enable = Signal()
         self.uart_rx_pin = Signal(init=1)
         self.uart_tx_pin = Signal(init=1)
-        self.transport = StarterTransport(clock_hz=clock_hz)
+        self.transport = StarterTransport(clock_hz=clock_hz, general_image=general_image)
         self.control = self.transport.control
         self.core = ChurchCore(expected_boot_guard=BOOT_GUARD, watchdog_clock_hz=clock_hz)
         self.verifier = ReceivedImageSHA256()
@@ -127,22 +130,30 @@ class StarterTop(Elaboratable):
         verifying = Signal()
         verify_epoch = Signal(32)
         verify_image = Signal()
+        verify_digest = Signal(256)
+        verify_digest_valid = Signal()
         m.d.comb += sha.start.eq(ctl.validate_request & ~verifying)
         with m.If(sha.start):
-            m.d.sync += [verifying.eq(1), verify_epoch.eq(ctl.epoch), verify_image.eq(tr.image)]
+            m.d.sync += [verifying.eq(1), verify_epoch.eq(ctl.epoch), verify_image.eq(tr.image),
+                         verify_digest.eq(tr.expected_digest),
+                         verify_digest_valid.eq(tr.digest_valid)]
         with m.If(sha.done):
             m.d.sync += verifying.eq(0)
         with m.If(ctl.begin_accepted):
             m.d.sync += verifying.eq(0)
         expected = Array(Const(int(h, 16), 256) for h in IMAGE_SHA256)
+        digest_ok = ((sha.digest == verify_digest) & verify_digest_valid
+                     if self.general_image else (sha.digest == expected[verify_image]))
         m.d.comb += [
             ctl.validation_valid.eq(sha.done),
             ctl.validation_epoch.eq(verify_epoch),
-            ctl.validation_ok.eq((sha.digest == expected[verify_image]) &
+            ctl.validation_ok.eq(digest_ok &
                                  (verify_epoch == ctl.epoch) & (verify_image == tr.image)),
         ]
         with m.If(sha.done & ctl.validate_request & ctl.validation_ok & ~ctl.abort):
             m.d.sync += [self.admitted_epoch.eq(verify_epoch), self.admitted_digest.eq(sha.digest)]
+        with m.If(ctl.begin_accepted):
+            m.d.sync += [self.admitted_epoch.eq(0), self.admitted_digest.eq(0)]
 
         # ROM provenance and synchronous memory settle rule match the retained
         # top. The actual guarded boot validates Namespace and Thread entry state.

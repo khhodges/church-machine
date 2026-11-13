@@ -12,12 +12,18 @@ MAGIC = b"CSI1"
 IMAGE_BYTES = 65536
 
 
-def command(op, image, epoch, length=0):
-    return MAGIC + bytes((op, image, 0, 0)) + epoch.to_bytes(4, "big") + length.to_bytes(4, "big")
+def command(op, image, epoch, length=0, *, general_image=False):
+    magic = b"CSI2" if general_image else MAGIC
+    return magic + bytes((op, image, 0, 0)) + epoch.to_bytes(4, "big") + length.to_bytes(4, "big")
 
 
 class StarterTransport(Elaboratable):
-    def __init__(self, *, clock_hz):
+    def __init__(self, *, clock_hz, general_image=False):
+        # CSI2: selector zero, BEGIN header, 32-byte SHA256 (big endian),
+        # then exactly IMAGE_BYTES. The hash is consistency, not authentication.
+        self.general_image = general_image
+        self.expected_digest = Signal(256)
+        self.digest_valid = Signal()
         self.control = StarterLifecycle()
         self.maintenance = Signal()
         self.valid = Signal()
@@ -37,6 +43,8 @@ class StarterTransport(Elaboratable):
         header = Signal(128)
         count = Signal(4)
         data_mode = Signal()
+        digest_mode = Signal()
+        digest_count = Signal(5)
         left = Signal(range(IMAGE_BYTES + 1))
         word = Signal(32)
         byte_index = Signal(2)
@@ -46,8 +54,10 @@ class StarterTransport(Elaboratable):
         complete = Signal()
         frame = Signal(128)
         op, image, epoch, length = frame[88:96], frame[80:88], frame[32:64], frame[:32]
-        valid_header = ((frame[96:] == int.from_bytes(MAGIC, "big")) &
-                        (frame[64:80] == 0) & (image < 2))
+        magic = b"CSI2" if self.general_image else MAGIC
+        valid_header = ((frame[96:] == int.from_bytes(magic, "big")) &
+                        (frame[64:80] == 0) &
+                        ((image == 0) if self.general_image else (image < 2)))
         epoch_ok = epoch == ctl.epoch
         timeout = idle == self.clock_hz * 2
         m.d.comb += [
@@ -63,11 +73,19 @@ class StarterTransport(Elaboratable):
         with m.If(active & (~self.maintenance | self.error | timeout)):
             m.d.comb += ctl.abort.eq(1)
         with m.If(~self.maintenance | self.error | timeout):
-            m.d.sync += [count.eq(0), data_mode.eq(0), idle.eq(0)]
+            m.d.sync += [count.eq(0), data_mode.eq(0), digest_mode.eq(0),
+                         self.digest_valid.eq(0), idle.eq(0)]
         with m.Else():
             with m.If(self.valid):
                 m.d.sync += idle.eq(0)
-                with m.If(data_mode):
+                with m.If(digest_mode):
+                    m.d.sync += [
+                        self.expected_digest.eq(Cat(self.byte, self.expected_digest[:248])),
+                        digest_count.eq(digest_count + 1)]
+                    with m.If(digest_count == 31):
+                        m.d.sync += [digest_mode.eq(0), data_mode.eq(1),
+                                     self.digest_valid.eq(1)]
+                with m.Elif(data_mode):
                     m.d.sync += [word.word_select(byte_index, 8).eq(self.byte),
                                  byte_index.eq(byte_index + 1), left.eq(left - 1)]
                     with m.If(byte_index == 3):
@@ -79,7 +97,7 @@ class StarterTransport(Elaboratable):
                     m.d.sync += [header.eq(frame), count.eq(count + 1)]
                     with m.If(count == 15):
                         m.d.comb += complete.eq(1)
-            with m.Elif(data_mode | (count != 0)):
+            with m.Elif(data_mode | digest_mode | (count != 0)):
                 m.d.sync += idle.eq(idle + 1)
 
         with m.If(complete):
@@ -90,7 +108,9 @@ class StarterTransport(Elaboratable):
                             m.d.comb += ctl.begin.eq(1)
                             with m.If(ctl.begin_accepted):
                                 m.d.sync += [
-                                    self.image.eq(image), data_mode.eq(1),
+                                    self.image.eq(image), data_mode.eq(not self.general_image),
+                                    digest_mode.eq(self.general_image), digest_count.eq(0),
+                                    self.expected_digest.eq(0), self.digest_valid.eq(0),
                                     left.eq(IMAGE_BYTES), index.eq(0),
                                     byte_index.eq(0), word.eq(0)]
                             with m.Else():

@@ -1,5 +1,10 @@
 # General prepared Namespace image admission — design review
 
+Subsequent decision: the user approved a focused programmer-selected loader
+correction instead of a new approval-authority project. See
+[the local CSI2 contract](general-image-local-contract.md). The signed-manifest
+recommendation below is historical, not an additional gate for that mode.
+
 Status: **proposal only, 13 November 2026**. No loader policy, executable source,
 saved design, build package or hardware was changed. This review does not
 authorize implementation, vendor builds, transfer, programming or execution.
