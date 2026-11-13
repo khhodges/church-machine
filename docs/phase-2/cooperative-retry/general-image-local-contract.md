@@ -175,3 +175,48 @@ compatibility remains unproved.
 
 Diagnostic script and bus/register evidence:
 `generated-artifacts/boot2-seal-diagnosis/probe.py` and `evidence.json`.
+
+## Local absent-LUMP candidate
+
+`prepare_lazy_candidate.py` prepares a separate candidate from the verified
+retained inputs. It reserves API-only allocation sizes for all eleven selected
+Lazy LUMPs, writes sealed descriptors and zero-code headers, and updates the
+member count. Bodies and C-lists remain absent; no executable code is installed.
+Existing resident allocations, instructions and GTs remain byte-for-byte intact.
+The new reservations use 5,056 words and fit the existing 64 KiB image.
+The original image and saved design are not modified.
+
+Six preparation tests passed, covering resident preservation, disjoint bounds,
+seals/header geometry, hash mismatch, overflow, occupied memory, existing
+descriptors and duplicate slots. The existing Mallory warning remains authored
+and is not repaired.
+
+The resulting image SHA-256 is
+`d565923b951c608042e72c8c491dc823cfaaec1546bc4aed05b99853e112e95d`.
+Replay at the decoded-byte transport boundary passed RAM SHA admission and
+guarded boot. The CALL passed descriptor integrity and read CapabilityTest's
+zero-code header at 0x4400. The first fault is now **ABSENT_OUTFORM (17)** at
+NIA **0x101c**, cycle 284, not SEAL.
+
+This is the retained runtime's intentional SYSTEM-originated absent-dependency
+fault: startup is executing in slot-2 Boot.Thread, which cannot suspend into
+itself to service a Lazy request. No CALL frame or callee capabilities were
+published before the fault. Successful Lazy delivery is still unproved.
+The next design choice is making startup-required dependencies resident or
+moving their calls into USER execution; neither change was made here.
+
+Reproduction:
+
+```sh
+python3 -m pytest docs/phase-2/cooperative-retry/test_lazy_candidate.py -q
+python3 docs/phase-2/cooperative-retry/prepare_lazy_candidate.py \
+  --source generated-artifacts/boot2-offline-check/candidate \
+  --output generated-artifacts/<fresh-local-candidate>
+python3 docs/phase-2/cooperative-retry/replay_lazy_candidate.py \
+  --candidate generated-artifacts/<fresh-local-candidate>
+```
+
+Current preparation and replay receipts are under
+`generated-artifacts/boot2-lazy-candidate/`. This candidate is not integrated
+into IDE preparation or Send; no RTL, vendor build or physical operation was
+changed.
