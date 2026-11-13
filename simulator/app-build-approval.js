@@ -293,15 +293,32 @@ const BuildApprovalView = {
 
     async copyBridgePairing() {
         const command = document.getElementById('baPairCommand');
+        const status = document.getElementById('baPairStatus');
+        if (!command || !command.value.trim()) {
+            status.textContent = 'Create a connection command first.';
+            return;
+        }
+        // Copy synchronously while the click still has user activation. The
+        // embedded preview can deny navigator.clipboard even on HTTPS.
+        command.focus();
+        command.select();
+        command.setSelectionRange(0, command.value.length);
         try {
+            if (document.execCommand && document.execCommand('copy')) {
+                status.textContent = 'Copied. Paste into the intended PowerShell window.';
+                return;
+            }
+        } catch (_) { /* Try the async clipboard when browser copy is unavailable. */ }
+        try {
+            if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
             await navigator.clipboard.writeText(command.value);
-            document.getElementById('baPairStatus').textContent =
-                'Copied. Stop the old bridge with Ctrl+C, then paste into PowerShell.';
+            status.textContent = 'Copied. Paste into the intended PowerShell window.';
         } catch (_) {
             command.focus();
             command.select();
-            document.getElementById('baPairStatus').textContent =
-                'Press Ctrl+C to copy the selected command.';
+            command.setSelectionRange(0, command.value.length);
+            status.textContent =
+                'Automatic copying was blocked by the browser. The command is selected: press Ctrl+C, then paste into PowerShell.';
         }
     },
 
