@@ -26,7 +26,8 @@ async function refreshEditorSavedLumps() {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn-sm';
-            button.textContent = row.abstraction + ' · v' + row.lump_version;
+            button.textContent = row.abstraction +
+                (Number.isInteger(row.lump_version) ? ' · v' + row.lump_version : '');
             button.onclick = async () => {
                 error.hidden = true;
                 choices.querySelectorAll('button').forEach(b => { b.disabled = true; });

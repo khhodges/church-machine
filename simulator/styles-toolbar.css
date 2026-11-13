@@ -1,9 +1,11 @@
 .editor-saved-lump-picker { position: relative; color: #ddd; font-size: 12px; }
 .editor-saved-lump-picker summary { cursor: pointer; padding: 6px 9px; border: 1px solid #45516b; border-radius: 4px; background: #192438; }
-.editor-saved-lump-picker[open] { min-width: 230px; }
-#editorSavedLumpChoices { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow: auto; }
-#editorSavedLumpChoices button { text-align: left; white-space: normal; padding: 7px; }
-#editorSavedLumpError { color: #ffb4a8; max-width: 300px; white-space: normal; }
+#editor .toolbar-phase:has(.editor-saved-lump-picker[open]) { width: 100%; align-items: center; }
+#editor .editor-saved-lump-picker[open] { order: 100; flex: 1 0 100%; width: 100%; min-width: 0; margin-top: 6px; }
+#editorSavedLumpChoices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 6px; max-height: min(55vh, 600px); overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; padding: 8px 4px; align-content: start; }
+#editorSavedLumpChoices button { text-align: left; white-space: normal; overflow-wrap: anywhere; min-width: 0; min-height: 38px; padding: 9px 10px; line-height: 1.4; }
+#editorSavedLumpChoices button:focus-visible, .editor-saved-lump-picker summary:focus-visible { outline: 2px solid #e4bf62; outline-offset: 1px; }
+#editorSavedLumpError { color: #ffb4a8; white-space: normal; }
 /* Narrow headers keep navigation on the left and board/settings on the right.
    display:contents preserves the existing controls and their visibility logic. */
 @media (max-width: 700px) {
