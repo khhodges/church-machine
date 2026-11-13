@@ -48,6 +48,18 @@ def build():
     return generate_image(state, config, None, image_format=FORMAT, artifacts=artifacts)
 
 
+@pytest.mark.parametrize("target,sequence", [(1, 0), (2, 0), (3, 511), (4, 0), (63, 7)])
+def test_image_validation_does_not_prove_entry_gt_destination(target, sequence):
+    image, _ = build()
+    words = list(struct.unpack(f"<{len(image)//4}I", image))
+    base = words[2 * 4]
+    caps = boot_image.thread_layout(256, 32)["caps_start"]
+    words[base + caps] = boot_image.create_gt(sequence, target, {"E": 1}, 1)
+    candidate = struct.pack(f"<{len(words)}I", *words)
+    report = validate_image(candidate, image_format=FORMAT)
+    assert report["bootTarget"] == {"slot": target, "sequence": sequence}
+
+
 def _assembled_lump(source, clist):
     assemble_script = r"""
 const fs = require('node:fs');

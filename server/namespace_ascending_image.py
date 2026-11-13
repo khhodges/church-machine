@@ -417,16 +417,7 @@ def validate_image(image, *, image_format):
     if (entry_gt >> 31 or decoded["type"] != 1 or decoded["domain"] != 1
             or decoded["permissions"] != 0b100):
         raise ValueError("Entry Thread CR0 must contain an executable Inform GT")
-    target = live.get(decoded["slot"])
-    if (decoded["slot"] < 3 or (target is not None and (
-            decoded["sequence"] != target["sequence"]
-            or target["location"] >= total))):
-        raise ValueError("Entry Thread CR0 does not bind to a live destination Namespace slot")
-    if target is not None:
-        target_header = words[target["location"]]
-        if (target["location"] < table_words
-                or target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0):
-            raise ValueError("Entry Thread CR0 target is not an ordinary in-range code LUMP")
+    # CR0's destination semantics are checked when the machine uses it.
 
     thread_rows = []
     for slot, entry in live.items():
@@ -446,32 +437,8 @@ def validate_image(image, *, image_format):
             body = words[location:location + size]
             _thread_words, target_fields, layout = _fresh_thread_words(
                 struct.pack(f">{size}I", *body), f"NS[{slot}]")
-            destination = live.get(target_fields["slot"])
-            if (target_fields["slot"] < 3 or (destination is not None and (
-                    destination["sequence"] != target_fields["sequence"]
-                    or destination["location"] >= total))):
-                raise ValueError(
-                    f"NS[{slot}] fresh Thread continuation does not bind to a live destination row")
-            if destination is not None:
-                target_header = words[destination["location"]]
-                target_size = 1 << (((target_header >> 23) & 15) + 6)
-                target_cw = (target_header >> 10) & 8191
-                if (target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0
-                        or target_cw == 0 or destination["location"] + target_size > total):
-                    raise ValueError(f"NS[{slot}] fresh Thread continuation target is not executable code")
             actor_gt = body[layout["caps_start"] + 1]
             actor_fields = _decode_gt(actor_gt) if actor_gt else None
-            if actor_fields:
-                actor = live.get(actor_fields["slot"])
-                if (actor_fields["slot"] < 3 or (actor is not None and (
-                        actor["sequence"] != actor_fields["sequence"]
-                        or actor["location"] >= total))):
-                    raise ValueError(f"NS[{slot}] prepared Thread actor does not bind to a live destination")
-                if actor is not None:
-                    actor_header = words[actor["location"]]
-                    if (actor_header >> 27 != 31 or ((actor_header >> 8) & 3) != 0
-                            or not ((actor_header >> 10) & 8191)):
-                        raise ValueError(f"NS[{slot}] prepared Thread actor is not executable code")
             thread_rows.append({
                 "slot": slot, "sequence": entry["sequence"],
                 "entrySlot": target_fields["slot"],
@@ -597,36 +564,16 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
                     or _integer(binding.get("destinationSlot"), "Thread destination slot") != slot
                     or _integer(binding.get("destinationSequence"), "Thread destination sequence") != sequence):
                 raise ValueError(f"NS[{slot}] fresh Thread image does not bind to its exact destination identity")
-            ordinal_text = str(row.get("name", "")).removeprefix("Thread.")
-            expected_entry_name = (
-                "CapabilityTest" if ordinal_text.isdigit() and int(ordinal_text) <= 3
-                else "SelfTest")
-            if not explicit and binding.get("entryName") not in (expected_entry_name, "ide." + expected_entry_name):
-                raise ValueError(
-                    f"NS[{slot}] fresh Thread must explicitly target {expected_entry_name}")
-            captest = next((candidate for candidate in by_slot.values()
-                            if candidate.get("name") == binding["entryName"]), None)
-            if captest is None:
-                raise ValueError(
-                    f"NS[{slot}] fresh Thread has no destination {expected_entry_name} row")
-            entry_slot = _integer(captest.get("slot"), f"{expected_entry_name} slot")
-            entry_sequence = _integer(captest.get("seq"), f"{expected_entry_name} sequence")
-            if (_integer(binding.get("entrySlot"), "Thread entry slot") != entry_slot
-                    or _integer(binding.get("entrySequence"), "Thread entry sequence") != entry_sequence):
-                raise ValueError(
-                    f"NS[{slot}] fresh Thread has a stale {expected_entry_name} binding")
-            actor = by_slot.get(binding.get("actorSlot")) if explicit else None
-            if explicit and (not actor or actor.get("type") not in ("Inform", "Resident")
-                    or actor.get("name") != binding.get("actorName")
-                    or actor.get("seq") != binding.get("actorSequence")):
-                raise ValueError(f"NS[{slot}] prepared Thread has a stale actor binding")
+            # Verify initializer bytes, not predicted runtime GT validity.
+            entry_slot = _integer(binding.get("entrySlot"), "Thread entry slot")
+            entry_sequence = _integer(binding.get("entrySequence"), "Thread entry sequence")
             expected = build_fresh_thread_lump(
                 allocation_words=_integer(row.get("allocationWords"), "Thread allocationWords"),
                 stack_words=_integer(row.get("stackWords"), "Thread stackWords"),
                 entry_slot=entry_slot, entry_sequence=entry_sequence,
                 entry_nia=binding.get("entryNia", 0),
-                actor_slot=actor["slot"] if actor else None,
-                actor_sequence=actor["seq"] if actor else 0)
+                actor_slot=_integer(binding.get("actorSlot"), "Thread actor slot") if explicit else None,
+                actor_sequence=_integer(binding.get("actorSequence"), "Thread actor sequence") if explicit else 0)
             actual = struct.pack(f">{len(body)}I", *body)
             if typ != 2 or actual != expected or _sha(actual) != binding.get("sha256"):
                 raise ValueError(f"NS[{slot}] Thread bytes do not match the fresh destination initializer")

@@ -88,9 +88,30 @@ def test_explicit_fresh_thread_nia_survives_admission(setup_design):
         assert words[base + layout["caps_start"] + 1] & 0xffff == 6
     document["rows"][-1]["preparedThread"]["entryNia"] = 32000
     path.write_text(json.dumps(document))
-    rejected = request(client, "prepare", {"namespaceFingerprint": digest(document)})
-    assert rejected.status_code == 409
-    assert "NIA" in rejected.json["error"]
+    encoded = request(client, "prepare", {"namespaceFingerprint": digest(document)})
+    assert encoded.status_code == 200, encoded.json
+
+
+@pytest.mark.parametrize("target", [1, 2, 63, 65535])
+def test_authored_thread_targets_are_encoded_without_runtime_proof(setup_design, target):
+    root, client, document, path, _ = setup_design
+    document["faultHandlerSlot"] = target
+    document["rows"].append(dict(slot=11, name="Thread.2", kind="thread",
+        policy="Resident", sequence=0, words=256,
+        preparedThread=dict(entrySlot=target, actorSlot=target, entryNia=32000)))
+    path.write_text(json.dumps(document))
+    prepared = request(client, "prepare", {"namespaceFingerprint": digest(document)})
+    assert prepared.status_code == 200, prepared.json
+    assert request(client, "approve", identifiers(prepared)).status_code == 200
+    active = request(client, "activate", identifiers(prepared))
+    assert active.status_code == 200, active.json
+    from server.boot_image import thread_layout, THREAD_STO_OFFSET
+    words = active.json["words"]
+    base = words[11 * 4]
+    sto = words[base + THREAD_STO_OFFSET] & 0xfff
+    assert words[base + sto + 1] & 0xffff == target
+    assert (words[base + sto + 2] >> 13) & 0x7fff == 32000
+    assert words[base + thread_layout(256, 32)["caps_start"] + 1] & 0xffff == target
 
 
 @pytest.mark.parametrize("profile", ["ascending", "phase1"])

@@ -180,6 +180,8 @@ def validate(document):
                 raise ValueError("Prepared Thread requires explicit driver and actor slots on a non-entry Thread")
             if "entryNia" in binding and not 0 <= binding["entryNia"] < 0x7fff:
                 raise ValueError("Prepared Thread entry NIA must be 0–32766")
+            if any(not 0 < binding[key] <= 65535 for key in ("entrySlot", "actorSlot")):
+                raise ValueError("Prepared Thread slots must fit the GT index field (1–65535)")
         if kind == "mmio":
             if any(type(row.get(k)) is not int or not 0 <= row[k] <= 0xffffffff for k in ("address", "limit")):
                 raise ValueError("Invalid MMIO address/limit")
@@ -203,18 +205,10 @@ def validate(document):
     # It does not select runtime fault entry; Boot.Thread retains continuation.
     if "faultHandlerSlot" in document:
         handler_slot = document["faultHandlerSlot"]
-        handler = by_slot.get(handler_slot, {}) if type(handler_slot) is int else {}
-        if (handler.get("kind") != "lump" or handler.get("policy") != "Resident"
-                or not handler.get("selection")):
-            raise ValueError("Saved fault handler must select an exact Resident LUMP")
-    for row in rows:
-        binding = row.get("preparedThread", {})
-        for slot in (binding[key] for key in ("entrySlot", "actorSlot") if key in binding):
-            target = by_slot.get(slot, {})
-            if target.get("kind") != "lump":
-                raise ValueError("Prepared Thread driver and actor must name declared LUMP rows")
-            if "entryNia" in binding and (target.get("policy") != "Resident" or not target.get("selection")):
-                raise ValueError("Fresh startup Thread requires selected Resident entry and application LUMPs")
+        if type(handler_slot) is not int or not 0 < handler_slot <= 65535:
+            raise ValueError("Fault handler slot must fit the GT index field (1–65535)")
+    # Do not predict whether an authored GT will succeed. Absent entries, target
+    # types, residency, and executable bounds are checked by the machine on use.
     if (by_slot.get(1, {}).get("name"), by_slot.get(1, {}).get("kind"),
         by_slot.get(2, {}).get("name"), by_slot.get(2, {}).get("kind"),
         by_slot.get(2, {}).get("sequence")) != ("Boot.NS", "namespace", "Boot.Thread", "thread", 0):

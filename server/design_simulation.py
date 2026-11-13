@@ -171,22 +171,24 @@ def stage(cfg, document, directory, entry_slot, *, saved_bound_bodies=None):
                 if not explicit and not ordinal.isdigit():
                     raise ValueError(f"NS[{slot}]: unsupported fresh Thread name; keep this design unexecuted.")
                 entry_name = "explicit driver" if explicit else ("CapabilityTest" if int(ordinal) <= 3 else "SelfTest")
-                targets = ([by_slot[explicit["entrySlot"]]] if explicit else
+                # Encode authored slot references, including absent/non-code
+                # targets. Never substitute another executable to make them pass.
+                authored = {r["slot"]: r for r in document["rows"]}
+                def reference(slot):
+                    member = authored.get(slot)
+                    return dict(slot=slot, seq=member["sequence"] if member else 0,
+                                name=member["name"] if member else f"NS[{slot}] (absent)")
+                targets = ([reference(explicit["entrySlot"])] if explicit else
                            [r for r in rows if r["name"] in (entry_name, "ide." + entry_name)])
                 if len(targets) != 1:
                     row.update(unresolved=True, unresolvedReason=f"Missing named Thread entry {entry_name}")
                     prepared.append(row)
                     continue
                 target = targets[0]
-                actor = by_slot[explicit["actorSlot"]] if explicit else None
+                actor = reference(explicit["actorSlot"]) if explicit else None
                 entry_nia = explicit.get("entryNia", 0) if explicit else 0
-                if explicit and "entryNia" in explicit:
-                    target_bytes = artifacts.get(target.get("filename"))
-                    if not target_bytes:
-                        raise ValueError(f"NS[{slot}]: fresh startup entry must be resident")
-                    target_header = struct.unpack_from(">I", target_bytes)[0]
-                    if entry_nia >= ((target_header >> 10) & 0x1fff):
-                        raise ValueError(f"NS[{slot}]: entry NIA is outside the selected entry LUMP code")
+                # NIA must fit its encoded field, but whether it lies in the
+                # target's code is a runtime check, not an IDE build condition.
                 raw = build_fresh_thread_lump(allocation_words=item["words"], stack_words=32,
                                              entry_slot=target["slot"], entry_sequence=target["seq"],
                                              entry_nia=entry_nia,

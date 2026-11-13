@@ -103,7 +103,7 @@ def test_invalid_design_never_commits(store, change):
     assert not store.path.exists()
 
 
-def test_explicit_saved_fault_handler_is_resident_and_roundtrips(store):
+def test_explicit_saved_fault_handler_encoding_roundtrips_without_runtime_proof(store):
     current = store.read()
     draft = copy.deepcopy(current["document"])
     handler = next(r for r in draft["rows"] if r["kind"] == "lump" and r.get("selection"))
@@ -111,13 +111,29 @@ def test_explicit_saved_fault_handler_is_resident_and_roundtrips(store):
     draft["faultHandlerSlot"] = handler["slot"]
     store.save(dict(fingerprint=current["fingerprint"], document=draft))
     assert store.read()["document"]["faultHandlerSlot"] == handler["slot"]
-    for invalid in (True, None, "7", 2, 63):
+    for invalid in (True, None, "7", 0, -1, 65536):
         bad = copy.deepcopy(draft)
         bad["faultHandlerSlot"] = invalid
-        with pytest.raises(ValueError, match="Saved fault handler"):
+        with pytest.raises(ValueError, match="Fault handler slot"):
             validate(bad)
     handler["policy"] = "Lazy"
-    with pytest.raises(ValueError, match="Saved fault handler"):
+    validate(draft)
+    for target in (2, 63, 65535):
+        draft["faultHandlerSlot"] = target
+        validate(draft)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("entrySlot", 0), ("actorSlot", 65536), ("entrySlot", -1),
+    ("entryNia", 32767), ("actorSlot", True),
+])
+def test_runtime_deferral_keeps_thread_encoding_checks(store, field, value):
+    draft = store.read()["document"]
+    thread = next(row for row in draft["rows"] if row["kind"] == "thread" and row["slot"] != 2)
+    thread["preparedThread"] = dict(entrySlot=63, actorSlot=62, entryNia=32000)
+    validate(draft)  # absent destinations and out-of-code NIA are runtime issues
+    thread["preparedThread"][field] = value
+    with pytest.raises(ValueError):
         validate(draft)
 
 
