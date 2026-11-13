@@ -284,3 +284,11 @@
 .kiss-workbench .nb-legend span { display:flex; align-items:center; gap:5px; }
 .kiss-workbench .nb-legend i { width:9px; height:9px; border-radius:2px; display:inline-block; }
 .kiss-workbench .nb-lump text { font-size:7px; }
+.kiss-workbench .nb-unplaced { list-style:none; margin:8px 0 0; padding:0; width:100%; font-size:10px; display:grid; gap:3px; }
+.kiss-workbench .nb-unplaced li { display:flex; justify-content:space-between; gap:8px; color:var(--kiss-muted); }
+.kiss-workbench .nb-proposed { width:100%; margin-top:10px; display:grid; gap:4px; }
+.kiss-workbench .nb-proposed-bar { display:flex; height:12px; gap:1px; background:#101722; border:1px solid #304153; border-radius:3px; overflow:hidden; }
+.kiss-workbench .nb-proposed-bar button { padding:0; border:0; border-radius:0; flex-basis:0; min-width:3px; }
+.kiss-workbench .nb-saved text { font-size:7px; }
+.kiss-workbench .nb-legend .nb-legend-rel { background:transparent; border:2px solid #fff0b1; }
+.kiss-workbench .nb-plan-block text { font-size:7px; }

@@ -59,6 +59,17 @@ function DefaultFallback({ error, resetError }: ErrorFallbackProps) {
         >
           Try again
         </button>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-4 ml-3 rounded bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700"
+        >
+          Reload view
+        </button>
+        <p className="mt-2 text-sm">
+          If retrying fails after an update, reload this view to fetch the current code.
+          This does not save a design or send anything to hardware.
+        </p>
       </div>
     </div>
   );

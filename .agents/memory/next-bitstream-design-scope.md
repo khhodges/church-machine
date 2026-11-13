@@ -33,6 +33,24 @@ Memory Glass and bidirectional selection between membership rows and glass.
 
 **Why:** The design workspace must make Namespace-to-LUMP relationships visible.
 
-**How to apply:** Until a common placement is defined, label the combined view
-schematic; independent saved Namespace addresses do not establish a shared
-physical layout. Matching artifact references do not grant cross-root authority.
+**How to apply:** The user explicitly rejected both equal-height schematic bands
+and overlapping A/B comparison lanes. Both Namespaces must coexist in one
+physical memory map with strictly disjoint allocations and proportional sizes.
+They run concurrently, executing sequentially on one FPGA without replacing
+memory when switching. Propose relocated ranges without modifying saved inputs;
+unknown sizes block placement, and proposed addresses are not a generated or
+rebound executable image. Matching artifact references do not grant cross-root
+authority or imply permission to share mutable copies.
+
+The Boot Namespace must hold MMIO and NS-GTs and run the abstractions as FPGA
+services. Other Namespaces provide their starter Thread at Slot 2. Amoeba is
+shared by all Threads and organizes round-robin execution; Threads use CR5 for
+private data. Whether the other Namespaces may contain additional Threads needs
+clarification of the user's phrase "and anot others."
+
+**Why:** The user specified the Boot/service and application-Namespace roles;
+duplicating complete standalone boot environments for A and B is not that model.
+
+**How to apply:** Treat these as next-bitstream architecture requirements, not
+evidence of an implemented scheduler, authorized hardware change, or permission
+to overwrite historical saved Namespace layouts.
