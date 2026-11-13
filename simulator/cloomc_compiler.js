@@ -1,4 +1,63 @@
 const FULL_ONLY_OPCODES = [4, 5, 7, 8, 9];
+// In-process diagnostic provenance, not serialized metadata or ISA authority.
+// Only the exact code array emitted by this compiler can recover these records.
+const NATIVE_FAULT_DIAGNOSTICS = new WeakMap();
+const NATIVE_FAULT_IMAGES = new Map();
+function rememberNativeFaultImage(words, sites) {
+    const key = words.join(',');
+    const previous = NATIVE_FAULT_IMAGES.get(key);
+    // Identical instructions can have different authored reasons. Never guess
+    // which source owns those bytes after the IDE has copied the array.
+    const record = Object.freeze({
+        words: Object.freeze(words.slice()),
+        sites: Object.freeze(sites.map(site => Object.freeze({...site}))),
+    });
+    NATIVE_FAULT_IMAGES.set(key, previous === null ||
+        (previous && JSON.stringify(previous.sites) !== JSON.stringify(sites))
+        ? null : record);
+    // Diagnostic cache only; eviction means an explicit unknown diagnosis.
+    if (NATIVE_FAULT_IMAGES.size > 128)
+        NATIVE_FAULT_IMAGES.delete(NATIVE_FAULT_IMAGES.keys().next().value);
+}
+function rememberNativeFaultProgram(result) {
+    if (result.errors.length || !result.methods) return;
+    const methods = result.methods;
+    const flat = [], flatSites = [], offsets = new Map();
+    let cursor = methods.length;
+    for (const m of methods) {
+        const record = NATIVE_FAULT_DIAGNOSTICS.get(m.code);
+        if (record && record.words.every((w, i) => w === m.code[i]) &&
+            record.words.length === m.code.length) {
+            flatSites.push(...record.sites.map(s => ({...s, addr: flat.length + s.addr})));
+        }
+        flat.push(...(m.code || []));
+        if (!m.aliasOf) {
+            offsets.set(m.name, cursor);
+            cursor += (m.code || []).length;
+        }
+    }
+    rememberNativeFaultImage(flat, flatSites);
+    const words = methods.map(m => m.visibility === 'private' ? 0 :
+        (offsets.get(m.aliasOf || m.name) ?? -1) + 1);
+    const sites = [];
+    for (const m of methods) {
+        if (m.aliasOf) continue;
+        const base = words.length;
+        const record = NATIVE_FAULT_DIAGNOSTICS.get(m.code);
+        if (record && record.words.length === m.code.length &&
+            record.words.every((w, i) => w === m.code[i]))
+            sites.push(...record.sites.map(s => ({...s, addr: base + s.addr})));
+        words.push(...(m.code || []));
+        for (const ref of m.crossMethodRefs || []) {
+            if (!offsets.has(ref.target)) return;
+            const displacement = offsets.get(ref.target) - (base + ref.addr);
+            if (Math.abs(displacement) > 0x3ffff) return;
+            words[base + ref.addr] = ((words[base + ref.addr] & ~0x7fffff) |
+                (displacement < 0 ? 0x40000 : 0) | Math.abs(displacement)) >>> 0;
+        }
+    }
+    rememberNativeFaultImage(words, sites);
+}
 const FULL_ONLY_OPCODE_NAMES = { 4: 'CHANGE', 5: 'SWITCH', 7: 'LAMBDA', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
 
 // Compiler-owned configuration, never loaded from functional-contract prose.
@@ -696,6 +755,7 @@ class CLOOMCCompiler {
                 result.errors.push({line:error.line || null, message:error.message});
             }
         }
+        rememberNativeFaultProgram(result);
         return result;
     }
 
@@ -2424,6 +2484,20 @@ class CLOOMCCompiler {
 
         const crossMethodRefs = this._crossMethodRefs;
         this._crossMethodRefs = null;
+        if (errors.length === 0) {
+            const sites = manifest.filter(m => m.hardfault).map(m => ({
+                addr: m.addr, kind: 'authored', reason: m.hardfault.reason,
+                explanation: m.hardfault.explanation, sourceLine: m.src,
+                method: method.name,
+            }));
+            for (const c of method._symbolicCalls || []) {
+                sites.push({addr: c.addr, kind: 'call', target: c.full_name});
+            }
+            if (sites.length) NATIVE_FAULT_DIAGNOSTICS.set(code, {
+                words: Object.freeze(code.slice()),
+                sites: Object.freeze(sites.map(s => Object.freeze(s))),
+            });
+        }
         return { code, errors, warnings, manifest, crossMethodRefs,
             symbolicCalls: (method._symbolicCalls || []).map(c => ({
                 addr: c.addr, full_name: c.full_name, row: c.row,
@@ -6201,6 +6275,16 @@ class CLOOMCCompiler {
     }
 }
 
+// Available both as browser scripts and CommonJS; only compiler-owned records
+// are exposed. No caller-supplied source maps are accepted.
+CLOOMCCompiler.getNativeFaultDiagnostics = words => {
+        const record = NATIVE_FAULT_DIAGNOSTICS.get(words);
+        return record && record.words.length === words.length &&
+            record.words.every((w, i) => w === words[i])
+            ? Object.freeze({...record}) : null;
+};
+CLOOMCCompiler.getNativeFaultImage = words =>
+    NATIVE_FAULT_IMAGES.get(Array.from(words, w => w >>> 0).join(',')) || null;
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CLOOMCCompiler;
 }

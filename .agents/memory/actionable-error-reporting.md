@@ -83,3 +83,16 @@ re-rendered while its request was pending.
 
 **How to apply:** Continue only for the same fault record; cancellation or a
 different incident must still prevent delayed navigation.
+
+Native trap explanations require compiler provenance through final code layout,
+not just an original method-array identity. Treat conflicting explanations for
+identical instruction bytes as unknown unless stronger artifact evidence resolves them.
+
+**Why:** The IDE copies compiled arrays and LUMP assembly relocates private
+branches; static HARDFAULT reasons do not themselves affect instruction bytes.
+An in-process method-only test can therefore pass while the ordinary loader
+loses the explanation, and byte equality alone cannot choose between reasons.
+
+**How to apply:** Verify copied and relocated final images, preserve the existing
+fault behavior, and never prescribe rebinding merely because the shared trap
+encoding could also represent an unresolved CALL.

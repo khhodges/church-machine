@@ -23,6 +23,7 @@ const ARCH_PROFILE_NAME = 'simulator-v20';
 // Private copies prevent a mutable browser cache (or a matching identifier
 // attached to unrelated bytes) from restoring simulation provenance.
 const SIMULATION_IMAGE_BINDINGS = new WeakMap();
+const NATIVE_FAULT_BINDINGS = new WeakMap();
 function sameSimulationImage(left, right) {
     if (!left || !right || left.byteLength !== right.byteLength) return false;
     const bytes = new Uint8Array(right);
@@ -1362,6 +1363,7 @@ class ChurchSimulator {
     }
 
     reset(reason = null) {
+        NATIVE_FAULT_BINDINGS.delete(this);
         this.simulationConfiguration = null;
         // Reset alone has no configuration. A subsequent successful loader
         // restores it only when every byte matches the activated private image.
@@ -10964,6 +10966,45 @@ class ChurchSimulator {
         });
     }
 
+    // Headless diagnostic attachment only: never installs bytes or grants access.
+    // Full method bytes must still match at the physical fault site.
+    registerNativeFaultDiagnostics(words, startAddr, finalImage = false) {
+        const compiler = typeof CLOOMCCompiler !== 'undefined' ? CLOOMCCompiler :
+            (typeof module !== 'undefined' && module.exports
+                ? require('./cloomc_compiler.js') : null);
+        if (!compiler) return false;
+        if (!Number.isSafeInteger(startAddr) || startAddr < 0 ||
+            startAddr + words.length > this.memory.length) return false;
+        const bindings = NATIVE_FAULT_BINDINGS.get(this) || new Map();
+        for (const [address, binding] of bindings) {
+            if (binding.startAddr < startAddr + words.length &&
+                startAddr < binding.startAddr + binding.record.words.length) {
+                bindings.delete(address);
+            }
+        }
+        NATIVE_FAULT_BINDINGS.set(this, bindings);
+        const record = finalImage ? compiler.getNativeFaultImage(words) :
+            compiler.getNativeFaultDiagnostics(words);
+        if (!record) return false;
+        for (const site of record.sites) bindings.set(startAddr + site.addr, {
+            startAddr, record, site,
+        });
+        NATIVE_FAULT_BINDINGS.set(this, bindings);
+        return true;
+    }
+
+    _nativeTrapDiagnostic(raw, address) {
+        const binding = NATIVE_FAULT_BINDINGS.get(this)?.get(address);
+        const hex = `0x${(raw >>> 0).toString(16).toUpperCase()}`;
+        if (binding && binding.record.words.every(
+            (w, i) => (w >>> 0) === this.memory[binding.startAddr + i])) {
+            const site = binding.site;
+            if (site.kind === 'authored') return `HardFault: authored HARDFAULT ${site.reason}: ${site.explanation} (${site.method}, source line ${site.sourceLine}; ${hex}).`;
+            if (site.kind === 'call') return `HardFault: executed an unresolved symbolic CALL placeholder for ${site.target} (${hex}). Bind Namespace Design to resolve it; Run/Step/Walk never rebind.`;
+        }
+        return `HardFault: executed trap/zero WORD encoding ${hex}. No exact compiler provenance is available to distinguish an authored HARDFAULT from an unresolved symbolic CALL or inline data.`;
+    }
+
     loadProgram(words, startAddr, targetSlot = null) {
         if (this.simulationConfiguration) {
             throw new Error('Programmer code cannot replace an activated simulation. Select its approved revision in a new configuration.');
@@ -11007,6 +11048,7 @@ class ChurchSimulator {
                         this.writePersistentWord(newLumpBase,
                             this.packLumpHeader(n_minus_6, words.length, 0, 0));
                         // Write code words starting at word 1
+                        this.registerNativeFaultDiagnostics(words, newLumpBase + 1, true);
                         for (let i = 0; i < words.length; i++) {
                             this.writePersistentWord(newLumpBase + 1 + i, words[i]);
                         }
@@ -11065,6 +11107,7 @@ class ChurchSimulator {
         // Code fits in the existing lump (or pre-boot load): write words directly.
         // +1: lump header occupies word 0; code starts at word 1.
         const codeStart = this.bootComplete ? baseAddr + 1 : baseAddr;
+        this.registerNativeFaultDiagnostics(words, codeStart, true);
         for (let i = 0; i < words.length; i++) {
             if (codeStart + i < this.memory.length) {
                 this.writePersistentWord(codeStart + i, words[i]);
@@ -11374,6 +11417,9 @@ class ChurchSimulator {
                 _identity.ordinary ? _identity.entry.cacheToken : (this.memory[nsBase + 3] >>> 0));
         });
 
+        this.registerNativeFaultDiagnostics(
+            this.memory.slice(installBase + 1, installBase + 1 + hdr.cw),
+            installBase + 1, true);
         // writeNSEntry is the canonical commit mechanism.  Assert the exact
         // four words it wrote for ordinary LUMPs so a future ABI drift cannot
         // make a valid binary run under an incoherent Namespace entry.
@@ -13045,7 +13091,7 @@ class ChurchSimulator {
                 return null;
             case 0x1E:
                 if (((d.raw >>> 0) & 0x7FFFFF) === 0) {
-                    this.fault('INVALID_OP', `HardFault: executed an unresolved symbolic CALL placeholder 0x${(d.raw >>> 0).toString(16).toUpperCase()} (or a zero WORD constant).`+' Bind Namespace Design to resolve it; Run/Step/Walk never rebind.');
+                    this.fault('INVALID_OP', this._nativeTrapDiagnostic(d.raw, fetch.addr));
                     return null;
                 }
                 this.fault('INVALID_OP', `WORD (opcode 0x1E) is an inline data constant and cannot be executed — check your RETURN placement`);

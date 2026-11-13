@@ -88,6 +88,7 @@ for(const label of ['reserve_complete','irreversible_latched','version_advanced'
             label+':\n HARDFAULT "injected publication cut"')}});
     const result=trial.run();
     assert(result.fault,label);
+    assert.match(result.fault.message, /authored HARDFAULT EXPLICIT_FAULT: injected publication cut/);
     assert.equal(result.events.filter(e=>e.kind==='released').length,0,label);
     assert.equal(trial.s.memory[BASE.state+4],1,'no unpublished block became clean');
 }
@@ -101,6 +102,7 @@ for(let offset=0;offset<8;offset++){
 continue_clear_cut:`)}});
     const result=trial.run();
     assert(result.fault,`clear word ${offset}`);
+    assert.match(result.fault.message, /authored HARDFAULT EXPLICIT_FAULT: injected clear cut/);
     assert.equal(result.events.filter(e=>e.kind==='clean').length,0);
     assert.equal(trial.s.memory[BASE.state+34],4);
 }
@@ -127,3 +129,4 @@ for(const method of ['Acquire','ReserveRelease','BeginInvalidate','StageReleased
     }
 }
 console.log(`PASS ${exercised} before/after custody and state-write fault cuts`);
+require('./test_native_fault_diagnostics');

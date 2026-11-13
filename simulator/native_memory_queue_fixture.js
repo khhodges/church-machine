@@ -140,6 +140,8 @@ function fixture({versions = [7,13], modes = ['cycle','cycle'], active = [true,t
             program.slot = SLOT[name];
             entry(program.slot, codeBase, program.lump.words.length - 1);
             s.memory.set(program.lump.words, codeBase);
+            s.registerNativeFaultDiagnostics(
+                program.lump.words.slice(1, 1 + program.lump.cw), codeBase + 1, true);
             codeBase += program.lump.words.length + 64;
         }
         assert(codeBase < BASE.word, 'code must not alias queue or data storage');
