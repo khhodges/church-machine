@@ -27,3 +27,12 @@ environment; distinguish tested behavior from an inferred root cause.
 
 **How to apply:** Check both A/B independently, focus-loss ordering, and the
 user's viewport. Do not describe an untested browser-specific cause as proven.
+
+The user wants A/B alternatives as left-side tabs with individual LUMPs in one
+Memory Glass and bidirectional selection between membership rows and glass.
+
+**Why:** The design workspace must make Namespace-to-LUMP relationships visible.
+
+**How to apply:** Until a common placement is defined, label the combined view
+schematic; independent saved Namespace addresses do not establish a shared
+physical layout. Matching artifact references do not grant cross-root authority.

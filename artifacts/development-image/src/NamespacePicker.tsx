@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 
 type Props = {
   id: string;
@@ -9,63 +9,34 @@ type Props = {
   options: {value: string; label: string}[];
 };
 
-// Render the popup in the document rather than the browser's native select UI.
-// This keeps the list visible inside the IDE's nested preview frames.
+// Native disclosure, ordinary buttons, and in-flow content: no popup layer,
+// focus transfer on opening, or blur handlers that can swallow a choice click.
 export default function NamespacePicker({id, label, value, onChange, loading, options}: Props) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const disclosure = useRef<HTMLDetailsElement>(null);
+  const summary = useRef<HTMLElement>(null);
   const items = [{value: "", label: "Unassigned"}, ...options];
-  const [active, setActive] = useState(0);
-  useEffect(() => {
-    if (!open) return;
-    const dismiss = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", dismiss);
-    return () => document.removeEventListener("pointerdown", dismiss);
-  }, [open]);
-  useEffect(() => {
-    if (open) root.current?.querySelectorAll<HTMLButtonElement>('[role="option"]')[active]?.focus();
-  }, [open, active]);
-  function show() {
-    setActive(Math.max(0, items.findIndex(item => item.value === value)));
-    setOpen(true);
+  function close() {
+    if (disclosure.current) disclosure.current.open = false;
+    summary.current?.focus();
   }
-  return <div ref={root} className="nb-picker" onBlur={event => {
-    // Safari and nested frames can report a null relatedTarget during pointer
-    // focus changes. Do not unmount options before their click can arrive.
-    // Pointer dismissal is owned by the document pointerdown listener.
-    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
-  }} onKeyDown={event => {
-    if (event.key === "Escape" && open) {
-      event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus();
+  return <details ref={disclosure} className="nb-picker" onKeyDown={event => {
+    if (event.key === "Escape") {
+      event.preventDefault(); event.stopPropagation(); close();
     }
   }}>
-    <button ref={trigger} type="button" id={id} aria-label={label} aria-haspopup="listbox"
-      aria-expanded={open} aria-controls={open ? `${id}-list` : undefined} disabled={loading}
-      className="nb-picker-trigger" onClick={() => open ? setOpen(false) : show()}
-      onKeyDown={event => {
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); show(); }
-      }}>
-      <span>{loading ? "Loading Namespaces…" : options.find(option => option.value === value)?.label || "Unassigned"}</span>
-      <span aria-hidden="true">▾</span>
-    </button>
-    {open && <div id={`${id}-list`} role="listbox" aria-label={label} className="nb-picker-list"
-      onKeyDown={event => {
-        if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-          event.preventDefault();
-          setActive(index => event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 :
-            (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length);
-        }
-      }}>
-      {items.map((option, index) => <button type="button" role="option" key={option.value}
-        aria-selected={option.value === value} tabIndex={index === active ? 0 : -1}
-        className="nb-picker-option" onClick={() => {
-          onChange(option.value); setOpen(false); trigger.current?.focus();
-        }}>
-        <span>{option.label}</span>{option.value === value && <span aria-hidden="true">✓</span>}
-      </button>)}
-    </div>}
-  </div>;
+    <summary ref={summary} id={id} aria-label={`Choose ${label}`} className="nb-picker-trigger">
+      <span>{loading ? "Loading Namespaces…" : items.find(option => option.value === value)?.label || "Unassigned"}</span>
+      <span className="nb-picker-action">Choose</span>
+    </summary>
+    <div id={`${id}-list`} role="group" aria-label={`${label} choices`} className="nb-picker-list">
+      {loading ? <p role="status">Loading saved Namespaces…</p> :
+        items.map(option => <button type="button" key={option.value}
+          aria-pressed={option.value === value} className="nb-picker-option"
+          onClick={() => { onChange(option.value); close(); }}>
+          <span>{option.label}</span>
+          {option.value === value && <span aria-hidden="true">✓</span>}
+        </button>)}
+      {!loading && !options.length && <p role="status">No saved Namespaces are available. Check the catalog message below.</p>}
+    </div>
+  </details>;
 }

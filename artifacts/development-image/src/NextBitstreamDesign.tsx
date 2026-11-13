@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { request } from "./image-api";
 import type { CatalogEntry } from "./image-api";
@@ -7,6 +7,11 @@ import { checkDraft, REGION_LABELS } from "./next-bitstream";
 import type { DraftInputs, DraftRegionKey } from "./next-bitstream";
 import NamespacePicker from "./NamespacePicker";
 import { readPlanningDraft, rememberPlanningDraft } from "./next-bitstream-draft";
+import { associate, glassKeyFor, lumpMembers, pickFromGlass, sideOf } from "./nb-association";
+import type { GlassLump, LumpPick, Side } from "./nb-association";
+import { useNamespaceInspection } from "./use-namespace-inspection";
+import NbNamespaceTabs, { SIDE_COLORS } from "./NbNamespaceTabs";
+import NbGlassLumps from "./NbGlassLumps";
 
 const COLORS: Record<DraftRegionKey, string> = {namespaceA: "#73d7c0", namespaceB: "#b8a1ee", lumpZone: "#e9c46a"};
 const EMPTY: DraftInputs = {total: "", namespaceA: "", namespaceB: "", lumpZone: ""};
@@ -25,6 +30,19 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
   useEffect(() => { rememberPlanningDraft({refA, refB, draft}); }, [refA, refB, draft]);
   const [selected, setSelected] = useState<DraftRegionKey | null>(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<Side>("A");
+  const [pick, setPick] = useState<LumpPick | null>(null);
+  const inspA = useNamespaceInspection(refA, entries);
+  const inspB = useNamespaceInspection(refB, entries);
+  useEffect(() => { setPick(prev => prev?.side === "A" ? null : prev); }, [refA]);
+  useEffect(() => { setPick(prev => prev?.side === "B" ? null : prev); }, [refB]);
+  const rowsOf = (st: typeof inspA.state) => st.status === "ready" ? (st.inspection.layoutRows ?? st.inspection.rows) : [];
+  const members = {A: lumpMembers("A", rowsOf(inspA.state)), B: lumpMembers("B", rowsOf(inspB.state))};
+  const lumpItems = associate(members.A, members.B);
+  const glassKey = glassKeyFor(lumpItems, pick);
+  const pickedItem = lumpItems.find(item => item.key === glassKey);
+  const selectGlassLump = (item: GlassLump) => { const next = pickFromGlass(item, tab); setTab(next.tab); setPick(next.pick); setSelected(null); };
+  const selectZone = (key: DraftRegionKey) => { setSelected(key); setPick(null); };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -60,6 +78,13 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
   const scale = check.scaleWords;
   const drawn = check.regions.filter(r => r.words !== null && r.start !== null && scale > 0);
   const shape = `M49 ${glassTop} H191 L181 ${glassBottom - 10} Q120 ${glassBottom + 17} 59 ${glassBottom - 10} Z`;
+  const lumpDrawn = drawn.find(r => r.key === "lumpZone");
+  const lumpBand = lumpDrawn ? (() => {
+    const words = Math.min(lumpDrawn.words!, Math.max(0, scale - lumpDrawn.start!));
+    return {top: glassTop + (scale - lumpDrawn.start! - words) / scale * glassHeight, height: words / scale * glassHeight};
+  })() : {top: glassTop + 4, height: glassHeight - 26};
+  const schematicOnly = !lumpDrawn || lumpBand.height < lumpItems.length * 4;
+  const band = schematicOnly ? {top: glassTop + 4, height: glassHeight - 26} : lumpBand;
   const set = (key: keyof DraftInputs) => (value: string) => setDraft(prev => ({...prev, [key]: value}));
 
   return (
@@ -108,9 +133,9 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                       <tr key={region.key} className={selected === region.key ? "kiss-active" : undefined}>
                         <td>{String(i + 1).padStart(2, "0")}</td>
                         <td><span className="kiss-slot-color" style={{"--kiss-lump-color": COLORS[region.key]} as CSSProperties} aria-hidden="true" />
-                          <button className="kiss-slot-button" style={{"--kiss-lump-color": COLORS[region.key]} as CSSProperties} aria-pressed={selected === region.key} onClick={() => setSelected(region.key)}>{regionName(region.key)}</button>
+                          <button className="kiss-slot-button" style={{"--kiss-lump-color": COLORS[region.key]} as CSSProperties} aria-pressed={selected === region.key} onClick={() => selectZone(region.key)}>{regionName(region.key)}</button>
                           <span className="kiss-tag">proposed</span></td>
-                        <td><input className="nb-input" aria-label={`${region.label} size in words`} placeholder="unspecified" value={draft[region.key]} onChange={e => set(region.key)(e.target.value)} onFocus={() => setSelected(region.key)} /></td>
+                        <td><input className="nb-input" aria-label={`${region.label} size in words`} placeholder="unspecified" value={draft[region.key]} onChange={e => set(region.key)(e.target.value)} onFocus={() => selectZone(region.key)} /></td>
                         <td className="kiss-kind">{region.start === null ? "—" : `0x${region.start.toString(16).toUpperCase().padStart(8, "0")}`}</td>
                       </tr>
                     ))}
@@ -129,14 +154,26 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                   <button type="button" onClick={() => { setDraft(EMPTY); setSelected(null); }}>Clear sizes</button>
                 </div>
               </div>
+              <div className="kiss-panel-head nb-alt-head"><h2><span className="kiss-step">02</span>Namespace alternatives</h2><span className="kiss-status">Read-only saved LUMPs</span></div>
+              <NbNamespaceTabs tab={tab} onTab={setTab}
+                names={{A: refA ? nameOf(refA) ?? "" : "", B: refB ? nameOf(refB) ?? "" : ""}}
+                states={{A: inspA.state, B: inspB.state}} onRetry={side => (side === "A" ? inspA : inspB).retry()}
+                members={members} items={lumpItems} pick={pick} glassKey={glassKey}
+                onPick={next => { setPick(next); setSelected(null); }} />
             </div>
 
             <section className="kiss-water-map" aria-labelledby="nb-glass-title">
               <div className="kiss-water-heading">
                 <div><span className="kiss-step">PROPOSED LAYOUT</span><h4 id="nb-glass-title">Next bitstream memory glass</h4></div>
-                <span className="kiss-water-caveat">{drawn.length} proposed zones</span>
+                <span className="kiss-water-caveat">{drawn.length} proposed zones · {lumpItems.length} LUMPs</span>
               </div>
               <p className="kiss-water-intro">Two resident Namespace regions and one common zone for individual LUMPs, stacked in entry order. Proposed sizes only; not a synthesized, compiled, or verified map.</p>
+              <p className="kiss-water-intro nb-schematic-note">{lumpItems.length === 0 ? "No LUMPs from Namespace A or B yet." : schematicOnly
+                ? "SCHEMATIC shared-LUMP view: equal bands, A then B order. A and B are independent saved address spaces; no positions or sizes here are addresses."
+                : "LUMPs drawn schematically inside the proposed common LUMP zone. Equal bands — saved A/B addresses are independent and are not overlaid."}</p>
+              <div className="nb-legend" aria-label="Association legend">
+                <span><i style={{background: SIDE_COLORS.A}} />A only</span><span><i style={{background: SIDE_COLORS.B}} />B only</span><span><i style={{background: SIDE_COLORS.AB}} />A+B exact identity</span>
+              </div>
               <div className="kiss-glass-layout">
                 <div className="kiss-glass-figure">
                   <div className="kiss-glass-capacity">{check.scaleSource === "proposed-total" ? `${scale.toLocaleString()}-word proposed total` : check.scaleSource === "sum-of-regions" ? "Scale: sum of proposed zones (no total)" : "No proposed sizes"}</div>
@@ -159,13 +196,14 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                         const active = selected === region.key;
                         return <g key={region.key} role="button" tabIndex={0} aria-pressed={active}
                           aria-label={`Select ${regionName(region.key)}, proposed ${region.words} words at word ${region.start}`}
-                          onClick={() => setSelected(region.key)}
-                          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(region.key); } }}
+                          onClick={() => selectZone(region.key)}
+                          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectZone(region.key); } }}
                           className={`kiss-region${active ? " is-selected" : ""}`} style={{"--kiss-lump-color": COLORS[region.key]} as CSSProperties}>
                           <rect x="60" y={y} width="120" height={h} rx="2" style={{opacity: active || !selected ? .85 : .3}} />
                           {h >= 14 && <text x="120" y={y + Math.min(h - 3, 12)} textAnchor="middle">PROPOSED · {region.key === "lumpZone" ? "LUMP ZONE" : region.key === "namespaceA" ? "NS A" : "NS B"}</text>}
                         </g>;
                       })}
+                      <NbGlassLumps items={lumpItems} top={band.top} height={band.height} selectedKey={glassKey} onSelect={selectGlassLump} />
                     </g>
                     <path d={`M55 ${glassTop + 7} V${glassBottom - 19}`} stroke="#e7fff8" strokeOpacity=".25" strokeWidth="3" />
                     {scale > 0 && [0, .25, .5, .75, 1].map((fraction, index) => {
@@ -175,7 +213,7 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                         <text x="32" y={y + 4} textAnchor="end" className="kiss-glass-tick">{Math.round(scale * (1 - fraction)).toLocaleString()}</text>
                       </g>;
                     })}
-                    {drawn.length === 0 && <>
+                    {drawn.length === 0 && lumpItems.length === 0 && <>
                       <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">UNSPECIFIED</text>
                       <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">Enter proposed sizes to draw zones</text>
                     </>}
@@ -183,7 +221,15 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                   <div className="kiss-glass-zero">{check.errors.length ? "Draft has validation errors" : "Proposed — no fit claim"}</div>
                 </div>
                 <aside className="kiss-device-card" aria-label="Selected proposed zone">
-                  {selected ? (() => {
+                  {pickedItem ? <>
+                    <span className="kiss-device-kicker">LUMP · {sideOf(pickedItem) === "AB" ? "SHARED A+B" : `NAMESPACE ${sideOf(pickedItem)} ONLY`}</span>
+                    <strong style={{color: SIDE_COLORS[sideOf(pickedItem)]}}>{pickedItem.name}</strong>
+                    <span className="kiss-device-type">{pickedItem.identity ? `Exact identity ${pickedItem.identity}` : "No exact artifact identity recorded; not matched across A/B."}</span>
+                    <dl className="kiss-inline-details">
+                      {pickedItem.members.map(m => <Fragment key={m.side}><dt>{m.side} slot {m.slot}</dt><dd>{m.words === null ? "size unknown" : `${m.words.toLocaleString()} words (saved)`}</dd></Fragment>)}
+                      <dt>Placement</dt><dd>Unplaced — schematic</dd>
+                    </dl>
+                  </> : selected ? (() => {
                     const region = check.regions.find(r => r.key === selected)!;
                     return <>
                       <span className="kiss-device-kicker">PROPOSED ZONE</span>
