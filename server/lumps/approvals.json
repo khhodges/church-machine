@@ -7296,6 +7296,106 @@
         "signature": "42359f8145397010b2d2c5ad6df91bf84cad46cedcca0136745b5ce0acb040fe"
       },
       "identity_hash": "9ebb8f61b58f65079059c53b6f624e127104841755c10661ad8a6692210d7c63"
+    },
+    "ab367d8598b585e01f6b9b664316865a78655bfe05ad93a1052020073c7dbcba": {
+      "binary_hash": "ab367d8598b585e01f6b9b664316865a78655bfe05ad93a1052020073c7dbcba",
+      "dot_name": "ide.Amoeba",
+      "issue_n": 1,
+      "abstraction": "ide.Amoeba",
+      "filename": "ide.Amoeba.1.0c3e9bc9.lump",
+      "compiled_at": 1794607099.4632034,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.AmoebaTargets",
+            "rights": [
+              "L"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.AmoebaReceiver",
+            "rights": [
+              "R"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.AmoebaControl",
+            "rights": [
+              "W"
+            ],
+            "relocation_row": 3,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.AmoebaUserThread",
+            "rights": [],
+            "relocation_row": 4,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.AmoebaSystemThread",
+            "rights": [],
+            "relocation_row": 5,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.Amoeba",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "ab367d8598b585e01f6b9b664316865a78655bfe05ad93a1052020073c7dbcba",
+        "source_hash": "50c1eec3655ef0dc0eecc5073d409da8eb1e43537db042c2ad66f995ede63f2d",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "d3b95c2c7e6142679d088fe75ea1cea52bb749cea376d41c179bcc12baea78d0",
+          "inputs": {
+            "_ide_hierarchy": {
+              "aliases": {
+                "Boot.Thread": "ide.BootThread",
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3"
+              },
+              "definitions": {},
+              "node": "ide"
+            },
+            "_resolved_call_api_authorities": {},
+            "language": "assembly"
+          }
+        },
+        "hardfault_sites": [
+          {
+            "explanation": "Amoeba delivery validation failed",
+            "method": "EnsureResident",
+            "offset": 60,
+            "reason": "EXPLICIT_FAULT",
+            "sourceLine": 89
+          }
+        ],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "00bc61940cbfba32f3836ebba31999e4dea09d2efe086f7c6eda0f33d0560c1f"
+      },
+      "identity_hash": "07c7e3dfeb54dcdeb56978496c4b81ba6ccc256f8fb698642f2bbe4378d4371f"
     }
   }
 }

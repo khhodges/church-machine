@@ -5446,5 +5446,13 @@
     "lump_version": 1,
     "compiled_at": 1794328697.1557386,
     "operation_id": "073f6fd8c7e64584a7ebdc933cc19350"
+  },
+  {
+    "token": "0fe93c8c",
+    "abstraction": "ide.Amoeba",
+    "filename": "ide.Amoeba.1.0c3e9bc9.lump",
+    "lump_version": 1,
+    "compiled_at": 1794607099.4632034,
+    "operation_id": "b461200c5d0147e49062a310b3366c0f"
   }
 ]

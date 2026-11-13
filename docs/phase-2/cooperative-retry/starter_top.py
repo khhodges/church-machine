@@ -30,7 +30,10 @@ BOOT_GUARD = (46 << 9) | 419
 class StarterTop(Elaboratable):
     def __init__(self, *, clock_hz=25_000_000, baud=57600, sim_mode=False,
                   lump_records=None, caller_records=None, general_image=False,
-                  boot_guard=None):
+                   boot_guard=None, amoeba_records=None, staging_base=0xa000,
+                   staging_words=1024):
+        if amoeba_records is not None and (not general_image or lump_records is not None):
+            raise ValueError("Amoeba requires general-image mode without legacy CLP1")
         if general_image and lump_records is not None:
             raise ValueError("General images cannot use the fixed demonstration CLP1 receiver")
         if general_image:
@@ -54,6 +57,12 @@ class StarterTop(Elaboratable):
         self.diagnostic = RequestDiagnostic()
         self.lump_receiver = None
         self.observer = None
+        self.amoeba_mode = amoeba_records is not None
+        self.staging_base = staging_base if self.amoeba_mode else 0xa000
+        if self.amoeba_mode:
+            from .amoeba_receiver import AmoebaReceiver
+            self.lump_receiver = AmoebaReceiver(amoeba_records, clock_hz=clock_hz,
+                staging_base=staging_base, staging_words=staging_words)
         if lump_records is not None:
             from .combined_receiver import CombinedReceiver
             from .combined_observer import CombinedObserver
@@ -82,6 +91,7 @@ class StarterTop(Elaboratable):
         m.submodules.diagnostic = DomainRenamer("execution")(diag)
         if lump is not None:
             m.submodules.lump_receiver = DomainRenamer("execution")(lump)
+        if self.observer is not None:
             m.submodules.observer = DomainRenamer("execution")(self.observer)
         m.d.comb += [
             ClockSignal("execution").eq(ClockSignal("sync")),
@@ -101,11 +111,15 @@ class StarterTop(Elaboratable):
             diag.byte.eq(rx.data), diag.error.eq(rx.error & ~enable),
             arb.req[0].eq(tr.tx_req), arb.data[0].eq(tr.tx_byte),
             arb.last[0].eq(tr.tx_last), tr.tx_ack.eq(arb.ack[0]),
-            arb.req[1].eq((self.observer.tx_req if lump is not None else diag.tx_req) &
+            arb.req[1].eq((lump.tx_req if self.amoeba_mode else
+                          self.observer.tx_req if lump is not None else diag.tx_req) &
                           ~ctl.execution_reset),
-            arb.data[1].eq(self.observer.tx_byte if lump is not None else diag.tx_byte),
-            arb.last[1].eq(self.observer.tx_last if lump is not None else diag.tx_last),
-            (self.observer.tx_ack if lump is not None else diag.tx_ack).eq(arb.ack[1]),
+            arb.data[1].eq(lump.tx_byte if self.amoeba_mode else
+                          self.observer.tx_byte if lump is not None else diag.tx_byte),
+            arb.last[1].eq(lump.tx_last if self.amoeba_mode else
+                          self.observer.tx_last if lump is not None else diag.tx_last),
+            (lump.tx_ack if self.amoeba_mode else
+             self.observer.tx_ack if lump is not None else diag.tx_ack).eq(arb.ack[1]),
             arb.ready.eq(~tx.busy & ~tx.done),
             tx.start.eq(arb.tx_start), tx.data.eq(arb.tx_data),
         ]
@@ -131,7 +145,7 @@ class StarterTop(Elaboratable):
             core.ns_rd_data.eq(Cat(rd.data, Const(0, 96))),
             core.clist_rd_data.eq(rd.data),
             inspect.addr.eq(Mux(ctl.validate_request, sha.address,
-                (0xa000 // 4 + lump.read_address) if lump is not None else diag.mem_addr)),
+                (self.staging_base // 4 + lump.read_address) if lump is not None else diag.mem_addr)),
             sha.data.eq(inspect.data), diag.mem_data.eq(inspect.data),
         ]
         if lump is not None:
@@ -206,6 +220,11 @@ class StarterTop(Elaboratable):
                     m.d.comb += mmio_data.eq(lump.selector)
                 with m.Case(0x40000028):
                     m.d.comb += mmio_data.eq(lump.transaction)
+                if self.amoeba_mode:
+                    with m.Case(0x4000002c):
+                        m.d.comb += mmio_data.eq(lump.size)
+                    with m.Case(0x40000034):
+                        m.d.comb += mmio_data.eq(lump.expected_header)
         mmio_valid, ram_valid = Signal(), Signal()
         mmio_latched = Signal(32)
         m.d.execution += [
@@ -247,14 +266,23 @@ class StarterTop(Elaboratable):
                 lump.commit.eq(core.dmem_wr_en & ctl.program_write_allowed &
                     ~core.sim_watchdog.block_program_writes &
                     (core.dmem_addr == 0x40000028) &
-                    (core.dmem_wr_data == lump.transaction)),
+                    (Const(1) if self.amoeba_mode else
+                     (core.dmem_wr_data == lump.transaction))),
             ]
+            if self.amoeba_mode:
+                m.d.comb += [
+                    lump.commit_transaction.eq(core.dmem_wr_data),
+                    lump.request.eq(core.dmem_wr_en & ctl.program_write_allowed &
+                        ~core.sim_watchdog.block_program_writes &
+                        (core.dmem_addr == 0x40000030)),
+                    lump.request_slot.eq(core.dmem_wr_data),
+                ]
         m.d.comb += [
             self.program_commit.eq(cpu_write & ctl.program_write_allowed &
                                    ~core.sim_watchdog.block_program_writes),
             wr.en.eq(ctl.memory_write | self.program_commit | staging_write),
             wr.addr.eq(Mux(ctl.memory_write, ctl.memory_address,
-                Mux(staging_write, 0xa000 // 4 + lump.memory_address, rd.addr)
+                Mux(staging_write, self.staging_base // 4 + lump.memory_address, rd.addr)
                 if lump is not None else rd.addr)),
             wr.data.eq(Mux(ctl.memory_write, ctl.memory_data,
                 Mux(staging_write, lump.memory_data,
@@ -266,7 +294,7 @@ class StarterTop(Elaboratable):
             self.memory_write.eq(wr.en), self.memory_address.eq(wr.addr),
             self.memory_data.eq(wr.data),
         ]
-        if lump is not None:
+        if self.observer is not None:
             obs = self.observer
             m.d.comb += [
                 obs.epoch.eq(self.admitted_epoch), obs.image_digest.eq(self.admitted_digest),

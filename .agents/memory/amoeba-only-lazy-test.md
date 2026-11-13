@@ -32,3 +32,20 @@ USER code uses normal CALL and the automatic suspend/service/retry path.
 Both paths retain runtime authority and integrity checks. This settles the
 behavioral split, not method numbering, register ABI, implementation completion,
 or authorization for hardware operations.
+
+## Native-loader review scope
+
+The user authorized writing CLOOMC Amoeba, compiling and saving a separate
+review LUMP, and including missing **local runtime delivery support**.
+This does not authorize replacing the saved boot design, vendor builds,
+device transfer or flashing.
+
+**Why:** A CLOOMC-only wrapper could not load through the general-image
+runtime; the user explicitly chose to include local runtime support rather
+than save another incomplete wrapper.
+
+**How to apply:** Keep native instruction execution responsible for copying
+and publishing received bodies. Distinguish bounded one-USER/fixed-allocation
+evidence from general scheduling, retirement/GC and exact Boot2 acceptance.
+Saving the portable review artifact is not provisioning its private grants
+or proof that installed hardware implements its interface.

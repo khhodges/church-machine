@@ -1,0 +1,99 @@
+; Native, fixed-allocation Amoeba review candidate.
+; Requires the local CLA1 receiver, NOT the installed CLP1/CSI1 hardware.
+; Targets is a private L table indexed by Namespace slot. Each populated row
+; holds the separately bounded RW grant for that slot's reserved body.
+; No caller-supplied destination address or host publication operation exists.
+; EnsureResident input DR1 = selected Namespace slot. Output DR1 = 0; CR1 kept.
+; Optional SYSTEM startup: initial DR1=slot and CR1=that target's E-GT.
+; DR1=0 skips startup and begins servicing the configured USER.
+; Run is the bounded one-USER service loop; UserStart is that USER's resident
+; entry wrapper, with its application's E capability in home CR1.
+; Retirement, allocator reuse, multiple USER scheduling are not implemented.
+abstraction ide.Amoeba {
+    capabilities {
+        SELF E, ide.AmoebaTargets L, ide.AmoebaReceiver R,
+        ide.AmoebaControl W, ide.AmoebaUserThread, ide.AmoebaSystemThread
+    }
+    main method Run() {
+        ISUB DR8, DR1, #0
+        BRANCHEQ StartUser
+        LOAD CR2, CR6, #0
+        CALL CR2, #1
+        CALL CR1, #0
+    StartUser:
+        LOAD CR1, CR6, #4
+    Dispatch:
+        ; LLR sets Z on reentry. An ordinary USER yield restores this Z=0.
+        ISUB DR8, DR0, #1
+        CHANGE CR1
+        BRANCHNE Dispatch
+        ; Retained LLR injects target Namespace slot in SYSTEM DR5.
+        IADD DR1, DR5, #0
+        LOAD CR2, CR6, #0
+        CALL CR2, #1
+        LOAD CR1, CR6, #4
+        BRANCH Dispatch
+    }
+    method EnsureResident() {
+        LOAD CR2, CR6, #1
+        LOAD CR3, CR2, DR1
+        DREAD DR9, CR3, #0
+        SHL DR7, DR9, #9
+        SHR DR7, DR7, #19
+        ISUB DR8, DR7, #0
+        BRANCHNE Resident
+        LOAD CR4, CR6, #2
+        LOAD CR7, CR6, #3
+        DWRITE DR1, CR7, #2
+    Waiting:
+        DREAD DR7, CR4, #1
+        ISUB DR8, DR7, #4
+        BRANCHEQ Ready
+        ISUB DR8, DR7, #7
+        BRANCHEQ Invalid
+        ; A real self-CHANGE keeps the existing cooperative watchdog contract.
+        ; No timeout converts an unavailable dependency into a successful load.
+        CHANGE CR12
+        BRANCH Waiting
+    Ready:
+        DREAD DR7, CR4, #2
+        ISUB DR8, DR7, DR1
+        BRANCHNE Invalid
+        DREAD DR11, CR4, #4
+        DREAD DR10, CR4, #6
+        ; Compare exact geometry/type/cc against the sealed absent header.
+        SHL DR7, DR10, #9
+        SHR DR7, DR7, #19
+        SHL DR7, DR7, #10
+        ISUB DR8, DR10, DR7
+        ISUB DR8, DR8, DR9
+        BRANCHNE Invalid
+        DREAD DR9, CR4, #0
+        ISUB DR8, DR9, DR10
+        BRANCHNE Invalid
+        IADD DR6, DR0, #1
+    Copy:
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, DR6
+        IADD DR6, DR6, #1
+        ISUB DR8, DR6, DR11
+        BRANCHNE Copy
+        ; Publish code last, after every body/C-list word has been copied.
+        DWRITE DR9, CR3, #0
+        DREAD DR7, CR4, #3
+        DWRITE DR7, CR7, #0
+    Resident:
+        IADD DR1, DR0, #0
+        RETURNAL 2
+    Invalid:
+        HARDFAULT "Amoeba delivery validation failed"
+    }
+    main method UserStart() {
+        CALL CR1, #0
+        LOAD CR11, CR6, #5
+        ; Application result remains DR1. A completed USER does not restart.
+    Finished:
+        CHANGE CR11
+        BRANCH Finished
+    }
+}
