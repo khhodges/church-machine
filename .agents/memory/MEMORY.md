@@ -1,6 +1,7 @@
 - [Next bitstream design scope](next-bitstream-design-scope.md) — separate two-Namespace/common-LUMP planning workspace; three-view Switch loop, no hardware authorization.
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
 - [Tooling and exports](tooling-lessons-index.md) — notebook capture limits, spreadsheet formula caches, Python ABI and TypeScript test compilation.
+- [Offline backend isolation](offline-backend-isolation.md) — importing the live server can start database initialization and services; offline evidence needs a side-effect-free interface.
 - [Mint compiler upgrade scope](mint-compiler-upgrade-scope.md) — focused current-ISA/Mint checks gate the upgrade, not unrelated legacy cleanup; baseline is not new-ABI acceptance.
 - [Runtime fault investigations](runtime-fault-change-approval.md) — explicit approval before NS21 fixes; linked replay guidance avoids false downstream faults.
 - [Mint DESTROY scope](mint-destroy-scope.md) — releases the Namespace slot and object memory; does not collect or erase GT copies.

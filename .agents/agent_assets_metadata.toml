@@ -2376,3 +2376,17 @@ mtime_ms = 1794432008429
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1f5bad67-1d3e-4926-8bbd-7ea801e007dd/59d135dd-4333-4d41-9a04-72fb837eea23"
 storage_version_token = "1794432034385173"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "7XD4MHSW1XRDbYLLP1QbU"
+uri = "file://generated-artifacts/boot2-offline-check/report.html"
+type = "html"
+title = "Boot2 offline compatibility result"
+description = "Retained candidate identity, exact-byte RTL admission results, preservation checks, and scope limits."
+logical_id = "3b4d0145-e095-48bc-bf8b-b562efbeda84"
+content_hash = "sha256:abd1f3dff4c8c614ac307d8aac75fd480e6a6cf3384d9934507bae8e7a4c90ee"
+size = 2325
+mtime_ms = 1794590874687
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3b4d0145-e095-48bc-bf8b-b562efbeda84/1fbba047-7f7e-4e36-a658-9064c252d4fc"
+storage_version_token = "1794590911853764"
+content_type = "text/html"
