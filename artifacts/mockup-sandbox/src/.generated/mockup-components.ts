@@ -12,7 +12,7 @@ export const modules: ModuleMap = {
   "./components/mockups/church-next/Workbench.tsx": () => import("../components/mockups/church-next/Workbench.tsx"),
   "./components/mockups/development-image/Current.tsx": () => import("../components/mockups/development-image/Current.tsx"),
   "./components/mockups/development-image/KISS.tsx": () => import("../components/mockups/development-image/KISS.tsx"),
-  "./components/mockups/hw-formats/HardwareFormats.tsx": () => import("../components/mockups/hw-formats/HardwareFormats.tsx"),
   "./components/mockups/namespace-header/Current.tsx": () => import("../components/mockups/namespace-header/Current.tsx"),
-  "./components/mockups/namespace-header/Reorganized.tsx": () => import("../components/mockups/namespace-header/Reorganized.tsx")
+  "./components/mockups/namespace-header/Reorganized.tsx": () => import("../components/mockups/namespace-header/Reorganized.tsx"),
+  "./components/mockups/hw-formats/HardwareFormats.tsx": () => import("../components/mockups/hw-formats/HardwareFormats.tsx")
 };

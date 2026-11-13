@@ -33,7 +33,10 @@ export default function NamespacePicker({id, label, value, onChange, loading, op
     setOpen(true);
   }
   return <div ref={root} className="nb-picker" onBlur={event => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
+    // Safari and nested frames can report a null relatedTarget during pointer
+    // focus changes. Do not unmount options before their click can arrive.
+    // Pointer dismissal is owned by the document pointerdown listener.
+    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
   }} onKeyDown={event => {
     if (event.key === "Escape" && open) {
       event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus();

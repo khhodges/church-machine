@@ -17,3 +17,13 @@ views mounted.
 
 **How to apply:** Retain the draft in the owning IDE tab's memory without making it
 a saved Namespace or hardware input. A full IDE page reload still clears it.
+
+Dropdown acceptance must include choosing an item and checking the resulting
+label, not merely observing that options exist or a popup opens.
+
+**Why:** Repeated user reports contradicted popup-only audits. Automated desktop
+success alone does not establish success in the user's nested preview or touch
+environment; distinguish tested behavior from an inferred root cause.
+
+**How to apply:** Check both A/B independently, focus-loss ordering, and the
+user's viewport. Do not describe an untested browser-specific cause as proven.
