@@ -159,3 +159,8 @@ pins, vendor synthesis/timing or physical hardware.
 The fixture uses an explicit historical 46/419 boot pair matched to its
 guarded Thread/Namespace structures. It is not the original 0/0 Boot2 image,
 and does not claim to have qualified all eleven Boot2 dependencies.
+
+The subsequent [actual Boot2 qualification](amoeba-boot2-qualification.md)
+provisions all eleven exact selections in isolated Amoeba-only images. It
+demonstrates native CapabilityTest delivery but records a downstream SYSTEM
+absence fault and first-CHANGE USER context faults; Boot2 is **not qualified**.

@@ -1,0 +1,71 @@
+{
+  "mode": "alice",
+  "imageSha256": "1e9bd6c03c6ea6ae8f55ec5c7b14e52226479e5e8ad2986a5d75b3844fe42c16",
+  "rtlManifestSha256": "b478e4bb67ddfb55f6098f18f5f0f44204b2115e5b31494a1bed15f8bdedc8cc",
+  "requests": [],
+  "publications": [],
+  "trace": [
+    {
+      "cycle": 65781,
+      "nia": 4,
+      "dr1": 0
+    },
+    {
+      "cycle": 65838,
+      "nia": 8,
+      "dr1": 0
+    },
+    {
+      "cycle": 65840,
+      "nia": 4112,
+      "dr1": 0
+    },
+    {
+      "cycle": 65842,
+      "nia": 4116,
+      "dr1": 0
+    },
+    {
+      "cycle": 65866,
+      "nia": 4132,
+      "dr1": 0
+    },
+    {
+      "cycle": 65868,
+      "nia": 4136,
+      "dr1": 0
+    },
+    {
+      "cycle": 66005,
+      "nia": 4140,
+      "dr1": 0
+    }
+  ],
+  "handoffs": [],
+  "hardwareOperations": false,
+  "scope": "decoded UART, real RAM/SHA and retained RTL; no instruction translation",
+  "admission": "READY",
+  "outcome": "first-runtime-fault",
+  "cycle": 66005,
+  "fault": 29,
+  "nia": 4140,
+  "faultInstruction": 0,
+  "faultGT": 0,
+  "faultStage": 0,
+  "receiverState": 0,
+  "receiverTransaction": 0,
+  "bootComplete": 1,
+  "targetWriteCounts": {
+    "6": 0,
+    "7": 0,
+    "9": 0,
+    "10": 0,
+    "14": 0,
+    "15": 0,
+    "16": 0,
+    "17": 0,
+    "18": 0,
+    "19": 0,
+    "20": 0
+  }
+}
