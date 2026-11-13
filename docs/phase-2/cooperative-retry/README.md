@@ -1,5 +1,9 @@
 # Cooperative retry: isolated local candidate
 
+For the design-only proposal to admit ordinary prepared Namespace images beyond
+the two demonstrations, see [general image admission review](general-image-admission-review.md).
+It does not change the approved loader policy or establish runtime/Lazy compatibility.
+
 The operator approved a fixed, enabled execution watchdog with no software
 control access for this diagnostic. This does not approve a general watchdog
 control ABI or SecurityRegulator provisioning.
