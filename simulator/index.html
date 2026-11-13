@@ -1248,8 +1248,13 @@
                     </div>
                     <div class="nr-selection">
                         <div class="nr-picker">
-                            <label for="namespaceDesignProfile">Namespace</label>
-                            <select id="namespaceDesignProfile" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
+                            <span id="namespacePickerLabel">Namespace</span>
+                            <details id="namespacePickerMenu" class="nr-namespace-menu">
+                                <summary aria-labelledby="namespacePickerLabel namespacePickerName"><span id="namespacePickerName">Choose Namespace</span> <span aria-hidden="true">▾</span></summary>
+                                <div id="namespacePickerChoices" role="group" aria-label="Saved Namespace choices"></div>
+                                <p id="namespacePickerError" role="alert" hidden></p>
+                            </details>
+                            <select id="namespaceDesignProfile" hidden aria-hidden="true" tabindex="-1" onchange="NamespaceDesignV1.selectShared('namespace:'+this.value).catch(error=>{alert(error.message);NamespaceDesignV1.render()})">
                                 <option value="phase1">Phase 1</option>
                                 <option value="ascending" selected>New Layout</option>
                                 <option value="legacy">Original</option>

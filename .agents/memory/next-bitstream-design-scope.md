@@ -28,6 +28,17 @@ environment; distinguish tested behavior from an inferred root cause.
 **How to apply:** Check both A/B independently, focus-loss ordering, and the
 user's viewport. Do not describe an untested browser-specific cause as proven.
 
+Prefer in-page Namespace choice menus over native select popups in the embedded
+IDE, including Namespace Designer, not just the A/B planner.
+
+**Why:** The user repeatedly reported that the menu itself would not open even
+after option-refresh and missing-catalog fixes. Passing DOM tests do not establish
+native popup behavior in their embedded browser.
+
+**How to apply:** Preserve draft guards, show rejected transitions inline, and
+keep open menus and focused choices stable across background renders. Do not
+claim the underlying browser cause is established.
+
 The user wants A/B alternatives as left-side tabs with individual LUMPs in one
 Memory Glass and bidirectional selection between membership rows and glass.
 

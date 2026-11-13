@@ -47,6 +47,14 @@
 #namespace .namespace-refined :is(button, select, summary):focus-visible { outline: 2px solid var(--nr-gold); outline-offset: 3px; }
 #namespace .namespace-refined .nr-selection { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 0 16px 13px; }
 #namespace .namespace-refined .nr-picker { display: flex; align-items: center; gap: 9px; }
+#namespace .namespace-refined #namespaceDesignProfile[hidden] { display: none; }
+#namespace .nr-namespace-menu { min-width: 220px; max-width: 420px; flex: 1; }
+#namespace .nr-namespace-menu summary { cursor: pointer; padding: 8px 10px; border: 1px solid #64748b; border-radius: 4px; background: #1b1b2c; color: #eee; }
+#namespace .nr-namespace-menu summary:focus-visible { outline: 2px solid #e4bf62; outline-offset: 2px; }
+#namespace #namespacePickerChoices { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; max-height: 280px; overflow-y: auto; }
+#namespace #namespacePickerChoices button { text-align: left; white-space: normal; padding: 8px 10px; min-height: 36px; }
+#namespace #namespacePickerChoices button[aria-pressed="true"] { border-color: #e4bf62; color: #e4bf62; }
+#namespace #namespacePickerError { color: #ffb4a8; white-space: normal; max-width: 400px; }
 #namespace .namespace-refined label { color: var(--nr-muted); font-size: 12px; }
 #namespace .namespace-refined select { min-height: 34px; width: 190px; max-width: 100%; border: 1px solid #53627b; border-radius: 4px; background: #101a29; color: #edf1f7; padding: 5px 30px 5px 10px; cursor: pointer; font-weight: 600; }
 #namespace .namespace-refined .nr-header-status { display: contents; }

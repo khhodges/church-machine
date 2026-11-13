@@ -302,6 +302,43 @@
             if (selector.value !== value) selector.value=value;
             const disabled=state.loading || state.saving;
             if (selector.disabled !== disabled) selector.disabled=disabled;
+            const menu=document.getElementById('namespacePickerMenu');
+            const choices=document.getElementById('namespacePickerChoices');
+            if (!menu || !choices) return;
+            const name=document.getElementById('namespacePickerName');
+            const selectedName=selector.selectedOptions[0]?.textContent || 'Choose Namespace';
+            if (name.textContent !== selectedName) name.textContent=selectedName;
+            if (choices._namespaceOptions !== options) {
+                choices.innerHTML=Array.from(selector.options).map(option=>
+                    `<button type="button" data-namespace-value="${esc(option.value)}">${esc(option.textContent)}</button>`).join('');
+                choices._namespaceOptions=options;
+            }
+            choices.querySelectorAll('button').forEach(button=>{
+                button.disabled=disabled;
+                button.setAttribute('aria-pressed', String(button.dataset.namespaceValue===value));
+            });
+            if (!choices.onclick) choices.onclick=async event=>{
+                const button=event.target.closest('button[data-namespace-value]');
+                if (!button || !choices.contains(button) || button.disabled) return;
+                const error=document.getElementById('namespacePickerError');
+                error.hidden=true;
+                try {
+                    await root.NamespaceDesignV1.selectShared('namespace:'+button.dataset.namespaceValue);
+                    syncNamespacePicker();
+                    menu.open=false;
+                    menu.querySelector('summary').focus();
+                } catch (cause) {
+                    error.textContent=cause.message || String(cause);
+                    error.hidden=false;
+                    syncNamespacePicker();
+                }
+            };
+            if (!menu.onkeydown) menu.onkeydown=event=>{
+                if(event.key==='Escape') {
+                    event.preventDefault(); menu.open=false;
+                    menu.querySelector('summary').focus();
+                }
+            };
         }
     }
     function render() {
