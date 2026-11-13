@@ -16,3 +16,19 @@ dependency itself. Distinguish the minimal AmoebaStartup wrapper from a working
 resident load service. Do not bypass seals, SYSTEM-origin absence faults, or
 pretend an external/preload fixture proves Amoeba delivery. Local tests do not
 authorize hardware operations or changes to the saved live design.
+
+## Explicit SYSTEM loading, automatic USER loading
+
+The user clarified: “Any LUMP called by SYSTEM must be loaded by Amoeba, but
+USERs can use the hidden automatic solution.”
+
+**Why:** SYSTEM must not depend on the USER-to-SYSTEM Lazy CALL handoff to
+service its own missing dependency. This is a runtime-wide rule, not just a
+startup dependency list or a requirement to preload every C-list entry.
+
+**How to apply:** SYSTEM explicitly ensures a target is resident through Amoeba
+before calling it; an already resident target needs no repeated transfer.
+USER code uses normal CALL and the automatic suspend/service/retry path.
+Both paths retain runtime authority and integrity checks. This settles the
+behavioral split, not method numbering, register ABI, implementation completion,
+or authorization for hardware operations.
