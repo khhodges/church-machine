@@ -282,16 +282,27 @@
         if(root.DesignSimulation) root.DesignSimulation.stop();
         ++sourceRequest; state.dirty=true; state.error=''; render();
     }
+    function syncNamespacePicker() {
+        const selector = document.getElementById('namespaceDesignProfile');
+        if (selector) {
+            const options='<option value="legacy">Original</option><option value="ascending">New Layout</option><option value="phase1">Phase 1</option>'+
+                copies.map(c=>`<option value="copy:${esc(c.id)}">${esc(c.name)}</option>`).join('');
+            // Periodic view refreshes must not destroy an open native menu.
+            // Cache the authored markup (DOM serialization may escape it differently).
+            if (selector._namespaceOptions !== options) {
+                selector.innerHTML=options;
+                selector._namespaceOptions=options;
+            }
+            const value=selectionKey().slice(10);
+            if (selector.value !== value) selector.value=value;
+            const disabled=state.loading || state.saving;
+            if (selector.disabled !== disabled) selector.disabled=disabled;
+        }
+    }
     function render() {
         if (typeof root.updateThreadControl === 'function') root.updateThreadControl();
         if (typeof root._renderTraceExecutionIdentity === 'function') root._renderTraceExecutionIdentity();
-        const selector = document.getElementById('namespaceDesignProfile');
-        if (selector) {
-            selector.innerHTML='<option value="legacy">Original</option><option value="ascending">New Layout</option><option value="phase1">Phase 1</option>'+
-                copies.map(c=>`<option value="copy:${esc(c.id)}">${esc(c.name)}</option>`).join('');
-            selector.value=selectionKey().slice(10);
-            selector.disabled=state.loading || state.saving;
-        }
+        syncNamespacePicker();
         refreshHeader();
         if (!state.active) return;
         const host = document.getElementById('namespaceTable');
