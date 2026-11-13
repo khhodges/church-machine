@@ -49,6 +49,11 @@ allocation reuse, Namespace-type Lazy loading, multiple-USER scheduling,
 dynamic replacement of the selected-record table, and hardware programming.
 It is a first loader, not the complete future Amoeba lifecycle.
 
+The separate [read-only lifecycle candidate](amoeba-readonly-lifecycle.md)
+extends this native loading mechanism with explicit retirement, continuation
+checks, collection, block reuse and reload. It deliberately leaves this saved
+review candidate unchanged. Modified and mutable bodies are not reclaimable.
+
 ## CLOOMC entry points
 
 | Method selector | Method | Contract |

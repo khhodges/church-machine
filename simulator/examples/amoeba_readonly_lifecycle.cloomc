@@ -1,0 +1,438 @@
+; Bounded read-only successor to the fixed-allocation Amoeba loader.
+; All methods run serialized in SYSTEM; only Wait performs self-CHANGE.
+; One reusable execution block, multiple selected equal-sized Inform LUMPs.
+; Config: words, targetCount, threadCount; then ten words per selected target:
+; slot, readonly, absent descriptor[4], resident descriptor[4].
+; EntryTable row i+1 is the RW view of selected target i's four NS words.
+; ThreadTable enumerates EVERY configured Thread, including SYSTEM.
+; State: owner slot, phase (0 free,1 resident,2 installing,3 reclaiming),
+; retirement slot. Tables/configuration are private, trusted provisioning.
+; No lifecycle operation, descriptor update or allocation is delegated to host.
+abstraction ide.AmoebaReadOnly {
+    capabilities {
+        SELF E, ide.AmoebaConfig R, ide.AmoebaState RW,
+        ide.AmoebaPool RW, ide.AmoebaEntryTable L, ide.AmoebaThreadTable L,
+        ide.AmoebaReceiver R, ide.AmoebaControl W,
+        ide.AmoebaUserThread, ide.AmoebaSystemThread
+    }
+
+    ; DR1=slot. Returns 0 success, 2 occupied. Never evicts an owner.
+    method EnsureResident() {
+        LOAD CR0, CR6, #0
+        CALL CR0, #3
+        LOAD CR2, CR6, #2
+        DREAD DR4, CR2, #0
+        DREAD DR5, CR2, #1
+        MCMP DR5, #1
+        BRANCHEQ occupied
+        MCMP DR5, #0
+        BRANCHNE invalid
+        MCMP DR4, #0
+        BRANCHNE invalid
+        ; Validate the retained absent descriptor before acquiring the block.
+        IADD DR3, DR0, #2
+        CALL CR0, #6
+        LOAD CR2, CR6, #2
+        DWRITE DR1, CR2, #0
+        IADD DR4, DR0, #2
+        DWRITE DR4, CR2, #1
+        CALL CR0, #4
+        LOAD CR3, CR6, #3
+        LOAD CR4, CR6, #6
+        LOAD CR10, CR6, #1
+        DREAD DR11, CR10, #0
+        DREAD DR10, CR4, #6
+        ; Header geometry must match both selected allocation and Inform type.
+        BFEXT DR7, DR10, #27, #5
+        MCMP DR7, #31
+        BRANCHNE invalid
+        BFEXT DR7, DR10, #8, #2
+        MCMP DR7, #0
+        BRANCHNE invalid
+        BFEXT DR7, DR10, #23, #4
+        IADD DR8, DR0, #64
+    header_size:
+        MCMP DR7, #0
+        BRANCHEQ header_size_done
+        SHL DR8, DR8, #1
+        ISUB DR7, DR7, #1
+        BRANCH header_size
+    header_size_done:
+        MCMP DR8, DR11
+        BRANCHNE invalid
+        BFEXT DR7, DR10, #10, #13
+        MCMP DR7, #0
+        BRANCHEQ invalid
+        DREAD DR9, CR4, #0
+        MCMP DR9, DR10
+        BRANCHNE invalid
+        IADD DR6, DR0, #1
+    install_words:
+        DREAD DR7, CR4, #0
+        DWRITE DR7, CR3, DR6
+        IADD DR6, DR6, #1
+        MCMP DR6, DR11
+        BRANCHLO install_words
+        ; No target descriptor points to this block during copying.
+        DWRITE DR9, CR3, #0
+        CALL CR0, #5
+        IADD DR3, DR0, #6
+        CALL CR0, #7
+        LOAD CR2, CR6, #2
+        IADD DR4, DR0, #1
+        DWRITE DR4, CR2, #1
+        IADD DR1, DR0, #0
+        RETURNAL 2
+    occupied:
+        MCMP DR4, DR1
+        BRANCHEQ already_resident
+        IADD DR1, DR0, #2
+        RETURNAL 2
+    already_resident:
+        IADD DR3, DR0, #6
+        CALL CR0, #6
+        IADD DR1, DR0, #0
+        RETURNAL 2
+    invalid:
+        HARDFAULT "Amoeba lifecycle state or identity invalid"
+    }
+
+    ; DR1=slot. Explicit intent only; no memory is freed here.
+    method Retire() {
+        LOAD CR0, CR6, #0
+        CALL CR0, #3
+        LOAD CR2, CR6, #2
+        DREAD DR4, CR2, #0
+        MCMP DR4, DR1
+        BRANCHNE invalid
+        DREAD DR4, CR2, #1
+        MCMP DR4, #1
+        BRANCHNE invalid
+        IADD DR3, DR0, #6
+        CALL CR0, #6
+        DWRITE DR1, CR2, #2
+        IADD DR1, DR0, #0
+        RETURNAL 2
+    invalid:
+        HARDFAULT "Amoeba retirement requires its resident owner"
+    }
+
+    ; DR1=slot. 0 reclaimed; 1 retained reference; 3 modified; 4 not read-only.
+    ; Self-CHANGE captures live CR0..CR11 into real Thread homes before scanning.
+    method Collect() {
+        CHANGE CR12
+        LOAD CR0, CR6, #0
+        CALL CR0, #3
+        LOAD CR2, CR6, #2
+        DREAD DR4, CR2, #0
+        MCMP DR4, DR1
+        BRANCHNE invalid
+        DREAD DR4, CR2, #2
+        MCMP DR4, DR1
+        BRANCHNE invalid
+        DREAD DR4, CR2, #1
+        MCMP DR4, #1
+        BRANCHNE invalid
+        LOAD CR10, CR6, #1
+        DREAD DR4, CR10, #1, DR2
+        MCMP DR4, #1
+        BRANCHNE mutable
+        IADD DR3, DR0, #6
+        CALL CR0, #6
+        ; Save selection in a preserved register; helpers return scalar status.
+        IADD DR14, DR1, #0
+        CALL CR0, #8
+        MCMP DR1, #0
+        BRANCHNE pinned
+        IADD DR1, DR14, #0
+        CALL CR0, #4
+        LOAD CR3, CR6, #3
+        LOAD CR4, CR6, #6
+        LOAD CR10, CR6, #1
+        DREAD DR11, CR10, #0
+        IADD DR6, DR0, #0
+        IADD DR12, DR0, #0
+    compare_words:
+        DREAD DR7, CR4, #0
+        DREAD DR8, CR3, DR6
+        MCMP DR7, DR8
+        BRANCHEQ equal_word
+        IADD DR12, DR0, #1
+    equal_word:
+        IADD DR6, DR6, #1
+        MCMP DR6, DR11
+        BRANCHLO compare_words
+        CALL CR0, #5
+        MCMP DR12, #0
+        BRANCHNE modified
+        ; No USER ran during the wait, but recheck protected roots after it.
+        IADD DR1, DR14, #0
+        CALL CR0, #8
+        MCMP DR1, #0
+        BRANCHNE pinned
+        IADD DR1, DR14, #0
+        CALL CR0, #3
+        LOAD CR2, CR6, #2
+        IADD DR4, DR0, #3
+        DWRITE DR4, CR2, #1
+        ; Detach before scrubbing. Slot, generation, token and size survive.
+        IADD DR3, DR0, #2
+        CALL CR0, #7
+        LOAD CR3, CR6, #3
+        LOAD CR10, CR6, #1
+        DREAD DR11, CR10, #0
+        IADD DR6, DR0, #0
+    clear_words:
+        DWRITE DR0, CR3, DR6
+        IADD DR6, DR6, #1
+        MCMP DR6, DR11
+        BRANCHLO clear_words
+        LOAD CR2, CR6, #2
+        DWRITE DR0, CR2, #2
+        DWRITE DR0, CR2, #0
+        ; FREE is published last; interrupted work is never reusable.
+        DWRITE DR0, CR2, #1
+        IADD DR1, DR0, #0
+        RETURNAL 2
+    pinned:
+        IADD DR1, DR0, #1
+        RETURNAL 2
+    modified:
+        IADD DR1, DR0, #3
+        RETURNAL 2
+    mutable:
+        IADD DR1, DR0, #4
+        RETURNAL 2
+    invalid:
+        HARDFAULT "Amoeba collection requires explicit resident retirement"
+    }
+
+    ; Resolve a selected slot, not caller-supplied addresses. DR2=config offset.
+    method Select() {
+        LOAD CR10, CR6, #1
+        DREAD DR4, CR10, #1
+        MCMP DR4, #0
+        BRANCHEQ invalid
+        IADD DR2, DR0, #3
+        IADD DR3, DR0, #0
+    search:
+        DREAD DR7, CR10, DR2
+        MCMP DR7, DR1
+        BRANCHEQ selected
+        IADD DR2, DR2, #10
+        IADD DR3, DR3, #1
+        MCMP DR3, DR4
+        BRANCHLO search
+    invalid:
+        HARDFAULT "Amoeba slot is not a selected artifact"
+    selected:
+        LOAD CR4, CR6, #4
+        IADD DR7, DR3, #1
+        LOAD CR7, CR4, DR7
+        RETURNAL 4095
+    }
+
+    ; Real CLA1 receiver validates the exact provisioned localized artifact.
+    method OpenImage() {
+        LOAD CR4, CR6, #6
+        LOAD CR7, CR6, #7
+        DWRITE DR1, CR7, #2
+    wait:
+        DREAD DR7, CR4, #1
+        MCMP DR7, #4
+        BRANCHEQ ready
+        MCMP DR7, #7
+        BRANCHEQ invalid
+        CHANGE CR12
+        BRANCH wait
+    ready:
+        DREAD DR7, CR4, #2
+        MCMP DR7, DR1
+        BRANCHNE invalid
+        DREAD DR7, CR4, #4
+        LOAD CR10, CR6, #1
+        DREAD DR8, CR10, #0
+        MCMP DR7, DR8
+        BRANCHNE invalid
+        RETURNAL 4095
+    invalid:
+        HARDFAULT "Amoeba artifact delivery rejected"
+    }
+
+    method CloseImage() {
+        LOAD CR4, CR6, #6
+        LOAD CR7, CR6, #7
+        DREAD DR7, CR4, #3
+        DWRITE DR7, CR7, #0
+        RETURNAL 4095
+    }
+
+    ; DR2 record offset, DR3 descriptor offset (2 absent,6 resident).
+    method CheckDescriptor() {
+        LOAD CR10, CR6, #1
+        IADD DR8, DR2, DR3
+        IADD DR6, DR0, #0
+    check:
+        DREAD DR9, CR10, DR8
+        DREAD DR10, CR7, DR6
+        MCMP DR6, #1
+        BRANCHNE compare_identity
+        ; G is a runtime reachability mark, not artifact identity.
+        BFINS DR9, DR0, #30, #1
+        BFINS DR10, DR0, #30, #1
+    compare_identity:
+        MCMP DR9, DR10
+        BRANCHNE invalid
+        IADD DR8, DR8, #1
+        IADD DR6, DR6, #1
+        MCMP DR6, #4
+        BRANCHLO check
+        RETURNAL 4095
+    invalid:
+        HARDFAULT "Amoeba selected Namespace identity changed"
+    }
+
+    method PublishDescriptor() {
+        ; Private precomputed descriptors differ only in location and its seal.
+        ; Never generate a new GT, increment a version, or clear an NS slot.
+        LOAD CR0, CR6, #0
+        IADD DR14, DR3, #0
+        CALL CR0, #3
+        LOAD CR10, CR6, #1
+        IADD DR8, DR2, DR14
+        DREAD DR9, CR10, DR8
+        DWRITE DR9, CR7, #0
+        IADD DR8, DR8, #2
+        DREAD DR9, CR10, DR8
+        DWRITE DR9, CR7, #2
+        RETURNAL 4095
+    }
+
+    ; Conservative roots: all saved CR homes and every live protected frame.
+    ; Slot-only comparison deliberately retains stale-generation references.
+    ; No heap scan, host call-stack shadow, or invented hardware pin bit.
+    method CheckRoots() {
+        LOAD CR4, CR6, #1
+        DREAD DR11, CR4, #2
+        MCMP DR11, #0
+        BRANCHEQ invalid
+        LOAD CR10, CR6, #5
+        IADD DR3, DR0, #0
+    thread:
+        IADD DR4, DR3, #1
+        LOAD CR7, CR10, DR4
+        DREAD DR4, CR7, #0
+        BFEXT DR6, DR4, #8, #2
+        MCMP DR6, #2
+        BRANCHNE invalid
+        BFEXT DR6, DR4, #23, #4
+        IADD DR7, DR0, #64
+    thread_size:
+        MCMP DR6, #0
+        BRANCHEQ thread_size_done
+        SHL DR7, DR7, #1
+        ISUB DR6, DR6, #1
+        BRANCH thread_size
+    thread_size_done:
+        MCMP DR7, #256
+        BRANCHLO invalid
+        BFEXT DR8, DR4, #0, #8
+        MCMP DR8, #12
+        BRANCHNE invalid
+        ISUB DR8, DR7, #12
+        BFEXT DR9, DR4, #10, #13
+        MCMP DR9, #0
+        BRANCHEQ invalid
+        ISUB DR10, DR8, DR9
+        MCMP DR10, #18
+        BRANCHLO invalid
+        DREAD DR9, CR7, #17
+        BFEXT DR12, DR9, #12, #1
+        MCMP DR12, #1
+        BRANCHNE invalid
+        BFEXT DR6, DR9, #0, #12
+        IADD DR6, DR6, #1
+        MCMP DR6, DR10
+        BRANCHLO invalid
+        MCMP DR6, DR8
+        BRANCHHS invalid
+    frame:
+        DREAD DR9, CR7, DR6
+        BFEXT DR13, DR9, #25, #2
+        MCMP DR13, #1
+        BRANCHNE invalid
+        BFEXT DR13, DR9, #30, #1
+        MCMP DR13, #1
+        BRANCHNE invalid
+        BFEXT DR9, DR9, #0, #16
+        MCMP DR9, DR1
+        BRANCHEQ pinned
+        IADD DR12, DR6, #1
+        DREAD DR9, CR7, DR12
+        BFEXT DR13, DR9, #12, #1
+        MCMP DR13, #1
+        BRANCHNE invalid
+        BFEXT DR13, DR9, #0, #12
+        MCMP DR13, DR12
+        BRANCHNE invalid
+        IADD DR6, DR6, #2
+        MCMP DR6, DR8
+        BRANCHLO frame
+        MCMP DR6, DR8
+        BRANCHNE invalid
+    home:
+        DREAD DR9, CR7, DR8
+        BFEXT DR9, DR9, #0, #16
+        MCMP DR9, DR1
+        BRANCHEQ pinned
+        IADD DR8, DR8, #1
+        MCMP DR8, DR7
+        BRANCHLO home
+        IADD DR3, DR3, #1
+        MCMP DR3, DR11
+        BRANCHLO thread
+        IADD DR1, DR0, #0
+        RETURNAL 4095
+    pinned:
+        IADD DR1, DR0, #1
+        RETURNAL 4095
+    invalid:
+        HARDFAULT "Amoeba cannot prove Thread continuation safety"
+    }
+
+    ; Same serialized one-USER entry contract as amoeba_loader.cloomc.
+    ; Retirement remains a separately invoked private service, never eviction.
+    main method Run() {
+        MCMP DR1, #0
+        BRANCHEQ start_user
+        LOAD CR0, CR6, #0
+        CALL CR0, #0
+        MCMP DR1, #0
+        BRANCHNE full
+        CALL CR1, #0
+    start_user:
+        LOAD CR1, CR6, #8
+    dispatch:
+        ISUB DR8, DR0, #1
+        CHANGE CR1
+        BRANCHNE dispatch
+        IADD DR1, DR5, #0
+        LOAD CR0, CR6, #0
+        CALL CR0, #0
+        MCMP DR1, #0
+        BRANCHNE full
+        LOAD CR1, CR6, #8
+        BRANCH dispatch
+    full:
+        HARDFAULT "Amoeba execution pool is occupied; explicit retirement required"
+    }
+
+    main method UserStart() {
+        CALL CR1, #0
+        LOAD CR1, NULL
+        LOAD CR11, CR6, #9
+    finished:
+        CHANGE CR11
+        BRANCH finished
+    }
+}

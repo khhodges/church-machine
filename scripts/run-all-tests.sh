@@ -166,6 +166,15 @@ register_suite "method-dispatch-gate-tests" \
 register_suite "method-dispatch-rtl-release" \
     'python3 -m pytest scripts/test_method_dispatch_release.py -q && python3 scripts/check_method_dispatch_release.py'
 
+register_suite "amoeba-readonly-lifecycle-tests" \
+    'node simulator/test_amoeba_readonly_lifecycle.js'
+
+register_suite "mandatory-call-admission-tests" \
+    'node tests/simulator/sim_call_dispatch_required.js && node simulator/test_save_progress_console.js && python3 -m pytest tests/hardware/test_retired_eloadcall.py tests/server/test_named_call_save_attestation.py -q'
+
+register_suite "native-memory-queue-tests" \
+    'node simulator/test_security_monitor_create_data.js && node simulator/test_queue_transfer_aliases.js && node simulator/test_queue_transfer_primitives.js && node simulator/test_native_memory_queues.js'
+
 register_suite "lump-consistency" \
     'python -m pytest tests/lump/test_lump_consistency.py -v'
 
