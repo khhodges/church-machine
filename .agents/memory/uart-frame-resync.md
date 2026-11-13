@@ -21,3 +21,15 @@ withdraw firmware-identity conclusions and stop active decoding/control before
 passive capture. Preserve protected pairing credentials. Identify baud/protocol
 from evidence; do not reset, reflash, or call the reported fault a Lazy Load
 failure merely to obtain a cleaner trace.
+
+An apparent legacy-trace framing failure may be a different, valid wire
+protocol rather than UART corruption or the wrong baud.
+
+**Why:** Passive capture at unchanged baud produced CRC-valid combined observer
+packets with advancing application counters and no sticky fault. The legacy
+bridge had interpreted their payload bytes as boot sentinels and fault traces.
+
+**How to apply:** Identify complete frames and verify their native CRC before
+changing baud or interpreting legacy fault reports. Detect incompatible
+protocols before any automatic UART writes. A reported application digest is
+not attestation of the exact programmed FPGA bitstream.
