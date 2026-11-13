@@ -111,7 +111,7 @@
             async function event(line){
                 if(!line.trim()) return;
                 const data=JSON.parse(line);
-                if(data.type==='error') throw Error(data.error);
+                if(data.type==='error') throw Error(data.message || data.error || 'Namespace binding failed');
                 if(data.type==='result') result=data.result;
                 else {
                     root.NamespaceBindingWindows?.progress(data);
@@ -132,7 +132,7 @@
             }finally{reader.releaseLock();}
         }
         const data = await response.json();
-        if (!response.ok || !data.ok) throw Error(data.error || 'Namespace design request failed');
+        if (!response.ok || !data.ok) throw Error(data.message || data.error || 'Namespace design request failed');
         return data;
     }
     function accept(data) {
