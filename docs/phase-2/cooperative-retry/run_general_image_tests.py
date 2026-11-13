@@ -33,7 +33,7 @@ def main():
         cwd=output, env=env, check=False).returncode
     receipt = dict(
         schema="church.general-image-local-check/v1", protocol="CSI2",
-        configuration=dict(general_image=True, lump_records=None),
+        configuration=dict(general_image=True, lump_records=None, boot_guard=0),
         authority="existing physical maintenance; digest is transfer consistency only",
         testExitCode=status, tests={name: digest(HERE / name) for name in tests},
         parentSourceReceiptSha256=digest(output / "starter-source-manifest.json"),

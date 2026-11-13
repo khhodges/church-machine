@@ -12,6 +12,11 @@ import pytest
 from hardware.starter_transport import StarterTransport, command
 from hardware.starter_sha256 import ReceivedImageSHA256
 from hardware.starter_top import StarterTop
+from hardware.boot_pair_guard import BootPairGuard
+from hardware.hw_types import FaultType
+
+# Explicit local boot configuration, never inferred from received descriptors.
+BOOT2_BOOT_GUARD = 0
 
 
 def header(op, epoch, **kw):
@@ -147,6 +152,41 @@ def test_general_mode_cannot_enable_fixed_clp_receiver():
         StarterTop(general_image=True, lump_records=[])
 
 
+@pytest.mark.parametrize("guard", [None, -1, True, 511, 511 << 9, 1 << 18])
+def test_general_mode_requires_valid_explicit_boot_guard(guard):
+    with pytest.raises(ValueError):
+        StarterTop(general_image=True, boot_guard=guard)
+
+
+def test_historical_mode_cannot_override_its_boot_guard():
+    with pytest.raises(ValueError, match="Historical CSI1"):
+        StarterTop(boot_guard=0)
+
+
+@pytest.mark.parametrize("guard,stage,observed,accepted", [
+    (BOOT2_BOOT_GUARD, 0, 0, True), (BOOT2_BOOT_GUARD, 1, 0, True),
+    (BOOT2_BOOT_GUARD, 0, 1, False), (BOOT2_BOOT_GUARD, 1, 1, False),
+    ((46 << 9) | 419, 0, 46, True), ((46 << 9) | 419, 1, 419, True),
+    ((46 << 9) | 419, 0, 0, False), ((46 << 9) | 419, 1, 0, False),
+])
+def test_boot_pair_comparisons_remain_independent(guard, stage, observed, accepted):
+    dut = BootPairGuard(expected_guard=guard)
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    async def bench(ctx):
+        ctx.set(dut.start, 1)
+        ctx.set(dut.thread_stage, stage)
+        ctx.set(dut.observed_version, observed)
+        await ctx.tick()
+        ctx.set(dut.start, 0)
+        ctx.set(dut.observed_version, 77)  # input was latched, not followed
+        assert bool(ctx.get(dut.accepted)) is accepted
+        assert ctx.get(dut.fault_type) == (FaultType.NONE if accepted else FaultType.VERSION)
+        assert ctx.get(dut.fault_slot) == (0 if accepted else stage + 1)
+    sim.add_testbench(bench)
+    sim.run()
+
+
 def test_boot2_exact_bytes_through_uart_and_guarded_core():
     """Optional retained-image replay; no fixture substitution or core mutation."""
     candidate = os.environ.get("BOOT2_REPLAY_IMAGE")
@@ -157,11 +197,13 @@ def test_boot2_exact_bytes_through_uart_and_guarded_core():
     assert len(raw) == 65536
     digest = hashlib.sha256(raw).hexdigest()
     assert digest == "1edceb0e6f1008098ac7a1aebc1c6e1db968d39270dfe509a0974df390f99014"
-    top = StarterTop(clock_hz=HZ, baud=BAUD, sim_mode=True, general_image=True)
+    top = StarterTop(clock_hz=HZ, baud=BAUD, sim_mode=True, general_image=True,
+                     boot_guard=BOOT2_BOOT_GUARD)
     h = Harness(top=top)
     result = dict(image_sha256=digest, scope="CSI2 UART pins, RAM SHA and retained guarded core",
                   hardware_operations=False, vendor_build=False,
-                  clp1_enabled=False, trace=[])
+                  clp1_enabled=False, boot_guard=BOOT2_BOOT_GUARD,
+                  expected_namespace_version=0, expected_thread_version=0, trace=[])
     async def observe(ctx):
         core = top.core
         cycle = 0
@@ -173,9 +215,11 @@ def test_boot2_exact_bytes_through_uart_and_guarded_core():
                 if ctx.get(core.fault_valid):
                     result.update(outcome="first-runtime-fault", cycle=cycle,
                                   fault=ctx.get(core.fault), nia=ctx.get(core.nia),
+                                  boot_fault_slot=ctx.get(core.boot_fault_slot),
                                   boot_complete=ctx.get(core.boot_complete),
                                   namespace_admitted=ctx.get(core.boot_namespace_admitted),
-                                  thread_validated=ctx.get(core.boot_thread_validated))
+                                  thread_validated=ctx.get(core.boot_thread_validated),
+                                  thread_activated=ctx.get(core.boot_thread_activated))
                     return
                 cycle += 1
             await ctx.tick()
@@ -183,6 +227,7 @@ def test_boot2_exact_bytes_through_uart_and_guarded_core():
         ctl, core = top.control, top.core
         await h.enable(ctx)
         await h.send(ctx, header(1, 0, length=65536))
+        print("Boot2: receiving unchanged image through UART pins", flush=True)
         await h.send(ctx, bytes.fromhex(digest) + raw)
         assert ctx.get(ctl.words_received) == 16384
         await h.send(ctx, header(2, 1))
@@ -191,6 +236,7 @@ def test_boot2_exact_bytes_through_uart_and_guarded_core():
         assert ctx.get(top.admitted_digest) == int(digest, 16)
         assert ctx.get(ctl.execution_reset) and not ctx.get(top.boots)
         result["admission"] = "READY"
+        print("Boot2: received RAM SHA matched; starting guarded core", flush=True)
         await h.send(ctx, header(3, 1))
         for _ in range(20000):
             if "outcome" in result:
@@ -198,6 +244,7 @@ def test_boot2_exact_bytes_through_uart_and_guarded_core():
             await ctx.tick()
         result.setdefault("outcome", "bounded-observation-no-fault")
         assert not ctx.get(h.violation)
+        assert ctx.get(core.boot_namespace_admitted), result
     sim = Simulator(h.module)
     sim.add_clock(1 / HZ)
     sim.add_testbench(observe, background=True)

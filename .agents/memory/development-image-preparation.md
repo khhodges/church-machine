@@ -71,6 +71,14 @@ The signed-manifest review recommendation is not a new prerequisite.
 first real incompatibility, and do not infer vendor-build or physical-operation
 authorization. Do not turn this approval into a broader Lazy protocol redesign.
 
+The subsequent local boot-version correction retains independently configured
+expected reset versions; it must never learn them from the incoming Namespace.
+The user approved local correction and exact-byte replay, not physical adoption.
+
+**Why:** The demonstration's 46/419 pair rejected the unchanged Boot2 0/0
+configuration. Removing the check or copying observed versions would defeat
+the approved boot-pair mismatch rule rather than correct configuration.
+
 The user requested a one-button operation on Build Approval for loading the
 selected development image; the Namespace Designer now has a separately
 approved Bind → Prepare → Load sequence.

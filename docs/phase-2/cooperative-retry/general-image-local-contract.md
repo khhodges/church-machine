@@ -16,7 +16,27 @@ installed-bitstream certification gate is added.
 The design-review document's signed-manifest recommendation remains a historical
 proposal, not an implementation prerequisite for this explicitly selected mode.
 The old CSI1 mode remains the default and retains its two-image allowlist.
-The general mode must be explicitly instantiated with `general_image=True`.
+The general mode must be explicitly instantiated with `general_image=True`
+and an explicit `boot_guard` configuration.
+
+## Expected reset versions
+
+The general mode no longer silently inherits the historical demonstration's
+Namespace/Thread pair of 46/419. The expected pair is a validated elaboration
+setting, packed as `(namespace_version << 9) | thread_version`. Both halves
+must be 0–510; reserved 511 is rejected. CSI1 still uses exactly 46/419 and
+rejects an override.
+
+For the bounded Boot2 replay, the explicitly selected local pair is **0/0**.
+It is fixed before receiving any image. It is not copied from observed RAM,
+accepted from UART, adjusted after a fault, or used to rewrite Boot2. Normal
+Namespace-stage and Thread-stage VERSION comparisons still run independently,
+and the core constructs its reset capabilities from this same fixed setting.
+
+This is a local source-configuration correction, not a new runtime guard
+selection mechanism. Loading a different boot pair still requires a matching
+core configuration. No saved guard policy, IDE provisioning, or physical
+bitstream has been changed.
 
 ## CSI2 wire contract
 
@@ -80,7 +100,7 @@ drive the transport byte interface, not UART pins.
 No IDE Send control or physical bridge is switched to CSI2 by this change.
 That integration and a new bitstream are not implied by local test success.
 
-## Observed Boot2 result
+## Earlier Boot2 result with the historical boot pair
 
 The retained image with SHA-256
 `1edceb0e6f1008098ac7a1aebc1c6e1db968d39270dfe509a0974df390f99014`
@@ -98,3 +118,24 @@ Evidence: `generated-artifacts/boot2-general-admission/boot2-replay.json`.
 28 targeted checks passed: 26 transport/SHA/lifecycle checks, one historical
 CSI1 UART rejection check, and the exact Boot2 UART/core observation. These are
 local RTL results, not evidence of changed or running physical hardware.
+
+## Boot2 replay with the explicit 0/0 boot pair
+
+The unchanged image passed RAM SHA admission, Namespace admission, entry-Thread
+validation and activation, and completed guarded boot. Both independent
+version comparisons remained enabled.
+
+The first subsequent runtime fault was **SEAL (10)** at byte NIA **0x101c**,
+246 observed execution cycles after START. The frozen prepared-image trace map
+identifies this as `ide.AmoebaStartup.7`, word `0x17040021`, displayed as
+`CALL CR0, CR8[0x0021]`. This identifies the failing instruction, not the reason
+for its seal mismatch; that cause has not been diagnosed or corrected.
+The replay stopped there without altering image bytes, GTs or runtime checks.
+
+All **42** targeted tests passed, including configuration validation,
+independent positive/negative version checks and the exact-byte UART/core
+replay. The reproduction command above now uses this explicit local profile.
+Evidence and source/test receipt are in
+`generated-artifacts/boot2-explicit-boot-guard/boot2-replay.json` and
+`generated-artifacts/boot2-explicit-boot-guard/general-image-check.json`.
+The earlier 46/419 observation remains historical evidence.

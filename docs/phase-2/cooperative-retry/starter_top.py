@@ -18,6 +18,7 @@ from .uart_packet_arbiter import UartPacketArbiter
 from .request_diagnostic import RequestDiagnostic
 from .starter_transport import StarterTransport
 from .starter_sha256 import ReceivedImageSHA256
+from .boot_pair_guard import validate_boot_guard
 
 # Pinned retained application binaries, not hashes supplied by the UART sender.
 IMAGE_SHA256 = (
@@ -28,9 +29,17 @@ BOOT_GUARD = (46 << 9) | 419
 
 class StarterTop(Elaboratable):
     def __init__(self, *, clock_hz=25_000_000, baud=57600, sim_mode=False,
-                  lump_records=None, caller_records=None, general_image=False):
+                  lump_records=None, caller_records=None, general_image=False,
+                  boot_guard=None):
         if general_image and lump_records is not None:
             raise ValueError("General images cannot use the fixed demonstration CLP1 receiver")
+        if general_image:
+            if boot_guard is None:
+                raise ValueError("General images require an explicit boot_guard configuration")
+        elif boot_guard is not None:
+            raise ValueError("Historical CSI1 retains its fixed boot_guard")
+        self.boot_guard = boot_guard if general_image else BOOT_GUARD
+        validate_boot_guard(self.boot_guard)
         self.general_image = general_image
         self.clock_hz, self.baud, self.sim_mode = clock_hz, baud, sim_mode
         self.clk = Signal()
@@ -40,7 +49,7 @@ class StarterTop(Elaboratable):
         self.uart_tx_pin = Signal(init=1)
         self.transport = StarterTransport(clock_hz=clock_hz, general_image=general_image)
         self.control = self.transport.control
-        self.core = ChurchCore(expected_boot_guard=BOOT_GUARD, watchdog_clock_hz=clock_hz)
+        self.core = ChurchCore(expected_boot_guard=self.boot_guard, watchdog_clock_hz=clock_hz)
         self.verifier = ReceivedImageSHA256()
         self.diagnostic = RequestDiagnostic()
         self.lump_receiver = None
