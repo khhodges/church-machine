@@ -45,8 +45,8 @@ authority or imply permission to share mutable copies.
 The Boot Namespace must hold MMIO and NS-GTs and run the abstractions as FPGA
 services. Other Namespaces provide their starter Thread at Slot 2. Amoeba is
 shared by all Threads and organizes round-robin execution; Threads use CR5 for
-private data. Whether the other Namespaces may contain additional Threads needs
-clarification of the user's phrase "and anot others."
+private data. The user explicitly confirmed that other Namespaces may contain
+additional Threads beyond their Slot 2 starter.
 
 **Why:** The user specified the Boot/service and application-Namespace roles;
 duplicating complete standalone boot environments for A and B is not that model.
