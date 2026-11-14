@@ -11,7 +11,7 @@ import { associate, glassKeyFor, lumpMembers } from "./nb-association";
 import type { LumpPick, Side } from "./nb-association";
 import { hexWord } from "./nb-geometry";
 import { planCoResidency } from "./nb-plan";
-import type { PlanItem, Zone } from "./nb-plan";
+import type { PendingInput, PlanItem, Zone } from "./nb-plan";
 import { useNamespaceInspection } from "./use-namespace-inspection";
 import NbNamespaceTabs, { SIDE_COLORS } from "./NbNamespaceTabs";
 import NbPlanGlass from "./NbPlanGlass";
@@ -19,6 +19,7 @@ import NbPlanGlass from "./NbPlanGlass";
 const ZONE_COLORS: Record<Zone, string> = {namespaceA: SIDE_COLORS.A, namespaceB: SIDE_COLORS.B, lumpZone: "#e9c46a"};
 const EMPTY: DraftInputs = {total: "", namespaceA: "", namespaceB: "", lumpZone: ""};
 const STATUS_TEXT = {
+  incomplete: "Incomplete — selected input not loaded",
   empty: "No resident entries", unresolved: "Unresolved — no fit claim", overflow: "Invalid — address overflow",
   insufficient: "Does not fit proposed total", "required-only": "Required span only", fits: "Fits proposed total (arithmetic)",
 };
@@ -38,8 +39,8 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
   const [error, setError] = useState("");
   const [tab, setTab] = useState<Side>("A");
   const [pick, setPick] = useState<LumpPick | null>(null);
-  const inspA = useNamespaceInspection(refA, entries);
-  const inspB = useNamespaceInspection(refB, entries);
+  const inspA = useNamespaceInspection(refA, entries, {planning: true, catalogLoading});
+  const inspB = useNamespaceInspection(refB, entries, {planning: true, catalogLoading});
   useEffect(() => { setPick(prev => prev?.side === "A" ? null : prev); }, [refA]);
   useEffect(() => { setPick(prev => prev?.side === "B" ? null : prev); }, [refB]);
 
@@ -68,12 +69,18 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
   const parsedTotal = parseWords(draft.total);
   const totalError = typeof parsedTotal === "string" ? `Proposed total memory ${parsedTotal}.` : "";
   const total = typeof parsedTotal === "number" ? parsedTotal : null;
+  const pending: PendingInput[] = ([["A", inspA.state], ["B", inspB.state]] as const).flatMap<PendingInput>(([side, st]) =>
+    st.status === "loading" ? [{side, state: "loading" as const}] : st.status === "error" ? [{side, state: "error" as const, message: st.message}] : []);
+  if (inA && inB && inA.planningManifestSha256 !== inB.planningManifestSha256)
+    pending.push({side: "B", state: "error", message: "A and B were read from different library snapshots (planning manifest differs). Reload both."});
+  const planningNote = inA?.planningNote ?? inB?.planningNote;
   const plan = planCoResidency([
     ...(inA ? [{side: "A" as Side, rows: rowsA, layoutSource: inA.layoutSource}] : []),
     ...(inB ? [{side: "B" as Side, rows: rowsB, layoutSource: inB.layoutSource}] : []),
-  ], total);
+  ], total, pending);
+  const lazyScale = plan.notProvisioned.reduce((n, i) => Math.max(n, i.plannedWords ?? 0, i.binaryWords ?? 0), 0);
   const placed = plan.items.filter(i => i.start !== null);
-  const scale = Math.max(plan.status === "fits" && total ? total : 0, plan.requiredWords ?? placed.reduce((n, i) => Math.max(n, i.start! + i.words!), 0));
+  const scale = plan.status === "incomplete" ? 0 : Math.max(plan.status === "fits" && total ? total : 0, plan.requiredWords ?? placed.reduce((n, i) => Math.max(n, i.start! + i.words!), 0));
   const scaleLabel = plan.status === "fits" ? `${scale.toLocaleString()}-word proposed total`
     : plan.status === "insufficient" ? `${scale.toLocaleString()}-word required span (exceeds proposed total)`
     : plan.status === "required-only" ? `${scale.toLocaleString()}-word required span — not hardware capacity`
@@ -106,7 +113,7 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
 
   const glassHeight = 420, glassTop = 42, glassBottom = glassTop + glassHeight;
   const shape = `M49 ${glassTop} H191 L181 ${glassBottom - 10} Q120 ${glassBottom + 17} 59 ${glassBottom - 10} Z`;
-  const bad = plan.status === "unresolved" || plan.status === "overflow" || plan.status === "insufficient" || !!totalError;
+  const bad = plan.status === "incomplete" || plan.status === "unresolved" || plan.status === "overflow" || plan.status === "insufficient" || !!totalError;
 
   return (
     <main className="kiss-workbench" hidden={hidden}>
@@ -133,6 +140,13 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
       {error && <p className="kiss-api-error" role="alert">{error} No saved data was changed.</p>}
       {catalogError && <p className="kiss-api-error" role="alert">{catalogError} References are read-only. <button type="button" onClick={() => setCatalogRefresh(v => v + 1)}>Retry catalog</button></p>}
       {catalogLoading && <p className="kiss-api-message" role="status">Reading saved Namespace references…</p>}
+      {pending.length > 0 && <div className="nb-check" role="status" aria-label="Selected input status">
+        {pending.map(p => <p key={p.side} className={p.state === "error" ? "nb-error" : undefined}>
+          Namespace {p.side}: {p.state === "loading" ? "reading latest verified LUMP sizes (read-only)…" : `${p.message} Not treated as zero; no fit is claimed.`}
+          {p.state === "error" && <> <button type="button" onClick={() => (p.side === "A" ? inspA : inspB).retry()}>Retry {p.side}</button></>}
+        </p>)}
+      </div>}
+      <p className="kiss-api-message">Planning sizes come from the latest verified <b>saved</b> compilation of each LUMP (read-only), not fresh compiler output. Compilation and binding may change the final layout.{planningNote ? ` ${planningNote}` : ""}</p>
       {sameRef && <p className="kiss-api-message" role="status">Namespace A and B reference the same saved Namespace. They are planned as two separate resident copies with disjoint memory.</p>}
 
       <div className="kiss-layout kiss-layout-single">
@@ -155,7 +169,7 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                       return <tr key={zone}>
                         <td>{String(i + 1).padStart(2, "0")}</td>
                         <td><span className="kiss-slot-color" style={{"--kiss-lump-color": ZONE_COLORS[zone]} as CSSProperties} aria-hidden="true" />{zoneLabel(zone)}<span className="kiss-tag">derived</span></td>
-                        <td className="kiss-kind">{plan.zoneWords[zone] === null ? "unresolved" : plan.zoneWords[zone]!.toLocaleString()}</td>
+                        <td className="kiss-kind">{pending.some(p => zone === "lumpZone" || zone === (p.side === "A" ? "namespaceA" : "namespaceB")) ? "Not loaded" : plan.zoneWords[zone] === null ? "Missing artifact — see details" : plan.zoneWords[zone]!.toLocaleString()}</td>
                         <td className="kiss-kind">{first?.start == null ? "—" : hexWord(first.start)}</td>
                       </tr>;
                     })}
@@ -170,14 +184,18 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                   <dt>Required</dt><dd>{plan.requiredWords === null ? "Unresolved" : `${plan.requiredWords.toLocaleString()} words`}</dd>
                   <dt>Proposed total</dt><dd>{total === null ? "Unspecified" : `${total.toLocaleString()} words`}</dd>
                   <dt>Unallocated</dt><dd>{plan.status === "fits" ? `${(total! - plan.requiredWords!).toLocaleString()} words (arithmetic only)` : "Not assessed"}</dd>
-                  <dt>Not provisioned</dt><dd>{plan.notProvisioned.length} lazy/unresident LUMPs</dd>
+                  <dt>Known resident</dt><dd>{plan.knownResidentWords.toLocaleString()} words with established sizes</dd>
+                  <dt>Lazy demand</dt><dd>{plan.notProvisioned.length} lazy LUMPs · {plan.lazyWords.toLocaleString()} runtime words{plan.lazyUnresolved ? ` · ${plan.lazyUnresolved} unresolved` : ""} (not resident)</dd>
+                  <dt>App RAM target</dt><dd>{plan.appTargetWords.toLocaleString()} words / 128 KiB provisional — {plan.targetStatus === "fits" ? "required span fits" : plan.targetStatus === "exceeds" ? "required span exceeds" : "not assessed"}</dd>
+                  <dt>Staging</dt><dd>{plan.stagingWords.toLocaleString()} words / 16 KiB reviewed reservation, outside application RAM</dd>
                   <dt>External MMIO</dt><dd>{plan.external.length} (outside RAM plan)</dd>
                 </dl>
                 <div className="kiss-dialog-actions" style={{justifyContent: "flex-start", marginTop: 8}}>
+                  <button type="button" onClick={() => { inspA.retry(); inspB.retry(); setCatalogRefresh(v => v + 1); }}>Refresh sizes</button>
                   <button type="button" onClick={() => setDraft(EMPTY)}>Clear total</button>
                 </div>
               </div>
-              <div className="kiss-panel-head nb-alt-head"><h2><span className="kiss-step">02</span>Namespace alternatives</h2><span className="kiss-status">Read-only saved LUMPs</span></div>
+              <div className="kiss-panel-head nb-alt-head"><h2><span className="kiss-step">02</span>Co-resident Namespaces</h2><span className="kiss-status">Read-only saved LUMPs</span></div>
               <NbNamespaceTabs tab={tab} onTab={setTab}
                 names={{A: refA ? nameOf(refA) ?? "" : "", B: refB ? nameOf(refB) ?? "" : ""}}
                 states={{A: inspA.state, B: inspB.state}} onRetry={side => (side === "A" ? inspA : inspB).retry()}
@@ -219,8 +237,8 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                       </g>;
                     })}
                     {placed.length === 0 && <>
-                      <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">{plan.status === "empty" ? "NO ENTRIES" : "UNRESOLVED"}</text>
-                      <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">{refA || refB ? "No resident entry has an established size" : "Choose Namespace A or B"}</text>
+                      <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">{plan.status === "empty" ? "NO ENTRIES" : plan.status === "incomplete" ? "INCOMPLETE" : "UNRESOLVED"}</text>
+                      <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">{plan.status === "incomplete" ? "Selected input not loaded" : refA || refB ? "First resident entry has no established size" : "Choose Namespace A or B"}</text>
                     </>}
                   </svg>
                   <div className="kiss-glass-zero">word 0 · {STATUS_TEXT[plan.status]}</div>
@@ -229,9 +247,31 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                       {[...offGlass, ...plan.notProvisioned, ...plan.external].map(item => <li key={`${item.side}:${item.slot}`}>
                         <button type="button" className="kiss-slot-button" aria-pressed={pick?.side === item.side && pick.slot === item.slot}
                           style={{"--kiss-lump-color": SIDE_COLORS[item.side]} as CSSProperties} onClick={() => selectItem(item)}>{item.side} · {item.name}</button>
-                        <span>{item.kind === "mmio" ? "external MMIO" : plan.notProvisioned.includes(item) ? "lazy — not provisioned" : item.problem ? "size unresolved" : "blocked by earlier unresolved"}</span>
+                        <span>{item.kind === "mmio" ? "external MMIO"
+                    : item.lazy ? (item.problem ? `lazy — ${item.problem}` : `lazy — ${item.plannedWords!.toLocaleString()} runtime words, not resident`)
+                    : item.problem ? item.problem : `${item.words!.toLocaleString()} words known — address blocked by earlier unresolved`}</span>
                       </li>)}
                     </ul>}
+                  {plan.notProvisioned.length > 0 && <div className="nb-lazy" aria-label="Lazy LUMP demand, not resident">
+                    <span className="kiss-step">LAZY DEMAND · NOT RESIDENT</span>
+                    <svg viewBox={`0 0 240 ${plan.notProvisioned.length * 14 + 4}`} className="kiss-water-svg" role="group" aria-label="Lazy runtime words compared to binary words">
+                      {plan.notProvisioned.map((item, i) => {
+                        const y = 2 + i * 14, full = 150;
+                        const bw = lazyScale && item.binaryWords ? item.binaryWords / lazyScale * full : 0;
+                        const rw = lazyScale && item.plannedWords && !item.problem ? item.plannedWords / lazyScale * full : 0;
+                        return <g key={`${item.side}:${item.slot}`} role="button" tabIndex={0} onClick={() => selectItem(item)}
+                          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectItem(item); } }}
+                          aria-label={`${item.side} ${item.name}: ${item.problem ?? `${item.plannedWords} runtime words`}`}>
+                          <rect x="84" y={y} width={Math.max(bw, 0)} height="10" fill="none" stroke={SIDE_COLORS[item.side]} strokeDasharray="2 2" />
+                          <rect x="84" y={y} width={rw} height="10" fill={SIDE_COLORS[item.side]} opacity=".7" />
+                          <text x="80" y={y + 8} textAnchor="end" className="kiss-glass-tick">{item.side} {item.name.slice(0, 12)}</text>
+                          {item.problem && <text x="86" y={y + 8} className="kiss-glass-tick" style={{fill: "#ee9b70"}}>unresolved</text>}
+                        </g>;
+                      })}
+                    </svg>
+                    <p className="kiss-meta">Filled: compact runtime words. Dashed: full binary words. Proportional to the largest lazy LUMP; never placed in resident memory.</p>
+                  </div>}
+                  {(offGlass.some(item => item.problem) || plan.lazyUnresolved > 0) && <p className="kiss-meta">Entries with missing or invalid artifacts remain listed with their exact reason. No size is invented. After correcting the library, refresh sizes to resolve them.</p>}
                 </div>
                 <aside className="kiss-device-card" aria-label="Selected entry details">
                   {picked ? <>
@@ -242,7 +282,8 @@ export default function NextBitstreamDesign({returnKey, hidden, onReturned}: Pro
                       {detailItems.map(item => <Fragment key={item.side}>
                         <dt>{item.side} slot</dt><dd>{item.slot}</dd>
                         <dt>{item.side} proposed</dt><dd>{item.start === null || item.words === null ? "Not placed" : `${hexWord(item.start)}–${hexWord(item.start + item.words - 1)}`}</dd>
-                        <dt>{item.side} size</dt><dd>{item.words === null ? "Unknown" : `${item.words.toLocaleString()} words`}</dd>
+                        <dt>{item.side} {item.lazy ? "runtime (lazy)" : "resident"}</dt><dd>{item.lazy ? (item.plannedWords == null ? "Not resolved" : `${item.plannedWords.toLocaleString()} words, not resident`) : item.words === null ? "Not resolved" : `${item.words.toLocaleString()} words`}</dd>
+                        <dt>{item.side} binary</dt><dd>{item.binaryWords == null ? "Not resolved" : `${item.binaryWords.toLocaleString()} words`}</dd>
                         <dt>{item.side} saved at</dt><dd>{item.sourceStart === null ? "Not recorded" : `${hexWord(item.sourceStart)} (source)`}</dd>
                         {item.problem && <><dt>{item.side} issue</dt><dd>{item.problem}</dd></>}
                       </Fragment>)}

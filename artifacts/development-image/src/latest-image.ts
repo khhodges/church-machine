@@ -8,9 +8,11 @@ export function latestChoices(entries: CatalogEntry[]): CatalogEntry[] {
   return entries;
 }
 
-export async function inspectChoice(id: string, signal: AbortSignal): Promise<Inspection> {
+export async function inspectChoice(id: string, signal: AbortSignal, planning = false): Promise<Inspection> {
   const original = sourceId(id);
-  const saved = await request<Inspection>("/api/development-image/inspect?id=" + encodeURIComponent(original), {signal});
+  const saved = await request<Inspection>("/api/development-image/inspect?id=" + encodeURIComponent(original) + (planning ? "&planning=latest" : ""), {signal});
+  if (planning && saved.planning !== true)
+    throw Error("The IDE server did not return a latest-planning inspection for this Namespace. No sizes are assumed.");
   // Even an old latest: link is navigation only. Preparation is explicit.
   return saved;
 }

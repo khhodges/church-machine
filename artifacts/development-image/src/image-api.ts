@@ -5,7 +5,10 @@ export type Slot = {
   location: number | null; limit?: number | string; allocationWords: number | null;
   policy?: string; load_policy?: string; resident?: boolean; token?: string;
   seq?: number; sequence?: number; boot?: boolean; filename?: string; lump_version?: number;
-  selection?: {filename?: string; revision?: number; token?: string};
+  selection?: {filename?: string; revision?: number; token?: string; binaryHash?: string};
+  /** Planning inspection: compact runtime requirement (api_size, no source). */
+  plannedWords?: number | null; unresolved?: boolean;
+  resolutionError?: string; resolutionSource?: "latest-verified-compilation" | string;
 };
 export type CatalogEntry = {id: string; name: string; saved_at: string; preparation: string; selection_key?: string};
 export type PreparedImage = {
@@ -29,6 +32,7 @@ export type Inspection = {
   layoutRows?: Slot[]; layoutSource?: string;
   capacityWords: number; capacitySource: string; image: PreparedImage | null;
   imageSha256: string | null; imageBytes: number | null;
+  planning?: boolean; planningNote?: string; planningManifestSha256?: string;
   inspectionOnly?: boolean; releaseApproved?: boolean;
   hardwareError: string | null; warnings: string[]; metadata: Record<string, unknown>;
 };

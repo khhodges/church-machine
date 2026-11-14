@@ -6,7 +6,9 @@ import type { Slot } from "./image-api";
 
 export type Side = "A" | "B";
 export type LumpPick = {side: Side; slot: number};
-export type LumpMember = {side: Side; slot: number; name: string; words: number | null; identity: string | null};
+export type LumpMember = {side: Side; slot: number; name: string; words: number | null; identity: string | null;
+  lazy?: boolean; plannedWords?: number | null; binaryWords?: number | null; error?: string};
+const pos = (v: unknown) => typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : null;
 export type GlassLump = {key: string; identity: string | null; name: string; members: LumpMember[]};
 
 export function isLumpRow(row: Slot): boolean {
@@ -19,7 +21,8 @@ export function lumpIdentity(row: Slot): string | null {
   const rev = row.selection?.revision ?? row.lump_version;
   if (!file || rev === undefined || rev === null) return null;
   const token = row.selection?.token ?? row.token;
-  return `${file}@${rev}${token ? `#${token}` : ""}`;
+  const hash = row.selection?.binaryHash;
+  return `${file}@${rev}${token ? `#${token}` : ""}${hash ? `$${hash}` : ""}`;
 }
 
 export function lumpMembers(side: Side, rows: Slot[] | null | undefined): LumpMember[] {
@@ -27,6 +30,9 @@ export function lumpMembers(side: Side, rows: Slot[] | null | undefined): LumpMe
     side, slot: row.slot, name: row.name,
     words: typeof row.allocationWords === "number" && row.allocationWords > 0 ? row.allocationWords : null,
     identity: lumpIdentity(row),
+    lazy: (row.policy ?? row.load_policy) === "Lazy" || row.resident === false,
+    plannedWords: pos(row.plannedWords), binaryWords: pos(row.geometry?.sizeWords),
+    error: row.unresolved ? row.resolutionError || "Latest verified compilation could not be resolved." : undefined,
   }));
 }
 

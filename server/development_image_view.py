@@ -278,6 +278,9 @@ def register(app, backend):
         try:
             with backend._namespace_commit_guard():
                 result = inspect(backend, request.args.get("id", ""))
+                if request.args.get("planning") == "latest":
+                    from server.development_memory_plan import resolve_inspection
+                    result = resolve_inspection(backend, result)
             response = jsonify(result)
         except (OSError, ValueError, KeyError, TypeError) as error:
             response = jsonify(ok=False, error=str(error), dataChanged=False)

@@ -17,7 +17,7 @@ export default function NbNamespaceTabs({tab, onTab, names, states, onRetry, mem
   const shared = (m: LumpMember) => items.find(i => i.members.includes(m))?.members.length === 2;
   return (
     <div className="nb-tabs">
-      <div className="nb-tablist" role="tablist" aria-label="Namespace alternatives">
+      <div className="nb-tablist" role="tablist" aria-label="Co-resident Namespaces">
         {(["A", "B"] as Side[]).map(side => (
           <button key={side} type="button" role="tab" id={`nb-tab-${side}`} aria-controls="nb-tabpanel"
             aria-selected={tab === side} className={`nb-tab${tab === side ? " is-active" : ""}${pick?.side === side || (glassKey && items.find(i => i.key === glassKey)?.members.some(m => m.side === side)) ? " is-linked" : ""}`}
@@ -35,7 +35,7 @@ export default function NbNamespaceTabs({tab, onTab, names, states, onRetry, mem
           ? <p className="nb-tab-note">This saved Namespace lists no LUMP rows.</p>
           : <div className="kiss-table-scroll" role="region" aria-label={`Namespace ${tab} LUMPs`}>
               <table>
-                <thead><tr><th scope="col">Slot</th><th scope="col">LUMP</th><th scope="col">Words</th><th scope="col">Identity</th></tr></thead>
+                <thead><tr><th scope="col">Slot</th><th scope="col">LUMP</th><th scope="col">Runtime words</th><th scope="col">Binary words</th><th scope="col">Identity</th></tr></thead>
                 <tbody>{rows.map(m => {
                   const active = pick?.side === m.side && pick.slot === m.slot;
                   const color = shared(m) ? SIDE_COLORS.AB : SIDE_COLORS[m.side];
@@ -46,7 +46,8 @@ export default function NbNamespaceTabs({tab, onTab, names, states, onRetry, mem
                         aria-pressed={active} aria-label={`Select ${m.name}, Namespace ${m.side} slot ${m.slot}`}
                         onClick={() => onPick({side: m.side, slot: m.slot})}>{m.name}</button>
                       <span className={`nb-badge nb-badge-${shared(m) ? "AB" : m.side}`}>{shared(m) ? "A+B" : m.side}</span></td>
-                    <td className="kiss-kind">{m.words === null ? "unknown" : m.words.toLocaleString()}</td>
+                    <td className="kiss-kind" title={m.error}>{m.error ? `unresolved: ${m.error}` : m.lazy ? (m.plannedWords == null ? "not supplied" : `${m.plannedWords.toLocaleString()} lazy`) : (m.words ?? m.plannedWords) == null ? "not supplied" : (m.words ?? m.plannedWords)!.toLocaleString()}</td>
+                    <td className="kiss-kind">{m.binaryWords == null ? "—" : m.binaryWords.toLocaleString()}</td>
                     <td className="kiss-kind" title={m.identity ?? "No exact artifact identity recorded"}>{m.identity ?? "unproven"}</td>
                   </tr>;
                 })}</tbody>

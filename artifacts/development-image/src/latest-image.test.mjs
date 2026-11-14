@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import {execFileSync} from "node:child_process";
+import {buildSync} from "esbuild";
 import {mkdtempSync, rmSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 const temp = mkdtempSync(join(tmpdir(), "latest-image-test-"));
 try {
-  execFileSync("node_modules/.bin/esbuild", ["artifacts/development-image/src/latest-image.ts",
-    "--bundle", "--platform=node", "--format=esm", `--outfile=${temp}/module.mjs`]);
+  buildSync({entryPoints: [new URL("./latest-image.ts", import.meta.url).pathname],
+    bundle: true, platform: "node", format: "esm", outfile: `${temp}/module.mjs`});
   const {latestChoices, inspectChoice, sourceId} = await import(`file://${temp}/module.mjs`);
   const entries = [{id: "design:one", name: "New Layout"}, {id: "archive", name: "Old"}];
   assert.equal(latestChoices(entries)[0].id, "design:one");
