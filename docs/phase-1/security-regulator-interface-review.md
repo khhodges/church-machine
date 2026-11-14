@@ -24,7 +24,7 @@ only a general capability, the missing concrete caller/use case is explicit.
 |---|---|---|
 | **LOADM — proposed interface with approved inputs**<br>`LOADM(sourceGT, homeIndex) → valueGT`<br>[ISA A.2](01-isa/instruction-set.md#a2-loadm--m-assisted-capability-load) | Approved inputs: CR1=`sourceGT`, DR1=`homeIndex` (zero-based). Source-register M may replace the source L requirement, not other checks. Return the exact loaded GT, including NULL data, in CR1 with CR1.M clear, replacing the source argument. NULL source authority remains invalid. Caller preserves ordinary working values needed after the call; protected CALL/RETURN behavior is unchanged. | Document exact working-register clobbers; verify the return mask and exact M acceptance/clear points. |
 | **SAVEM — proposed interface with approved inputs**<br>`SAVEM(destinationGT, homeIndex, valueGT) → void`<br>[ISA A.3](01-isa/instruction-set.md#a3-savem--m-assisted-golden-token-save); [operation-review corrections](security-regulator-operation-review.md) | CR1=`destinationGT`, DR1=`homeIndex`, CR2=`valueGT`. `valueGT` is a GT, not a DR integer or register number. Destination authority governs SAVE. Successful SAVE clears B only in the stored copy; source remains unchanged. | Complete clobber/return contract and M-state implementation boundaries. Reconcile historical source-B admission wording; do not reopen approved operand assignments. |
-| **SWITCHM — interface requires reconciliation**<br>Namespace GT preloaded in any usable CRn; instruction index selects Thread slot<br>[ISA appendix](01-isa/instruction-set.md#review-appendix-securityregulator-methods); diagnostic comparison below | Save outgoing Thread → change Namespace → load incoming Thread. Namespace input is a direct preloaded GT, not a C-list lookup. The instruction's index selects the incoming Thread slot, not necessarily 2. CR15.M is required; raw M remains private to SR. | Reconcile method calling convention, usable register range, encoding and direct-Namespace checks. Specify clobbers, continuation and M consumption. The diagnostic and older source/row proposal do not settle this public ABI. |
+| **SWITCHM — proposed interface**<br>`SWITCHM(sourceCListGT, rowIndex) → context transfer`<br>[ISA appendix](01-isa/instruction-set.md#review-appendix-securityregulator-methods); diagnostic comparison below | Fixed Namespace entry-Thread transfer, not an ordinary immediate return. CR15.M is required; the source must have explicit L. Raw M remains private to SR. | Decide whether the final public interface accepts the proposed CR1 source/DR1 row or uses a privately provisioned fixed next-Namespace binding. Specify clobbers, continuation and M consumption. The diagnostic does not settle this public ABI. |
 | **MintM — proposed interface**<br>`MintM(Ctype, Permissions, Slot) → GT`<br>[ISA construction discussion](01-isa/instruction-set.md); [construction-port clarification](../phase-2/gt-construction-port.md) | Constructs a GT; it does not allocate an object or increment its version. The clarified mechanism packs DATA and reads it as a GT under monitor M, rather than using an ordinary scratch L grant. | Final argument/result registers, exact `GTvars`/field mapping, identity-field derivation and type validation, clobbers and return preservation. Reconcile naming with SecurityMonitor `Create(GTvars)` without assuming an alias. |
 | **MakeOutformM — proposed interface**<br>`MakeOutformM(sourceInformGT) → outformGT`<br>[ISA conversion discussion](01-isa/instruction-set.md) | Original source GT is mandatory; a slot-only reconstruction is not equivalent. | Argument/result registers, precise conversion checks and preserved/transformed fields, clobbers and M-use implementation. |
 | **MakeInformM — proposed interface**<br>`MakeInformM(sourceOutformGT) → informGT`<br>[ISA conversion discussion](01-isa/instruction-set.md) | Original source GT is mandatory; a slot-only reconstruction is not equivalent. | Argument/result registers, precise conversion checks and preserved/transformed fields, clobbers and M-use implementation. |
@@ -78,16 +78,15 @@ specific caller still needs to be named.
 
 - **User:** Amoeba in the mediated diagnostic; the final public caller/binding
   arrangement remains to be specified.
-- **Reason:** Hand execution to another Namespace's instruction-index-selected Thread while
+- **Reason:** Hand execution to another Namespace's fixed entry Thread while
   keeping the raw M-control grant private to SecurityRegulator.
 - **Why not ordinary CHANGE?** CHANGE changes Threads, not Namespace roots.
-  SWITCH requires CR15.M; SR supplies the bounded M
+  SWITCH requires CR15.M and explicit source L; SR supplies the bounded M
   operation rather than distributing its raw M-control grant.
 - **Evidence:** [mediated Amoeba fixture](../phase-2/cooperative-retry/candidate_mediated_fixture.py);
   [diagnostic SwitchM implementation](../phase-2/cooperative-retry/candidate_regulator_switch.cloomc).
   Amoeba calls diagnostic method 0; private SR C-list row 2 supplies the peer
-  Namespace. This is historical diagnostic behavior, not the corrected direct
-  preloaded-Namespace input contract.
+  Namespace. This does not establish the proposed source/row public ABI.
 
 #### MintM — user and reason
 
@@ -194,7 +193,7 @@ does not restore those execution gates.
 
 | Reference | Interface actually shown | Meaning / limitation |
 |---|---|---|
-| ISA review appendix | Namespace GT preloaded in any usable CRn; instruction index selects Thread | Corrected input model; replaces the earlier C-list/row proposal. Final method calling convention remains open. |
+| ISA review appendix | `SWITCHM(sourceCListGT, rowIndex)` | Proposed general source/row interface. |
 | [candidate source](../phase-2/cooperative-retry/candidate_regulator_switch.cloomc) | `candidate.SecurityRegulator.SwitchM()` | Executable diagnostic with no explicit arguments. Private C-list row 1 holds M-control; row 2 holds the next-Namespace GT. Explicitly not a complete SR. |
 | [mediated fixture](../phase-2/cooperative-retry/candidate_mediated_fixture.py) | Amoeba loads its SR E-GT and calls method **0** | Numeric index belongs to that diagnostic binary only; it is not the final API's method-number assignment. |
 | [Namespace concept review](../reviews/current-namespace-abstraction.md) | `SecurityRegulator.SwitchNamespace(Boot.NS, Passkey)` | Conceptual orchestration example, not a compiled ABI or alias of either interface above. |
@@ -217,10 +216,8 @@ variants or candidate families into exported methods.
 
 ## Remaining review choices, in dependency order
 
-1. **Public switching interface:** specify the method calling convention and
-   encoding for a Namespace GT preloaded in any usable CRn plus the
-   instruction-selected incoming Thread slot (not fixed slot 2); resolve the
-   conceptual `SwitchNamespace` name's disposition.
+1. **Public switching interface:** explicit source/row versus private fixed
+   peer binding; resolve the conceptual `SwitchNamespace` name's disposition.
 2. **Complete callable ABI:** argument/result registers, clobbers, preservation
    masks and final method indices. Preserve already-approved SAVEM operands.
 3. **Required extensions:** choose B-setter, F-setter and version-increment

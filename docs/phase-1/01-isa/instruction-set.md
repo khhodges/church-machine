@@ -1476,22 +1476,6 @@ Namespace images, catalogs, resident LUMPs, or deployment approvals.
 
 ## SWITCH: combined Namespace and Thread handoff
 
-**Latest Namespace-operand correction:** The destination Namespace GT is
-preloaded directly in any usable CRn. SWITCH does not obtain it by indexing
-a supplied C-list. The instruction's index selects the incoming Thread slot.
-This supersedes the older C-list-source/row-lookup wording below, including
-its source-L rationale. “Usable CRn” does not itself settle an encoded register
-range or change protected-register rules; those require reconciliation.
-
-**Latest Thread-selection correction:** SWITCH saves the outgoing Thread,
-changes Namespace, then loads the incoming Thread selected by the instruction's
-index. That Thread slot is **not necessarily 2**. This supersedes fixed-slot-2
-incoming Thread claims elsewhere in this document. The earlier source-row
-notation below must be reconciled with this index meaning before freezing
-SWITCHM's ABI or instruction encoding; it does not establish that the Thread
-index is a source C-list row. This correction does not claim implementation
-conformance or authorize hardware changes.
-
 **Approved Phase 1 semantics:** CHANGE is THREADSAVE → THREADLOAD. SWITCH is
 the same halves with LOAD NAMESPACE(CR15) inserted between them. Ordinary CHANGE
 leaves CR15 unchanged; CR13 is NULL and never touched. The earlier blanket
@@ -2037,40 +2021,29 @@ destination-M permission needed for this example.
 
 ### A.4 SWITCHM — M-authorized Namespace/Thread handoff
 
-**Thread-selection correction:** The incoming Thread slot is selected by the
-instruction's index, not fixed at 2. Preserve the sequence THREADSAVE →
-Namespace change → THREADLOAD. The source/row signature below remains a
-historical proposal pending reconciliation with this corrected index meaning;
-its input registers have not been approved.
-
-**Approved Namespace input:** The destination Namespace GT is preloaded
-directly in any usable CRn, independently of the instruction's incoming
-Thread-slot index. No C-list lookup is required to obtain that Namespace GT.
-The exact method register convention and encoding remain to be reconciled.
-
-**Function:** perform the combined SWITCH handoff using that preloaded
-Namespace GT with CR15.M authorization.
+**Function:** select a Namespace GT from a supplied C-list and perform the
+existing combined SWITCH handoff with CR15.M authorization.
 
 ```text
-Namespace input: destination Namespace GT preloaded in a usable CRn
-Thread selection: instruction index
-Result: context transfer
+SWITCHM(sourceCListGT, rowIndex) -> context transfer
+
+Proposed entry: CR1 = sourceCListGT; DR1 = rowIndex
+Operand selected by SWITCH: sourceCListGT[rowIndex]
 ```
 
-The older `SWITCHM(sourceCListGT, rowIndex)` proposal is superseded as an
-input model. Do not substitute a C-list row for the Thread-slot index.
+This accepts a **C-list GT plus row**, not a direct Namespace GT and not an
+arbitrary destination-register number.
 
 **Defined underlying operation:**
 
 1. Latch CR15.M at SWITCH acceptance. Its absence faults PERM_L.
-2. Read the preloaded destination Namespace GT from a usable CRn. Reconcile
-   the exact permitted register range and direct-Namespace admission checks;
-   do not carry over the retired C-list lookup's L requirement by assumption.
+2. Use a source register in CR0–CR11 with explicit L permission. Source M
+   cannot replace L, including for CR6.
 3. Validate the selected Namespace capability, bounds, identity/integrity
    and Namespace type before outgoing save or incoming installation.
 4. Save the outgoing Thread, install the Namespace into fixed CR15, then
-   load the incoming Thread selected by the instruction's index into CR12.
-   Do not substitute fixed slot 2 for the selected Thread slot.
+   activate that Namespace's fixed slot-2 entry Thread into CR12 according
+   to the approved SWITCH contract.
 5. Consume CR15.M on successful handoff. CR13 remains untouched.
 
 No additional CR12.M grant is required. Instruction bits 22:19 remain
