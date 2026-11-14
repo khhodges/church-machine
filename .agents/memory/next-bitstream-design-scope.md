@@ -2,6 +2,17 @@
 name: Next bitstream design scope
 description: Approved separate planning view and three-view Switch loop.
 ---
+For this candidate, Genesis alone issues M authority, exclusively to
+SecurityRegulator. Use that mediated path; Namespace ownership and direct
+Amoeba M-control are not alternatives.
+
+**Why:** The user explicitly corrected the proposed ownership choice.
+
+**How to apply:** Follow the authoritative issuance rule in
+[M-bit I/O object](m-bit-io-object.md). Keep only-Amoeba initial executable
+residency and do not silently preload a privileged helper or grant raw M to
+Amoeba to bypass missing integration.
+
 The user approved a second Image Development view to design the next bitstream with two resident Namespaces and a common memory zone for individual LUMPs, preserving the existing view and working configuration.
 
 The user also confirmed two resident Namespaces for the next FPGA test

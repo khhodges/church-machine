@@ -29,12 +29,13 @@ does not qualify physical UART timing.
 
 ## Inputs not yet ready to freeze
 
-**Blocked on M-control authority:** the two-root native fixture reaches a
+**Blocked on Genesis/SecurityRegulator integration:** the two-root native fixture reached a
 PERM_S rejection when Amoeba attempts to arm the M bits needed for SWITCH.
-The existing Namespace-execution-only hardware gate remains intact. The
-only-Amoeba residency rule must be reconciled with privileged mediation before
-this can be a build-ready image. The failing two-root fixture is diagnostic,
-not a release image. No source/image freeze or vendor-build authorization is
+Genesis alone issues M to SecurityRegulator; that authority decision is settled.
+The existing Namespace-execution-only hardware gate is not the ownership
+contract. Native issuance/mediation and the only-Amoeba residency rule must
+both be satisfied before this is build-ready. The direct-Amoeba fixture is
+disabled, not a release image. No source/image freeze or vendor-build authorization is
 implied by passing loader component tests.
 
 The candidate's staging-only receiver connection now passes seven focused

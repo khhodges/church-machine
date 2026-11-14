@@ -3,6 +3,22 @@ name: M-bit I/O object
 description: Canonical representation and custody rule for CR M state.
 ---
 
+## Authoritative issuance rule
+
+Genesis is the only issuer of M authority, and SecurityRegulator is its only
+recipient. Neither Namespace, Amoeba, ordinary allocation services, nor the
+IDE/Builder may independently issue or receive that authority.
+
+**Why:** The user explicitly clarified: “M is only issues to
+SecurityRegulator by Genesis.” This settles the candidate's authority boundary;
+the existing Namespace-only execution gate is implementation history, not an
+alternative ownership policy.
+
+**How to apply:** Implement Genesis → SecurityRegulator issuance and native
+SecurityRegulator mediation. Do not provision raw M-control into Amoeba to
+enable SWITCH. Older provisioning/Namespace-custody statements below are
+historical where they conflict with this rule.
+
 SecurityRegulator must include a GT-version increment method alongside its
 B-bit methods, as a software companion to the Phase 2 Thread-reset rule.
 
@@ -18,10 +34,11 @@ to implement or provision it.
 
 ## Current mechanism-versus-policy clarification
 
-The user approved trusted IDE/Builder provisioning of the raw M-control
+Historically, the user approved trusted IDE/Builder provisioning of the raw M-control
 capability into SecurityRegulator's private C-list during Namespace preparation
 on 2026-11-03. Ordinary Mint/FreeHandler allocation must not create or distribute
-it, and SR does not acquire it automatically at runtime. Boot and automatic
+it, and SR does not acquire it automatically at runtime. This earlier issuer
+description is superseded by Genesis-only issuance above. Boot and automatic
 CR6.M retain their defined exceptions.
 
 **Why:** Explicit preparation establishes intended custody without giving
@@ -392,7 +409,7 @@ per-operation policy checks. This clarification does not by itself specify
 which checks M bypasses, change the GT format, or authorize code/hardware
 changes; derive those details from the approved ISA and explicit decisions.
 
-**Current review authority:** M belongs only to SecurityRegulator, trusted as
+**Current review authority:** Genesis issues M only to SecurityRegulator, trusted as
 part of the TSB. See [hardwired recovery and security](hardwired-recovery-security-authority.md).
 The historical interface and watchdog discussion below does not authorize
 reintroducing an IRQ/WatchdogFault role in the current review.

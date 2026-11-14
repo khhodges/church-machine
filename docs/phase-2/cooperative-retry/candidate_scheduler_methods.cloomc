@@ -1,5 +1,8 @@
 ; Source fragment composed with the qualified EnsureResident method.
 ; This stage proves one cross-Namespace USER request, not Mallory containment.
+; REJECTED EXPERIMENT: direct Amoeba M-control below violates Genesis-only
+; issuance to SecurityRegulator. The fixture generator is disabled. This is
+; diagnostic source, not an approved scheduler or build input.
     main method Run() {
     Serve:
         LOAD CR9, CR6, #7

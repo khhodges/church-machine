@@ -10,6 +10,13 @@ from .amoeba_fixture import run_compile
 
 
 def prepare():
+    # This earlier experiment attempted direct M ownership by Amoeba. It is
+    # not an authorized candidate and must not emit an image. Retain its
+    # diagnostic layout below only until the Genesis/SecurityRegulator path
+    # replaces it; do not remove this guard merely to make the RTL test pass.
+    raise NotImplementedError(
+        "Genesis must issue M only to SecurityRegulator; "
+        "the native mediated handoff is not implemented")
     words, _, record, _ = loader_fixture()
     here = Path(__file__).parent
     source = (here / "candidate_amoeba.cloomc").read_text()

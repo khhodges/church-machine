@@ -145,17 +145,23 @@ regressions. Longer received-image regressions are tracked separately.
 
 ### Remaining build qualification
 
-**Current stop: M-control authority, not a passing final image.**
+**Authority settled; native integration remains unfinished.**
+Genesis alone issues M authority, exclusively to SecurityRegulator. Neither
+Namespace ownership nor direct Amoeba M-control is an approved alternative.
+The next implementation must follow Genesis → SecurityRegulator issuance and
+native mediation, while retaining only-Amoeba initial executable residency.
+
 The new disposable two-Namespace source reaches Amoeba's M-control write and
 faults with PERM_S at NIA `0x8024`. The maintained core deliberately accepts
 M-bit writes only under Namespace execution identity (Inform RX at slot 5).
 A normal Amoeba E execution identity is not that authority, even when supplied
 an exact device capability. The hardware gate has NOT been relaxed.
 
-The diagnostic fixture is not approved provisioning and must not be exported
-as the final image. Completing its first SWITCH requires reconciling the
-only-Amoeba initial-executable rule with privileged M-control mediation, or
-explicitly approving a different M-control authority boundary. Do not erase
+The direct-Amoeba diagnostic fixture is not approved provisioning; its generator
+is now disabled before compilation or image construction. Completing the first
+SWITCH requires the Genesis/SecurityRegulator path, not a new ownership choice.
+The existing Namespace-only execution check must be reconciled with that
+authoritative contract, not presented as a policy decision still open. Do not erase
 this failure with host-set M bits, a new implicit privilege, instruction-word
 translation, or secretly preloaded executable dependencies.
 
