@@ -2034,7 +2034,8 @@ Operand selected by SWITCH: sourceCListGT[rowIndex]
 **Approved operand inputs:** CR1 supplies the source C-list GT and DR1 selects
 its Namespace-GT row. This selects the software method's input assignments,
 not a change to the ISA or RTL. The incoming Thread remains fixed at slot 2.
-Continuation and working-register preservation remain separate review items.
+The approved continuation and ISA-owned transactional preservation are stated
+below.
 
 This accepts a **C-list GT plus row**, not a direct Namespace GT and not an
 arbitrary destination-register number.
@@ -2074,6 +2075,13 @@ guaranteed restoration. RETURN after restoration completes the call within the
 restored Namespace; it does not itself switch Namespaces. Exact frame handling,
 wrapper M setup and clobbers still require implementation verification under
 the unchanged ISA/RTL.
+
+**Transactional preservation clarification:** Everything transactional is saved
+automatically by the ISA and restored through its matching context mechanisms.
+SWITCHM relies on that behavior; do not add a separate caller-save requirement
+for transactional state or reopen its ownership as a software-method choice.
+Checking the wrapper's actual scratch-register use remains implementation
+verification, not a replacement for ISA-owned transactional preservation.
 
 ### A.5 Shared ABI and M-lifecycle review items
 

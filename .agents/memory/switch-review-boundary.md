@@ -38,3 +38,13 @@ of CHANGE match. The suspended call belongs to that saved SYSTEM context.
 **How to apply:** Verify the matching saved continuation rather than inventing
 a fresh call or return path. RETURN completes the call in the restored Namespace;
 it does not switch Namespaces or guarantee a later restoration.
+
+Transactional state is saved automatically by the ISA. SWITCHM must rely on
+that preservation, not impose a separate caller-save contract for that state.
+
+**Why:** The user corrected the attempted caller-versus-method preservation
+choice: “Everything transactional is saved automatically by the ISA.”
+
+**How to apply:** Do not reopen architectural transactional preservation as an
+ABI choice. Verify implementation scratch use separately without weakening or
+duplicating the ISA's context mechanisms.

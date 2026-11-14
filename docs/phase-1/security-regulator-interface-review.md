@@ -82,6 +82,9 @@ specific caller still needs to be named.
   It hands off to the destination Namespace's SYSTEM Thread in slot 2.
   Restoration of the outgoing SYSTEM Thread requires another SWITCHM; do not
   describe this as an arbitrary USER Thread switching or independently resuming.
+- **Transactional preservation:** The ISA automatically saves transactional
+  state and restores its matching context. SWITCHM does not add a separate
+  caller-save requirement for that state.
 - **Reason:** Hand execution to another Namespace's fixed entry Thread while
   keeping the raw M-control grant private to SecurityRegulator.
 - **Why not ordinary CHANGE?** CHANGE changes Threads, not Namespace roots.
