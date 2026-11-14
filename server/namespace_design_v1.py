@@ -134,11 +134,13 @@ def validate(document):
         raise ValueError("Expected a complete Namespace design")
     count = document["slotCount"]
     phase1 = document["format"] == PHASE1_FORMAT
+    capacity = document["capacityWords"]
     if (document["format"] not in (FORMAT, PHASE1_FORMAT) or
-            document["capacityWords"] != 16384 or document["outputProfile"] != "api" or
+            type(capacity) is not int or capacity not in (8192, 16384) or
+            (phase1 and capacity != 16384) or document["outputProfile"] != "api" or
             type(count) is not int or
             (not phase1 and count != 64) or (phase1 and not 16 <= count <= 4096)):
-        raise ValueError("Expected ascending-v1 with 64 slots or Phase 1 with 16–4096 slots, 16384 words and API-only output")
+        raise ValueError("Expected ascending-v1 with 64 slots and 8192/16384 words, or Phase 1 with 16–4096 slots and 16384 words; API-only output")
     rows = document["rows"]
     if not isinstance(rows, list) or len(rows) > count - 1:
         raise ValueError("Invalid Namespace member count")
@@ -146,7 +148,7 @@ def validate(document):
     for row in rows:
         if not isinstance(row, dict) or set(row) - {
             "slot", "name", "kind", "policy", "sequence", "selection", "boot",
-            "words", "address", "limit", "authoring", "preparedThread",
+            "words", "address", "limit", "authoring", "preparedThread", "sharedFrom",
         }:
             raise ValueError("Unexpected Namespace row fields")
         slot, name = row.get("slot"), row.get("name")
@@ -167,6 +169,17 @@ def validate(document):
             raise ValueError("Invalid load policy")
         if kind != "lump" and row["policy"] != ("Hardware" if kind == "mmio" else "Resident"):
             raise ValueError("Architectural objects retain their residency")
+        if "sharedFrom" in row:
+            shared = row["sharedFrom"]
+            if (kind != "lump" or row["policy"] != "Resident"
+                    or not isinstance(shared, dict)
+                    or set(shared) != {"designId", "slot", "fingerprint"}
+                    or not isinstance(shared["designId"], str)
+                    or not re.fullmatch(r"[a-f0-9]{32}", shared["designId"])
+                    or type(shared["slot"]) is not int or not 3 <= shared["slot"] < 4096
+                    or not isinstance(shared["fingerprint"], str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", shared["fingerprint"])):
+                raise ValueError("Shared residents require an exact saved design, slot and fingerprint")
         if kind == "thread" and (type(row.get("words")) is not int or
                                  row["words"] not in THREAD_SUPPORTED_BODY_WORDS):
             raise ValueError("Thread allocation must be one of " +
@@ -250,6 +263,34 @@ def api_size(row, lumps):
     return allocation, warning
 
 
+def require_standalone_design(document):
+    """Never silently turn shared planning references into private image copies."""
+    if document.get("capacityWords", 16384) != 16384 or any("sharedFrom" in r for r in document["rows"]):
+        raise ValueError(
+            "This reduced/shared Namespace requires the combined-image builder and "
+            "verified bound-LUMP sharing. Standalone binding/simulation is not supported; "
+            "the saved design is retained.")
+
+
+def shared_source_label(row, lumps):
+    """Validate reference identity without claiming physical sharing is proven."""
+    ref = row["sharedFrom"]
+    folder = Path(lumps) / "design-drafts" / "copies" / ref["designId"]
+    if folder.is_symlink() or (folder / "design.json").is_symlink():
+        raise ValueError("Shared source must not be a symlink")
+    source = validate(json.loads((folder / "design.json").read_text()))
+    if digest(source) != ref["fingerprint"]:
+        raise ValueError("Shared source changed; review and reselect its exact saved revision")
+    target = next((r for r in source["rows"] if r["slot"] == ref["slot"]), None)
+    if (not target or target["kind"] != "lump" or target["policy"] != "Resident"
+            or target["name"] != row["name"] or "sharedFrom" in target):
+        raise ValueError("Shared source must be the same resident LUMP, not a chained reference")
+    if row.get("selection") != target.get("selection"):
+        raise ValueError("Shared source and destination must select the same exact artifact")
+    metadata = json.loads((folder / "metadata.json").read_text())
+    return metadata["name"]
+
+
 def project(document, lumps):
     validate(document)
     rows, cursor, warnings = [], 4 * document["slotCount"], []
@@ -266,6 +307,18 @@ def project(document, lumps):
             row["location"] = row["address"]
         elif row["kind"] == "thread":
             row["allocationWords"] = row["words"]
+        elif "sharedFrom" in row:
+            # No duplicate local allocation. Actual pool address/size and bound
+            # C-list compatibility must come from a qualified combined image.
+            row.update(sharedAllocation=True, sharingVerified=False, unresolved=True)
+            try:
+                row["sharedSourceLabel"] = shared_source_label(row, lumps)
+                warnings.append(
+                    f"{row['name']}: shared from {row['sharedSourceLabel']} "
+                    f"NS[{row['sharedFrom']['slot']}]; no local copy reserved. "
+                    "Bound-byte compatibility and common placement remain unverified.")
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                warnings.append(f"{row['name']}: invalid shared reference: {exc}")
         elif row["policy"] == "Resident":
             try:
                 row["allocationWords"], warning = api_size(row, lumps)
@@ -283,10 +336,13 @@ def project(document, lumps):
         rows.append(row)
     if cursor is not None and cursor > document["capacityWords"]:
         warnings.append("Resident allocations exceed Namespace capacity; design remains editable")
-    header = ((31 << 27) | ((14-13) << 23) | (document["slotCount"] << 10) | (1 << 8))
+    header = ((31 << 27) | ((document["capacityWords"].bit_length()-1-13) << 23)
+              | (document["slotCount"] << 10) | (1 << 8))
     return dict(rows=sorted(rows, key=lambda r: r["slot"]),
                 metadataWords=[header, 0, len(rows)-1, 0], tableWords=4 * document["slotCount"],
                 usedWords=cursor, warnings=warnings, activationAllowed=False,
+                sharedResidentCount=sum("sharedFrom" in r for r in document["rows"]),
+                sharedPhysicalWords=None if any("sharedFrom" in r for r in document["rows"]) else 0,
                 buildReady=False, addressesAreProposed=True,
                 privateSimulationAdmission="exact-saved-design",
                 privateSimulationNote="Private simulation has a separate compiler-authenticated admission path. "

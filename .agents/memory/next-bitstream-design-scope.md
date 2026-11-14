@@ -95,6 +95,20 @@ no raw M. The numeric C-list row, exact GT bindings and physical sharing/copying
 remain to be established. Identical instructions do not prove that one physical
 bound C-list is suitable for both Namespaces.
 
+Whole-LUMP physical sharing requires identical C-list GT words as well as
+identical instructions. The same CR6 row with different GT bits works only
+with separate bound copies, not one shared C-list word.
+
+**Why:** The user explicitly identified the clash when moving from identical
+code to one physically shared Amoeba LUMP.
+
+**How to apply:** A possible shared binding uses the same local slot index,
+permissions and generation in both Namespace tables, with different local
+descriptors resolving that index to the appropriate peer. Validate every C-list
+entry and keep mutable state private before claiming whole-LUMP sharing.
+Do not assume support for separate per-Namespace C-lists attached to one shared
+instruction body; that would require a distinct supported execution mechanism.
+
 The next test candidate targets the second Wukong V3 used for the recent
 physical demonstrations.
 

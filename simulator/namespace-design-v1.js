@@ -410,7 +410,7 @@
                 aria-label="${esc(profileLabel())} · ${label}"
                 title="${esc(origin)}${state.dirty?' Local changes have not been saved.':''}${state.dirty || state.persisted === false?' Save explicitly; binding remains a separate action.':''}">
             <span class="nr-saved" data-status="${status}">${status==='saved'?icon('check'):''}${label}</span>
-            <span class="nr-state-note">${esc(note)}</span>
+            <span class="nr-state-note">${esc(note)} · Capacity ${(state.document?.capacityWords || 0)*4/1024} KiB${state.document?.rows?.some(r=>r.sharedFrom)?' · Shared resident references; physical sharing unverified':''}</span>
             </div><div class="nr-file-actions" role="group" aria-label="Saved design actions">
             <button type="button" id="reloadNamespaceSaved" onclick="NamespaceDesignV1.reloadSaved()" ${state.loading || state.saving?'disabled':''}>${icon('reload')}Reload saved design</button>
             <button type="button" id="duplicateNamespace" onclick="NamespaceDesignV1.duplicateNamespace()" ${state.loading || state.saving?'disabled':''}>${icon('copy')}Duplicate Namespace</button></div>`;
@@ -441,7 +441,7 @@
             const current=!state.dirty && projection && projection.policy===r.policy && projection.name===r.name;
             const location=r.kind==='namespace'?0:r.kind==='mmio'?r.address:current?projection.location:null;
             const limit=r.kind==='namespace'?slotCount()*4-1:r.kind==='mmio'?r.limit:current?projection.limit:null;
-            const select=r.kind==='lump'?`<select aria-label="Load policy for slot ${slot}" onchange="NamespaceDesignV1.policy(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${r.policy==='Resident'?'selected':''}>Resident</option><option ${r.policy==='Lazy'?'selected':''}>Lazy</option></select>`:
+            const select=r.sharedFrom?`<span class="ns-fixed-policy">Resident · Shared from ${esc(projection?.sharedSourceLabel || 'saved Namespace')} NS[${r.sharedFrom.slot}] · unverified</span>`:r.kind==='lump'?`<select aria-label="Load policy for slot ${slot}" onchange="NamespaceDesignV1.policy(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${r.policy==='Resident'?'selected':''}>Resident</option><option ${r.policy==='Lazy'?'selected':''}>Lazy</option></select>`:
                 `<span class="ns-fixed-policy">${r.kind==='mmio'?'Resident I/O register':r.kind==='thread'?'Resident · Thread':'Bootstrap'}</span>`;
             const clear=r.kind==='lump'&&!r.boot?`<button class="btn btn-xs" onclick="NamespaceDesignV1.clear(${slot})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-right:4px;font-size:0.65rem;padding:1px 5px;">Clear</button>`:'';
             const selection=r.selection||{};

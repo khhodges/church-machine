@@ -143,6 +143,15 @@ is separate: identical instructions do not establish that a single physical
 bound C-list works in both contexts. This records the design, not an applied
 Namespace change or qualified native implementation.
 
+For one physically shared LUMP, the C-list words themselves must also be
+identical. The earlier allowance for different local Namespace slot indices
+therefore applies to separately bound copies. A possible common binding uses
+the same local slot index and compatible GT type/rights/generation in both
+tables; each table's descriptor then identifies its own appropriate peer.
+Maintained Namespace lookup uses the active CR15 base plus the GT slot index.
+This is a layout option to validate, not approval of guessed GT values or a
+claim that all remaining C-list entries and mutable state are shareable.
+
 ## Confirmed: fault entry preserves Boot's continuation
 
 Carry forward direct fault stashing into the configured Boot.Thread, one

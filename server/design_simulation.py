@@ -10,7 +10,7 @@ import math
 from pathlib import Path
 import struct
 
-from server.namespace_design_v1 import validate, FORMAT
+from server.namespace_design_v1 import validate, FORMAT, require_standalone_design
 from server.simulation_preparation import artifact_bindings, _validate_body, _localize_portable
 from server.symbolic_binding import embedded_api
 from server.namespace_ascending_image import generate_image, build_fresh_thread_lump
@@ -18,6 +18,7 @@ from server.namespace_ascending_image import generate_image, build_fresh_thread_
 
 def selected_rows(document):
     validate(document)
+    require_standalone_design(document)
     rows = []
     for item in document["rows"]:
         if item["kind"] != "lump":
@@ -217,6 +218,7 @@ def stage(cfg, document, directory, entry_slot, *, saved_bound_bodies=None):
 
 def configuration(document):
     validate(document)
+    require_standalone_design(document)
     return dict(step1=dict(totalNamespaceWords=document["capacityWords"],
                            nsSlotsMax=document["slotCount"], threadLumpWords=256,
                            threadStackWords=32))
