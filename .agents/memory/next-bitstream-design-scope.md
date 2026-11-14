@@ -114,6 +114,17 @@ state, including Alice's value. Never use it as ordinary attack recovery.
 Partial/invalid installs remain stopped; no rollback promise or new sender-
 authentication claim. Physical installation still requires separate approval.
 
+The user authorized the first isolated memory/admission code and local-test
+stage, with a stop for review before later integration.
+
+**Why:** Begin bounded engineering after the candidate decisions rather than
+treat every internal implementation detail as a separate approval question.
+
+**How to apply:** Preserve historical profiles and evidence. Do not extend
+this approval to vendor builds, board operations, saved-artifact changes,
+Namespace-aware scheduling or fresh-Mallory integration. Report core-facing
+foundation evidence separately from a runnable core/top demonstration.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

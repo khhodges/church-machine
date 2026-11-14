@@ -60,3 +60,10 @@ Detailed change/provisioning map: [candidate change map](next-fpga-test-change-m
 The subsequent entry-contract review confirmed preserving Boot's saved
 continuation, not introducing a fresh handler root. This resolves the candidate's
 documentation choice; exact larger-image bindings and integration remain open.
+
+The first authorized memory/admission stage is now implemented as an isolated
+foundation with checked core-facing ports. Its 70 passing local/compatibility
+tests do not wire those ports into StarterTop or qualify the two-Namespace
+application. The original 64 KiB top, Namespace-aware receiver, trusted Boot
+integration and fresh-attempt software gaps above remain integration work.
+See [stage results](cooperative-retry/candidate-memory-admission.md).

@@ -195,7 +195,7 @@ Namespace switching and ordinary Lazy delivery do not replace the whole image.
 Independent Namespace replacement while preserving the other Namespace is
 outside this approved initial installation scope.
 
-## Proposed first implementation stage — awaiting authorization
+## Authorized first local implementation stage
 
 Implement and locally test only the checked memory and stopped-image admission
 foundation. Keep the historical 64 KiB profiles and retained evidence unchanged.
@@ -222,6 +222,11 @@ wiring, scheduler/restart integration and their tests remain subsequent stages.
 No vendor synthesis, physical transfer/programming, saved LUMP migration or
 live image/Namespace change is included.
 
+Stage result: the isolated foundation and compatibility checks report 70
+passed tests and one unrun opt-in Boot2 replay. See the stage document for
+the exact test split and integration limits. Work stopped for the agreed
+review; no subsequent stage is implicitly authorized.
+
 ## Next decisions
 
 - Readiness findings: [initial source and capacity review](next-fpga-test-readiness.md).
@@ -231,6 +236,8 @@ live image/Namespace change is included.
 - Exact memory ledger, receiver/device map and observation interface.
 - Frozen test images, acceptance criteria and local build gates.
 
-Only design work is authorized so far. The first implementation stage above is
-submitted separately for approval; later stages and vendor builds require
-their own review. Physical testing remains separately authorized.
+The user authorized the first isolated code/test stage above. Its implementation
+boundary is documented in
+[memory/admission stage](cooperative-retry/candidate-memory-admission.md).
+Later integration stages and vendor builds require their own review.
+Physical testing remains separately authorized.

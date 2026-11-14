@@ -10,21 +10,29 @@ from .starter_lifecycle import StarterLifecycle
 
 MAGIC = b"CSI1"
 IMAGE_BYTES = 65536
+COMBINED_IMAGE_BYTES = 131072
 
 
-def command(op, image, epoch, length=0, *, general_image=False):
-    magic = b"CSI2" if general_image else MAGIC
+def command(op, image, epoch, length=0, *, general_image=False, combined_image=False):
+    if combined_image and not general_image:
+        raise ValueError("CSI3 requires general-image admission")
+    magic = b"CSI3" if combined_image else b"CSI2" if general_image else MAGIC
     return magic + bytes((op, image, 0, 0)) + epoch.to_bytes(4, "big") + length.to_bytes(4, "big")
 
 
 class StarterTransport(Elaboratable):
-    def __init__(self, *, clock_hz, general_image=False):
+    def __init__(self, *, clock_hz, general_image=False, combined_image=False):
         # CSI2: selector zero, BEGIN header, 32-byte SHA256 (big endian),
         # then exactly IMAGE_BYTES. The hash is consistency, not authentication.
+        if combined_image and not general_image:
+            raise ValueError("CSI3 requires general-image admission")
         self.general_image = general_image
+        self.combined_image = combined_image
+        self.image_bytes = COMBINED_IMAGE_BYTES if combined_image else IMAGE_BYTES
         self.expected_digest = Signal(256)
         self.digest_valid = Signal()
-        self.control = StarterLifecycle()
+        self.control = StarterLifecycle(image_words=self.image_bytes // 4,
+                                        combined_image=combined_image)
         self.maintenance = Signal()
         self.valid = Signal()
         self.byte = Signal(8)
@@ -45,7 +53,7 @@ class StarterTransport(Elaboratable):
         data_mode = Signal()
         digest_mode = Signal()
         digest_count = Signal(5)
-        left = Signal(range(IMAGE_BYTES + 1))
+        left = Signal(range(self.image_bytes + 1))
         word = Signal(32)
         byte_index = Signal(2)
         index = Signal(32)
@@ -54,7 +62,7 @@ class StarterTransport(Elaboratable):
         complete = Signal()
         frame = Signal(128)
         op, image, epoch, length = frame[88:96], frame[80:88], frame[32:64], frame[:32]
-        magic = b"CSI2" if self.general_image else MAGIC
+        magic = b"CSI3" if self.combined_image else b"CSI2" if self.general_image else MAGIC
         valid_header = ((frame[96:] == int.from_bytes(magic, "big")) &
                         (frame[64:80] == 0) &
                         ((image == 0) if self.general_image else (image < 2)))
@@ -104,14 +112,14 @@ class StarterTransport(Elaboratable):
             with m.If(valid_header & epoch_ok):
                 with m.Switch(op):
                     with m.Case(1):
-                        with m.If(length == IMAGE_BYTES):
+                        with m.If(length == self.image_bytes):
                             m.d.comb += ctl.begin.eq(1)
                             with m.If(ctl.begin_accepted):
                                 m.d.sync += [
                                     self.image.eq(image), data_mode.eq(not self.general_image),
                                     digest_mode.eq(self.general_image), digest_count.eq(0),
                                     self.expected_digest.eq(0), self.digest_valid.eq(0),
-                                    left.eq(IMAGE_BYTES), index.eq(0),
+                                    left.eq(self.image_bytes), index.eq(0),
                                     byte_index.eq(0), word.eq(0)]
                             with m.Else():
                                 m.d.sync += self.rejected.eq(self.rejected + 1)

@@ -11,9 +11,10 @@ from amaranth import Elaboratable, Module, Signal
 class StarterLifecycle(Elaboratable):
     HELD, LOADING, VERIFYING, READY, RUNNING, FAILED = range(6)
 
-    def __init__(self, *, image_words=16384):
-        if type(image_words) is not int or not 0 < image_words <= 16384:
-            raise ValueError("image_words must be 1..16384")
+    def __init__(self, *, image_words=16384, combined_image=False):
+        maximum = 32768 if combined_image else 16384
+        if type(image_words) is not int or not 0 < image_words <= maximum:
+            raise ValueError(f"image_words must be 1..{maximum}")
         self.image_words = image_words
         self.state = Signal(range(6), init=self.HELD)
         self.epoch = Signal(32)
@@ -32,6 +33,9 @@ class StarterLifecycle(Elaboratable):
         self.validate_request = Signal()
         self.start = Signal()
         self.start_authorized = Signal()
+        # Legacy users need no extra initialization. The combined candidate
+        # drives this low until its separate staging area has been cleared.
+        self.start_ready = Signal(init=1)
         self.start_epoch = Signal(32)
         self.start_accepted = Signal()
         self.execution_reset = Signal()
@@ -57,7 +61,8 @@ class StarterLifecycle(Elaboratable):
                          (self.words_received >= self.image_words) |
                          (self.word_index != self.words_received))),
             valid_start.eq((self.state == self.READY) & self.start &
-                           self.start_authorized & (self.start_epoch == self.epoch)),
+                           self.start_authorized & self.start_ready &
+                           (self.start_epoch == self.epoch)),
             self.start_accepted.eq(valid_start & ~self.abort & ~bad_word),
             self.execution_reset.eq((self.state != self.RUNNING) |
                                     self.begin_accepted),

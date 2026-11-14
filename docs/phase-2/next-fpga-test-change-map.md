@@ -1,7 +1,9 @@
 # Next FPGA candidate — change and provisioning map
 
-Design review only. Maintained RTL is approved as the source base; no code
-implementation, synthesis, installation or physical testing is authorized here.
+Maintained RTL is approved as the source base. The user subsequently authorized
+only the first local memory/admission implementation and tests, as scoped in
+the candidate specification. Synthesis, installation and physical testing
+remain unauthorized.
 Inspected repository revision: `360164dcda97f696e0199e9733db918c30e6d431`.
 This identifies the inspection, not the final candidate manifest.
 
@@ -69,8 +71,9 @@ approved retained continuation, including when service requests are outstanding.
 5. Review a frozen source/input manifest and vendor-build readiness.
 6. Obtain separate vendor-build and physical-test authorizations.
 
-Only the current design-review work is authorized. No new tests were run for
-this source map, and no runtime or hardware files were changed.
+This source map was a read-only inspection. Subsequent first-stage local code
+and test work is recorded separately in the memory/admission stage document;
+the other stages above still require review.
 
 The combined stopped-image installation policy is now approved. Independent
 Namespace replacement is excluded. The image covers 128 KiB of allocations;
