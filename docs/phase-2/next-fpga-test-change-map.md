@@ -60,7 +60,8 @@ approved retained continuation, including when service requests are outstanding.
 
 ## Engineering sequence after design approval
 
-1. Specify the exact image/request profiles with the approved Boot continuation.
+1. Implement the approved combined stopped-image direction with an explicit
+   new profile; the proposed first stage is detailed in the candidate specification.
 2. Build the checked memory/address layer and admission changes in isolation.
 3. Integrate Namespace-aware receiver and explicit trusted Boot wiring.
 4. Provision native startup/scheduling/restart candidates, without modifying
@@ -70,3 +71,8 @@ approved retained continuation, including when service requests are outstanding.
 
 Only the current design-review work is authorized. No new tests were run for
 this source map, and no runtime or hardware files were changed.
+
+The combined stopped-image installation policy is now approved. Independent
+Namespace replacement is excluded. The image covers 128 KiB of allocations;
+16 KiB staging is initialized separately. Exact Namespace-aware LUMP request
+framing and software provisioning remain separate unresolved work.

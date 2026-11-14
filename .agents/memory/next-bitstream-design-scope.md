@@ -102,6 +102,18 @@ separate handler selector.
 context, which remains non-resumable evidence. Verify fault processing with
 outstanding service work and retain catastrophic Boot-entry failure behavior.
 
+The user approved combined stopped installation: replace both Namespaces with
+one complete 128 KiB allocation-area image, initialize the separate staging
+area, verify received RAM and require a separate authorized START.
+
+**Why:** Keep the first test platform's installation mechanism bounded;
+independent Namespace replacement introduces additional state/reference rules.
+
+**How to apply:** Installation starts a new test run and replaces volatile
+state, including Alice's value. Never use it as ordinary attack recovery.
+Partial/invalid installs remain stopped; no rollback promise or new sender-
+authentication claim. Physical installation still requires separate approval.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

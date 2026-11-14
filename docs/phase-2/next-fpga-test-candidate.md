@@ -173,7 +173,7 @@ reported separately. Mallory's expected fault is a passing negative test only
 when the exact forbidden operation is rejected and preservation/progress checks
 also pass. No complete Phase 1, Phase 2 or W7 acceptance follows from these gates.
 
-## Proposed: combined test-image installation — awaiting review
+## Confirmed: combined stopped test-image installation
 
 For the initial candidate, install both Namespaces as one complete 128 KiB
 allocation-area image while execution is stopped. The separate 16 KiB staging
@@ -193,7 +193,34 @@ including Alice's value, and starts a new test run. It is never a way to
 recover from Mallory's ordinary faults or to fake preserved state. Runtime
 Namespace switching and ordinary Lazy delivery do not replace the whole image.
 Independent Namespace replacement while preserving the other Namespace is
-outside this proposed initial installation scope.
+outside this approved initial installation scope.
+
+## Proposed first implementation stage — awaiting authorization
+
+Implement and locally test only the checked memory and stopped-image admission
+foundation. Keep the historical 64 KiB profiles and retained evidence unchanged.
+
+- Provide 128 KiB of allocation space and 16 KiB of separate staging using
+  bounded banks rather than a triplicated 256 KiB rounded allocation.
+- Check full addresses before slicing on data, fetch, Namespace, C-list,
+  inspection, write and observation paths. Preserve arbitration and the
+  explicit MMIO boundary.
+- Add an explicitly distinct 128 KiB whole-image profile, with exact transfer
+  bounds, received-RAM hash verification and separately authorized START.
+- Initialize staging and receiver eligibility before release; invalidate
+  previous admission/request state on a new installation without epoch wrap.
+- Test boundaries, high-address aliasing, malformed/interrupted transfer,
+  stale START, authorization loss and compatibility with old profiles.
+
+The deliverable is code plus bounded local evidence for these mechanisms,
+not a runnable two-Namespace application demonstration or a build-ready BIT.
+Do not enable unresolved shared-service routing or fresh-Mallory initialization
+through placeholder grants, fabricated success or bypassed checks.
+
+Stop for review after this stage. Namespace-aware LUMP delivery, trusted Boot
+wiring, scheduler/restart integration and their tests remain subsequent stages.
+No vendor synthesis, physical transfer/programming, saved LUMP migration or
+live image/Namespace change is included.
 
 ## Next decisions
 
@@ -204,5 +231,6 @@ outside this proposed initial installation scope.
 - Exact memory ledger, receiver/device map and observation interface.
 - Frozen test images, acceptance criteria and local build gates.
 
-The completed specification must be reviewed before implementation/build
-authorization is requested. Physical testing remains separately authorized.
+Only design work is authorized so far. The first implementation stage above is
+submitted separately for approval; later stages and vendor builds require
+their own review. Physical testing remains separately authorized.
