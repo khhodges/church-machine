@@ -25,3 +25,13 @@ policy with HardFault excepted.
 **How to apply:** Consume DR1 inputs before writing status, retain GT result
 destinations, and never reinterpret this software convention as authorization
 to catch or downgrade an architectural HardFault.
+
+A returned software rejection leaves the selected caller GT unchanged and
+returns a nonzero fault code in DR1. Success replaces it with the Outform and
+returns DR1=0. HardFault has no rollback guarantee under this decision.
+
+**Why:** The user explicitly approved leaving the GT unchanged on rejection.
+
+**How to apply:** Verify rejection paths do not modify the selected GT; keep
+that guarantee separate from architectural HardFault handling and from the
+still-unverified caller-register access mechanism.

@@ -2285,9 +2285,17 @@ software rejection; its numeric code remains unspecified.
 The selected register supplies the original GT; `n` is a register selector,
 not a Namespace slot or reconstructed token.
 
+**Approved returned-rejection behavior:** A software rejection leaves the
+selected caller GT unchanged and returns a nonzero fault code in DR1. On
+success, the selected Inform GT is replaced by its Outform and DR1=0.
+HardFault retains the ISA fault path; this approval makes no rollback
+guarantee for HardFault. Caller-register access remains subject to verification
+under the unchanged ISA/RTL.
+
 The earlier approved fixed CR1 input/result convention remains the recorded
 baseline while this alternative is evaluated. Caller-context access across
-CALL/RETURN, allowed registers, result preservation and failure behavior must
+CALL/RETURN, allowed registers, result preservation and implementation of the
+approved returned-rejection behavior must
 be resolved before adopting the alternative as an executable ABI. A software
 rejection status does not imply that ISA hard faults can be caught and returned
 in DR1. No ISA/RTL change is authorized. MakeInformM assignments remain separate.
