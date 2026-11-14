@@ -92,8 +92,22 @@ def test_real_core_high_ram_and_cross_root_boot(access, bad):
         ctx.set(d.bridge.held, 0)
         writes, faults, reads, retired = [], [], [], []
         readback = False
+        readback_due = False
+        recovered = False
+        progress_due = False
         for cycle in range(12000):
+            if progress_due:
+                assert ctx.get(core.debug_dr_words[10]) == 1
+                assert len(faults) == 1, faults
+                return
+            if readback_due:
+                # Retirement describes the pending commit edge; inspect the
+                # architectural register only after that edge has occurred.
+                assert ctx.get(core.debug_dr_words[2]) == 17
+                readback = True
+                readback_due = False
             if ctx.get(core.fault_entry_active):
+                assert not ctx.get(core.imem_valid), "ordinary fetch during recovery"
                 reads.append((cycle, ctx.get(core.dmem_addr), ctx.get(core.dmem_rd_en),
                               ctx.get(core.dmem_rd_valid), ctx.get(core.dmem_rd_data),
                               ctx.get(core.fault_memory_safe),
@@ -106,8 +120,11 @@ def test_real_core_high_ram_and_cross_root_boot(access, bad):
                           ctx.get(core.retire_fault_valid))
                 retired.append(record)
                 if record[0] == 0x4014 and not record[2]:
-                    assert ctx.get(core.debug_dr_words[2]) == 17
-                    readback = True
+                    readback_due = True
+                if recovered and record[0] == 0x1c004 and not record[2]:
+                    # Boot must execute its retained LOAD/CHANGE continuation,
+                    # not merely expose the expected next address.
+                    progress_due = True
             if ctx.get(core.retire_fault_valid) and not ctx.get(core.fault_entry_active):
                 faults.append((ctx.get(core.retire_nia), ctx.get(core.fault),
                                ctx.get(core.retire_instr)))
@@ -126,16 +143,17 @@ def test_real_core_high_ram_and_cross_root_boot(access, bad):
                 assert ctx.get(core.debug_dr_words[6]) == 0x12345678
                 assert ctx.get(core.flags.as_value()) == 5
                 if access == 0x40000:
-                    assert faults[0][0:2] == (0x4010, 8), faults
+                    assert faults[0][0:2] == (0x4008, 8), faults
                     assert not any(a == 0 or a == 0x40000 for a, _ in writes)
-                    assert not any(n == 0x4010 and not f for n, _, f in retired)
+                    assert not any(n in (0x4008, 0x4010, 0x4014) and not f
+                                   for n, _, f in retired)
                 elif access == 0x12000:
                     assert readback
                     assert (access, 17) in writes
                 assert faults
                 assert ctx.get(core.debug_dr_words[2]) == faults[0][0]
                 assert ctx.get(core.debug_dr_words[4]) == faults[0][2]
-                return
+                recovered = True
             await ctx.tick()
         pytest.fail(f"No terminal result: faults={faults}, pc={ctx.get(core.imem_addr):x}, "
                     f"writes={writes[-10:]}, retired={retired[-10:]}")

@@ -2,8 +2,10 @@
 
 The user authorized this isolated code/test stage. The preceding memory/
 admission stage passed its local checks; it did not connect ChurchCore.
-Current integration is incomplete: the recovery handshake loop is corrected,
-but Boot activation still fails its Thread-context check.
+The handshake, resolver-capacity and recovery-fetch corrections now pass
+their focused local checks, including real retained Boot continuation.
+Full installed-image execution and physical rejection-edge evidence remain
+unqualified; this is not complete candidate acceptance.
 See [implementation status](next-fpga-core-integration-status.md). No vendor
 build or physical operations are authorized or claimed.
 

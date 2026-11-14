@@ -33,7 +33,11 @@ class ChurchMLoad(Elaboratable):
              → FAULT
     """
 
-    def __init__(self, enable_seal_check=None, *, resident_word_locations=False):
+    def __init__(self, enable_seal_check=None, *, resident_word_locations=False,
+                 capacity_words=16384):
+        if capacity_words not in (16384, 32768):
+            raise ValueError("Unsupported mLoad memory capacity")
+        self.capacity_words = capacity_words
         self.resident_word_locations = resident_word_locations
         self.enable_seal_check = enable_seal_check if enable_seal_check is not None else ENABLE_SEAL_CHECK
         if resident_word_locations and not self.enable_seal_check:
@@ -160,13 +164,13 @@ class ChurchMLoad(Elaboratable):
         invalid_descriptor = Signal()
         if self.resident_word_locations:
             m.d.comb += [
-                resolved_base.eq(Mux(u_ns_gate.raw_base < 16384,
+                resolved_base.eq(Mux(u_ns_gate.raw_base < self.capacity_words,
                                      u_ns_gate.raw_base << 2, u_ns_gate.raw_base)),
                 resolved_authority.eq(cached_authority(u_ns_gate.raw_w2)),
                 invalid_descriptor.eq(
                     u_ns_gate.raw_w2[31] |
-                    Mux(u_ns_gate.raw_base < 16384,
-                        u_ns_gate.raw_base + u_ns_gate.raw_w2[:21] >= 16384,
+                    Mux(u_ns_gate.raw_base < self.capacity_words,
+                        u_ns_gate.raw_base + u_ns_gate.raw_w2[:21] >= self.capacity_words,
                         (u_ns_gate.raw_base[30:32] != 1) &
                         (u_ns_gate.raw_base != M_BIT_PORT))),
             ]

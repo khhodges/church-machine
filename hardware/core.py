@@ -386,13 +386,15 @@ class ChurchCore(Elaboratable):
         m.submodules.u_save = _rst(u_save)
         m.submodules.u_load = _rst(u_load)
         u_shared_mload = ChurchMLoad(
-            resident_word_locations=self.expected_boot_guard is not None)
+            resident_word_locations=self.expected_boot_guard is not None,
+            capacity_words=self.memory_bytes // 4)
         m.submodules.u_shared_mload = _rst(u_shared_mload)
         u_dread = ChurchDRead()
         u_dwrite = ChurchDWrite(monitor_clear_enabled=self.monitor_clear_enabled)
         m.d.comb += self.monitor_clear.eq(u_dwrite.monitor_clear)
         u_cload = ChurchCLoad(
-            resident_word_locations=self.expected_boot_guard is not None)
+            resident_word_locations=self.expected_boot_guard is not None,
+            capacity_words=self.memory_bytes // 4)
 
         if self.iot_profile:
             u_outform = ChurchOutformIoT()

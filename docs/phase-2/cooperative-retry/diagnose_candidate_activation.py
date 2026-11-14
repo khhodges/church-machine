@@ -80,6 +80,10 @@ def diagnose(access=None):
             if ctx.get(core.fault_catastrophic):
                 print(json.dumps({"activation_trace": list(history)}, indent=2))
                 return
+            if ctx.get(core.fault_entry_done):
+                print(json.dumps({"activation_complete": cycle,
+                                  "pc": hex(ctx.get(core.imem_addr))}))
+                return
             await ctx.tick()
         raise RuntimeError("Diagnosis did not reach a terminal result")
 

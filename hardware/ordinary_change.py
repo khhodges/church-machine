@@ -52,7 +52,8 @@ class OrdinaryChange(Elaboratable):
             enable_seal_check=True,
             authority_version_shift=21)
         m.submodules.home_load = home_load = ChurchMLoad(
-            enable_seal_check=True, resident_word_locations=self.resident_word_locations)
+            enable_seal_check=True, resident_word_locations=self.resident_word_locations,
+            capacity_words=self.capacity_words)
         resolved_base = Signal(32)
         resolved_authority = Signal(32)
         invalid_descriptor = Signal()

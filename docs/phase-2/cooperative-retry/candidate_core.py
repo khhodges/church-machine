@@ -56,7 +56,7 @@ class CandidateCoreBridge(Elaboratable):
             core.imem_data.eq(Mux(rom_selected, rom.data, mem.fetch.rdata)),
             core.imem_from_reset_rom.eq(rom_selected),
             core.imem_fetch_address.eq(previous),
-            core.imem_valid.eq(active & (previous == core.imem_addr) &
+            core.imem_valid.eq(active & ~core.fault_entry_active & (previous == core.imem_addr) &
                 (core.imem_addr[:2] == 0) &
                 (rom_selected | (mem.fetch.rvalid & ~mem.fetch.rerror))),
         ]

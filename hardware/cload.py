@@ -47,7 +47,11 @@ class ChurchCLoad(Elaboratable):
     or cload_fault is asserted.
     """
 
-    def __init__(self, enable_seal_check=None, *, resident_word_locations=False):
+    def __init__(self, enable_seal_check=None, *, resident_word_locations=False,
+                 capacity_words=16384):
+        if capacity_words not in (16384, 32768):
+            raise ValueError("Unsupported cLoad memory capacity")
+        self.capacity_words = capacity_words
         # Explicit build profile, never inferred from live bytes or a failed
         # legacy lookup. ChurchNSGate verifies the original W0 before conversion.
         self.resident_word_locations = resident_word_locations
@@ -229,7 +233,7 @@ class ChurchCLoad(Elaboratable):
                     m.next = "FAULT"
                 with m.Elif(u_ns_gate.ns_gate_done):
                     with m.If(self.resident_word_locations &
-                              ((u_ns_gate.raw_base >= 16384) | u_ns_gate.raw_w2[31])):
+                              ((u_ns_gate.raw_base >= self.capacity_words) | u_ns_gate.raw_w2[31])):
                         m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
                         m.next = "FAULT"
                     with m.Elif(same_code_latched &
@@ -268,7 +272,7 @@ class ChurchCLoad(Elaboratable):
                         (_hdr.cw == 0) | (_hdr.cw >= _caps) |
                         ((raw_w2[:21] != _size - 1) &
                          (raw_w2[:21] != _caps - 1)) |
-                        ((raw_base >> 2) + _size > 16384))
+                        ((raw_base >> 2) + _size > self.capacity_words))
                     with m.If(self.resident_word_locations & _invalid):
                         m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
                         m.next = "FAULT"

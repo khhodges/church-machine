@@ -1,10 +1,69 @@
-# Local core integration — handshake corrected, activation still failing
+# Local core integration — bounded corrections verified
 
 Scope remains isolated code and local tests. No vendor synthesis, board
 access, installed-image change, saved LUMP modification or live Namespace
 replacement was performed.
 
-## Latest result: authorized handshake correction
+## Latest result: capacity and recovery-fetch corrections
+
+The authorized bounded fixes are applied:
+
+- Guarded mLoad and cLoad accept an explicit 16,384/32,768-word capacity,
+  with 16,384 retained as the default. The core and nested ordinary-CHANGE
+  home resolver propagate the candidate capacity. Existing MMIO, descriptor,
+  seal, version and permission checks remain in place.
+- The candidate bridge excludes ordinary fetch throughout fault entry,
+  including cleanup/activation, while preserving the core's frozen-source
+  evidence handling.
+- The out-of-range capability fixture expects BOUNDS at its original LOAD.
+  It does not require an invalid capability to reach DWRITE.
+- DREAD result inspection now occurs after its retirement/commit edge,
+  rather than reading the old destination register before that edge.
+
+### Current verification
+
+**15 candidate checks passed**: seven core/handshake/stash cases and eight
+resolver-capacity cases. The four real-core cases were subsequently strengthened
+and passed again: successful recovery must execute Boot's retained LOAD/CHANGE
+continuation and then commit the healthy high-bank worker's counter increment,
+not merely land at the expected Boot PC.
+
+The legal-access case writes and reads back 17 at `0x12000`. The invalid
+capability case faults at LOAD `0x4008`, preserves the original issuer facts,
+does not access its invalid target, and completes Boot recovery. Both local
+composed-circuit cycle checks pass. A corrupted binding remains catastrophic.
+
+The broader targeted regression run reported **37 passed, 3 failed, 6
+deselected**. All three failures are in the existing guarded-mLoad historical
+fixture (`thread`, `namespace`, `bad_seal`). Running its seven cases against
+the exact pre-change `hardware/mload.py` from Git, loaded in an isolated Python
+process without changing workspace files, reproduced the same **4 passed,
+3 failed**. They are baseline failures, not introduced by the capacity option.
+No historical test or binary was modified to conceal them.
+
+Thus there are **52 distinct passing focused checks**, with three reproduced
+baseline failures. Repeated checks are not counted as additional passes.
+The deselected full-wrapper tests remain unrun.
+
+The read-only observer also completed all three non-corrupt cases at Boot PC
+`0x1a008` (cycles 780, 815 and 800). It reported no recovery LOAD reissue.
+
+### Remaining qualification boundary
+
+These results complete the requested bounded corrections, not the entire
+candidate acceptance programme. Still unproven here:
+
+- full CSI3 installation/hash/scrub/START followed by real-core execution
+  (the composed graph passes; the runtime fixture begins with disposable
+  preloaded RAM);
+- a physical-memory rejection at the ordinary operation's commit edge,
+  distinguished from the earlier native descriptor BOUNDS rejection;
+- the later only-Amoeba image, service/device integration and repeated
+  Mallory acceptance already described in the candidate plan.
+
+Stop for review. No vendor or physical qualification is implied.
+
+## Earlier result: authorized handshake correction
 
 Recovery safety now derives from independent execution/ownership controls:
 execution active, CPU service enabled and maintenance excluded. It no longer
@@ -42,7 +101,7 @@ Remaining failures:
 These are deliberately failing acceptance tests, not skips or expected-failure
 waivers. The later activation failure has not been repaired or bypassed.
 
-## Focused diagnosis of the remaining failures
+## Historical diagnosis leading to these corrections
 
 The bounded observer `cooperative-retry/diagnose_candidate_activation.py`
 completed all three failing fixture variants without changing RTL or forcing
@@ -86,7 +145,7 @@ The maintained `hardware/wukong_top.py` already suppresses `imem_valid` througho
 `fault_entry_active`. The new bridge omitted that condition. The core's separate
 frozen-source fetch handling must remain intact for original fault evidence.
 
-### Bounded correction recommended, not applied in this diagnosis
+### Correction recommended at diagnosis, subsequently applied
 
 1. Pass the explicit candidate capacity into guarded mLoad instances, retaining
    the 64 KiB default and existing seal/version/type/MMIO rules. Audit sibling
@@ -109,8 +168,8 @@ PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}" timeout 45s \
   python docs/phase-2/cooperative-retry/diagnose_candidate_activation.py
 ```
 
-No passing integration result is claimed by this diagnostic. The last
-acceptance-suite result remains **4 passed, 3 failed**.
+At diagnosis time the acceptance suite remained **4 passed, 3 failed**.
+The current results above supersede that failure status.
 
 ## Work implemented, not fully qualified
 
@@ -189,9 +248,9 @@ Before correction: exit 1, `CombinationalCycle`, with the path above.
 After correction: this check passes; permanent tests also check the complete
 admission/core composition.
 
-No successful Boot continuation, invalid-access atomicity, complete CSI3-to-core
-run or 100-attack acceptance is claimed. The latest run completed all seven
-local candidate tests; the passing stash evidence is not activation acceptance.
+At this earlier stage, successful Boot continuation had not been established.
+It is now verified by the current tests above. Full CSI3-to-core runtime,
+physical rejection-edge atomicity and 100-attack acceptance remain separate.
 
 ## Checks completed independently
 
@@ -241,10 +300,10 @@ separate and is not supplied by instantiating the maintained core alone.
    elaboration alone is not execution acceptance.
 
 The ownership/acceptance separation is now implemented and locally checked.
-The activation and setup failure causes are now identified above. The next
-unresolved action is the bounded resolver-capacity and recovery-fetch
-correction, with the invalid-access fixture expecting the earliest rejection.
-Do not broaden the scope to scheduling or physical tests.
+The identified capacity and recovery-fetch defects are corrected and verified
+as described at the top. Remaining qualification work stays within the
+existing candidate plan; do not broaden into scheduling or physical tests
+without the corresponding review.
 Do not restore progress by tying grants or memory safety high, bypassing
 checks, skipping instructions, adding recovery retries or changing identities.
 The new path remains opt-in while this blocker is unresolved.
