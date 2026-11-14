@@ -2390,3 +2390,17 @@ mtime_ms = 1794590874687
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3b4d0145-e095-48bc-bf8b-b562efbeda84/1fbba047-7f7e-4e36-a658-9064c252d4fc"
 storage_version_token = "1794590911853764"
 content_type = "text/html"
+
+[[outputs]]
+id = "pOAPlW0LZeWIaRF8KmY7n"
+uri = "file://reports/two-namespace-draft-audit.html"
+type = "html"
+title = "Two-Namespace audit and corrected slot maps"
+description = "Full saved slot maps, residency corrections, preserved revisions, verification results and remaining implementation/binding blockers."
+logical_id = "fb430230-6a75-4eec-b020-a36b136b03e1"
+content_hash = "sha256:b0539d28e7543fb5c9bf559c1cc423baae74a18986aedf354ebb193e4c8edc10"
+size = 8549
+mtime_ms = 1794672592219
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/fb430230-6a75-4eec-b020-a36b136b03e1/6305187d-6f8e-4dae-b8ec-3f8575ce5313"
+storage_version_token = "1794672602870564"
+content_type = "text/html"
