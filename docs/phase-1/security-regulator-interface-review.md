@@ -15,6 +15,11 @@ No numeric method indices are assigned to the final `ide.SecurityRegulator`.
 approved within it. “Required extension” means the behavior was requested but
 its callable interface is not yet selected.
 
+Evidence below names the **user (calling service)** and **reason for use**, not
+the person requesting the feature. A documented use is not proof of an
+implemented call or an additional authority grant. Where the review supplies
+only a general capability, the missing concrete caller/use case is explicit.
+
 | Method / signature / evidence | Settled behavior or operand decisions | Remaining choices / implementation specifications |
 |---|---|---|
 | **LOADM — proposed interface**<br>`LOADM(sourceGT, homeIndex) → valueGT`<br>[ISA A.2](01-isa/instruction-set.md#a2-loadm--m-assisted-capability-load) | Source-register M may replace the source L requirement, not other checks. Return the exact loaded GT, including NULL data, in CR1 with CR1.M clear. NULL source authority remains invalid. | Confirm proposed entry CR1=`sourceGT`, DR1=`homeIndex`; working-register clobbers, preservation mask and exact M acceptance/clear points. |
@@ -30,6 +35,144 @@ its callable interface is not yet selected.
 The six named methods are **not a closed inventory** after the B, F and
 version-increment requirements. Watchdog-control ownership is specified
 separately; that does not establish additional public method names or signatures.
+
+### Expanded evidence: user and reason for each method
+
+These entries expand the evidence in the table above without adding columns.
+They separate an identified service use from a general requirement whose
+specific caller still needs to be named.
+
+#### LOADM — user and reason
+
+- **User:** No concrete service call site is identified in the cited coverage
+  review. Mint and FreeHandler have approved invocation-grant designs, but that
+  alone does not establish that either needs LOADM.
+- **Reason:** Retrieve an existing GT when the approved access requires source
+  M in place of L. This is retrieval, not construction or permission enlargement.
+- **Why not ordinary LOAD?** Ordinary LOAD is sufficient wherever valid L already
+  exists. FreeHandler's Inventory/directory scan is explicitly such a case;
+  CR6.M C-list access is also a separate architectural exception, not a reason
+  to call SR.
+- **Evidence:** [LOADM contract](01-isa/instruction-set.md#a2-loadm--m-assisted-capability-load);
+  [service-operation coverage](01-isa/instruction-set.md#a91-service-operation-coverage).
+- **Usage still to justify:** Name the caller, source object and capability home
+  that actually require this method rather than ordinary LOAD.
+
+#### SAVEM — user and reason
+
+- **User:** FreeHandler, when preparing an issued Thread for an application.
+- **Reason:** Put the supplied application E-GT into saved CR1 (home 1) of the
+  selected permission-free Thread GT:
+  `SAVEM(ide.B1.FreeThread, 1, applicationE_GT)`.
+- **Why not ordinary SAVE?** The proposed path removes the need for the separate
+  `ide.B1.ThreadSetup S` grant by using SR's approved destination-M operation.
+  Ordinary SAVE remains sufficient when the caller already holds destination S.
+  Source B is not a reason to require this method.
+- **Evidence:** [FreeHandler worked use](security-regulator-operation-review.md#freehandler-first-consumer-not-issuer-of-m-authority);
+  [B1 call](security-regulator-operation-review.md#b1-call).
+  The reviewed FreeHandler implementation still uses ThreadSetup S and ordinary
+  SAVE; replacing it is a proposed adoption, not a completed implementation.
+- **Boundary:** FreeHandler still selects the Thread, updates Block State and
+  preserves values it needs after the call. SAVEM does not allocate the Thread.
+
+#### SWITCHM — user and reason
+
+- **User:** Amoeba in the mediated diagnostic; the final public caller/binding
+  arrangement remains to be specified.
+- **Reason:** Hand execution to another Namespace's fixed entry Thread while
+  keeping the raw M-control grant private to SecurityRegulator.
+- **Why not ordinary CHANGE?** CHANGE changes Threads, not Namespace roots.
+  SWITCH requires CR15.M and explicit source L; SR supplies the bounded M
+  operation rather than distributing its raw M-control grant.
+- **Evidence:** [mediated Amoeba fixture](../phase-2/cooperative-retry/candidate_mediated_fixture.py);
+  [diagnostic SwitchM implementation](../phase-2/cooperative-retry/candidate_regulator_switch.cloomc).
+  Amoeba calls diagnostic method 0; private SR C-list row 2 supplies the peer
+  Namespace. This does not establish the proposed source/row public ABI.
+
+#### MintM — user and reason
+
+- **User:** Mint, as the service issuing a GT for its allocated/bound object.
+- **Reason:** Materialize a new Golden Token from explicit type, permissions and
+  slot information under the trusted construction mechanism.
+- **Why not LOADM or ordinary LOAD?** Those retrieve an existing GT. This method
+  constructs one; the clarified mechanism packs DATA and reads it as a GT under
+  monitor M, rather than granting ordinary L access to writable result storage.
+- **Evidence:** [construction contract and Mint responsibilities](01-isa/instruction-set.md#a7-mintm--golden-token-construction);
+  [construction-port clarification](../phase-2/gt-construction-port.md).
+- **Boundary:** Mint owns allocation, slot lifecycle and publication. MintM does
+  not perform them. The relationship to SecurityMonitor `Create(GTvars)` still
+  needs reconciliation; FreeHandler is not thereby granted unrestricted
+  construction.
+
+#### MakeOutformM — user and reason
+
+- **User:** Mint, in its Inform-to-Outform conversion responsibility.
+- **Reason:** Produce an Outform representing the same living object as the
+  supplied Inform, retaining source identity evidence rather than rebuilding a
+  token from a slot number.
+- **Why a separate method?** MintM has no source-GT argument and cannot stand in
+  for identity-preserving conversion. Mechanical conversion does not itself
+  establish preserved backing or release local storage.
+- **Evidence:** [source-required conversion contract](01-isa/instruction-set.md#a8-inform--outform-conversion--source-gt-required);
+  [Mint conversion coverage](01-isa/instruction-set.md#a91-service-operation-coverage).
+- **Usage still to specify:** The concrete Mint workflow/call site and the
+  backing/binding conditions under which conversion is requested.
+
+#### MakeInformM — user and reason
+
+- **User:** Mint, in its Outform-to-Inform conversion responsibility.
+- **Reason:** Produce an Inform for the same living object identified by the
+  supplied Outform, with the required local binding established or reused.
+- **Why a separate method?** Constructing a fresh token from a slot would discard
+  the source's identity evidence and could incorrectly refresh a stale reference.
+  Mint must resolve the living object and arrange its local binding separately.
+- **Evidence:** [source-required conversion contract](01-isa/instruction-set.md#a8-inform--outform-conversion--source-gt-required);
+  [Mint resolution/binding coverage](01-isa/instruction-set.md#a91-service-operation-coverage).
+- **Usage still to specify:** The concrete Mint workflow/call site and the
+  admissible source and destination-binding conditions.
+
+#### Explicit B setter — user and reason
+
+- **User:** A specifically authorized caller has not yet been named for this
+  operation. The compiler's ESaveLists workflow is cited as needing returned
+  GTs, but that is not evidence of a B-setter invocation.
+- **Reason:** Explicitly set the supplied GT's B to 0 or 1 without changing
+  unrelated fields or other copies.
+- **Why a separate method?** LOAD preserves B; CALL clears passed argument B;
+  RETURN preserves B in kept CRs; SAVE clears B in the stored copy. None is a
+  general explicit setter for both values. In particular, source B=0 does not
+  prevent SAVE and is not a justification for invoking SR.
+- **Evidence:** [B-setter requirement, movement corrections and ESaveLists context](security-regulator-operation-review.md).
+- **Usage still to justify:** Name the caller and the operation that needs an
+  explicit B=1 or B=0 result, independently of ordinary movement rules.
+
+#### Explicit F setter — user and reason
+
+- **User:** No concrete calling service or call site is named in the requirement.
+- **Reason:** Explicitly choose Near or Far for the supplied target; the
+  requirement is not a toggle or a SAVE-check bypass.
+- **Why a separate method?** The requested operation is deliberate F setting,
+  not an incidental effect of SAVEM or Inform/Outform conversion. The cited
+  requirement does not establish those operations as substitutes.
+- **Evidence:** [explicit Near/Far requirement](security-regulator-operation-review.md).
+- **Usage still to justify:** Name the caller, target and situation requiring
+  Near versus Far, then settle the target encoding and mechanism.
+
+#### Version increment — user and reason
+
+- **User:** Authorized USER-Thread reset software in the Phase 2 lifecycle;
+  the concrete calling abstraction has not yet been selected.
+- **Reason:** Increment that Thread's authoritative Namespace-entry version
+  before the reset context becomes eligible, so retained pre-reset GTs cannot
+  activate or complete work against the replacement context.
+- **Why not edit a GT copy or use MintM?** Editing one copy does not invalidate
+  other holders. MintM constructs a token but does not change the authoritative
+  version. Hardware checks versions and must not increment them automatically.
+- **Evidence:** [Thread-reset invalidation and requested SR companion](../lazy-lifecycle-unified.md);
+  [version-method requirement](security-regulator-operation-review.md).
+- **Boundary:** No wrap, no silent upgrade of old holders, and no change to other
+  Threads or the requested target LUMP. New-context GT provisioning and the
+  exact caller/ABI remain open.
 
 ## Common contract: settled versus open
 
