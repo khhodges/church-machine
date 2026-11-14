@@ -2238,10 +2238,19 @@ Contrast:
 MintM(Ctype, Permissions, Slot) -> GT    // no source GT argument
 ```
 
-**Approved MakeOutformM registers:** CR1 supplies the original Inform GT and
-receives the converted Outform GT, replacing the input. This selects only the
-software calling convention; conversion rules and ISA/RTL remain unchanged.
-MakeInformM register assignments remain a separate review item.
+**MakeOutformM alternative under review:** The user confirmed that DR1=`n`
+selects the **caller's CR[n]** for in-place Inform-to-Outform conversion,
+not SecurityRegulator's own CR[n]. The proposed status result is DR1=0 on
+success or a nonzero rejection code (for example, register not allowed).
+The selected register supplies the original GT; `n` is a register selector,
+not a Namespace slot or reconstructed token.
+
+The earlier approved fixed CR1 input/result convention remains the recorded
+baseline while this alternative is evaluated. Caller-context access across
+CALL/RETURN, allowed registers, result preservation and failure behavior must
+be resolved before adopting the alternative as an executable ABI. A software
+rejection status does not imply that ISA hard faults can be caught and returned
+in DR1. No ISA/RTL change is authorized. MakeInformM assignments remain separate.
 
 The source GT is mandatory operation input, not an optional hint, a slot
 number, or a reconstructed current token. Validate it under the reviewed

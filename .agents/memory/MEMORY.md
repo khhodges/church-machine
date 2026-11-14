@@ -153,3 +153,4 @@
 - [Native memory queue delivery](native-memory-queue-delivery.md) — native CLOOMC service execution is required; host fixtures and documentation cannot substitute for the allocator.
 - [Embedded browser storage](embedded-browser-storage.md) — standalone page success does not prove iframe startup; never replace durable drafts with silent temporary storage.
 - [SWITCH review boundary](switch-review-boundary.md) — retain existing ISA/RTL; direct Namespace and indexed incoming Thread proposals were withdrawn.
+- [Indexed conversion review](sr-indexed-conversion-review.md) — DR1 selects caller CR[n] in the MakeOutformM alternative; feasibility and error semantics remain unverified.
