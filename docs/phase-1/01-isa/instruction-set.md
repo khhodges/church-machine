@@ -2184,12 +2184,15 @@ storage, initialize an object, activate a Thread or change a generation.
 FreeHandler continues to distribute its prepared objects; adding MintM does
 not silently grant it unrestricted construction authority.
 
-**Fields not present in the signature:** resolve how generation and any
-type-dependent identity fields are obtained. Do not assume all Ctype values
-use an Inform slot/generation interpretation, silently refresh a stale GT,
-or add a version argument without review. Reading an established generation
-for an explicitly requested new construction is distinct from hardware
-changing that generation; the precise rule remains to be specified.
+**Approved Inform version source:** When constructing a new Inform GT, MintM
+reads the current version from the selected slot's valid live entry in the
+active Namespace. It does not increment that version. Mint remains responsible
+for allocating and preparing the object beforehand. No version argument is
+added. This is new construction, not conversion or refresh of an existing
+stale GT, and it changes neither the ISA nor RTL.
+
+**Other identity fields:** Resolve remaining type-dependent identity fields.
+Do not assume all Ctype values use the Inform slot/version interpretation.
 
 **Phase I mechanism review:** identify how construction enters a CR under M,
 what ordinary non-M behavior remains prohibited, and which instruction/register
@@ -2204,7 +2207,7 @@ resolved identity fields, resulting GT identity, relevant M state and outcome.
 The common audit secret-handling and delivery requirements apply.
 
 **Review closure:** legal types/permissions, slot bounds and empty-slot behavior,
-generation/identity source, result register and clobbers, M setup/consumption,
+non-Inform version and remaining identity sources, result register and clobbers, M setup/consumption,
 fault/write boundary, nested-call Passcode attribution and safe result return.
 No concrete register ABI or new numeric fault codes are selected here.
 
@@ -2269,7 +2272,7 @@ No seventh method is selected by this review.
 | Load a GT where an approved M-assisted access is required | LOADM | Exact M override, legal registers and return ABI remain open |
 | Save a GT through existing S authority with valid transfer authority | Ordinary SAVE | Do not require M for operations already authorized without it |
 | Initialize an issued Thread's saved CR1 through its permission-free GT | SAVEM | Resolve destination M and source transfer separately; preserve FreeHandler's selected Thread and State across the call |
-| Construct Mint's issued GT from explicit fields | MintM | Legal Ctype/permission mapping, slot context and generation/identity source remain open |
+| Construct Mint's issued GT from explicit fields | MintM | Inform version comes from the valid live slot entry in the active Namespace; legal Ctype/permission mapping and other identity fields remain open |
 | Convert Inform to Outform | MakeOutformM, with source GT | Mint must separately establish any required preserved backing/binding |
 | Convert Outform to Inform | MakeInformM, with source GT | Mint must separately resolve the living object and establish/reuse local binding |
 | Allocate/zero storage; maintain queues and counts | Mint/Cleaner/FreeHandler using ordinary granted access | Not regulator policy or a new M primitive |

@@ -144,3 +144,14 @@ a queue-design decision. Consult the master ISA's approved A.1/A.2 rules and
 audit conformance; missing implementation is not missing architectural approval.
 Earlier GTMint proposals do not override the master ISA. Keep pending-result
 custody separate from instruction authorization; do not invent a software lease.
+
+For MintM construction of a new Inform GT, use the current version from the
+selected slot's valid live entry in the active Namespace, without incrementing
+it. Mint prepares the allocated object beforehand.
+
+**Why:** The user selected the live Namespace-entry version rather than adding
+a version argument to MintM.
+
+**How to apply:** Limit this decision to new Inform construction; it does not
+authorize refreshing stale GTs, changing versions, or applying Inform identity
+rules to every Ctype.
