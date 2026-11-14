@@ -89,18 +89,27 @@ and evidence. The application-side entry code must be available before USER
 dispatch without preloading a second executable: establish its explicit
 loading/bootstrap sequence as part of this contract.
 
-## Fault entry: carry forward the current ISA contract
+## Confirmed: fault entry preserves Boot's continuation
 
-The Master ISA's Namespace fault recovery section and
-`../phase-1/boot-fault-rtl-contract.md` govern machine-owned fault entry:
-stash directly into configured Boot.Thread, prime it, attempt the outgoing
-Thread save once, finalize save status, then load Boot Namespace/Thread.
+Carry forward direct fault stashing into the configured Boot.Thread, one
+attempt to save the outgoing Thread, finalized save status and explicit
+Boot Namespace/Thread activation. For this candidate, the user confirmed the
+maintained RTL's retained-Boot-continuation behavior: preserve Boot's saved
+frame, stack indicator and flags rather than manufacture a fresh handler root
+at offset zero. There is no separate fault-handler selection.
+
+This explicitly resolves the older fresh-handler wording in the Master ISA
+fault section and `../phase-1/boot-fault-rtl-contract.md` for this candidate.
+Those broader historical documents are not rewritten by this specification.
 The saved faulting context is evidence, not a resumable continuation.
 Original Thread and Namespace references must retain their original meaning.
 
-Failed Boot stash, priming or activation takes the specified indefinite LED
+Failed Boot stash, required setup or activation takes the specified indefinite LED
 loop, not an invented fallback or retry policy. This is distinct from an
 ordinary Lazy suspension, whose pending CALL is resumable.
+Boot must process the injected fault facts correctly even with outstanding
+service work. Mallory's fresh-attempt policy below does not reset Boot's
+continuation or permit resuming Mallory's faulted context.
 
 ## Confirmed: repeated Mallory attacks
 
@@ -163,6 +172,28 @@ Local model evidence, vendor build evidence and physical observations must be
 reported separately. Mallory's expected fault is a passing negative test only
 when the exact forbidden operation is rejected and preservation/progress checks
 also pass. No complete Phase 1, Phase 2 or W7 acceptance follows from these gates.
+
+## Proposed: combined test-image installation — awaiting review
+
+For the initial candidate, install both Namespaces as one complete 128 KiB
+allocation-area image while execution is stopped. The separate 16 KiB staging
+area is not executable image content and must be initialized with its receiver
+state before START. Clear old request/completion eligibility and establish a
+new installation epoch without reusing stale identities.
+
+Require explicit physical maintenance authorization, exact length and a hash
+of actual received image RAM, followed by a separate authorized START. A hash
+checks transfer consistency, not sender authentication or provenance.
+Use an explicit new candidate wire profile; historical 64 KiB profiles remain
+unchanged. Partial/invalid installation remains stopped, with no claimed
+rollback to the prior image.
+
+Full installation intentionally replaces both Namespaces' volatile state,
+including Alice's value, and starts a new test run. It is never a way to
+recover from Mallory's ordinary faults or to fake preserved state. Runtime
+Namespace switching and ordinary Lazy delivery do not replace the whole image.
+Independent Namespace replacement while preserving the other Namespace is
+outside this proposed initial installation scope.
 
 ## Next decisions
 

@@ -25,7 +25,7 @@ Named existing tests are extension points, not claims of new test passes.
 | --- | --- | --- |
 | Physical allocation | Exact sizes and nonoverlapping ranges for both roots, Threads, code, private data, records, templates and staging | Aggregate target approved; exact ledger pending |
 | Namespace identities | Both full root identities and descriptor generations; Slot 2 Threads and initial frames | Roles approved; exact selected bytes pending |
-| Boot fault authority | Exact Boot root/Thread identity, admitted-image hash and normal boot guard; no discovery through the attacker C-list | Existing binding mechanism found; larger-image adaptation and entry contract pending |
+| Boot fault authority | Exact Boot root/Thread identity, admitted-image hash and normal boot guard; no discovery through the attacker C-list | Retained continuation approved; larger-image adaptation and exact bindings pending |
 | Application service entry | Executable binding and initialization order before dispatching USERs | Route approved; bootstrap sequence pending |
 | Loader grants | Per-root selected target/digest/geometry plus separately bounded destination authority; no caller-selected arbitrary destination | New two-root table pending |
 | Request/completion records | Owner Namespace and full versioned Thread identity, target identity, session/request lifetime, private storage and allowed writers | Fields/ownership requirements known; exact ABI pending |
@@ -37,7 +37,7 @@ Do not invent absent grants or select saved revisions implicitly to fill this
 ledger. Pending software definitions are not proof of an RTL defect and must
 remain separate from hardware conformance/build gates.
 
-## Entry-continuation discrepancy requiring resolution
+## Entry-continuation discrepancy resolved for this candidate
 
 The Master ISA's older fault section describes a configured handler at offset
 zero with canonical root/flags. Maintained `FaultStash` explicitly preserves
@@ -46,20 +46,21 @@ foundational Namespace/Thread identity only, not a separate handler.
 `test_fault_boot_binding.py` asserts no handler field; the integration test
 expects Boot's retained continuation, not a manufactured handler.
 
-Recommendation: retain the maintained Boot-continuation behavior in this
-candidate, consistent with the later retained-continuation recovery direction,
-and reconcile the older wording explicitly. Distinguish Boot's valid service
+The user approved retaining the maintained Boot-continuation behavior in this
+candidate, consistent with the later retained-continuation recovery direction.
+The candidate specification now explicitly supersedes the older wording for
+this scope without rewriting historical contracts. Distinguish Boot's valid service
 continuation from the faulted Mallory context, which remains evidence and is
 not resumed. Boot's outstanding service/request state must tolerate the
 injected fault facts; preserving a continuation alone is not proof of that.
 
 Do not silently edit the master contract or reintroduce a separate handler
-selector while implementing the wrapper. Candidate entry semantics must be
-settled before its Boot bindings and tests are frozen.
+selector while implementing the wrapper. Bindings and tests must preserve the
+approved retained continuation, including when service requests are outstanding.
 
 ## Engineering sequence after design approval
 
-1. Resolve Boot-entry wording and the exact image/request profiles.
+1. Specify the exact image/request profiles with the approved Boot continuation.
 2. Build the checked memory/address layer and admission changes in isolation.
 3. Integrate Namespace-aware receiver and explicit trusted Boot wiring.
 4. Provision native startup/scheduling/restart candidates, without modifying

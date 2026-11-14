@@ -91,6 +91,17 @@ snapshot as the complete future platform.
 after reconciliation. Source selection does not authorize implementation,
 vendor builds, saved-image replacement or physical operations.
 
+The user confirmed that this candidate preserves Boot.Thread's saved
+continuation on fault entry, not a fresh offset-zero handler.
+
+**Why:** Maintained RTL and the later recovery direction preserve Boot's
+service continuation; older fresh-handler wording must not reintroduce a
+separate handler selector.
+
+**How to apply:** Distinguish Boot's valid continuation from Mallory's faulted
+context, which remains non-resumable evidence. Verify fault processing with
+outstanding service work and retain catastrophic Boot-entry failure behavior.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

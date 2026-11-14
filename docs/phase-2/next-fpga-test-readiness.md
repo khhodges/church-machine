@@ -56,3 +56,7 @@ must not be mislabeled as a hardware defect. This review authorizes no code
 implementation, vendor build, saved-artifact changes or physical operations.
 
 Detailed change/provisioning map: [candidate change map](next-fpga-test-change-map.md).
+
+The subsequent entry-contract review confirmed preserving Boot's saved
+continuation, not introducing a fresh handler root. This resolves the candidate's
+documentation choice; exact larger-image bindings and integration remain open.
