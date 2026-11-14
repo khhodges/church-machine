@@ -36,7 +36,7 @@ design target. This does not authorize disturbing its current image.
 The exact source baseline, candidate BIT and installed identity must be
 established separately; a board selection is not proof of source compatibility.
 
-## Proposed: initial workload inventory — awaiting review
+## Confirmed: initial workload inventory
 
 | Namespace | Initial test responsibilities |
 | --- | --- |
@@ -58,6 +58,34 @@ candidate, subject to interface/capacity checks before hardware freeze. They
 are not silently added as dependencies of the initial loading demonstration.
 Cross-Namespace service entry, pending-request ownership, scheduling and fault
 return remain contracts to settle, not behavior established by this inventory.
+
+## Proposed: cross-Namespace Lazy service route — awaiting review
+
+Preserve the existing local LLR destination: the requesting Namespace's
+validated Slot 2 SYSTEM Thread. Do not silently redefine LLR as a direct
+cross-Namespace transfer to a globally addressed Boot Thread.
+
+Proposed software route:
+
+1. USER absence enters its local Slot 2 continuation through normal LLR.
+2. Local SYSTEM records the originating Namespace identity, full versioned
+   USER GT and requested target before explicitly switching to Boot/service.
+3. Boot/service Amoeba uses only its provisioned destination authority to
+   validate and install the selected body.
+4. An explicit SWITCH returns to the application's Slot 2 continuation;
+   ordinary CHANGE selects the now-ready USER and retries its original CALL.
+
+An equal slot number in another Namespace is not the same target or owner.
+Request data does not grant write, SWITCH or Thread activation authority.
+SWITCH still requires CR15.M and enters the destination's Slot 2; CHANGE
+does not change the Namespace.
+
+This is a proposed control-flow contract, not an implemented protocol.
+Private request/completion storage, grants, shared-code bindings, root identity
+validation, watchdog renewal and multiple-waiter scheduling need exact design
+and evidence. The application-side entry code must be available before USER
+dispatch without preloading a second executable: establish its explicit
+loading/bootstrap sequence as part of this contract.
 
 ## Next decisions
 

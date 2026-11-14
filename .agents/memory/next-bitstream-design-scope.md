@@ -24,6 +24,18 @@ baseline.
 **How to apply:** Treat this as target selection only, not permission to alter
 its installed image or proof that newer runtime changes are installed.
 
+The user approved the first test inventory: Boot/service holds Amoeba,
+CapabilityTest, SelfTest and WukongCallHome; application has a Slot 2 starter
+and separate Alice/Mallory Threads. Mint/Cleaner and read-only retirement are
+later software test stages, with interface/capacity checks before hardware freeze.
+
+**Why:** Establish native loading and legitimate progress despite deliberately
+rejected attacks before expanding lifecycle acceptance.
+
+**How to apply:** Only Amoeba code starts resident; required structures/data
+are distinct from executable residency. Inventory approval does not settle
+cross-Namespace dispatch, scheduling or fault recovery.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.
