@@ -81,6 +81,16 @@ one fault, a console PASS or successful byte transfer alone.
 reinitialize Alice, and distinguish local, vendor and physical evidence.
 The count is a functional target, not MTBF or full W7 closure.
 
+The user selected maintained RTL as the next candidate's source base, with
+explicit reconciliation against the retained successful Amoeba snapshot.
+
+**Why:** Preserve newer maintained fixes rather than treating an older passing
+snapshot as the complete future platform.
+
+**How to apply:** Keep historical evidence immutable and freeze a new manifest
+after reconciliation. Source selection does not authorize implementation,
+vendor builds, saved-image replacement or physical operations.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

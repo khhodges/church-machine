@@ -42,9 +42,9 @@ inventory and excludes the new service-entry code, scheduler, fresh-Thread
 storage and potentially enlarged Namespace tables. No final capacity or resource
 fit is claimed.
 
-## Recommended source strategy — awaiting review
+## Approved source strategy
 
-Use current maintained RTL as the proposed source base, reviewing its differences
+Use current maintained RTL as the source base, reviewing its differences
 from the retained successful replay. Compose the isolated starter explicitly
 with the required receiver, memory and trusted Boot bindings. Keep the old
 snapshot/image immutable as a regression reference, not as a reason to discard
@@ -54,3 +54,5 @@ First produce an exact change/provisioning map. Software protocol and test-image
 work remain distinct from hardware conformance/build gates; unfinished software
 must not be mislabeled as a hardware defect. This review authorizes no code
 implementation, vendor build, saved-artifact changes or physical operations.
+
+Detailed change/provisioning map: [candidate change map](next-fpga-test-change-map.md).

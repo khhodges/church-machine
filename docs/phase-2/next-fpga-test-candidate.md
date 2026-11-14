@@ -167,7 +167,8 @@ also pass. No complete Phase 1, Phase 2 or W7 acceptance follows from these gate
 ## Next decisions
 
 - Readiness findings: [initial source and capacity review](next-fpga-test-readiness.md).
-- Exact source baseline.
+- Maintained RTL is the approved source base; freeze its exact manifest after
+  reconciliation. See the [change/provisioning map](next-fpga-test-change-map.md).
 - Software fault recovery and exact shared-service handoff ABI/provisioning.
 - Exact memory ledger, receiver/device map and observation interface.
 - Frozen test images, acceptance criteria and local build gates.
