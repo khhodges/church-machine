@@ -44,8 +44,8 @@ def prepared(*, access=None, boot_bad=False):
         mem.update({
             0x4008: encode_church(ChurchOpcode.LOAD, cr_dst=3, cr_src=6, imm=2 << 4),
             0x400c: encode_turing(TuringOpcode.IADD, dr_dst=1, dr_src=0, imm=17),
-            0x4010: encode_church(ChurchOpcode.DWRITE, cr_dst=1, cr_src=3),
-            0x4014: encode_church(ChurchOpcode.DREAD, cr_dst=2, cr_src=3),
+            0x4010: encode_turing(TuringOpcode.DWRITE, dr_dst=1, dr_src=3),
+            0x4014: encode_turing(TuringOpcode.DREAD, dr_dst=2, dr_src=3),
             0x4018: 0xf7000000,
         })
     words = tuple(mem.get(i * 4, 0) for i in range(32768))
@@ -96,7 +96,9 @@ def test_real_core_high_ram_and_cross_root_boot(access, bad):
             if ctx.get(core.fault_entry_active):
                 reads.append((cycle, ctx.get(core.dmem_addr), ctx.get(core.dmem_rd_en),
                               ctx.get(core.dmem_rd_valid), ctx.get(core.dmem_rd_data),
-                              ctx.get(core.fault_memory_safe)))
+                              ctx.get(core.fault_memory_safe),
+                              ctx.get(core.model_change.change_fault),
+                              ctx.get(core.model_change.fault_type)))
             if ctx.get(mem.commit):
                 writes.append((ctx.get(mem.commit_address), ctx.get(mem.commit_data)))
             if ctx.get(core.retire_valid):
@@ -110,7 +112,7 @@ def test_real_core_high_ram_and_cross_root_boot(access, bad):
                 faults.append((ctx.get(core.retire_nia), ctx.get(core.fault),
                                ctx.get(core.retire_instr)))
             if ctx.get(core.fault_catastrophic):
-                assert bad, (cycle, faults, writes[-8:], retired[-8:], reads[-24:])
+                assert bad, f"cycle={cycle} faults={faults} writes={writes[-8:]} reads={reads[-24:]}"
                 for _ in range(4):
                     await ctx.tick()
                     assert not ctx.get(mem.commit)
@@ -137,5 +139,81 @@ def test_real_core_high_ram_and_cross_root_boot(access, bad):
             await ctx.tick()
         pytest.fail(f"No terminal result: faults={faults}, pc={ctx.get(core.imem_addr):x}, "
                     f"writes={writes[-10:]}, retired={retired[-10:]}")
+    sim.add_testbench(bench)
+    sim.run()
+
+
+@pytest.mark.parametrize("admitted_top", [False, True])
+def test_candidate_handshake_has_no_combinational_cycles(admitted_top):
+    # Runs the local graph checker before any vendor processing. In particular,
+    # request-derived readiness must never gate its own recovery request.
+    from amaranth.back import rtlil
+    words, binding = prepared()
+    _install_amaranth_elaboration_caches()
+    dut = (module("candidate_core").CandidateCoreTop(words, binding)
+           if admitted_top else Fixture(words, binding))
+    rtlil.convert(dut, ports=[])
+
+
+def test_recovery_stash_acceptance_and_actual_ram_readback():
+    """Qualify stashing only; do not disguise the later activation failure."""
+    words, binding = prepared()
+    dut = Fixture(words, binding)
+    _install_amaranth_elaboration_caches()
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+
+    async def bench(ctx):
+        core, mem = dut.core, dut.memory
+        await ctx.tick().repeat(3)
+        assert not ctx.get(core.fault_memory_safe)
+        assert not ctx.get(core.dmem_write_granted)
+        ctx.set(dut.bridge.held, 0)
+        original = None
+        stores = []
+        for _ in range(2000):
+            if ctx.get(core.retire_fault_valid) and not ctx.get(core.fault_entry_active):
+                original = (ctx.get(core.debug_cr_words[12][0]),
+                            ctx.get(core.debug_cr_words[15][0]),
+                            ctx.get(core.fault), ctx.get(core.retire_nia),
+                            ctx.get(core.retire_instr))
+            if ctx.get(core.fault_entry_active):
+                assert ctx.get(core.fault_memory_safe)
+                if ctx.get(mem.commit):
+                    assert ctx.get(core.dmem_write_granted)
+                    assert ctx.get(mem.commit_source) == 2
+                    stores.append((ctx.get(mem.commit_address), ctx.get(mem.commit_data)))
+            if ctx.get(core.fault_evidence_ready):
+                assert original is not None
+                assert original[2:] == (11, 0x4008, 0xf7000000)
+                expected = {
+                    0x19000 + 245 * 4: original[0],
+                    0x19000 + 246 * 4: original[1],
+                    0x19008: original[2],
+                    0x1900c: original[3],
+                    0x19014: original[4],
+                    0x19010: 1,  # outgoing context save succeeded
+                    0x19018: 0,
+                }
+                for address, value in expected.items():
+                    assert (address, value) in stores
+                protected = [0x19000 + n * 4 for n in (238, 239, 244)]
+                assert not any(address in protected for address, _ in stores)
+                for address in protected:
+                    expected[address] = words[address // 4]
+                # Independent inspect lane reads the real RAM, not the grant
+                # trace or an expected-data shadow.
+                for address, value in expected.items():
+                    ctx.set(mem.inspect.address, address)
+                    ctx.set(mem.inspect.read, 1)
+                    await ctx.tick()
+                    assert ctx.get(mem.inspect.rvalid)
+                    assert not ctx.get(mem.inspect.rerror)
+                    assert ctx.get(mem.inspect.rdata) == value
+                return
+            assert not ctx.get(core.fault_catastrophic)
+            await ctx.tick()
+        pytest.fail("Direct fault stash did not reach verified evidence")
+
     sim.add_testbench(bench)
     sim.run()

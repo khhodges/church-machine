@@ -1,8 +1,46 @@
-# Local core integration — incomplete, paused for review
+# Local core integration — handshake corrected, activation still failing
 
 Scope remains isolated code and local tests. No vendor synthesis, board
 access, installed-image change, saved LUMP modification or live Namespace
 replacement was performed.
+
+## Latest result: authorized handshake correction
+
+Recovery safety now derives from independent execution/ownership controls:
+execution active, CPU service enabled and maintenance excluded. It no longer
+depends on the gated request, its readiness, or request-derived diagnostics.
+The real per-operation write grant additionally requires a committed CPU store
+from the selected data lane. Read validity/errors and failure handling remain.
+No grant or safety input was tied high and no extra pending-write delay was
+introduced.
+
+The bounded candidate suite completed in **18.60 seconds: 4 passed, 3 failed**.
+
+Passing evidence:
+
+- Local combinational-cycle checks for both the preloaded disposable fixture
+  and the full CSI3/admission/core composition.
+- Real-core fault stash and outgoing save through the checked RAM, with original
+  Thread/Namespace identity and fault facts read back through the independent
+  inspection lane. Boot's protected continuation words remain unchanged.
+- A mutated trusted Boot binding reaches catastrophic failure without writes
+  afterward.
+
+Remaining failures:
+
+- The original fault fixture now proceeds through stashing and outgoing save,
+  then ordinary Boot activation reports **THREAD_CONTEXT (29)** at cycle 679,
+  followed by catastrophic state at cycle 680. It no longer hangs.
+- The two access fixtures also fail activation with code 29. Their first fault
+  is BOUNDS at the setup LOAD at `0x4008`, before the intended DWRITE/DREAD.
+  Therefore they do **not** prove either legal application access or rejection
+  atomicity at the intended operation.
+- Those two previously unexecuted fixtures initially had invalid Python enum
+  references. They now use the actual Turing DWRITE/DREAD encoders. No historical
+  fixture, saved LUMP, or runtime instruction encoding was changed.
+
+These are deliberately failing acceptance tests, not skips or expected-failure
+waivers. The later activation failure has not been repaired or bypassed.
 
 ## Work implemented, not fully qualified
 
@@ -21,7 +59,7 @@ replacement was performed.
 These are implementation changes, not evidence that the composed candidate
 works. The stage must not be used for a vendor build or physical test.
 
-## Observed execution and blocker
+## Earlier blocker and diagnosis
 
 The real maintained core reached the expected application INVALID_OP at
 `0x4008` after guarded boot and a normal USER CHANGE through the new memory
@@ -77,11 +115,13 @@ rtlil.convert(fixture, ports=[fixture.bridge.held])
 PY
 ```
 
-Observed result: exit 1, `CombinationalCycle`, with the path above.
+Before correction: exit 1, `CombinationalCycle`, with the path above.
+After correction: this check passes; permanent tests also check the complete
+admission/core composition.
 
-No successful high-bank Boot continuation, invalid-access atomicity, complete
-CSI3-to-core run or 100-attack acceptance is claimed. Later cases in the new
-four-case test were not completed because the run stopped at its first case.
+No successful Boot continuation, invalid-access atomicity, complete CSI3-to-core
+run or 100-attack acceptance is claimed. The latest run completed all seven
+local candidate tests; the passing stash evidence is not activation acceptance.
 
 ## Checks completed independently
 
@@ -110,7 +150,7 @@ no fake peripheral successes. This is not a release-safe general device
 decoder or a vendor-ready top. Watchdog/service integration also remains
 separate and is not supplied by instantiating the maintained core alone.
 
-### Proposed minimal correction — not applied during diagnosis
+### Reviewed correction contract
 
 1. Derive recovery memory safety from independent ownership/availability
    controls: execution enabled, maintenance excluded, and the established
@@ -130,8 +170,10 @@ separate and is not supplied by instantiating the maintained core alone.
    accepted/rejected write effects and refused recovery operations. Successful
    elaboration alone is not execution acceptance.
 
-The next action is to implement and verify that separation within the already
-bounded local integration stage, after review of this diagnosis.
+The ownership/acceptance separation is now implemented and locally checked.
+The next unresolved action is to diagnose the activation THREAD_CONTEXT
+failure and the access fixtures' earlier setup LOAD faults. Do not broaden
+the scope to scheduling or physical tests.
 Do not restore progress by tying grants or memory safety high, bypassing
 checks, skipping instructions, adding recovery retries or changing identities.
 The new path remains opt-in while this blocker is unresolved.

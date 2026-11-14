@@ -83,7 +83,8 @@ class CandidateCoreBridge(Elaboratable):
             core.clist_rd_data.eq(mem.clist.rdata),
             core.dmem_rd_data.eq(mem.data.rdata),
             core.dmem_rd_valid.eq(mem.data.rvalid & ~mem.data.rerror),
-            core.dmem_write_granted.eq(mem.data.write & mem.data.ready & ~mem.data.error),
+            core.dmem_write_granted.eq(mem.data.write & mem.data.ready & ~mem.data.error &
+                                      mem.commit & (mem.commit_source == 2)),
             # Evidence is already directly stashed by the core. No external
             # diagnostic receiver is allowed to keep the local recovery held.
             core.fault_evidence_captured.eq(core.fault_evidence_ready),
@@ -95,8 +96,13 @@ class CandidateCoreBridge(Elaboratable):
         # edge, before the next recovery phase. Do not invent a pending-write
         # cycle after that edge: it would falsely revoke ownership while
         # FaultStash verifies its own just-completed store.
+        # Ownership is independent of the requests that FaultEntry gates with
+        # this signal. In this fabric maintenance excludes CPU service, CPU
+        # stores precede the staging receiver, and no writes are posted.
+        # FaultEntry's core mux owns the CPU lanes during stashing. Individual
+        # denied operations still fail via the real grant/response interface.
         m.d.comb += core.fault_memory_safe.eq(
-            ~self.protocol_error & ~self.unsupported_mmio)
+            active & mem.cpu_enabled & ~mem.maintenance)
         return m
 
 
