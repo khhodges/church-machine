@@ -34,11 +34,50 @@ An artificial extra pending-write cycle was removed: this synchronous fabric
 commits a granted write at its clock edge, so the following verification cycle
 must not be treated as an outstanding write.
 
-The latest integrated test stalls in the simulator's signal-settling loop.
+The integrated test stalled in the simulator's signal-settling loop.
 A wall-clock diagnostic ended with timeout status 124; the captured stack
-was in Amaranth `pysim.step_design`. This suggests unresolved combinational
-feedback, but the exact path is not yet established. No further speculative
-integration changes were made after that diagnosis.
+was in Amaranth `pysim.step_design`.
+
+The subsequent focused diagnosis **confirmed a combinational cycle**, without
+changing runtime code. Amaranth's local netlist cycle checker rejected this path:
+
+```text
+core.dmem_rd_en
+  -> candidate bridge request
+  -> candidate bridge protocol_error
+  -> core.fault_memory_safe
+  -> FaultEntry.safe
+  -> FaultStash.safe
+  -> FaultStash.read_en
+  -> FaultEntry.read_en
+  -> core.dmem_rd_en
+```
+
+Recovery uses safety to enable the request, while the wrapper uses that
+request and its readiness to decide safety. This circular dependency is
+present before any vendor processing; it is not a RAM contents problem,
+instruction failure, or evidence that Mallory's attack should be repaired.
+The checker reports one cycle at a time: this identifies a definite blocker,
+not proof that no other cycles remain.
+
+Reproduction from the workspace root (local elaboration only, no vendor
+synthesis and no emitted output file):
+
+```sh
+timeout 35s python - <<'PY'
+import sys
+sys.path.insert(0, "docs/phase-2/cooperative-retry")
+from test_candidate_core import Fixture, prepared
+from hardware.test_wukong_upload_fsm import _install_amaranth_elaboration_caches
+from amaranth.back import rtlil
+_install_amaranth_elaboration_caches()
+words, binding = prepared()
+fixture = Fixture(words, binding)
+rtlil.convert(fixture, ports=[fixture.bridge.held])
+PY
+```
+
+Observed result: exit 1, `CombinationalCycle`, with the path above.
 
 No successful high-bank Boot continuation, invalid-access atomicity, complete
 CSI3-to-core run or 100-attack acceptance is claimed. Later cases in the new
@@ -58,8 +97,10 @@ though the supplied hash correctly described the altered image. A matching
 transfer hash therefore cannot substitute for the configured Boot bindings.
 
 The preceding stage's 70 passes remain historical evidence; they are not
-automatically a pass for all subsequent changes. This turn established 22
-passing focused checks, not a passing integrated-core stage.
+automatically a pass for all subsequent changes. The preceding implementation
+run established 22 passing focused checks, not a passing integrated-core stage.
+The focused diagnosis performed the failing local cycle check; it did not
+rerun those unchanged tests or claim new execution passes.
 
 ## Integration limits and next review
 
@@ -69,8 +110,28 @@ no fake peripheral successes. This is not a release-safe general device
 decoder or a vendor-ready top. Watchdog/service integration also remains
 separate and is not supplied by instantiating the maintained core alone.
 
-The next focused action is to identify the settling cycle between memory
-ownership/grants and the fault-entry engine, then review the minimal correction.
+### Proposed minimal correction — not applied during diagnosis
+
+1. Derive recovery memory safety from independent ownership/availability
+   controls: execution enabled, maintenance excluded, and the established
+   exclusive recovery route. Account for any actual outstanding transaction;
+   this synchronous fabric has no posted writes. Do not derive ownership from
+   the request being gated or from its request-dependent readiness/errors.
+2. Keep per-operation acceptance separate. A write grant must still mean the
+   real selected destination commits; invalid addresses must not commit.
+   Read response validity/errors and the existing stash/activation failure
+   paths must remain authoritative. Removing the circular safety dependency
+   does not authorize a request or convert an error to success.
+3. Retain explicit detection of unsupported MMIO and internal port collisions,
+   without feeding those request-derived diagnostics back into the safety
+   predicate that generated the request.
+4. Check the composed dependency graph first, then rerun bounded real-core
+   recovery tests. Verify retained high-bank Boot continuation, fault evidence,
+   accepted/rejected write effects and refused recovery operations. Successful
+   elaboration alone is not execution acceptance.
+
+The next action is to implement and verify that separation within the already
+bounded local integration stage, after review of this diagnosis.
 Do not restore progress by tying grants or memory safety high, bypassing
 checks, skipping instructions, adding recovery retries or changing identities.
 The new path remains opt-in while this blocker is unresolved.

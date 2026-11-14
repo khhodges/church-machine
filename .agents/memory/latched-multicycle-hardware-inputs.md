@@ -64,3 +64,14 @@ interface really does require completion tracking.
 **How to apply:** Derive the safety/grant contract from the concrete memory
 latency and acceptance point. Verify the composed logic for combinational
 feedback; neither a constant grant nor an invented delay proves safe recovery.
+
+Keep bus ownership eligibility independent of the requests it enables;
+request-dependent readiness/errors belong to per-operation acceptance.
+
+**Why:** Feeding a gated request back into its own safety predicate creates a
+combinational cycle, even where Boolean simplification might appear to cancel
+the dependency. This can prevent simulation from advancing at all.
+
+**How to apply:** For a settling hang, inspect the elaborated combinational
+dependency graph before changing timing. A cycle-free graph is necessary, but
+does not replace real execution and rejection-edge tests.
