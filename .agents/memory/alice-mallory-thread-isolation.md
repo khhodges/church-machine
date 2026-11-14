@@ -5,6 +5,16 @@ description: User-directed separate Thread setup for the NewLayout protection de
 
 ## Current proposed combined-loop arrangement
 
+Mallory deliberately demonstrates a failed attack. Do not classify her intended
+protection fault as an application defect or propose making the attack succeed.
+
+**Why:** The user explicitly corrected that characterization after the native
+loading replay.
+
+**How to apply:** Preserve the attack and protection checks. Distinguish expected
+attack rejection from unrelated loader/activation failures, and from separate
+evidence of containment and continued legitimate progress.
+
 Use the inspected AmoebaStartup saved design as the combined-loop baseline.
 The user explicitly selected this rather than a different working design.
 

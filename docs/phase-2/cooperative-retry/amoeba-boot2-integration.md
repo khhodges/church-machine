@@ -125,5 +125,8 @@ The retained `system-replay.json` reports `bounded-observation`, admission
 This closes the observed dispatch blocker for the bounded SYSTEM→single-Alice
 path with only Amoeba code initially resident. It does not qualify simultaneous
 USER scheduling, missing Mint bindings, physical peripherals, or all Boot2
-applications. The separate Mallory BOUNDS fault remains unresolved.
+applications. Mallory deliberately demonstrates a failed attack: her separate
+BOUNDS fault is not an application defect to repair or a reason to grant more
+authority. This bounded observation does not independently prove continued
+Alice progress or recovery after the attack.
 No saved LUMP, saved Namespace, live boot image, or hardware was changed.
