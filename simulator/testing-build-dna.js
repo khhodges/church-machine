@@ -534,6 +534,26 @@
     ui.dlgBanner = el('div', 'tbd-banner');
     top.appendChild(ui.dlgBanner);
     var tools = el('div', 'tbd-tools');
+    ui.glassBtn = el('button', 'tbd-btn', 'Memory Glass');
+    ui.glassBtn.type = 'button';
+    ui.glassBtn.disabled = true;
+    ui.glassBtn.title = 'Open this Namespace in Memory Glass';
+    ui.glassBtn.addEventListener('click', function () {
+      var revision = state.graph && (state.graph.namespaceRevisionId ||
+        (state.mode === 'namespace' ? state.graphId : null));
+      if (!revision) return;
+      var host = dialogHost().defaultView;
+      function navigate() {
+        if (host.DevelopmentImageView && typeof host.DevelopmentImageView.show === 'function')
+          host.DevelopmentImageView.show(revision);
+        else host.location.assign('/simulator/#development-image?namespace=' + encodeURIComponent(revision));
+      }
+      if (workspace && workspace.open) {
+        afterWorkspaceClose = navigate;
+        workspace.close();
+      } else navigate();
+    });
+    tools.appendChild(ui.glassBtn);
     [['−', 'Zoom out', function () { zoomAt(1 / 1.25); }], ['+', 'Zoom in', function () { zoomAt(1.25); }], ['Fit', 'Fit graph to view', fit]].forEach(function (s) {
       var bt = el('button', 'tbd-btn', s[0]); bt.type = 'button'; bt.setAttribute('aria-label', s[1]); bt.title = s[1];
       bt.addEventListener('click', s[2]); tools.appendChild(bt);
@@ -628,6 +648,7 @@
   function loadGraph(kind, id) {
     var t = gate.next();
     state.mode = kind; state.graphId = id; state.graph = null; state.selectedNode = null; state.layout = null;
+    ui.glassBtn.disabled = true;
     ui.side.hidden = true; ui.main.classList.remove('has-selection');
     openDialog();
     ui.dlgBanner.textContent = ''; ui.dlgMeta.textContent = ''; ui.detail.textContent = '';
@@ -653,6 +674,7 @@
 
   function renderGraph(kind, id) {
     var g = state.graph;
+    ui.glassBtn.disabled = !(g.namespaceRevisionId || (kind === 'namespace' && id));
     var meta = ui.dlgMeta;
     meta.textContent = '';
     var mItems = state.metaItems = metaItems(kind, id, g, kind === 'bitstream' ? findBs(id) : null);

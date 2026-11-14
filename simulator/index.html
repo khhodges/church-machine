@@ -3775,7 +3775,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="design-simulation.js?v=sha256-35c7e05323f7"></script>
     <script src="namespace-selection.js?v=sha256-7bc7fff31bf4"></script>
     <script src="development-image-view.js?v=sha256-4aa845460a65"></script>
-    <script src="namespace-design-v1.js?v=sha256-c8c6abec4abc"></script>
+    <script src="namespace-design-v1.js?v=sha256-b228d8da72db"></script>
     <script src="namespace-ide-node.js?v=sha256-94708018f5d1"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>
     <script src="app-abstractions.js?v=sha256-2b7042544808"></script>
@@ -4245,6 +4245,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <div style="max-width:960px;margin:0 auto;padding:1.25rem 1rem;">
         <div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:0.2rem;">
             <h2 style="color:#d4a843;font-size:1.15rem;margin:0;">Namespace DNA</h2>
+            <button type="button" class="btn btn-sm" id="namespaceDnaMemoryGlass" onclick="DevelopmentImageView.show(NamespaceSelection.current() || NamespaceSelection.read())" title="Open the selected Namespace in Memory Glass">Memory Glass</button>
             <span style="font-size:0.8rem;color:#6e7681;">Capability GT links between abstractions</span>
         </div>
         <p style="color:#6e7681;font-size:0.8rem;margin:0 0 0.75rem;">
