@@ -25,9 +25,10 @@ class FaultBootBinding:
     image_sha256: str
     resident_words: bool
     boot_guard: object
+    memory_bytes: int = 65536
 
     @classmethod
-    def from_prepared_image(cls, words, *, image_sha256, boot_guard):
+    def from_prepared_image(cls, words, *, image_sha256, boot_guard, memory_bytes=65536):
         """Consume the selected ascending IDE image; never select artifacts.
 
         Boot Namespace and Boot.Thread are foundational slots 1 and 2.
@@ -35,7 +36,9 @@ class FaultBootBinding:
         No faultHandlerSlot or separate executable selection is consumed.
         """
         words = tuple(words)
-        if (len(words) != 16384 or
+        if memory_bytes not in (65536, 131072):
+            raise ValueError("Unsupported fault-entry memory aperture")
+        if (len(words) != memory_bytes // 4 or
                 any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words)):
             raise ValueError("Prepared Boot image must contain 16384 uint32 words")
         if words[4] != 0:
@@ -48,25 +51,28 @@ class FaultBootBinding:
         thread_gt = 0x02000002 | ((words[9] >> 21) & 511) << 16
         return cls.from_image(
             words, namespace=namespace, thread_gt=thread_gt,
-            image_sha256=image_sha256, resident_words=True, boot_guard=boot_guard)
+            image_sha256=image_sha256, resident_words=True, boot_guard=boot_guard,
+            memory_bytes=memory_bytes)
 
     @classmethod
     def from_image(cls, words, *, namespace, thread_gt,
-                   image_sha256, resident_words=False, boot_guard=None):
+                   image_sha256, resident_words=False, boot_guard=None, memory_bytes=65536):
         """Bind explicit inputs, never discover/select an artifact or revision."""
         words = tuple(words)
-        if (len(words) != 16384 or
+        if memory_bytes not in (65536, 131072):
+            raise ValueError("Unsupported fault-entry memory aperture")
+        if (len(words) != memory_bytes // 4 or
                 any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words)):
             raise ValueError("Fault entry requires 16384 uint32 words")
         digest = hashlib.sha256(b"".join(struct.pack("<I", w) for w in words)).hexdigest()
-        if len(words) != 16384 or digest != image_sha256:
-            raise ValueError("Fault entry requires the exact 64 KiB admitted image")
+        if digest != image_sha256:
+            raise ValueError("Fault entry requires the exact admitted image")
         if resident_words != (boot_guard is not None):
             raise ValueError("Fault entry address profile and boot guard must agree")
         root_gt = namespace & 0xffffffff
         root_base = (namespace >> 32) & 0xffffffff
         root_auth = namespace >> 64
-        if (root_base % 4 or root_base >= 65536 or root_gt & 0xffff != 1 or
+        if (root_base % 4 or root_base >= memory_bytes or root_gt & 0xffff != 1 or
                 root_gt >> 25 & 3 != 1 or root_auth & 0x80000000):
             raise ValueError("Invalid explicit Boot Namespace")
         if thread_gt & 0xfe00ffff != 0x02000002:
@@ -78,7 +84,7 @@ class FaultBootBinding:
             if slot * 4 + 3 > (root_auth & 0x1fffff):
                 raise ValueError("Binding outside Boot Namespace")
             address = root_base + slot * 16
-            if address + 16 > 65536:
+            if address + 16 > memory_bytes:
                 raise ValueError("Descriptor aliases local RAM")
             raw, auth, seal, token = words[address // 4:address // 4 + 4]
             def rol(v, n):
@@ -88,7 +94,7 @@ class FaultBootBinding:
                 raise ValueError("Invalid sealed binding or version")
             base = raw * 4 if resident_words else raw
             limit = auth & 0x1fffff
-            if base % 4 or base + (limit + 1) * 4 > 65536:
+            if base % 4 or base + (limit + 1) * 4 > memory_bytes:
                 raise ValueError("Binding aliases local RAM")
             for i, value in enumerate((raw, auth, seal, token)):
                 checks[address + i * 4] = value
@@ -111,7 +117,7 @@ class FaultBootBinding:
         if any(base <= a < base + size * 4 and a != base for a in checks):
             raise ValueError("Boot.Thread overlaps trusted descriptors")
         return cls(namespace, thread, size, tuple(sorted(checks.items())),
-                   digest, resident_words, boot_guard)
+                   digest, resident_words, boot_guard, memory_bytes)
 
 
 class FaultEntry(Elaboratable):
@@ -159,7 +165,8 @@ class FaultEntry(Elaboratable):
         protected_overlap = Const(0)
         for a, _ in b.checks:
             protected_overlap = protected_overlap | ((source <= a) & (end > a))
-        stash = FaultStash(thread_base=base, thread_words=b.thread_words)
+        stash = FaultStash(thread_base=base, thread_words=b.thread_words,
+                           memory_bytes=b.memory_bytes)
         m.submodules.stash = ResetInserter(~self.busy)(stash)
         m.d.comb += [
             stash.thread_gt.eq(self.thread[:32]), stash.namespace_gt.eq(self.namespace[:32]),
@@ -187,7 +194,7 @@ class FaultEntry(Elaboratable):
                     m.next = "CHECK_SAFE"
             with m.State("CHECK_SAFE"):
                 with m.If(~self.safe | ~self.owned | overlap | protected_overlap |
-                          (source[:2] != 0) | (end > 65536) |
+                          (source[:2] != 0) | (end > b.memory_bytes) |
                           (self.thread[25:32] != 1)):
                     m.next = "CATASTROPHIC"
                 with m.Else():

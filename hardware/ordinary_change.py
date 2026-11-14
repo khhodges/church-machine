@@ -36,7 +36,10 @@ class OrdinaryChange(Elaboratable):
         "nia_restore_en", "nia_restore_val", "flags_restore_en", "flags_restore_data",
     )
 
-    def __init__(self, ports, *, resident_word_locations=False):
+    def __init__(self, ports, *, resident_word_locations=False, capacity_words=16384):
+        if capacity_words not in (16384, 32768):
+            raise ValueError("Unsupported CHANGE memory capacity")
+        self.capacity_words = capacity_words
         self.resident_word_locations = resident_word_locations
         self.system_thread_gt = ports.system_thread_gt
         self.change_start = Signal()
@@ -59,8 +62,8 @@ class OrdinaryChange(Elaboratable):
             m.d.comb += [
                 resolved_base.eq(gate.raw_base << 2),
                 resolved_authority.eq(cached_authority(gate.raw_w2)),
-                invalid_descriptor.eq((gate.raw_base >= 16384) |
-                    (gate.raw_base + gate.raw_w2[:21] >= 16384)),
+                invalid_descriptor.eq((gate.raw_base >= self.capacity_words) |
+                    (gate.raw_base + gate.raw_w2[:21] >= self.capacity_words)),
             ]
         else:
             m.d.comb += [resolved_base.eq(gate.raw_base),

@@ -231,7 +231,8 @@ review; no subsequent stage is implicitly authorized.
 
 - Proposed next stage:
   [maintained-core and trusted Boot integration](next-fpga-core-integration-review.md).
-  The user requested this review; implementation is not yet authorized.
+  The user authorized local implementation; it is now partially implemented
+  and paused at the [recovery integration blocker](next-fpga-core-integration-status.md).
 - Readiness findings: [initial source and capacity review](next-fpga-test-readiness.md).
 - Maintained RTL is the approved source base; freeze its exact manifest after
   reconciliation. See the [change/provisioning map](next-fpga-test-change-map.md).

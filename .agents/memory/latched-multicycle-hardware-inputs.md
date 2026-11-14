@@ -52,3 +52,15 @@ and incorrectly diagnose ordinary access containment.
 
 **How to apply:** Establish and verify the intended privilege phase before
 capturing instruction pre-state. Keep boot-window tests separate.
+
+Memory-safety handshakes must describe actual outstanding transactions, not
+merely whether a write occurred in the preceding cycle.
+
+**Why:** Direct Boot stashing verifies its own writes. For synchronous memory
+whose accepted writes commit at the edge, an artificial extra pending cycle
+can revoke valid ownership during verification. Conversely, a posted-write
+interface really does require completion tracking.
+
+**How to apply:** Derive the safety/grant contract from the concrete memory
+latency and acceptance point. Verify the composed logic for combinational
+feedback; neither a constant grant nor an invented delay proves safe recovery.

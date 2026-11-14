@@ -7,7 +7,10 @@ from .thread_design import THREAD_MIN_N_MINUS_6, THREAD_MAX_N_MINUS_6
 
 
 class BootThreadValidation(Elaboratable):
-    def __init__(self, *, expected_guard):
+    def __init__(self, *, expected_guard, capacity_words=16384):
+        if capacity_words not in (16384, 32768):
+            raise ValueError("Unsupported Thread admission memory capacity")
+        self.capacity_words = capacity_words
         validate_boot_guard(expected_guard)
         self.expected_guard = expected_guard
         self.start = Signal()
@@ -129,8 +132,8 @@ class BootThreadValidation(Elaboratable):
                 with m.If(computed != d[2]):
                     fail(FaultType.SEAL)
                 with m.Elif(d[1][31] | (d[0] < (slots << 2)) |
-                            (d[0] >= 16384) | (d[1][:21] >= 16384) |
-                            ((d[0] + d[1][:21]) >= 16384)):
+                            (d[0] >= self.capacity_words) | (d[1][:21] >= self.capacity_words) |
+                            ((d[0] + d[1][:21]) >= self.capacity_words)):
                     fail(FaultType.BOUNDS)
                 with m.Else():
                     m.d.sync += index.eq(4)

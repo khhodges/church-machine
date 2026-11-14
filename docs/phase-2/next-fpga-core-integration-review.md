@@ -1,9 +1,10 @@
 # Next candidate stage: maintained core and trusted Boot integration
 
-Design proposal, not implementation authorization. The preceding isolated
-memory/admission stage passed its local checks; it did not connect ChurchCore.
-No runtime edits, new tests, vendor build or physical operations were performed
-for this review.
+The user authorized this isolated code/test stage. The preceding memory/
+admission stage passed its local checks; it did not connect ChurchCore.
+Current integration is incomplete and paused at a failing recovery boundary.
+See [implementation status](next-fpga-core-integration-status.md). No vendor
+build or physical operations are authorized or claimed.
 
 ## Findings from maintained source
 

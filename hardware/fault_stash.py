@@ -13,10 +13,12 @@ from .thread_design import THREAD_SUPPORTED_BODY_WORDS
 
 
 class FaultStash(Elaboratable):
-    def __init__(self, *, thread_base, thread_words):
+    def __init__(self, *, thread_base, thread_words, memory_bytes=65536):
+        if memory_bytes not in (65536, 131072):
+            raise ValueError("Unsupported fault stash memory aperture")
         if (thread_base < 0 or thread_base % 4 or
                 thread_words not in THREAD_SUPPORTED_BODY_WORDS or
-                thread_base + thread_words * 4 > 65536):
+                thread_base + thread_words * 4 > memory_bytes):
             raise ValueError("Boot.Thread must fit aligned local RAM without aliasing")
         self.base, self.words = thread_base, thread_words
         self.start = Signal()

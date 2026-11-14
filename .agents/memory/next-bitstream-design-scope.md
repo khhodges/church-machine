@@ -125,6 +125,18 @@ this approval to vendor builds, board operations, saved-artifact changes,
 Namespace-aware scheduling or fresh-Mallory integration. Report core-facing
 foundation evidence separately from a runnable core/top demonstration.
 
+The user subsequently authorized isolated maintained-core/trusted-Boot
+integration, including BOUNDS for otherwise-admitted misaligned/out-of-range
+ordinary RAM accesses, truthful acceptance, and retained Boot continuation.
+
+**Why:** Fabric error outputs alone do not prevent instruction engines from
+reporting success; the real core must consume the checked access outcome.
+
+**How to apply:** Preserve existing authority fault reasons and prior accepted
+effects; no false read results, dropped writes, retries or faulted-context
+resumption. Keep vendor/physical operations and later scheduler/Mallory
+integration outside this authorization, and stop at unresolved interface rules.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

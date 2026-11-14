@@ -62,7 +62,19 @@ class ChurchCore(Elaboratable):
     """
 
     def __init__(self, iot_profile=False, *, expected_boot_guard=None,
-                 monitor_clear_enabled=False, fault_boot_binding=None):
+                 monitor_clear_enabled=False, fault_boot_binding=None,
+                 checked_memory=False, memory_bytes=65536):
+        if memory_bytes not in (65536, 131072):
+            raise ValueError("Unsupported core memory aperture")
+        if checked_memory and (iot_profile or fault_boot_binding is None):
+            raise ValueError("Checked memory requires explicit trusted Boot binding")
+        if fault_boot_binding is not None and fault_boot_binding.memory_bytes != memory_bytes:
+            raise ValueError("Fault Boot binding memory aperture mismatch")
+        self.checked_memory = checked_memory
+        self.memory_bytes = memory_bytes
+        # Request-local physical RAM rejection, driven only by the checked
+        # wrapper. Recovery writes use their existing grant/valid interface.
+        self.memory_reject = Signal()
         self.iot_profile = iot_profile
         self.monitor_clear_enabled = monitor_clear_enabled
         self.monitor_clear = Signal()
@@ -318,6 +330,10 @@ class ChurchCore(Elaboratable):
         fault_activation_live = Signal()
         fault_start = Signal()
         fault_freeze = Signal()
+        memory_rejected = Signal()
+        memory_failure = Signal()
+        m.d.comb += memory_failure.eq(
+            Const(self.checked_memory) & (self.memory_reject | memory_rejected))
         if self.fault_boot_binding is not None:
             from .fault_entry import FaultEntry
             fault_entry = FaultEntry(self.fault_boot_binding)
@@ -387,6 +403,7 @@ class ChurchCore(Elaboratable):
             u_gc = ChurchGCUnit()
             u_lambda = ChurchLambda()
             u_change = ChurchChange(
+                capacity_words=self.memory_bytes // 4,
                 resident_word_locations=self.expected_boot_guard is not None,
                 system_thread_gt=(0x02000002 |
                     (((self.expected_boot_guard or 0) & 0x1FF) << 16)))
@@ -478,11 +495,13 @@ class ChurchCore(Elaboratable):
                 (nia_reg == 8) & (self.imem_data == 0x17000001))
         namespace_error = Signal(5)
         if self.expected_boot_guard is not None:
-            reader = AscendingNamespaceBootstrap(namespace_only=True)
+            reader = AscendingNamespaceBootstrap(
+                self.memory_bytes // 4, namespace_only=True)
             guard = BootPairGuard(expected_guard=self.expected_boot_guard)
             m.submodules.boot_metadata = _rst(reader)
             m.submodules.boot_namespace_guard = _rst(guard)
-            thread = BootThreadValidation(expected_guard=self.expected_boot_guard)
+            thread = BootThreadValidation(expected_guard=self.expected_boot_guard,
+                                          capacity_words=self.memory_bytes // 4)
             m.submodules.boot_thread_validation = _rst(thread)
             activation = BootThreadActivation(expected_guard=self.expected_boot_guard)
             m.submodules.boot_thread_activation = _rst(activation)
@@ -3160,6 +3179,8 @@ class ChurchCore(Elaboratable):
             m.d.comb += [self.fault.eq(u_dread.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_dwrite.fault):
             m.d.comb += [self.fault.eq(u_dwrite.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(memory_failure):
+            m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
         with m.Elif(u_cload.cload_fault):
             m.d.comb += [self.fault.eq(u_cload.cload_fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_outform.outform_fault & ~outform_mode2_active):
@@ -3226,7 +3247,8 @@ class ChurchCore(Elaboratable):
         delayed_fault = (
             u_load.load_fault | u_save.save_fault | u_tperm.tperm_fault |
             u_dread.fault | u_dwrite.fault |
-            u_call.call_fault | u_return.fault_valid
+            u_call.call_fault | u_return.fault_valid |
+            (memory_failure & any_unit_busy)
         )
         if not self.iot_profile:
             delayed_issue = delayed_issue | (
@@ -3743,7 +3765,7 @@ class ChurchCore(Elaboratable):
                 u_change.change_fault | ~self.fault_memory_safe |
                 (activation_read & ~self.dmem_rd_valid) |
                 (fault_activation_live & self.dmem_rd_en &
-                 ((self.dmem_addr[:2] != 0) | (self.dmem_addr >= 65536))))
+                 ((self.dmem_addr[:2] != 0) | (self.dmem_addr >= self.memory_bytes))))
             with m.If(fault_entry.busy & ~fault_entry.release_source):
                 m.d.comb += [
                     self.dmem_addr.eq(fault_entry.address),
@@ -3754,6 +3776,14 @@ class ChurchCore(Elaboratable):
                     self.clist_wr_en.eq(0), self.clist_rd_en.eq(0),
                 ]
             outer = Module()
+            if self.checked_memory:
+                # Retain only the rejection condition while the issuing
+                # engine is frozen. PC, instruction, GTs and flags stay in
+                # that engine; there is no intermediate fault-event bank.
+                with outer.If(self.reboot_req | fault_cleanup):
+                    outer.d.sync += memory_rejected.eq(0)
+                with outer.Elif(self.memory_reject & ~fault_entry.busy):
+                    outer.d.sync += memory_rejected.eq(1)
             outer.submodules.engine = EnableInserter(~fault_freeze)(m)
             outer.submodules.fault_entry = ResetInserter(self.reboot_req)(fault_entry)
             return outer

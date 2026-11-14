@@ -115,6 +115,31 @@ def test_changed_last_high_word_cannot_pass_received_ram_hash():
     run(d, bench)
 
 
+def test_trusted_foundational_words_are_checked_after_real_image_hash():
+    checks = ((0, 0x12345678), (0x10000, 0xabcdef00), (0x1fffc, 0x42))
+    d = CandidateAdmission(clock_hz=100, trusted_words=checks)
+    async def bench(ctx):
+        ctx.set(d.transport.maintenance, 1)
+        for mismatch in (False, True):
+            data = bytearray(131072)
+            for a, value in checks:
+                data[a:a+4] = value.to_bytes(4, "little")
+            if mismatch:
+                data[-4] ^= 1
+            # The supplied hash matches even the altered image. Foundational
+            # validation must independently reject the last changed word.
+            epoch = await load(ctx, d, bytes(data))
+            assert ctx.get(d.control.state) == (d.control.FAILED if mismatch else d.control.READY)
+            if not mismatch:
+                await send(ctx, d.transport, header(3, epoch))
+                assert ctx.get(d.control.state) == d.control.RUNNING
+            else:
+                assert not ctx.get(d.admitted_digest)
+                await send(ctx, d.transport, header(3, epoch))
+                assert ctx.get(d.control.execution_reset)
+    run(d, bench)
+
+
 @pytest.mark.parametrize("failure", ["short-digest", "short-word", "maintenance",
                                     "uart-error", "wrong-magic", "wrong-length",
                                     "oversized", "reserved-byte"])

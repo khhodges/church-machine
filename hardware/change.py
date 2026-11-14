@@ -19,7 +19,9 @@ from .thread_design import (
 
 
 class ChurchChange(Elaboratable):
-    def __init__(self, *, resident_word_locations=False, system_thread_gt=0x02000002):
+    def __init__(self, *, resident_word_locations=False, system_thread_gt=0x02000002,
+                 capacity_words=16384):
+        self.capacity_words = capacity_words
         self.resident_word_locations = resident_word_locations
         self.system_thread_gt = system_thread_gt
         self.change_start = Signal()
@@ -104,7 +106,8 @@ class ChurchChange(Elaboratable):
     def elaborate(self, platform):
         m = Module()
         m.submodules.ordinary = ordinary = OrdinaryChange(
-            self, resident_word_locations=self.resident_word_locations)
+            self, resident_word_locations=self.resident_word_locations,
+            capacity_words=self.capacity_words)
         self.model_ordinary = ordinary
         ordinary_selected = Signal()
         with m.If(self.change_start & ~self.change_busy):
