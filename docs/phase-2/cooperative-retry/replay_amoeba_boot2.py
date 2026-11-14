@@ -9,8 +9,8 @@ import sys
 RTL_MANIFEST_SHA = "b478e4bb67ddfb55f6098f18f5f0f44204b2115e5b31494a1bed15f8bdedc8cc"
 
 
-def verify_snapshot(snapshot):
-    if hashlib.sha256((snapshot / "starter-source-manifest.json").read_bytes()).hexdigest() != RTL_MANIFEST_SHA:
+def verify_snapshot(snapshot, expected_manifest=RTL_MANIFEST_SHA):
+    if hashlib.sha256((snapshot / "starter-source-manifest.json").read_bytes()).hexdigest() != expected_manifest:
         raise ValueError("RTL manifest differs from pinned qualification snapshot")
     source_manifest = json.loads((snapshot / "starter-source-manifest.json").read_text())
     for name, expected in source_manifest["files"].items():
@@ -19,8 +19,10 @@ def verify_snapshot(snapshot):
             raise ValueError(f"Retained RTL input changed: {name}")
 
 
-def replay(directory, snapshot, mode):
-    verify_snapshot(snapshot)
+def replay(directory, snapshot, mode, expected_manifest=RTL_MANIFEST_SHA, execution_steps=60000):
+    if not 1 <= execution_steps <= 500000:
+        raise ValueError("Execution steps must be between 1 and 500000")
+    verify_snapshot(snapshot, expected_manifest)
     sys.path.insert(0, str(snapshot))
     from amaranth import Elaboratable, Module, Signal
     from amaranth.sim import Simulator
@@ -45,13 +47,14 @@ def replay(directory, snapshot, mode):
     starter.UartRx = Bytes
     top = starter.StarterTop(sim_mode=True, general_image=True, boot_guard=0,
         amoeba_records=records, staging_base=evidence["stagingBase"],
-        staging_words=evidence["stagingWords"], clock_hz=20000, baud=5000)
+        staging_words=evidence["stagingWords"], clock_hz=20000, baud=5000,
+        amoeba_mmio_base=evidence.get("receiverBase", 0x4000001c))
     sim = Simulator(top)
     sim.add_clock(1e-6)
     result = dict(mode=mode, imageSha256=digest,
         rtlManifestSha256=hashlib.sha256((snapshot / "starter-source-manifest.json").read_bytes()).hexdigest(),
         requests=[], publications=[],
-        trace=[], handoffs=[], hardwareOperations=False,
+        trace=[], handoffs=[], executions={}, hardwareOperations=False, executionSteps=execution_steps,
         scope="decoded UART, real RAM/SHA and retained RTL; no instruction translation")
     class Fault(Exception):
         pass
@@ -63,9 +66,22 @@ def replay(directory, snapshot, mode):
             nonlocal cycle
             if observe:
                 if ctx.get(core.retire_valid):
-                    result["trace"].append(dict(cycle=cycle, nia=ctx.get(core.retire_nia),
-                                               dr1=ctx.get(core.debug_dr_words[1])))
+                    nia = ctx.get(core.retire_nia)
+                    dr1 = ctx.get(core.debug_dr_words[1])
+                    result["trace"].append(dict(cycle=cycle, nia=nia, dr1=dr1))
                     result["trace"] = result["trace"][-128:]
+                    for r in records:
+                        offset = (nia - r["baseByte"]) // 4
+                        cw = (r["words"][0] >> 10) & 8191
+                        if nia % 4 == 0 and 1 <= offset <= cw:
+                            execution = result["executions"].setdefault(str(r["slot"]),
+                                dict(firstCycle=cycle, retired=0, returns=[]))
+                            execution["retired"] += 1
+                            execution["lastCycle"] = cycle
+                            # Retained ISA RETURN opcode=3. Keep first outcomes
+                            # even when the rolling instruction trace advances.
+                            if r["words"][offset] >> 27 == 3 and len(execution["returns"]) < 8:
+                                execution["returns"].append(dict(cycle=cycle, nia=nia, dr1=dr1))
                 if ctx.get(core.llr_complete):
                     result["handoffs"].append(dict(cycle=cycle, slot=ctx.get(core.debug_dr_words[5])))
                 if ctx.get(top.program_commit):
@@ -113,7 +129,7 @@ def replay(directory, snapshot, mode):
         try:
             await send(image_command(3, 0, 1, general_image=True), False)
             ctx.set(top.maintenance_enable, 0)
-            for _ in range(60000):
+            for _ in range(execution_steps):
                 await tick()
                 if ctx.get(receiver.state) == receiver.WAITING:
                     slot, txn = ctx.get(receiver.selector), ctx.get(receiver.transaction)
@@ -143,11 +159,19 @@ if __name__ == "__main__":
     parser.add_argument("--candidate", required=True, type=Path)
     parser.add_argument("--rtl", required=True, type=Path)
     parser.add_argument("--mode", choices=["system", "alice", "mallory"], required=True)
+    parser.add_argument("--rtl-manifest-sha", default=RTL_MANIFEST_SHA)
+    parser.add_argument("--execution-steps", type=int, default=60000)
+    parser.add_argument("--report-name", default=None,
+                        help="Separate .json filename; historical reports are never overwritten")
     args = parser.parse_args()
     directory = args.candidate.resolve()
-    output = directory / f"{args.mode}-replay.json"
+    report_name = args.report_name or f"{args.mode}-replay.json"
+    if Path(report_name).name != report_name or not report_name.endswith(".json"):
+        raise ValueError("Report name must be a simple .json filename")
+    output = directory / report_name
     if output.exists():
         raise ValueError("Refusing to overwrite retained evidence")
-    result = replay(directory, args.rtl.resolve(), args.mode)
+    result = replay(directory, args.rtl.resolve(), args.mode, args.rtl_manifest_sha,
+                    args.execution_steps)
     output.write_text(json.dumps(result, indent=2)+"\n")
     print(json.dumps({k: v for k, v in result.items() if k != "trace"}))

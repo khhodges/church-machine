@@ -36,7 +36,7 @@ def verified_inputs(source=SOURCE):
     return manifest
 
 
-def prepare(source=SOURCE):
+def prepare(source=SOURCE, *, receiver_base=None, correct_system_gt=False, system_loads=False):
     from hardware.integrity32 import integrity32
     from server.design_simulation import api_only
     from server.namespace_binding_report import binding_report
@@ -58,6 +58,17 @@ def prepare(source=SOURCE):
         raise ValueError(f"Exact selected binding blocked: {blocked}")
     original = (source / "boot2.bin").read_bytes()
     memory = list(struct.unpack("<16384I", original))
+    if receiver_base is not None:
+        if (type(receiver_base) is not int or receiver_base % 4 or
+                not 0x40000000 <= receiver_base <= 0x7fffffe4):
+            raise ValueError("Invalid receiver MMIO window")
+        for slot in range(1, 64):
+            location, authority = memory[slot*4:slot*4+2]
+            if location >> 30 == 1:
+                end = location + ((authority & 0x1fffff) + 1) * 4
+                if receiver_base < end and location < receiver_base + 28:
+                    raise ValueError(f"Receiver overlaps existing device slot {slot}")
+    mmio_base = 0x4000001c if receiver_base is None else receiver_base
     # Preserve actual Namespace/three Thread structures and device selections.
     # Replace the old startup wrapper only in this isolated image.
     memory[1024:] = [0] * (16384 - 1024)
@@ -84,9 +95,10 @@ def prepare(source=SOURCE):
     descriptor(21, base, len(amoeba))
     table = allocate(64, "private target table")
     descriptor(22, table, 64)
-    descriptor(23, 0x4000001c, 7)
-    descriptor(24, 0x40000028, 3)
+    descriptor(23, mmio_base, 7)
+    descriptor(24, mmio_base + 12, 3)
     records = []
+    system_revision = None
     for grant_slot, item in enumerate(sorted(selected, key=lambda i: i["slot"]), 32):
         slot = item["slot"]
         localized = struct.pack(f">{len(item['boundWords'])}I", *item["boundWords"])
@@ -94,6 +106,11 @@ def prepare(source=SOURCE):
             raise ValueError("Localized hash mismatch")
         compact = api_only(localized)
         words = list(struct.unpack(f">{len(compact)//4}I", compact))
+        if system_loads and slot == 10:
+            from amoeba_system_candidate import compile_system_candidate
+            selection = next(r["selection"] for r in document["rows"] if r["slot"] == 10)
+            words, system_revision = compile_system_candidate(
+                (source / "private-lumps" / selection["filename"]).read_bytes(), words)
         target = allocate(len(words), item["name"])
         descriptor(slot, target, len(words), item["generation"])
         descriptor(grant_slot, target, len(words), item["generation"])
@@ -108,8 +125,10 @@ def prepare(source=SOURCE):
     staging_base = allocate(staging_words, "receiver staging") * 4
     validate_records(records, staging_base=staging_base, staging_words=staging_words)
     # Only declared relocation words change in the saved review LUMP.
+    system_gt = (0x02000002 | (((memory[2*4+1] >> 21) & 511) << 16)
+                 if correct_system_gt else 0x03000002)
     amoeba[-6:] = [0x4a000015, 0x1a000016, 0x12000017,
-                   0x22000018, 0x0200000b, 0x03000002]
+                   0x22000018, 0x0200000b, system_gt]
     memory[base:base+len(amoeba)] = amoeba
     # Count actual occupied slots, excluding metadata and Namespace self.
     memory[2] = sum(any(memory[s*4:s*4+4]) for s in range(2, 64))
@@ -128,7 +147,7 @@ def prepare(source=SOURCE):
             raise ValueError("Selected USER Thread has invalid continuation geometry")
         image[user_base+frame] = (frame | 0x1000) | ((amoeba[3]-1) << 13)
         image[user_base+245] = 0x4a000000 | actor
-        image[user_base+255] = 0x03000002
+        image[user_base+255] = system_gt
         images[mode] = struct.pack("<16384I", *image)
     evidence = dict(originalSha256=sha(original), amoebaSha256=AMOEBA_SHA,
         inputs=manifest["files"], ranges=ranges, records=records,
@@ -137,18 +156,26 @@ def prepare(source=SOURCE):
         hardwareOperations=False, instructionTranslation=False,
         initiallyResidentExecutableSlots=[21],
         scope="SYSTEM startup and independent single-USER probes; not simultaneous USER scheduling",
-        knownMappingConflict="Boot2 UART_DEV/BTN_DEV/TIMER_DEV overlap local Amoeba receiver/control MMIO")
+        receiverBase=mmio_base, correctedSystemGT=correct_system_gt,
+        systemRevision=system_revision,
+        knownMappingConflict=("Boot2 UART_DEV/BTN_DEV/TIMER_DEV overlap local Amoeba receiver/control MMIO"
+                              if receiver_base is None else None))
     return images, evidence
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--output", required=True, type=Path)
+    p.add_argument("--receiver-base", type=lambda value: int(value, 0))
+    p.add_argument("--correct-system-gt", action="store_true")
+    p.add_argument("--system-loads", action="store_true")
     args = p.parse_args()
     out = args.output.resolve()
     if out.exists() or not out.is_relative_to(ROOT / "generated-artifacts"):
         raise ValueError("Use a fresh generated-artifacts directory")
-    images, evidence = prepare()
+    images, evidence = prepare(receiver_base=args.receiver_base,
+                               correct_system_gt=args.correct_system_gt,
+                               system_loads=args.system_loads)
     out.mkdir()
     for mode, raw in images.items():
         (out / f"{mode}.bin").write_bytes(raw)

@@ -49,3 +49,14 @@ and publishing received bodies. Distinguish bounded one-USER/fixed-allocation
 evidence from general scheduling, retirement/GC and exact Boot2 acceptance.
 Saving the portable review artifact is not provisioning its private grants
 or proof that installed hardware implements its interface.
+
+SYSTEM must dispatch Lazy requests at its actual restored continuation,
+including when a different SYSTEM LUMP performed the USER CHANGE.
+
+**Why:** The real startup trial reached repeated USER Lazy handoffs but issued
+no deliveries: SYSTEM resumed inside its calling LUMP, not Amoeba's main loop.
+Resident Amoeba alone does not make hardware invoke its service.
+
+**How to apply:** Preserve the pending-instruction handoff ABI and explicitly
+route pending requests from each SYSTEM yield continuation to Amoeba. Do not
+replace this with preloaded USER bodies or automatic SYSTEM absent-CALL repair.

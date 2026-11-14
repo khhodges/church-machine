@@ -74,6 +74,57 @@ def test_changed_saved_review_is_rejected(tmp_path, monkeypatch):
         prep.verified_inputs()
 
 
+def test_relocated_receiver_preserves_devices_and_saved_code(prepared):
+    images, receipt = prep.prepare(receiver_base=0x40000100)
+    original = struct.unpack("<16384I", (prep.SOURCE / "boot2.bin").read_bytes())
+    assert receipt["knownMappingConflict"] is None
+    assert receipt["receiverBase"] == 0x40000100
+    for mode, raw in images.items():
+        words = struct.unpack("<16384I", raw)
+        previous = struct.unpack("<16384I", prepared[0][mode])
+        assert {i for i, (a, b) in enumerate(zip(words, previous)) if a != b} == {92, 94, 96, 98}
+        for slot in (3, 4, 5, 8, 13):
+            assert words[slot*4:slot*4+4] == original[slot*4:slot*4+4]
+
+
+@pytest.mark.parametrize("base", [0x4000001c, 0x40000028, 0x4000002c, 0x40000101, 0x80000000])
+def test_conflicting_or_invalid_receiver_map_rejected(base):
+    with pytest.raises(ValueError, match="overlaps|Invalid"):
+        prep.prepare(receiver_base=base)
+
+
+def test_private_system_grants_match_retained_descriptor_generation():
+    images, receipt = prep.prepare(receiver_base=0x40000100, correct_system_gt=True)
+    assert receipt["correctedSystemGT"]
+    for mode, raw in images.items():
+        words = struct.unpack("<16384I", raw)
+        expected = (words[9] >> 21) & 511
+        user = 768 if mode == "mallory" else 512
+        assert (words[user+255] >> 16) & 511 == expected
+        assert (words[1024+2047] >> 16) & 511 == expected
+        assert words[user+255] == words[1024+2047]
+
+
+def test_system_revision_loads_dependencies_before_original_checks(prepared):
+    images, receipt = prep.prepare(receiver_base=0x40000100,
+                                  correct_system_gt=True, system_loads=True)
+    revision = receipt["systemRevision"]
+    assert revision and "IADD DR1, DR0, #6" in revision["source"]
+    assert "IADD DR1, DR0, #7" in revision["source"]
+    source = revision["source"]
+    assert source.index("CALL CR2, #1") < source.index("LOAD CR0, CR6, #1")
+    assert "ISUB DR8, DR0, #1\nCHANGE CR6, #8\nBRANCHNE Start" in source
+    assert "IADD DR1, DR5, #0\nLOAD CR2, CR6, #13\nCALL CR2, #1" in source
+    old = {r["slot"]: r for r in prepared[1]["records"]}
+    for record in receipt["records"]:
+        if record["slot"] != 10:
+            assert record["words"] == old[record["slot"]]["words"]
+        else:
+            assert record["words"][-1] == 0x4a000015
+            assert record["words"][-14:-1] == old[10]["words"][-13:]
+            assert record["words"] != old[10]["words"]
+
+
 def test_self_consistent_replaced_boot2_manifest_is_rejected(tmp_path):
     (tmp_path / "boot2.bin").write_bytes(b"different image")
     (tmp_path / "manifest.json").write_text(json.dumps({

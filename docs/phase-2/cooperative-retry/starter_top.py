@@ -31,7 +31,10 @@ class StarterTop(Elaboratable):
     def __init__(self, *, clock_hz=25_000_000, baud=57600, sim_mode=False,
                   lump_records=None, caller_records=None, general_image=False,
                    boot_guard=None, amoeba_records=None, staging_base=0xa000,
-                   staging_words=1024):
+                   staging_words=1024, amoeba_mmio_base=0x4000001c):
+        if (type(amoeba_mmio_base) is not int or amoeba_mmio_base % 4 or
+                not 0x40000000 <= amoeba_mmio_base <= 0x7fffffe4):
+            raise ValueError("Invalid Amoeba MMIO window")
         if amoeba_records is not None and (not general_image or lump_records is not None):
             raise ValueError("Amoeba requires general-image mode without legacy CLP1")
         if general_image and lump_records is not None:
@@ -58,6 +61,7 @@ class StarterTop(Elaboratable):
         self.lump_receiver = None
         self.observer = None
         self.amoeba_mode = amoeba_records is not None
+        self.amoeba_mmio_base = amoeba_mmio_base
         self.staging_base = staging_base if self.amoeba_mode else 0xa000
         if self.amoeba_mode:
             from .amoeba_receiver import AmoebaReceiver
@@ -210,20 +214,21 @@ class StarterTop(Elaboratable):
         mmio = core.dmem_addr[30] & ~core.dmem_addr[31]
         read_mmio = core.dmem_rd_en & mmio & ~ctl.execution_reset
         mmio_data = Signal(32)
+        receiver_base = self.amoeba_mmio_base if self.amoeba_mode else 0x4000001c
         with m.Switch(core.dmem_addr):
-            with m.Case(0x4000001C):
+            with m.Case(receiver_base):
                 m.d.comb += mmio_data.eq(lump.word if lump is not None else diag.data)
-            with m.Case(0x40000020):
+            with m.Case(receiver_base + 4):
                 m.d.comb += mmio_data.eq(lump.state if lump is not None else diag.status)
             if lump is not None:
-                with m.Case(0x40000024):
+                with m.Case(receiver_base + 8):
                     m.d.comb += mmio_data.eq(lump.selector)
-                with m.Case(0x40000028):
+                with m.Case(receiver_base + 12):
                     m.d.comb += mmio_data.eq(lump.transaction)
                 if self.amoeba_mode:
-                    with m.Case(0x4000002c):
+                    with m.Case(receiver_base + 16):
                         m.d.comb += mmio_data.eq(lump.size)
-                    with m.Case(0x40000034):
+                    with m.Case(receiver_base + 24):
                         m.d.comb += mmio_data.eq(lump.expected_header)
         mmio_valid, ram_valid = Signal(), Signal()
         mmio_latched = Signal(32)
@@ -262,10 +267,10 @@ class StarterTop(Elaboratable):
                 lump.memory_ready.eq(ctl.program_write_allowed & ~cpu_write &
                                      ~core.sim_watchdog.block_program_writes),
                 staging_write.eq(lump.memory_write & lump.memory_ready),
-                lump.pop.eq(read_mmio & (core.dmem_addr == 0x4000001C)),
+                lump.pop.eq(read_mmio & (core.dmem_addr == receiver_base)),
                 lump.commit.eq(core.dmem_wr_en & ctl.program_write_allowed &
                     ~core.sim_watchdog.block_program_writes &
-                    (core.dmem_addr == 0x40000028) &
+                    (core.dmem_addr == receiver_base + 12) &
                     (Const(1) if self.amoeba_mode else
                      (core.dmem_wr_data == lump.transaction))),
             ]
@@ -274,7 +279,7 @@ class StarterTop(Elaboratable):
                     lump.commit_transaction.eq(core.dmem_wr_data),
                     lump.request.eq(core.dmem_wr_en & ctl.program_write_allowed &
                         ~core.sim_watchdog.block_program_writes &
-                        (core.dmem_addr == 0x40000030)),
+                        (core.dmem_addr == receiver_base + 20)),
                     lump.request_slot.eq(core.dmem_wr_data),
                 ]
         m.d.comb += [
