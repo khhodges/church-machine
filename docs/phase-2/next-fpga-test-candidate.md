@@ -135,7 +135,10 @@ targets Boot.Services. Amoeba calls local SecurityRegulator for the privileged
 operation; raw M remains exclusive to SecurityRegulator.
 
 Here n is a C-list row, not a Namespace slot number. The numeric row and exact
-bindings are not yet frozen. Physical instruction sharing versus copied bodies
+bindings are not yet frozen. The GT at that fixed row may reference different
+local Namespace slot numbers in the two bindings; identical instruction code
+does not require identical Namespace slot layouts.
+Physical instruction sharing versus copied bodies
 is separate: identical instructions do not establish that a single physical
 bound C-list works in both contexts. This records the design, not an applied
 Namespace change or qualified native implementation.

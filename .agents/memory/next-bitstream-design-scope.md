@@ -83,9 +83,11 @@ implementation, vendor-build and physical-operation authorization.
 Amoeba encapsulates Namespace switching: identical instruction code uses the
 same CR6[n] C-list row for the peer Namespace GT in each local binding.
 Boot-side binding targets the application; application-side binding targets Boot.
+The GTs in that row need not reference the same local Namespace slot number.
 
 **Why:** The user proposed a SWITCH method in Amoeba to limit Namespace exposure,
-then specified the same CR6[n] row with identical code.
+then specified the same CR6[n] row with identical code and explicitly distinguished
+that fixed C-list row from potentially different Namespace slots.
 
 **How to apply:** Keep the peer GT private to Amoeba, not an AppSystem argument.
 Amoeba invokes local SecurityRegulator for the M-requiring operation; it receives
