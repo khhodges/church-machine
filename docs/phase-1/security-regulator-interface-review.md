@@ -143,6 +143,9 @@ specific caller still needs to be named.
 - **Why a separate method?** Constructing a fresh token from a slot would discard
   the source's identity evidence and could incorrectly refresh a stale reference.
   Mint must resolve the living object and arrange its local binding separately.
+- **Lazy Load boundary:** Lazy Load belongs to the original request, not SR.
+  The proposed MakeInformM register interface does not authorize an implicit
+  fetch/load. Missing-binding behavior remains a separate review question.
 - **Evidence:** [source-required conversion contract](01-isa/instruction-set.md#a8-inform--outform-conversion--source-gt-required);
   [Mint resolution/binding coverage](01-isa/instruction-set.md#a91-service-operation-coverage).
 - **Usage still to specify:** The concrete Mint workflow/call site and the

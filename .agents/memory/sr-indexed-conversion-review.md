@@ -35,3 +35,12 @@ returns DR1=0. HardFault has no rollback guarantee under this decision.
 **How to apply:** Verify rejection paths do not modify the selected GT; keep
 that guarantee separate from architectural HardFault handling and from the
 still-unverified caller-register access mechanism.
+
+Lazy Load belongs to the original request, not SR's MakeInformM conversion.
+
+**Why:** The user clarified ownership when the conversion-interface question
+appeared to imply that SR would initiate Lazy Load.
+
+**How to apply:** Keep register selection and mechanical conversion separate
+from loading. Do not introduce an implicit SR fetch or infer an agreed
+missing-binding status/HardFault outcome from this ownership clarification.

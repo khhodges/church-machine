@@ -2313,6 +2313,13 @@ storage, resurrect an object or prove that a destination binding is ready.
 Mint's preservation/resolution and binding responsibilities remain distinct
 from the regulator's mechanical conversion.
 
+**Lazy Load ownership clarification:** Lazy Load belongs to the original
+request, not to SecurityRegulator's conversion method. The MakeInformM
+register-interface proposal does not authorize SR to initiate Lazy Load.
+Do not interpret conversion as an implicit fetch/load request. Behavior when
+the required local binding is unavailable remains to be specified under the
+common status/HardFault policy.
+
 **Review closure:** exact source-form validation, output identity/permission
 mapping, destination Namespace and binding rules where applicable, invalid
 source/fault behavior, M lifecycle, MakeInformM register assignments and
