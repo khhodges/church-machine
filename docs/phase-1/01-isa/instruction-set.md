@@ -2064,11 +2064,12 @@ fault-recovery sequence.
 **Review closure — software continuation:** a CALL into SecurityRegulator
 followed by SWITCH saves a continuation inside the regulator, not automatically
 the caller's post-CALL continuation. Specify that saved frame and how a later
-reactivation completes the method. Define which outgoing Thread performs the
-handoff and the wrapper's M setup. Do not add an ordinary RETURN after SWITCH
+reactivation completes the method. SWITCHM uses the SYSTEM Thread in slot 2,
+not an arbitrary USER Thread; the destination is likewise its Namespace's
+SYSTEM Thread in slot 2. Specify the wrapper's M setup. Do not add an ordinary RETURN after SWITCH
 and claim that it ran immediately in the original context.
 
-**Restoration prerequisite clarified:** The outgoing Thread can only be
+**Restoration prerequisite clarified:** The outgoing SYSTEM Thread in slot 2 can only be
 restored after another SWITCHM. This does not promise an automatic switch back
 or guaranteed restoration. Whether the restored method then executes RETURN
 to its caller remains a separate, unapproved continuation choice.

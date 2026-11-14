@@ -78,6 +78,10 @@ specific caller still needs to be named.
 
 - **User:** Amoeba in the mediated diagnostic; the final public caller/binding
   arrangement remains to be specified.
+- **Execution Thread:** SWITCHM always uses the SYSTEM Thread in slot 2.
+  It hands off to the destination Namespace's SYSTEM Thread in slot 2.
+  Restoration of the outgoing SYSTEM Thread requires another SWITCHM; do not
+  describe this as an arbitrary USER Thread switching or independently resuming.
 - **Reason:** Hand execution to another Namespace's fixed entry Thread while
   keeping the raw M-control grant private to SecurityRegulator.
 - **Why not ordinary CHANGE?** CHANGE changes Threads, not Namespace roots.
