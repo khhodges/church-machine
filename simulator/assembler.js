@@ -2477,9 +2477,13 @@ class ChurchAssembler {
                     crSrc = this._parseCR(parts[1], lineNum);
                     this._checkPrivCR(crSrc, 'Namespace SWITCH source', lineNum);
                     imm = this._parseImm(parts[2], lineNum);
-                    if (!Number.isInteger(imm) || imm < 0 || imm > 0x7fff) {
+                    if (!Number.isInteger(imm) || imm < 0 || imm > 1023) {
                         this.errors.push({ line: lineNum, message:
-                            'Candidate Namespace SWITCH row must be 0–32767 without truncation.' });
+                            'Candidate Namespace SWITCH literal row must be 0–1023 without truncation.' });
+                    } else {
+                        // Existing compact ISA: DR0 + ten-bit magnitude.
+                        // A raw literal in bits 3:0 would select a data register.
+                        imm <<= 4;
                     }
                     break;
                 }

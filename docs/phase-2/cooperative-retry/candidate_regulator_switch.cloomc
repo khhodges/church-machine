@@ -1,0 +1,30 @@
+; Isolated SWITCH mechanism qualification, NOT a complete SecurityRegulator.
+; Audit intent must be acknowledged before any privileged effect.
+; Final invocation/audit identity and physical transport remain unqualified.
+; Row 2: the one locally bound next-Namespace GT; no volatile argument storage.
+; The configured M-control device grant is private to this executable.
+abstraction candidate.SecurityRegulator {
+    capabilities {
+        SELF E, candidate.MBits W, candidate.NextNamespace, candidate.Audit RW
+    }
+    method SwitchM() {
+        LOAD CR8, CR6, #3
+        IADD DR7, DR0, #1
+        DWRITE DR7, CR8, #0
+    AwaitAudit:
+        DREAD DR7, CR8, #1
+        ISUB DR8, DR7, #2
+        BRANCHEQ AuditDelivered
+        ISUB DR8, DR7, #1
+        BRANCHEQ AwaitAudit
+        HARDFAULT "Home IDE audit delivery failed"
+    AuditDelivered:
+        LOAD CR9, CR6, #1
+        IADD DR7, DR0, #1
+        SHL DR7, DR7, #15
+        IADD DR7, DR7, #64
+        DWRITE DR7, CR9, #0
+        SWITCH CR6, #2
+        RETURN
+    }
+}

@@ -20,14 +20,15 @@ from .candidate_service import CandidateService
 
 class CandidateCoreBridge(Elaboratable):
     """Connect a one-cycle checked fabric to a trusted, reset-held core."""
-    def __init__(self, memory, binding, service=None):
+    def __init__(self, memory, binding, service=None, *, m_control_recipients=None):
         if binding.memory_bytes != ALLOCATION_BYTES:
             raise ValueError("Candidate requires explicit 128 KiB Boot binding")
         self.memory, self.binding = memory, binding
         self.service = service
         self.core = ChurchCore(expected_boot_guard=binding.boot_guard,
                               fault_boot_binding=binding,
-                              checked_memory=True, memory_bytes=ALLOCATION_BYTES)
+                              checked_memory=True, memory_bytes=ALLOCATION_BYTES,
+                              m_control_recipients=m_control_recipients)
         self.held = Signal(init=1)
         self.protocol_error = Signal()
         self.unsupported_mmio = Signal()
@@ -85,6 +86,7 @@ class CandidateCoreBridge(Elaboratable):
                                self.memory.cpu_enabled & ~self.memory.maintenance),
                 svc.namespace.eq(Cat(*core.debug_cr_words[15][:3])),
                 svc.thread.eq(core.debug_cr_words[12][0]),
+                svc.execution.eq(core.debug_cr_words[14][0]),
                 p.address.eq(core.dmem_addr), p.wdata.eq(core.device_write_data),
                 p.read.eq(mmio & core.dmem_rd_en),
                 p.write.eq(mmio & core.dmem_wr_en & core.device_write_request),

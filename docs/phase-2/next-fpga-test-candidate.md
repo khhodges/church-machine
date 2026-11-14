@@ -125,6 +125,13 @@ remain unselected/unqualified. Invocation grants and private local M-control
 binding remain separate from entry presence.
 Do not grant raw M to AppSystem or Amoeba.
 
+**Audit delivery decision:** SecurityRegulator must receive acknowledgement
+of the current audit intent from the Home IDE before the privileged operation.
+Delivery rejection or a missing acknowledgement within the bounded wait causes
+a Hard Fault. A stale receipt cannot authorize a new operation; local
+queue-and-proceed behavior is not approved. Intent acknowledgement is not
+evidence that execution succeeded.
+
 ## Resident replication — current decision
 
 Replicate resident LUMPs rather than share their physical bodies across

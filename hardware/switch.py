@@ -22,6 +22,7 @@ class ChurchSwitch(Elaboratable):
         self.target = Signal(4)  # required-zero encoding, NOT a CR selector
         self.index = Signal(32)
         self.target_m = Signal()  # CR15.M at acceptance
+        self.cr6_m = Signal()  # existing CR6.M permits reading its E-only C-list
         self.switch_busy = Signal()
         self.switch_complete = Signal()
         self.switch_fault = Signal()
@@ -53,6 +54,17 @@ class ChurchSwitch(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
+        accepted_source = Signal(CAP_REG_LAYOUT)
+        accepted_view = View(CAP_REG_LAYOUT, accepted_source)
+        m.d.comb += accepted_source.eq(self.cr_rd_data)
+        # A read-side view only: never rewrite the architectural E identity.
+        # Other source registers still require an actual L capability.
+        with m.If((self.cr_src == 6) & self.cr6_m &
+                  (accepted_view.word0_gt.gt_type == 1)):
+            m.d.comb += [
+                accepted_view.word0_gt.dom.eq(1),
+                accepted_view.word0_gt.perm.eq(1),
+            ]
         m.submodules.load = load = ChurchMLoad(enable_seal_check=True,
             resident_word_locations=self.resident_word_locations,
             capacity_words=self.capacity_words)
@@ -94,7 +106,7 @@ class ChurchSwitch(Elaboratable):
                 m.d.comb += self.cr_rd_addr.eq(self.cr_src)
                 with m.If(self.switch_start):
                     m.d.sync += [
-                        src.eq(self.cr_rd_data), namespace.eq(self.cr15_namespace),
+                        src.eq(accepted_source), namespace.eq(self.cr15_namespace),
                         row.eq(self.index), armed.eq(0), code.eq(0),
                         self.accepted_nia.eq(self.nia_current),
                         self.accepted_flags.eq(self.flags_in),

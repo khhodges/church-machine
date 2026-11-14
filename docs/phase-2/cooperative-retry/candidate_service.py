@@ -4,6 +4,8 @@ Word offsets: 0 pop, 1 state, 2 target GT, 3 transaction/commit,
 4 size, 5 request (write 1), 6 expected header, 7..9 origin Namespace,
 10 origin Thread, 11 target GT. Origin fields are software handoff evidence,
 not authority. Only exact provisioned records can be selected.
+When explicitly configured, offsets 12..14 expose audit submit, status and
+sequence. The audit device is a separate private regulator capability.
 """
 from amaranth import Cat, Elaboratable, Module, Mux, Signal
 from .candidate_memory import Port
@@ -12,12 +14,14 @@ BASE = 0x40000100
 
 
 class CandidateService(Elaboratable):
-    def __init__(self, delivery):
+    def __init__(self, delivery, *, audit=None):
         self.delivery = delivery
+        self.audit = audit
         self.bus = Port("service")
         self.enabled = Signal()
         self.namespace = Signal(96)
         self.thread = Signal(32)
+        self.execution = Signal(32)
 
     def elaborate(self, platform):
         m = Module()
@@ -31,6 +35,13 @@ class CandidateService(Elaboratable):
         locked = (rx.state == rx.READY) | (rx.state == rx.COPYING)
         read_ok, write_ok, data = Signal(), Signal(), Signal(32)
         request = Signal()
+        if self.audit is not None:
+            m.submodules.audit = audit = self.audit
+            m.d.comb += [
+                audit.enabled.eq(self.enabled),
+                audit.namespace.eq(self.namespace), audit.thread.eq(self.thread),
+                audit.execution.eq(self.execution),
+                audit.start.eq(p.ready & ~p.error & p.write & (p.address == BASE + 48))]
         m.d.comb += [
             d.request_namespace.eq(Cat(*fields[:3])),
             d.request_thread.eq(fields[3]), d.request_target.eq(fields[4]),
@@ -46,6 +57,14 @@ class CandidateService(Elaboratable):
             rx.commit_transaction.eq(p.wdata),
         ]
         with m.Switch(p.address):
+            if self.audit is not None:
+                with m.Case(BASE + 48):
+                    m.d.comb += write_ok.eq((p.wdata == 1) &
+                        ((audit.state == audit.IDLE) | (audit.state == audit.ACKED)))
+                with m.Case(BASE + 52):
+                    m.d.comb += [read_ok.eq(1), data.eq(audit.state)]
+                with m.Case(BASE + 56):
+                    m.d.comb += [read_ok.eq(1), data.eq(audit.sequence)]
             with m.Case(BASE):
                 m.d.comb += [read_ok.eq(locked & (rx.consumed < rx.size)),
                              data.eq(rx.word)]

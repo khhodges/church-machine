@@ -5,6 +5,18 @@ description: Namespace runtime authority decisions and discriminating handoff ev
 
 ## Hard-fault containment and ordinary activation evidence
 
+Native handoff qualification must exercise nonzero C-list rows as well as
+distinct Namespace generations and local executable bodies.
+
+**Why:** A zero-row probe concealed a compiler/RTL index-encoding disagreement;
+a copied historical nonzero SYSTEM generation also conflicted with an ordinary
+Namespace entry's fixed expected generation. Neither warrants an ISA change.
+
+**How to apply:** Verify exact compiler words against the current operand
+contract before changing RTL decoding. Configure the new image's reset guard
+explicitly, retain historical images, and test CR6's actual E-only identity
+with its separate M-enabled read permission rather than inventing RX authority.
+
 Handoff errors, including interrupted context-save/restore errors, take the
 existing hard-fault path. Do not require a new recovery/rollback/retry policy.
 

@@ -63,7 +63,8 @@ class ChurchCore(Elaboratable):
 
     def __init__(self, iot_profile=False, *, expected_boot_guard=None,
                  monitor_clear_enabled=False, fault_boot_binding=None,
-                 checked_memory=False, memory_bytes=65536):
+                 checked_memory=False, memory_bytes=65536,
+                 m_control_recipients=None):
         if memory_bytes not in (65536, 131072):
             raise ValueError("Unsupported core memory aperture")
         if checked_memory and (iot_profile or fault_boot_binding is None):
@@ -72,6 +73,15 @@ class ChurchCore(Elaboratable):
             raise ValueError("Fault Boot binding memory aperture mismatch")
         self.checked_memory = checked_memory
         self.memory_bytes = memory_bytes
+        self.m_control_recipients = (
+            None if m_control_recipients is None else tuple(m_control_recipients))
+        if self.m_control_recipients is not None:
+            from .configured_m_control import MControlRecipient
+            if (not checked_memory or fault_boot_binding is None
+                    or any(not isinstance(r, MControlRecipient) for r in self.m_control_recipients)
+                    or any(r.image_sha256 != fault_boot_binding.image_sha256
+                           for r in self.m_control_recipients)):
+                raise ValueError("M-control recipients require the exact trusted candidate image")
         # Request-local physical RAM rejection, driven only by the checked
         # wrapper. Recovery writes use their existing grant/valid interface.
         self.memory_reject = Signal()
@@ -1824,13 +1834,17 @@ class ChurchCore(Elaboratable):
         namespace_exec_gt = View(
             GT_LAYOUT, View(CAP_REG_LAYOUT, u_regs.cr14_code).word0_gt)
         namespace_exec_authorized = Signal()
-        m.d.comb += namespace_exec_authorized.eq(
-            (namespace_exec_gt.gt_type == GT_TYPE_INFORM) &
-            (namespace_exec_gt.slot_id == NAMESPACE_EXEC_SLOT) &
-            ~namespace_exec_gt.dom &
-            (namespace_exec_gt.perm == 0b101) &
-            ~namespace_exec_gt.b_flag
-        )
+        if self.m_control_recipients is None:
+            m.d.comb += namespace_exec_authorized.eq(
+                (namespace_exec_gt.gt_type == GT_TYPE_INFORM) &
+                (namespace_exec_gt.slot_id == NAMESPACE_EXEC_SLOT) &
+                ~namespace_exec_gt.dom &
+                (namespace_exec_gt.perm == 0b101) &
+                ~namespace_exec_gt.b_flag)
+        else:
+            from .configured_m_control import recipient_matches
+            m.d.comb += namespace_exec_authorized.eq(recipient_matches(
+                u_regs.cr15_namespace, u_regs.cr14_code, self.m_control_recipients))
         m.d.comb += u_dread.namespace_authorized.eq(namespace_exec_authorized)
         m.d.comb += dwrite_start_sig.eq(
             cond_exec_enable & is_dwrite_op & ~any_unit_busy
@@ -2303,6 +2317,7 @@ class ChurchCore(Elaboratable):
                 # Required-zero CRd never indexes M: the fixed destination
                 # is CR15, sharing its authorization with incoming CR12.
                 u_switch.target_m.eq(u_regs.isolated_m_flags[3]),
+                u_switch.cr6_m.eq(u_regs.m_bit_device_state[CR_CLIST]),
                 u_switch.nia_current.eq(nia_reg),
                 u_switch.flags_in.eq(u_regs.flags),
                 u_switch.handoff_done.eq(u_change.change_complete),
