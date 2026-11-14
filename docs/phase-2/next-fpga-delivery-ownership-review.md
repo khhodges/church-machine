@@ -1,4 +1,20 @@
-# Candidate delivery: verified staging and pending ownership decision
+# Candidate delivery: single-transfer decision recorded
+
+The user selected one LUMP transfer at a time. This does not serialize all
+Thread execution or require unloading either resident Namespace.
+
+The isolated ownership latch now retains Namespace, requesting Thread and
+target identity through completion/cancellation. Four local tests pass:
+matching completion, owner fault, disable and image-epoch change. Each also
+checks that changing live request inputs cannot redirect the active request,
+an unrelated Namespace's fault does not cancel it, and stale completion cannot
+release its successor. Transaction numbers are not reused on same-epoch
+cancellation.
+
+This latch is not yet wired into the receiver/native service path. In
+particular, trusted record selection, serial transaction numbering and
+publication authorization must be connected consistently before this is
+end-to-end delivery evidence. It creates neither a queue nor a capability.
 
 ## Implemented locally
 
@@ -20,13 +36,13 @@ existing receiver checks also passed against these modules' legacy defaults.
 
 This is not native publication or a complete only-Amoeba image.
 
-## Consequential interface to settle
+## Service interface to connect
 
 The retained CLA1 receiver selects records by slot alone and requires unique
 slots across its table. Two resident Namespaces can legitimately use the same
 slot. Increasing RAM bounds does not fix that ownership ambiguity.
 
-Proposed bounded service contract, pending review:
+Bounded service contract guiding integration:
 
 1. One active serial transfer at a time. Other Lazy requests remain pending in
    the native scheduler; no concurrent reuse of the staging bank.
@@ -45,7 +61,7 @@ Proposed bounded service contract, pending review:
    destination grants and publishes header last; normal CALL admission remains
    authoritative afterward.
 
-After this decision, implement the qualified request/record interface, connect
+Next implement the qualified request/record interface, connect
 service MMIO and serial routing, and construct the exact only-Amoeba image.
 Do not reuse CLA1's slot-only meaning for two Namespaces or preload dependencies
 to make the candidate appear ready. No synthesis or physical operations.

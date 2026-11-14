@@ -129,6 +129,16 @@ The user subsequently authorized isolated maintained-core/trusted-Boot
 integration, including BOUNDS for otherwise-admitted misaligned/out-of-range
 ordinary RAM accesses, truthful acceptance, and retained Boot continuation.
 
+The user selected **one LUMP transfer at a time** for this first bitstream.
+This serializes delivery, not Namespace residency or runnable Thread execution.
+
+**Why:** The user chose the simpler first-bitstream path after clarification
+that both Namespaces remain resident and runnable Threads can still take turns.
+
+**How to apply:** Do not implement concurrent staging transfers for this
+candidate. Retain each request's originating identity across Namespace switches;
+a slot number alone is not a globally unique destination.
+
 Keep the next work focused on the shortest path to this candidate bitstream:
 candidate-specific checks and exact build preparation, not unrelated legacy
 test cleanup or additional side projects. Stop before synthesis for approval.
