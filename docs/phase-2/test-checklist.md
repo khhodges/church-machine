@@ -102,7 +102,7 @@ delivery, disable the watchdog or bypass admission because a contract is open.
 | F.24 | Explicit retirement only; next eligible allocation skips reserved/retained slots, respects 1,000 total slots and never silently expands or evicts. | Later, G5 exhaustion |
 | F.25 | Exclude old setup bytes/work across FPGA, bridge and IDE before new session; failure to prove boundary cannot report setup success. Disconnect alone preserves session. | G2 |
 | F.26 | Reset one USER queued and then in-flight; increment only its version through software, invalidate its old association, preserve other USER/session/counter state. Valid returned object admission remains separate. | G4 |
-| F.27 | Last valid Thread version succeeds; increment beyond maximum HardFaults without wrap, new runnable context or automatic slot replacement. | G4 |
+| F.27 | Last valid Thread version succeeds with DR1=0; increment at maximum returns DR1=1 with version unchanged, no wrap, new runnable context or automatic slot replacement. | G4 |
 | F.28 | SYSTEM unavailable dependency HardFaults with ABSENT_OUTFORM 0x11, no loading trap/request/recursive entry; invalid authority keeps applicable reason. | Agreed |
 | F.29 | SYSTEM exits through ordinary CHANGE using selected USER's full permissionless GT; restore original CALL/context; stale GT/context HardFaults. | Agreed |
 | F.30 | Reuse normal protected USER save with original registers/flags/operands, no duplicate context bank or callee frame; failed save cannot enter SYSTEM partially. | Agreed |

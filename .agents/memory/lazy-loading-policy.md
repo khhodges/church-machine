@@ -510,17 +510,19 @@ never rewrite it to match the new version. Separate valid target admission/GC
 from stale-requester eligibility. Preserve other Thread and target versions,
 session and request counter. Exact authorized reset/GT provisioning sequence,
 stale-owner completion behavior remain open. For Phase 2, version exhaustion
-hard-faults instead of wrapping, as specified below.
+returns DR1=1 without wrapping, as specified below.
 
 Phase 2 Thread reset never wraps the Thread version; incrementing beyond the
-existing field maximum hard-faults.
+existing field maximum returns DR1=1 with the version unchanged. Successful
+IncrementVersion returns DR1=0. Other HardFaults retain the ISA fault path.
 
-**Why:** The user chose no-wrap/HardFault for this phase rather than extending
-the design with version-reuse or recovery mechanisms.
+**Why:** The user replaced the earlier exhaustion-HardFault requirement with
+returned status 1 at maximum, retaining no-wrap and no automatic recovery.
 
 **How to apply:** Do not publish a wrapped version or release the reset context
 when increment is impossible. Keep hardware comparison-only; no automatic
-slot replacement or version recycling. Exact diagnostic code remains open.
+slot replacement or version recycling. This does not approve the proposed
+DR1 caller-register selector input or select a returned new-version GT.
 
 Keep the ongoing Phase 2 review to FPGA rules and microcode/software interface
 contracts, not SYSTEM or IDE software orchestration.

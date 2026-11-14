@@ -534,8 +534,11 @@ The reset implementation must also provide the new context's legitimate
 Thread GT through the authorized path; existing old-version holders are not
 silently upgraded. **Phase 2 exhaustion rule:** never wrap the Thread version.
 If incrementing on reset would exceed the existing version field's maximum,
-hard-fault rather than publish a wrapped version or make the reset context
-runnable. No automatic slot replacement, version recycling or recovery
+IncrementVersion returns DR1=1 and leaves the version unchanged rather than
+publishing a wrapped version or making the reset context runnable. Success
+returns DR1=0. This supersedes the earlier exhaustion-HardFault rule for this
+condition only; other HardFaults retain the ISA fault path.
+No automatic slot replacement, version recycling or recovery
 mechanism is introduced. Exact version-update ordering, provisioning of the
 new GT, exhaustion diagnostic and stale-owner completion disposition remain open.
 This rule does not change another Thread's version, the target LUMP's version,
@@ -544,7 +547,7 @@ the shared session ID or the request counter, and does not authorize FPGA edits.
 **Requested software companion:** the B-bit SecurityRegulator must include a
 GT-version increment method for this authorized operation. Its Thread-reset use
 must affect the authoritative Namespace-entry version so old GTs become stale,
-not merely change a copied token. Apply the Phase 2 no-wrap/HardFault rule.
+not merely change a copied token. Apply the Phase 2 no-wrap/DR1=1 exhaustion rule.
 The approved method name is **IncrementVersion**. Register ABI and new-GT
 result semantics remain open in the
 [SecurityRegulator operation review](phase-1/security-regulator-operation-review.md).
@@ -1240,8 +1243,8 @@ is not execution acceptance.
 | F.26 | USER-reset version and LLR invalidation | Reset one USER with an LLR queued, then in a separate case with an LLR already sent. Authorized software increments that Thread's Namespace-entry version before the reset context becomes eligible; hardware does not change it. Remove queued work or invalidate sent completion ownership. The retained old Thread GT fails normal version validation and cannot wake the reset context; never rewrite it to match. Treat a returned target under ordinary admission/slot/GT/GC rules, not an automatic reset-specific discard. The next LLR uses the reserved record with a new request number. Other USERs, target version, shared session and counter remain unchanged. |
 
 **F.27 — Thread reset version exhaustion:** exercise the largest valid version
-and an attempted reset increment beyond it. Require a hard fault with no
-wrapped version published and no reset-context release. An increment from the
+and an attempted reset increment beyond it. Require DR1=1 with the version
+unchanged, no wrapped version published and no reset-context release. An increment from the
 preceding version to the maximum remains valid subject to ordinary reset checks.
 No automatic slot replacement or recovery is expected.
 
@@ -1398,7 +1401,7 @@ The following are not settled by the design discussion:
   repaired. Returned-target admission follows ordinary slot/GT/GC rules, not
   reset-specific discard. Define precise update/provisioning ordering and
   exhaustion diagnostic. **Settled Phase 2 limit:** no version wrap; a reset
-  increment beyond the existing field maximum hard-faults without publishing
+  increment beyond the existing field maximum returns DR1=1 without publishing
   a wrapped identity or releasing the reset context.
 - Request framing/byte order, capacity, correlation, event lifetime, cancellation
   and reset. **Settled payload:** metadata words 0–3 plus target slot, 20 bytes.

@@ -15,7 +15,11 @@ associated with a supplied GT. Record this as a software-method requirement,
 not a new FPGA instruction or automatic hardware version mutation.
 Its Phase 2 Thread-reset use must invalidate old-version Thread GTs through
 the authoritative Namespace-entry version, not merely edit a detached GT copy.
-No wrap: inability to increment hard-faults. Existing holders are not silently
+No wrap. **Updated exhaustion result:** IncrementVersion returns DR1=1 when
+the version is already at maximum, leaving the version unchanged; success
+returns DR1=0. This replaces the earlier exhaustion-HardFault requirement for
+that condition only. Other HardFaults retain the ISA fault path. A failed
+increment must not make the reset context runnable. Existing holders are not silently
 upgraded. **Approved method name: IncrementVersion.** Argument/result registers, authorized descriptor
 update and any returned new-version GT remain to be specified under the current
 SR invocation rules. B alone does not imply invocation authority. This addition

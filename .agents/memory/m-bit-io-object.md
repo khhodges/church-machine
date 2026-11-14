@@ -52,9 +52,11 @@ lifecycle review to FPGA rules.
 
 **How to apply:** Preserve the existing SR invocation/authority model; B alone
 does not grant access. For Thread reset, change the authoritative entry version
-so old GTs become stale, with no wrap/HardFault on exhaustion. Do not mutate
+so old GTs become stale, with no wrap and DR1=1 at maximum (version unchanged).
+Success returns DR1=0; other HardFaults remain separate. Do not mutate
 versions automatically in FPGA or silently upgrade other GT copies. Exact
-method name, ABI and returned-GT semantics remain open; this is not permission
+method name is IncrementVersion; input ABI and returned-GT semantics remain open;
+this is not permission
 to implement or provision it.
 
 ## Current mechanism-versus-policy clarification
