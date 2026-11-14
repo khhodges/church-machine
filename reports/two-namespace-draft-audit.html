@@ -4,6 +4,7 @@
 <style>body{font:16px/1.55 system-ui,sans-serif;max-width:1050px;margin:32px auto;padding:0 20px;color:#172334}h1,h2{line-height:1.2}table{border-collapse:collapse;width:100%;margin:20px 0}th,td{padding:9px;text-align:left;border-bottom:1px solid #d9e0e8;vertical-align:top}th{background:#edf2f7}.warning{background:#fff2cf;padding:18px;border-left:4px solid #b27a00}code{overflow-wrap:anywhere}small{color:#526273}@media(max-width:650px){table{font-size:13px}th,td{padding:6px}}</style>
 <h1>Two-Namespace draft audit</h1>
 <p>Saved designs: <strong>Boot.Services</strong> and <strong>AliceMallory.Application</strong>.</p>
+<p><strong>Current decision:</strong> replicate Amoeba and SecurityRegulator in each Namespace, with separate local C-list bindings. Physical resident sharing and the sharing-based size reduction were dropped. The ISA remains unchanged; both draft capacities remain 64 KiB.</p>
 <p class="warning"><strong>Draft layout corrected; executable configuration remains incomplete.</strong>
 These are separate editable designs, not a compiled, linked, approved or installed two-Namespace image.
 Unfinished services and incompatible historical bindings have not been replaced by guessed capabilities.</p>
@@ -38,6 +39,8 @@ Unfinished services and incompatible historical bindings have not been replaced 
 <tr><td>19</td><td>ide.MalloryDriver</td><td>Lazy</td><td>Retained exact saved revision 3.</td></tr>
 <tr><td>20</td><td>ide.ActorManager</td><td>Lazy</td><td>Retained exact saved revision 2; local Thread references still require explicit binding.</td></tr>
 <tr><td>21</td><td>ide.AmoebaStartup</td><td>Lazy</td><td>Retained as a revision target, no longer entry or fault handler. Removed revision 5 selection because its direct CapabilityTest/WukongCallHome calls assume the old local layout.</td></tr>
+<tr><td>22</td><td>ide.Amoeba</td><td>Resident</td><td>Separate application-local resident copy; candidate binary and local bindings still unselected.</td></tr>
+<tr><td>23</td><td>ide.SecurityRegulator</td><td>Resident</td><td>Separate application-local resident copy; candidate binary and private M-control bindings still unselected.</td></tr>
 <tr><td>24</td><td>ide.AppSystem</td><td>Lazy</td><td>New unresolved application entry intent. Boot must load it before first application dispatch; no working startup sequence is claimed.</td></tr>
 </tbody></table>
 <p>Removed the duplicate Boot services and all direct device entries from the application draft. Unlisted slots are empty, not assigned implicit capabilities.</p>
@@ -57,7 +60,7 @@ Unfinished services and incompatible historical bindings have not been replaced 
 <li>Read every original row; checked exact selected binary hashes and embedded API names/imports. No original selected binary hash mismatch was found.</li>
 <li>Both corrected documents passed the existing Namespace schema validator and were saved with binding disabled, then read back for exact equality.</li>
 <li>Verified four Thread structures: one in Boot.Services and three in AliceMallory.Application.</li>
-<li>Verified exactly two Resident executable intents: Amoeba and SecurityRegulator. All other executable entries are Lazy; application has no MMIO entries.</li>
+<li>Two resident abstraction identities are replicated: Amoeba and SecurityRegulator in each Namespace, four local Resident entries total. All other executable entries are Lazy; application M-control provisioning remains open.</li>
 <li>Removed the inherited faultHandlerSlot selector; fault recovery must preserve Boot.Thread's continuation.</li>
 <li>Read-only binding reports confirmed missing exact binding snapshots; no successful binding or runnable-image claim was made.</li>
 <li>Verified New Layout, the live Namespace state, manifest, existing LUMP files and binary images were byte-for-byte unchanged.</li>

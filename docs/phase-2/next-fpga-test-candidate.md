@@ -119,34 +119,49 @@ This settles software structure, not implementation or qualification.
 The configurator selected Resident SecurityRegulator entries in both Namespaces,
 at local slot 23. This provides a local invocation target before an outgoing
 SWITCH; keeping the regulator solely in Boot cannot implement that route.
-This is a design decision, not evidence that both saved drafts or runnable
-bindings have been updated. Invocation grants, private local M-control binding
-and physical code sharing/copying remain separate from entry presence.
+Both drafts reserve Amoeba at slot 22 and SecurityRegulator at slot 23 as
+separate Resident copies. Their candidate binaries and executable bindings
+remain unselected/unqualified. Invocation grants and private local M-control
+binding remain separate from entry presence.
 Do not grant raw M to AppSystem or Amoeba.
+
+## Resident replication — current decision
+
+Replicate resident LUMPs rather than share their physical bodies across
+Namespaces. Each Namespace receives a local Amoeba and SecurityRegulator copy,
+with its own destination-bound C-list. Preserve the existing ISA and normal
+CALL/RETURN mechanism; do not add caller-specific C-list switching or shared
+code machinery. This supersedes the physical-sharing optimization and its
+proposed application-capacity reduction.
+
+The editable drafts retain their existing 64 KiB capacities. This is not proof
+that the final combined image fits: count both local copies of each resident
+LUMP and all private data when qualifying the aggregate allocation.
 
 ## Peer Namespace selection inside Amoeba
 
-The configurator's selected approach is to keep **all configured Namespace GTs
-in Amoeba's C-list and implement a switching algorithm**. The algorithm selects
-the appropriate C-list entry for the current Namespace context and intended
-destination. AppSystem does not supply a raw Namespace GT. Amoeba invokes
-local SecurityRegulator for the privileged operation; raw M remains exclusive
-to SecurityRegulator.
+Following resident replication, this two-Namespace loop uses one fixed
+next-Namespace C-list row in each local Amoeba copy. The Boot-side entry names
+AliceMallory.Application; the application-side entry names Boot.Services.
+Identical code can use that row with different locally bound GTs. AppSystem
+does not supply a raw Namespace GT. Amoeba invokes local SecurityRegulator for
+the privileged operation; raw M remains exclusive to SecurityRegulator.
 
 The C-list retains the authoritative copies across CALLs. Preset working
-registers are not the sole storage for switching authority. This supersedes
-the proposed single context-dependent peer row and register-only approaches.
+registers are not the sole storage for switching authority. The all-NS-GTs
+selection algorithm considered for physical sharing is not required for this
+replicated two-Namespace loop. The existing C-list-source/index SWITCH operand
+contract remains unchanged; no direct-GT instruction form is introduced.
 
-One physically shared C-list may contain different GT values at different
-rows. It must not require different values at the same physical word.
-Matching local Namespace slot numbers are not an imposed requirement:
-the algorithm may select different context-appropriate GT rows. Maintained
+Each resident Amoeba copy has its own C-list. Matching local Namespace slot
+numbers are not an imposed requirement: the algorithm may select
+context-appropriate GT rows. Maintained
 lookup still uses active CR15 plus the selected GT's slot index, so every
 selected route must be validated in its actual Namespace context.
 
 The route-selection algorithm, exact rows and bindings, and native tests remain
-implementation work. This records the chosen design, not applied Namespace
-bindings or proof that all LUMP data and remaining dependencies are shareable.
+implementation work. This records the chosen design, not applied executable
+bindings or native qualification.
 
 ## Confirmed: fault entry preserves Boot's continuation
 

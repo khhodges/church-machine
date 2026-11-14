@@ -65,9 +65,8 @@ SWITCH before AppSystem can invoke the regulator that performs that SWITCH,
 then directed the review to continue.
 
 **How to apply:** Preserve SR-only M custody. Local presence is not an invocation
-grant; exact private M-control bindings and shared-versus-copied physical code
-remain separate decisions. Do not claim the application draft has been updated
-or that runnable regulator code exists merely because this design is settled.
+grant; exact private M-control bindings remain separate decisions. Physical
+resident replication is settled below; it does not establish runnable code.
 
 The user also confirmed two resident Namespaces for the next FPGA test
 candidate, with consequential specification decisions reviewed step by step.
@@ -80,34 +79,35 @@ candidate that requires another build.
 two-LUMP initial executable baseline and separate specification approval from
 implementation, vendor-build and physical-operation authorization.
 
-Amoeba keeps **all configured Namespace GTs in its C-list** and implements a
-switching algorithm to select the appropriate entry. This supersedes treating
-one context-dependent peer row or a preset working register as the chosen design.
+Amoeba keeps switching authority in its C-list. Following the decision to
+replicate residents, the two-Namespace loop can use one fixed next-Namespace
+row in each local Amoeba copy, bound to that copy's peer.
 
-**Why:** The user explicitly corrected the alternatives: "the straightforward
-way is keep all NS GTs in the Clist and code a switching algorithm."
+**Why:** The user first required all NS GTs in the C-list rather than volatile
+working-register storage. After choosing replication, they simplified the
+next-Namespace reference to one entry; the multiple-GT sharing workaround is
+no longer required for this two-Namespace loop.
 
-**How to apply:** Keep Namespace GTs inside Amoeba. The algorithm selects the
-entry valid for the current context and intended destination, then invokes
+**How to apply:** Keep Namespace GTs inside Amoeba. Use the same C-list row
+convention with different locally bound GTs, then invoke
 SecurityRegulator for the privileged operation without receiving raw M.
 Keep the authoritative GT copies in the C-list across CALLs. Do not impose
-matching Namespace slot numbers as a prerequisite: multiple context-appropriate
-GTs can occupy different rows of the one shared C-list. Exact route selection,
+matching Namespace slot numbers as a prerequisite. Each local resident copy
+has its own destination-bound C-list. Exact route selection,
 bindings and native implementation remain to be verified.
 
-Whole-LUMP physical sharing requires identical C-list GT words as well as
-identical instructions. The same CR6 row with different GT bits works only
-with separate bound copies, not one shared C-list word.
+Replicate resident LUMPs in each Namespace. Do not pursue physical resident
+sharing or change the ISA to support it. Amoeba and SecurityRegulator remain
+the two resident abstraction identities, with separate local copies/bindings.
 
-**Why:** The user explicitly identified the clash when moving from identical
-code to one physically shared Amoeba LUMP.
+**Why:** The user explicitly rejected the sharing detour: "This is wasting time
+for small gain. The right solution is to replicate resident lumps not change
+the ISA." This supersedes the earlier memory-sharing/size-reduction direction.
 
-**How to apply:** One shared C-list can contain multiple different GTs at
-different rows; it must not require different bits at the same physical row.
-Validate each selected route in its actual Namespace context and keep mutable
-state private before claiming whole-LUMP sharing.
-Do not assume support for separate per-Namespace C-lists attached to one shared
-instruction body; that would require a distinct supported execution mechanism.
+**How to apply:** Use ordinary CALL/RETURN and destination-local C-lists.
+Count each physical resident copy in the memory budget; do not claim sharing
+savings or shrink the application reservation on that basis. Keep original
+artifacts immutable and qualify the actual local copies before image approval.
 
 The next test candidate targets the second Wukong V3 used for the recent
 physical demonstrations.

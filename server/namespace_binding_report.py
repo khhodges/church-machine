@@ -16,9 +16,6 @@ from server.binding_cleanup import serialized
 
 @serialized("directory")
 def binding_report(document, directory, fingerprint, *, bind_now=True, progress=None):
-    if bind_now:
-        from server.namespace_design_v1 import require_standalone_design
-        require_standalone_design(document)
     directory = Path(directory)
     lists, candidates, rows, bodies = [], [], [], {}
     for placement in document["rows"]:
