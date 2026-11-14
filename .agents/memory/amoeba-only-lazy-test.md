@@ -2,6 +2,18 @@
 name: Amoeba-only resident Lazy test
 description: The required Boot2 test starts with only Amoeba executable code resident.
 ---
+**Scope update:** This remains the historical single-loader test contract.
+The user explicitly approved Amoeba **and SecurityRegulator** as the initial
+resident executable baseline for the next two-Namespace FPGA candidate.
+See [next bitstream scope](next-bitstream-design-scope.md). Do not preload any
+other executable dependencies or rewrite the historical evidence.
+
+**Why:** SecurityRegulator must be available for privileged operations from
+startup; this exception was explicitly approved rather than inferred.
+
+**How to apply:** Apply the two-LUMP rule to the new candidate and the original
+rule below only to its historical tests.
+
 The user requires “everything except Amoeba is lazy load.” Treat Amoeba as the
 only initially resident executable LUMP in this test, with Namespace/Thread
 structures and required device descriptors still present.

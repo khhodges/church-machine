@@ -10,7 +10,21 @@ Namespace changes are authorized by this specification.
 The candidate must support two Namespaces resident together in one physical
 memory map. Switching between them must not require replacing the image.
 Resident Namespace structures do not imply resident application code:
-the native loading test still starts with only Amoeba executable code resident.
+the native loading test starts with only Amoeba and SecurityRegulator
+executable code resident.
+
+## Confirmed: two-LUMP resident baseline
+
+The user approved Amoeba and SecurityRegulator as the initially resident
+executable LUMPs, available throughout the run. This replaces the earlier
+only-Amoeba requirement for this candidate; historical loader tests retain
+their original scope. All other executable dependencies start absent.
+
+Genesis alone issues M authority, exclusively to SecurityRegulator. Amoeba
+requests protected operations through SecurityRegulator and does not receive
+raw M-control. Residency itself grants no authority. Account for both LUMPs
+in the 128 KiB allocation budget. This decision does not claim implementation
+or authorize synthesis, physical operations, or saved-image replacement.
 
 Initial loading tests may exercise one Namespace before cross-Namespace tests.
 Networking remains a later campaign; two resident Namespaces do not imply
@@ -40,10 +54,10 @@ established separately; a board selection is not proof of source compatibility.
 
 | Namespace | Initial test responsibilities |
 | --- | --- |
-| Boot/service | Amoeba loading/scheduling, CapabilityTest, SelfTest, WukongCallHome, and the required device/service grants |
+| Boot/service | Resident Amoeba and SecurityRegulator; lazy CapabilityTest, SelfTest, WukongCallHome; required device/service grants |
 | Application | Slot 2 starter and separate Alice/Mallory Threads, with their private state and explicitly granted capabilities |
 
-Only Amoeba executable code starts resident. Required Namespace/Thread
+Amoeba and SecurityRegulator executable code start resident. Required Namespace/Thread
 structures, private loader data and device descriptors are present initially;
 all other executable LUMPs are delivered as needed. SYSTEM explicitly ensures
 its dependencies; USER CALL uses automatic Lazy handoff.
@@ -154,7 +168,7 @@ These are required results, not test results or build authorization.
 | Gate | Required evidence |
 | --- | --- |
 | Identity and memory | Exact source/BIT/image identities, selected board evidence, both Namespace roots resident, disjoint allocations and no high-address aliasing. Verify actual contents rather than relying on labels. |
-| Native loading | Only Amoeba code initially resident; explicit SYSTEM dependency loading; automatic USER suspend/service/retry across the approved Namespace route; exact body publication and original CALL execution once per request. |
+| Native loading | Only Amoeba and SecurityRegulator code initially resident; explicit SYSTEM dependency loading; automatic USER suspend/service/retry across the approved Namespace route; exact body publication and original CALL execution once per request. |
 | Waiting and progress | Delayed delivery leaves the requester pending while another eligible USER progresses; all-waiting SYSTEM renews the watchdog through approved transitions. No forced resume or invented request timeout. |
 | Repeated attack containment | 100 deliberately rejected Mallory attempts from fresh authorized contexts; at least one completed, read-back-verified Alice update after every rejection before the next attempt, including after the last. No Alice reinitialization or protection bypass. |
 | Delivery rejection | Corrupt, wrong-target, truncated, oversized, duplicate and stale deliveries cannot publish invalid code, resume the wrong owner or replay a completed CALL. Exact rejection dispositions remain to be specified. |

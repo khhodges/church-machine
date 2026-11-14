@@ -1,5 +1,5 @@
 - [Next bitstream design scope](next-bitstream-design-scope.md) — separate two-Namespace/common-LUMP planning workspace; three-view Switch loop, no hardware authorization.
-- [Amoeba-only Lazy test](amoeba-only-lazy-test.md) — only Amoeba executable code starts resident; preloading startup dependencies does not satisfy the test.
+- [Historical Amoeba-only test](amoeba-only-lazy-test.md) — original loader test; next FPGA candidate now starts with Amoeba and SecurityRegulator, all other code lazy.
 - [Amoeba read-only reclamation](amoeba-readonly-reclamation.md) — first reclaim step excludes mutable or modified bodies; continuation protection and slot identity remain required.
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
 - [Tooling and exports](tooling-lessons-index.md) — notebook capture limits, spreadsheet formula caches, Python ABI and TypeScript test compilation.

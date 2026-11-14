@@ -79,7 +79,7 @@ rejection, real hash success/corruption rejection, complete word consumption,
 transaction commit, and unchanged high/low executable destinations. Fourteen
 existing receiver checks also passed against these modules' legacy defaults.
 
-This is not native publication or a complete only-Amoeba image.
+These staging checks alone are not native publication or a complete candidate image.
 
 ## Service interface to connect
 
@@ -132,7 +132,7 @@ effects are disabled throughout fault entry.
 Exact newly compiled instructions now exercise real device writes/status reads
 and rejected writes through the maintained core, then reach healthy progress
 through Boot's retained recovery continuation. These diagnostic fixtures still
-contain resident test code and are NOT the final only-Amoeba image.
+contain resident test code and are NOT the final two-LUMP resident candidate image.
 
 `candidate_host_delivery.py` provides an offline matching CRQ1/CLQ1 codec.
 It validates provisioned records, rejects stale epochs/transactions and emits
@@ -149,7 +149,8 @@ regressions. Longer received-image regressions are tracked separately.
 Genesis alone issues M authority, exclusively to SecurityRegulator. Neither
 Namespace ownership nor direct Amoeba M-control is an approved alternative.
 The next implementation must follow Genesis → SecurityRegulator issuance and
-native mediation, while retaining only-Amoeba initial executable residency.
+native mediation, with the now-approved Amoeba-plus-SecurityRegulator initial
+executable residency. All other executable dependencies remain initially absent.
 
 The new disposable two-Namespace source reaches Amoeba's M-control write and
 faults with PERM_S at NIA `0x8024`. The maintained core deliberately accepts
@@ -191,7 +192,7 @@ slot-addressed legacy program. It cannot be silently reused with the new
 full-GT service status or treated as the two-Namespace round-robin service.
 The next implementation must supply the explicit application Slot-2 → SWITCH
 to Boot/Amoeba → SWITCH to application Slot-2 → CHANGE to USER route, private
-qualified destination/handoff data, only-Amoeba executable residency, and fresh
+qualified destination/handoff data, Amoeba-plus-SecurityRegulator executable residency, and fresh
 Mallory initialization while retaining Alice across 100 rejected attempts.
 
 Compile new disposable candidates without rewriting saved LUMPs; bind the

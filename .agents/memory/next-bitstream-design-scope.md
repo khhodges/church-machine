@@ -9,9 +9,21 @@ Amoeba M-control are not alternatives.
 **Why:** The user explicitly corrected the proposed ownership choice.
 
 **How to apply:** Follow the authoritative issuance rule in
-[M-bit I/O object](m-bit-io-object.md). Keep only-Amoeba initial executable
-residency and do not silently preload a privileged helper or grant raw M to
-Amoeba to bypass missing integration.
+[M-bit I/O object](m-bit-io-object.md). The approved initial executable baseline
+is now Amoeba plus SecurityRegulator; do not grant raw M to Amoeba.
+
+The user approved **Amoeba and SecurityRegulator as the two initially resident
+executable LUMPs**, available throughout the run. All other executable
+dependencies remain initially absent and must load lazily.
+
+**Why:** SecurityRegulator's central role warrants availability from startup,
+avoiding a dependency on loading the regulator before privileged operations.
+This explicitly supersedes the only-Amoeba residency rule for this candidate,
+not the historical single-loader test.
+
+**How to apply:** Include both footprints in the 128 KiB budget, preserve
+Genesis-only issuance exclusively to SecurityRegulator, and do not describe
+the resulting candidate as an only-Amoeba test. Residency grants no authority.
 
 The user approved a second Image Development view to design the next bitstream with two resident Namespaces and a common memory zone for individual LUMPs, preserving the existing view and working configuration.
 
@@ -23,7 +35,7 @@ native-loading tests exercise one Namespace; avoid an unnecessarily narrow
 candidate that requires another build.
 
 **How to apply:** Namespace residency is not executable residency. Keep the
-Amoeba-only initial executable test and separate specification approval from
+two-LUMP initial executable baseline and separate specification approval from
 implementation, vendor-build and physical-operation authorization.
 
 The next test candidate targets the second Wukong V3 used for the recent
@@ -43,7 +55,7 @@ later software test stages, with interface/capacity checks before hardware freez
 **Why:** Establish native loading and legitimate progress despite deliberately
 rejected attacks before expanding lifecycle acceptance.
 
-**How to apply:** Only Amoeba code starts resident; required structures/data
+**How to apply:** Amoeba and SecurityRegulator code start resident; required structures/data
 are distinct from executable residency. Inventory approval does not settle
 cross-Namespace dispatch, scheduling or fault recovery.
 
@@ -207,7 +219,7 @@ release blockers for this work.
 
 **How to apply:** Fix actual candidate defects; report unrelated baseline
 failures without expanding the scope. Distinguish a diagnostic installation
-image from the approved only-Amoeba candidate before freezing build inputs.
+image from the approved two-LUMP resident candidate before freezing build inputs.
 
 **Why:** Fabric error outputs alone do not prevent instruction engines from
 reporting success; the real core must consume the checked access outcome.

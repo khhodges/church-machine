@@ -33,7 +33,7 @@ does not qualify physical UART timing.
 PERM_S rejection when Amoeba attempts to arm the M bits needed for SWITCH.
 Genesis alone issues M to SecurityRegulator; that authority decision is settled.
 The existing Namespace-execution-only hardware gate is not the ownership
-contract. Native issuance/mediation and the only-Amoeba residency rule must
+contract. Native issuance/mediation and the approved Amoeba-plus-SecurityRegulator residency rule must
 both be satisfied before this is build-ready. The direct-Amoeba fixture is
 disabled, not a release image. No source/image freeze or vendor-build authorization is
 implied by passing loader component tests.
@@ -50,7 +50,7 @@ Native MMIO request/consumption and original fault identity are now connected
 and exercised with exact newly compiled instructions. The offline host codec
 also exists. These are not the final native two-Namespace program/image.
 
-- The final only-Amoeba-resident image and its Namespace-aware delivery/service
+- The final Amoeba-plus-SecurityRegulator-resident image and its Namespace-aware delivery/service
   path are not supplied by the diagnostic image used for core qualification.
 - The new service decoder rejects unknown accesses. The final program must
   provision its private device grant and use the qualified handoff ABI; the
