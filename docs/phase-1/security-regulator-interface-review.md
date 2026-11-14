@@ -44,8 +44,7 @@ specific caller still needs to be named.
 
 #### LOADM — user and reason
 
-- **User:** No concrete service call site is identified in the cited coverage
-  review. Mint and FreeHandler have approved invocation-grant designs, but that
+- **User:** Mint and FreeHandler have approved invocation-grant designs, but that
   alone does not establish that either needs LOADM.
 - **Reason:** Retrieve an existing GT when the approved access requires source
   M in place of L. This is retrieval, not construction or permission enlargement.
