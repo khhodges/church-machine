@@ -48,14 +48,28 @@ The deselected full-wrapper tests remain unrun.
 The read-only observer also completed all three non-corrupt cases at Boot PC
 `0x1a008` (cycles 780, 815 and 800). It reported no recovery LOAD reissue.
 
+### Subsequent installed-image and board-interface verification
+
+The full CSI3 installation test now passes (**1 passed in 109.44 seconds**):
+all 128 KiB are transmitted into real banked RAM, hashed, checked against
+trusted foundational words, held stopped through staging clearance and READY,
+then started by the correct epoch's separate START. A stale START remains
+stopped. Real execution verifies high-bank data 17, the unchanged low-bank
+alias, retained Boot recovery and healthy-worker progress. Clock-edge
+assertions prohibit valid fetch, retirement and granted CPU writes while reset
+is held. This test uses decoded serial bytes, not physical UART timing.
+
+The new `candidate_board.py` connects maintained UART RX/TX and installer
+replies to this composition, with synchronized maintenance and the retained
+50-to-25 MHz Wukong clock circuit. Its physical-top local elaboration/cycle
+check passed (**1 passed in 8.87 seconds**), without invoking vendor tools.
+See [build input map](next-fpga-build-inputs.md) for actual build boundaries.
+
 ### Remaining qualification boundary
 
 These results complete the requested bounded corrections, not the entire
 candidate acceptance programme. Still unproven here:
 
-- full CSI3 installation/hash/scrub/START followed by real-core execution
-  (the composed graph passes; the runtime fixture begins with disposable
-  preloaded RAM);
 - a physical-memory rejection at the ordinary operation's commit edge,
   distinguished from the earlier native descriptor BOUNDS rejection;
 - the later only-Amoeba image, service/device integration and repeated
@@ -251,6 +265,8 @@ admission/core composition.
 At this earlier stage, successful Boot continuation had not been established.
 It is now verified by the current tests above. Full CSI3-to-core runtime,
 physical rejection-edge atomicity and 100-attack acceptance remain separate.
+The subsequent installed-image test above now covers decoded CSI3-to-core
+runtime; it does not establish physical serial or board qualification.
 
 ## Checks completed independently
 

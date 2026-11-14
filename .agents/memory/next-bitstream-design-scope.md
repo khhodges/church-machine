@@ -129,6 +129,18 @@ The user subsequently authorized isolated maintained-core/trusted-Boot
 integration, including BOUNDS for otherwise-admitted misaligned/out-of-range
 ordinary RAM accesses, truthful acceptance, and retained Boot continuation.
 
+Keep the next work focused on the shortest path to this candidate bitstream:
+candidate-specific checks and exact build preparation, not unrelated legacy
+test cleanup or additional side projects. Stop before synthesis for approval.
+
+**Why:** The user explicitly questioned distractions and agreed to prioritize
+the bitstream. Unrelated failures reproduced on the baseline are not new
+release blockers for this work.
+
+**How to apply:** Fix actual candidate defects; report unrelated baseline
+failures without expanding the scope. Distinguish a diagnostic installation
+image from the approved only-Amoeba candidate before freezing build inputs.
+
 **Why:** Fabric error outputs alone do not prevent instruction engines from
 reporting success; the real core must consume the checked access outcome.
 

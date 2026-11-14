@@ -1,0 +1,40 @@
+# Next FPGA candidate — build input map
+
+This is preparation, not a frozen or synthesis-approved release package.
+Do not use the historical 64 KiB combined-starter exporter for this candidate.
+
+| Input | Selected implementation |
+| --- | --- |
+| Board | QMTECH Wukong V3, xc7a100tfgg676-2 |
+| New top | `cooperative-retry/candidate_board.py`, `CandidateBoard` |
+| Maintained core | `hardware/core.py`, explicit 128 KiB profile |
+| Allocation/staging | `cooperative-retry/candidate_memory.py`: 128 KiB + separate 16 KiB |
+| Installation | CSI3, actual received-RAM SHA, trusted foundational checks, separate START |
+| Clock | Maintained `WukongClock25`: M21 50 MHz input to 25 MHz |
+| Maintenance | M6 active-low, synchronized, no transport-reset connection |
+| Serial | F3 RX, E3 TX, 57,600 baud, maintained UART blocks |
+| Existing pin evidence | `cooperative-retry/combined-board.xdc`; not modified |
+
+The new board wrapper connects the physical UART installer, its replies and
+the clock to the new core composition. Its local RTLIL circuit check passes
+with the real MMCM/BUFGCE primitives present. This is not vendor timing,
+utilization, DRC, electrical or board evidence.
+
+The installed-image test sends the complete 128 KiB disposable image through
+CSI3, hashes actual RAM, checks cleared staging and separate authorized START,
+then runs high-bank write/readback, fault recovery and healthy-worker progress.
+It passed in 109.44 seconds. Reset-time assertions prohibit valid fetch,
+retirement and granted core writes during installation. This decoded-byte test
+does not qualify physical UART timing.
+
+## Inputs not yet ready to freeze
+
+- The final only-Amoeba-resident image and its Namespace-aware delivery/service
+  path are not supplied by the diagnostic image used for core qualification.
+- The required runtime device/service routing is not connected to the new
+  wrapper. Unsupported MMIO assertions are not a production device decoder.
+- The final RTL export, complete constraints and exact image/source hashes
+  must be frozen together after that integration, before synthesis approval.
+
+These are candidate implementation requirements, not unrelated legacy-test
+cleanup. No build authorization or programming authorization is present.
