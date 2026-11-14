@@ -2061,18 +2061,19 @@ After outgoing-save writes begin, no rollback or substitute Namespace is
 promised. The wrapper must not mask faults or redefine the hardware's trusted
 fault-recovery sequence.
 
-**Review closure — software continuation:** a CALL into SecurityRegulator
-followed by SWITCH saves a continuation inside the regulator, not automatically
-the caller's post-CALL continuation. Specify that saved frame and how a later
-reactivation completes the method. SWITCHM uses the SYSTEM Thread in slot 2,
-not an arbitrary USER Thread; the destination is likewise its Namespace's
-SYSTEM Thread in slot 2. Specify the wrapper's M setup. Do not add an ordinary RETURN after SWITCH
-and claim that it ran immediately in the original context.
+**Approved software continuation:** A CALL into SecurityRegulator followed by
+SWITCH saves the SYSTEM Thread's continuation inside the regulator. SWITCHM
+always uses the SYSTEM Thread in slot 2; the destination is likewise its
+Namespace's SYSTEM Thread in slot 2. After another SWITCHM restores the original
+SYSTEM Thread, it resumes after SWITCH and executes RETURN to its original
+caller. The save and load halves restore the matching Thread context, including
+the suspended call continuation.
 
-**Restoration prerequisite clarified:** The outgoing SYSTEM Thread in slot 2 can only be
-restored after another SWITCHM. This does not promise an automatic switch back
-or guaranteed restoration. Whether the restored method then executes RETURN
-to its caller remains a separate, unapproved continuation choice.
+There is no immediate RETURN at the initial handoff, automatic switch back or
+guaranteed restoration. RETURN after restoration completes the call within the
+restored Namespace; it does not itself switch Namespaces. Exact frame handling,
+wrapper M setup and clobbers still require implementation verification under
+the unchanged ISA/RTL.
 
 ### A.5 Shared ABI and M-lifecycle review items
 
