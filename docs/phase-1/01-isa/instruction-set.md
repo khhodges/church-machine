@@ -2027,9 +2027,14 @@ existing combined SWITCH handoff with CR15.M authorization.
 ```text
 SWITCHM(sourceCListGT, rowIndex) -> context transfer
 
-Proposed entry: CR1 = sourceCListGT; DR1 = rowIndex
+Approved entry: CR1 = sourceCListGT; DR1 = rowIndex (zero-based)
 Operand selected by SWITCH: sourceCListGT[rowIndex]
 ```
+
+**Approved operand inputs:** CR1 supplies the source C-list GT and DR1 selects
+its Namespace-GT row. This selects the software method's input assignments,
+not a change to the ISA or RTL. The incoming Thread remains fixed at slot 2.
+Continuation and working-register preservation remain separate review items.
 
 This accepts a **C-list GT plus row**, not a direct Namespace GT and not an
 arbitrary destination-register number.
