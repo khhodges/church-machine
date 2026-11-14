@@ -32,6 +32,17 @@ the resulting candidate as an only-Amoeba test. Residency grants no authority.
 
 The user approved a second Image Development view to design the next bitstream with two resident Namespaces and a common memory zone for individual LUMPs, preserving the existing view and working configuration.
 
+The user approved creating the two named candidate review drafts as independent
+copies of New Layout, without splitting their contents or activating them.
+
+**Why:** The immediate request was to open and inspect each Namespace in the IDE.
+Identical initial contents are intentional, not evidence that the proposed
+service/application separation is implemented.
+
+**How to apply:** Keep draft creation separate from membership changes,
+compilation, approval and activation; do not treat these copies as a qualified
+two-Namespace image.
+
 The user also confirmed two resident Namespaces for the next FPGA test
 candidate, with consequential specification decisions reviewed step by step.
 
