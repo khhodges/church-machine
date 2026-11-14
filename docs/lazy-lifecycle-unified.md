@@ -545,7 +545,8 @@ the shared session ID or the request counter, and does not authorize FPGA edits.
 GT-version increment method for this authorized operation. Its Thread-reset use
 must affect the authoritative Namespace-entry version so old GTs become stale,
 not merely change a copied token. Apply the Phase 2 no-wrap/HardFault rule.
-Exact method name, register ABI and new-GT result semantics remain open in the
+The approved method name is **IncrementVersion**. Register ABI and new-GT
+result semantics remain open in the
 [SecurityRegulator operation review](phase-1/security-regulator-operation-review.md).
 This records a software dependency, not another FPGA rule or implementation.
 

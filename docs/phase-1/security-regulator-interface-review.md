@@ -43,7 +43,7 @@ only a general capability, the missing concrete caller/use case is explicit.
 | **ResetB — approved name and register signature**<br>DR1=`n`: set caller CR[n].B to 0; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set B to 0, not toggle. No DR2 value argument. Do not change unrelated GT fields or other copies. Ordinary movement rules remain separate. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify caller-register access, instruction mechanism and rejection effects under unchanged ISA/RTL; specify allowed registers, rejection conditions and numeric fault codes. |
 | **SetNear — approved name and register signature**<br>DR1=`n`: set caller CR[n] to Near; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set F state to Near, not toggle or bypass a SAVE check. No DR2 value argument. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify exact F encoding, permitted targets, caller-register access, mechanism and rejection effects under unchanged ISA/RTL; settle rejection conditions and numeric fault codes. |
 | **SetFar — approved name and register signature**<br>DR1=`n`: set caller CR[n] to Far; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set F state to Far, not toggle or bypass a SAVE check. No DR2 value argument. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify exact F encoding, permitted targets, caller-register access, mechanism and rejection effects under unchanged ISA/RTL; settle rejection conditions and numeric fault codes. |
-| **Version increment — required extension; unnamed**<br>No selected signature<br>[version-increment requirement](security-regulator-operation-review.md); [lifecycle specification](../lazy-lifecycle-unified.md) | Increment the authoritative version associated with a supplied GT. Thread-reset use must invalidate old GTs through the Namespace entry. No wrap; inability to increment hard-faults. No hardware automatic version mutation or silent upgrade of existing holders. | Method name, argument/result registers, authorized descriptor update, and whether/how a new-version GT is returned. |
+| **IncrementVersion — approved name**<br>Input/result signature not yet selected<br>[version-increment requirement](security-regulator-operation-review.md); [lifecycle specification](../lazy-lifecycle-unified.md) | Increment the authoritative version associated with a supplied GT. Thread-reset use must invalidate old GTs through the Namespace entry. No wrap; inability to increment hard-faults. No hardware automatic version mutation or silent upgrade of existing holders. | Argument/result registers, authorized descriptor update, and whether/how a new-version GT is returned. |
 
 The six named methods are **not a closed inventory** after the B, F and
 version-increment requirements. Watchdog-control ownership is specified
@@ -183,7 +183,7 @@ specific caller still needs to be named.
 - **Usage still to justify:** Name the caller, target and situation requiring
   Near versus Far, then settle the target encoding and mechanism.
 
-#### Version increment — user and reason
+#### IncrementVersion — user and reason
 
 - **User:** Authorized USER-Thread reset software in the Phase 2 lifecycle;
   the concrete calling abstraction has not yet been selected.
@@ -258,7 +258,8 @@ variants or candidate families into exported methods.
    SetNear/SetFar names and DR1 signatures are approved; verify their encoding,
    permitted targets, mechanism and unchanged-GT rejection effect; settle
    rejection conditions and numeric codes.
-   Choose the version-increment name/signature and mechanism.
+   IncrementVersion is the approved name; choose its input/result signature
+   and verify its mechanism.
 4. **Construction/conversion details:** reconcile `MintM` with `Create(GTvars)`,
    specify identity-field handling and precise conversion rules.
 5. **Common implementation contracts:** finish invocation/proof propagation,

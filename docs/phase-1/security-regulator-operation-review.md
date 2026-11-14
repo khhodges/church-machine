@@ -16,7 +16,7 @@ not a new FPGA instruction or automatic hardware version mutation.
 Its Phase 2 Thread-reset use must invalidate old-version Thread GTs through
 the authoritative Namespace-entry version, not merely edit a detached GT copy.
 No wrap: inability to increment hard-faults. Existing holders are not silently
-upgraded. Exact method name, argument/result registers, authorized descriptor
+upgraded. **Approved method name: IncrementVersion.** Argument/result registers, authorized descriptor
 update and any returned new-version GT remain to be specified under the current
 SR invocation rules. B alone does not imply invocation authority. This addition
 does not approve an implementation or expand the FPGA-only lifecycle review.
