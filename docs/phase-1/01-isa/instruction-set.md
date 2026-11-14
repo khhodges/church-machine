@@ -1878,8 +1878,13 @@ Approved return: CR1 = exact loaded valueGT; CR1.M clear
 ```
 
 **Approved operand inputs:** CR1 and DR1 are selected. CR1's source argument
-is replaced by the result. This approval does not select working-register
-clobbers or a preservation mask; those remain a separate review question.
+is replaced by the result.
+
+**Approved preservation responsibility:** The caller preserves ordinary working
+values it needs after LOADM. LOADM guarantees its result in CR1 but does not
+promise preservation of other ordinary working registers. The implementation
+must document its exact clobber set and verify its return mask. This does not
+change protected CALL/RETURN behavior or permit temporary M authority to escape.
 
 **Proposed operation:**
 
