@@ -57,6 +57,18 @@ services review. This preserves the two initially resident executable identities
 implementation, tested startup or approval of additional grants. Native service
 qualification remains open.
 
+SecurityRegulator is to be Resident and locally addressable in both Namespaces,
+at slot 23 in the reviewed layout.
+
+**Why:** The user proposed adding it to both Namespaces to avoid requiring a
+SWITCH before AppSystem can invoke the regulator that performs that SWITCH,
+then directed the review to continue.
+
+**How to apply:** Preserve SR-only M custody. Local presence is not an invocation
+grant; exact private M-control bindings and shared-versus-copied physical code
+remain separate decisions. Do not claim the application draft has been updated
+or that runnable regulator code exists merely because this design is settled.
+
 The user also confirmed two resident Namespaces for the next FPGA test
 candidate, with consequential specification decisions reviewed step by step.
 

@@ -116,11 +116,13 @@ entry, rather than an application-entry method in shared Amoeba. AppSystem is
 Lazy; Boot-side Amoeba must load it before the first application dispatch.
 This settles software structure, not implementation or qualification.
 
-The application-side SWITCH also requires a locally reachable SecurityRegulator
-invocation path before leaving that Namespace. Keeping every regulator/device
-binding solely in Boot cannot, by itself, implement that path. The exact
-invocation grants and local regulator/M-control binding remain subject to the
-authority and binding review; do not grant raw M to AppSystem or Amoeba.
+The configurator selected Resident SecurityRegulator entries in both Namespaces,
+at local slot 23. This provides a local invocation target before an outgoing
+SWITCH; keeping the regulator solely in Boot cannot implement that route.
+This is a design decision, not evidence that both saved drafts or runnable
+bindings have been updated. Invocation grants, private local M-control binding
+and physical code sharing/copying remain separate from entry presence.
+Do not grant raw M to AppSystem or Amoeba.
 
 ## Confirmed: fault entry preserves Boot's continuation
 
