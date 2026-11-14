@@ -1873,9 +1873,13 @@ verification; Boot's defined behavior remains unchanged.
 ```text
 LOADM(sourceGT, homeIndex) -> valueGT
 
-Proposed entry: CR1 = sourceGT; DR1 = homeIndex
-Proposed return: CR1 = exact loaded valueGT
+Approved entry: CR1 = sourceGT; DR1 = homeIndex (zero-based capability-home index)
+Approved return: CR1 = exact loaded valueGT; CR1.M clear
 ```
+
+**Approved operand inputs:** CR1 and DR1 are selected. CR1's source argument
+is replaced by the result. This approval does not select working-register
+clobbers or a preservation mask; those remain a separate review question.
 
 **Proposed operation:**
 
