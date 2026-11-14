@@ -5,6 +5,19 @@ description: User-directed separate Thread setup for the NewLayout protection de
 
 ## Current proposed combined-loop arrangement
 
+Readiness inventories must start from the prior attack build's complete,
+version-pinned Namespace/LUMP inventory, not a hand-picked list of core
+workload names or the methods in CapabilityTest.
+
+**Why:** The user corrected an inventory that omitted the dedicated actor,
+driver and startup LUMPs used in the prior Mallory demonstration and wrongly
+described Alice/Mallory only as methods and Threads.
+
+**How to apply:** Distinguish saved implementation, evidence from the prior
+build, and qualification for the new candidate. Do not call existing code
+missing because it has not been qualified for the new candidate, and do not
+substitute the latest catalog revision for a selected historical build.
+
 Mallory deliberately demonstrates a failed attack. Do not classify her intended
 protection fault as an application defect or propose making the attack succeed.
 
