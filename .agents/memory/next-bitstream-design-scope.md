@@ -60,6 +60,17 @@ instruction. Bring any required fresh-Thread initialization subset into initial
 test scope; general lifecycle work remains separate. Exact reset/grant/version
 mechanisms still need design and evidence.
 
+The user approved a provisional aggregate memory target of 128 KiB for
+resident allocations plus 16 KiB isolated incoming-LUMP staging, at the
+retained 25 MHz functional-test target.
+
+**Why:** Accommodate both resident Namespaces and the agreed test workloads
+without treating the earlier 64 KiB demonstration as a capacity requirement.
+
+**How to apply:** This is not a fixed 64 KiB partition per Namespace, measured
+resource fit, or approval to implement SD/Ethernet. Verify exact allocation,
+overhead, staging limits and new timing/resource results before freezing.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

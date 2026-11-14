@@ -116,7 +116,7 @@ and pending-request invalidation remain engineering work. Required
 Mint/Amoeba initialization may therefore enter the first containment test;
 this is not approval for the entire general lifecycle or a hardware build.
 
-## Proposed: aggregate memory target — awaiting review
+## Confirmed: aggregate memory design target
 
 Use 128 KiB for resident Namespace/Thread structures, LUMP allocations,
 private state and software records, plus 16 KiB of isolated transfer staging.
@@ -138,11 +138,37 @@ body unless a separately reviewed streaming design is adopted. Verify selected
 LUMP sizes and recovery storage before freezing this limit. Oversized bodies
 must fail explicitly, not truncate or silently enlarge storage.
 
+## Proposed: first-candidate acceptance gates — awaiting review
+
+These are required results, not test results or build authorization.
+
+| Gate | Required evidence |
+| --- | --- |
+| Identity and memory | Exact source/BIT/image identities, selected board evidence, both Namespace roots resident, disjoint allocations and no high-address aliasing. Verify actual contents rather than relying on labels. |
+| Native loading | Only Amoeba code initially resident; explicit SYSTEM dependency loading; automatic USER suspend/service/retry across the approved Namespace route; exact body publication and original CALL execution once per request. |
+| Waiting and progress | Delayed delivery leaves the requester pending while another eligible USER progresses; all-waiting SYSTEM renews the watchdog through approved transitions. No forced resume or invented request timeout. |
+| Repeated attack containment | 100 deliberately rejected Mallory attempts from fresh authorized contexts; at least one completed, read-back-verified Alice update after every rejection before the next attempt, including after the last. No Alice reinitialization or protection bypass. |
+| Delivery rejection | Corrupt, wrong-target, truncated, oversized, duplicate and stale deliveries cannot publish invalid code, resume the wrong owner or replay a completed CALL. Exact rejection dispositions remain to be specified. |
+| Fault and reset boundaries | Normal fault entry retains original Namespace/Thread attribution; failed Boot entry takes the specified LED loop. Explicit reset invalidates affected pending work without granting stale authority. |
+| Physical evidence | New resource, routed timing and DRC reports for the frozen candidate; separately authorized physical runs with raw observations correlated to exact inputs, not only a console PASS. |
+
+The 100-attempt target is a bounded functional test, not an MTBF claim.
+Choose initial generations and counter values with enough legal headroom;
+no version or value wrap is allowed. If the approved fresh-context mechanism
+cannot support the target, return for review rather than reuse invalid
+authority, silently lower the count or reset Alice. Test overall time bounds
+must be specified before execution and must not become runtime load timeouts.
+
+Local model evidence, vendor build evidence and physical observations must be
+reported separately. Mallory's expected fault is a passing negative test only
+when the exact forbidden operation is rejected and preservation/progress checks
+also pass. No complete Phase 1, Phase 2 or W7 acceptance follows from these gates.
+
 ## Next decisions
 
 - Exact source baseline.
 - Software fault recovery and exact shared-service handoff ABI/provisioning.
-- Memory capacity, receiver/device map and observation interface.
+- Exact memory ledger, receiver/device map and observation interface.
 - Frozen test images, acceptance criteria and local build gates.
 
 The completed specification must be reviewed before implementation/build
