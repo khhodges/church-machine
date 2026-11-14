@@ -196,10 +196,12 @@ The write stores the supplied GT with B cleared in the stored copy, preserving
 all other fields; it does not upgrade permissions.
 No allocation, activation, generation change or policy decision is included.
 
-**Return contract retained:** Successful SAVEM returns normally with no result
-value or success flag. Failed SAVE follows the defined machine-fault path, not
-a successful return. This is not completion of FreeHandler's wider allocation
-bookkeeping. Audit-delivery failure behavior remains a separate review item.
+**Updated standard return contract:** Successful SAVEM returns DR1=0, with no
+GT result. A returned software failure uses a nonzero fault code; HardFault
+still follows the defined ISA fault path, not a normal status return. This
+supersedes the earlier “no success flag” wording. Numeric codes and returnable
+software failures remain to be specified. This does not complete FreeHandler's
+wider bookkeeping or make optional reporting an execution prerequisite.
 
 **Approved operand inputs:** this freezes only the three assignments below,
 not the method selector, audit inputs, preservation or return contract.

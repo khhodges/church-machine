@@ -11,6 +11,15 @@ No numeric method indices are assigned to the final `ide.SecurityRegulator`.
 
 ## Method and signature table
 
+**Standard return policy for all methods:** DR1=0 means success; a nonzero DR1
+is a returned fault code. HardFault follows the existing ISA fault path and is
+not converted into a status return. DR1 inputs are consumed before DR1 becomes
+the status result; GT results retain their specified capability destinations.
+Signatures below describe functional results, with this common status implicit
+(including methods marked `void`). SWITCHM returns status only upon completion
+after restoration of its matching SYSTEM context. Numeric fault codes and
+returnable failure cases remain to be specified; ISA/RTL are unchanged.
+
 “Proposed” describes the published interface, not a rejection of behavior already
 approved within it. “Required extension” means the behavior was requested but
 its callable interface is not yet selected.
@@ -26,7 +35,7 @@ only a general capability, the missing concrete caller/use case is explicit.
 | **SAVEM — proposed interface with approved inputs**<br>`SAVEM(destinationGT, homeIndex, valueGT) → void`<br>[ISA A.3](01-isa/instruction-set.md#a3-savem--m-assisted-golden-token-save); [operation-review corrections](security-regulator-operation-review.md) | CR1=`destinationGT`, DR1=`homeIndex`, CR2=`valueGT`. `valueGT` is a GT, not a DR integer or register number. Destination authority governs SAVE. Successful SAVE clears B only in the stored copy; source remains unchanged. | Complete clobber/return contract and M-state implementation boundaries. Reconcile historical source-B admission wording; do not reopen approved operand assignments. |
 | **SWITCHM — approved inputs and continuation**<br>`SWITCHM(sourceCListGT, rowIndex) → context transfer`<br>[ISA appendix](01-isa/instruction-set.md#review-appendix-securityregulator-methods); diagnostic comparison below | Approved inputs: CR1=`sourceCListGT`, DR1=`rowIndex` (zero-based Namespace-GT row). SYSTEM Thread slot-2 handoff; after another SWITCHM restores its matching saved context, resume after SWITCH and RETURN to the original caller. No immediate return or automatic switch back. CR15.M is required; the source must have explicit L. Raw M remains private to SR. ISA and RTL are unchanged. | Specify clobbers and M setup/consumption; verify the saved continuation and return sequence. The diagnostic's fixed private binding does not replace the approved public inputs. |
 | **MintM — approved argument/result registers**<br>`MintM(Ctype, Permissions, Slot) → GT`<br>[ISA construction discussion](01-isa/instruction-set.md); [construction-port clarification](../phase-2/gt-construction-port.md) | DR1=`Ctype`, DR2=`Permissions`, DR3=`Slot`; return GT in CR1. Constructs a GT; it does not allocate an object or increment its version. Approved for new Inform GTs: read the current version from the selected slot's valid live entry in the active Namespace, without refreshing an existing GT. The clarified mechanism packs DATA and reads it as a GT under monitor M, rather than using an ordinary scratch L grant. | Exact `GTvars`/field mapping, remaining identity-field derivation and type validation, clobbers and return preservation. Reconcile naming with SecurityMonitor `Create(GTvars)` without assuming an alias. |
-| **MakeOutformM — indexed alternative under review**<br>Baseline: `MakeOutformM(sourceInformGT) → outformGT` in CR1<br>Alternative: DR1=`n`, convert caller's CR[n] in place; proposed DR1 status<br>[ISA conversion discussion](01-isa/instruction-set.md) | User confirmed that the alternative selects the caller's CR[n], not the regulator's register. Original source GT remains mandatory. Earlier fixed CR1 convention remains the baseline pending alternative evaluation. | Verify caller-context access and result preservation under existing ISA/RTL; settle allowed registers, rejection codes and failure effects. Proposed status is 0 for success or nonzero rejection; this does not establish recoverable hardware faults. Conversion checks and M-use implementation remain open. |
+| **MakeOutformM — indexed alternative under review**<br>Baseline: `MakeOutformM(sourceInformGT) → outformGT` in CR1<br>Alternative: DR1=`n`, convert caller's CR[n] in place; standard DR1 status<br>[ISA conversion discussion](01-isa/instruction-set.md) | User confirmed that the alternative selects the caller's CR[n], not the regulator's register. Original source GT remains mandatory. Earlier fixed CR1 convention remains the baseline pending alternative evaluation. Standard DR1 return status is approved independently: 0 success, nonzero returned fault code, except HardFault. | Verify caller-context access and result preservation under existing ISA/RTL; settle allowed registers, numeric fault codes and failure effects. HardFault retains the ISA fault path. Conversion checks and M-use implementation remain open. |
 | **MakeInformM — proposed interface**<br>`MakeInformM(sourceOutformGT) → informGT`<br>[ISA conversion discussion](01-isa/instruction-set.md) | Original source GT is mandatory; a slot-only reconstruction is not equivalent. | Argument/result registers, precise conversion checks and preserved/transformed fields, clobbers and M-use implementation. |
 | **Explicit B setter — required extension; unnamed**<br>No selected signature<br>[B/F requirements](security-regulator-operation-review.md) | Set the supplied GT's B to **0 or 1**, not toggle. Do not change unrelated GT fields or other copies. Ordinary movement rules remain separate. | Method name, target/result convention, registers and instruction mechanism. |
 | **Explicit F setter — required extension; unnamed**<br>No selected signature<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set **Near or Far**, not toggle or merely bypass a SAVE check. | Method name, precise target/encoding, argument/result registers and mechanism. |
@@ -181,6 +190,11 @@ specific caller still needs to be named.
   exact caller/ABI remain open.
 
 ## Common contract: settled versus open
+
+The DR1 standard applies independently of the indexed MakeOutformM alternative:
+status is approved for all methods, while caller-register access remains under
+review. It supersedes older “no success flag” wording and any description of
+DR1 status as merely proposed. It does not authorize catching HardFault.
 
 | Area | Preserve as settled | Still to specify or verify |
 |---|---|---|

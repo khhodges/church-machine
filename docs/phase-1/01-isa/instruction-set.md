@@ -1677,6 +1677,19 @@ behavior does not supply a normative answer.
 
 ### A.1 Common contract and notation
 
+**Approved standard software return status:** All SecurityRegulator methods
+use DR1=0 for success and a nonzero fault code for a returned failure.
+HardFault is excepted: it follows the existing ISA fault path, not a normal
+method RETURN carrying status. This policy does not convert HardFaults into
+recoverable software failures or change ISA/RTL.
+
+Where DR1 holds an input, the method must consume or preserve that input before
+replacing it with return status. GT results remain in their specified capability
+registers. For SWITCHM, successful return status accompanies completion after
+the matching SYSTEM context is restored, not an immediate return at handoff.
+Exact nonzero codes and which software-detectable failures return them remain
+to be specified; existing mandatory HardFault behavior remains unchanged.
+
 SecurityRegulator is a **digital mechanism, not a policy decision service**.
 Held authority expresses trust. The methods do not decide whether a caller's
 business purpose, Block ownership or allocation policy deserves an operation.
@@ -1920,7 +1933,7 @@ home using the defined M-assisted SAVE semantics.
 SAVEM(destinationGT, homeIndex, valueGT) -> void
 
 Approved operand inputs: CR1 = destinationGT; DR1 = homeIndex; CR2 = valueGT
-Return: normal completion; no result value
+Return: DR1 = 0 on success; no GT result
 ```
 
 **Approved operand clarification:** `valueGT` is supplied in a capability
@@ -2240,8 +2253,10 @@ MintM(Ctype, Permissions, Slot) -> GT    // no source GT argument
 
 **MakeOutformM alternative under review:** The user confirmed that DR1=`n`
 selects the **caller's CR[n]** for in-place Inform-to-Outform conversion,
-not SecurityRegulator's own CR[n]. The proposed status result is DR1=0 on
-success or a nonzero rejection code (for example, register not allowed).
+not SecurityRegulator's own CR[n]. The approved common status result is DR1=0
+on success or a nonzero fault code for a returned failure, except HardFault
+(which remains on the ISA fault path). Register-not-allowed is a proposed
+software rejection; its numeric code remains unspecified.
 The selected register supplies the original GT; `n` is a register selector,
 not a Namespace slot or reconstructed token.
 
