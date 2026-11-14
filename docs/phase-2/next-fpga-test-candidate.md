@@ -26,6 +26,12 @@ raw M-control. Residency itself grants no authority. Account for both LUMPs
 in the 128 KiB allocation budget. This decision does not claim implementation
 or authorize synthesis, physical operations, or saved-image replacement.
 
+Genesis means the human configurator using the IDE to assign authority.
+The IDE carries out those choices; it is not an independent issuer. There is
+no additional Genesis executable LUMP, method or runtime service required by
+this decision. M-to-SecurityRegulator is the current configured policy, not a
+claim that the configurator cannot choose a different authority arrangement.
+
 Initial loading tests may exercise one Namespace before cross-Namespace tests.
 Networking remains a later campaign; two resident Namespaces do not imply
 automatic cross-Namespace authority.

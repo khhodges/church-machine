@@ -29,11 +29,13 @@ does not qualify physical UART timing.
 
 ## Inputs not yet ready to freeze
 
-**Blocked on Genesis/SecurityRegulator integration:** the two-root native fixture reached a
+**Blocked on configured SecurityRegulator authority and native mediation:** the two-root native fixture reached a
 PERM_S rejection when Amoeba attempts to arm the M bits needed for SWITCH.
 Genesis alone issues M to SecurityRegulator; that authority decision is settled.
+Genesis is the human configurator using the IDE, not a missing executable or
+runtime issuance API. The build must preserve and validate that configuration.
 The existing Namespace-execution-only hardware gate is not the ownership
-contract. Native issuance/mediation and the approved Amoeba-plus-SecurityRegulator residency rule must
+contract. Configured grants, native mediation and the approved Amoeba-plus-SecurityRegulator residency rule must
 both be satisfied before this is build-ready. The direct-Amoeba fixture is
 disabled, not a release image. No source/image freeze or vendor-build authorization is
 implied by passing loader component tests.

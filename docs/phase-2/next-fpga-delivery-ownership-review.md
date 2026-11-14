@@ -148,7 +148,10 @@ regressions. Longer received-image regressions are tracked separately.
 **Authority settled; native integration remains unfinished.**
 Genesis alone issues M authority, exclusively to SecurityRegulator. Neither
 Namespace ownership nor direct Amoeba M-control is an approved alternative.
-The next implementation must follow Genesis → SecurityRegulator issuance and
+Here Genesis is the human configurator acting through the IDE, not another
+abstraction or a runtime issuer to implement. The IDE must carry out the
+configurator's authority decisions. The next implementation must preserve
+the configured SecurityRegulator grants and provide
 native mediation, with the now-approved Amoeba-plus-SecurityRegulator initial
 executable residency. All other executable dependencies remain initially absent.
 

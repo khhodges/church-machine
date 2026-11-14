@@ -6,7 +6,12 @@ For this candidate, Genesis alone issues M authority, exclusively to
 SecurityRegulator. Use that mediated path; Namespace ownership and direct
 Amoeba M-control are not alternatives.
 
-**Why:** The user explicitly corrected the proposed ownership choice.
+Genesis is the human configurator using the IDE, not another executable LUMP
+or a runtime service to implement. The configurator determines authority
+assignments; M-to-SecurityRegulator is the current explicit choice.
+
+**Why:** The user explicitly corrected both the ownership choice and the
+mistaken treatment of Genesis as missing software.
 
 **How to apply:** Follow the authoritative issuance rule in
 [M-bit I/O object](m-bit-io-object.md). The approved initial executable baseline

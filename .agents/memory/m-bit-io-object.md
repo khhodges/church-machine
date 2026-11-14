@@ -5,6 +5,19 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Authoritative issuance rule
 
+Genesis is the human authority configuring grants through the IDE, not a
+missing executable abstraction, resident LUMP, or runtime issuance service.
+The IDE implements that authority's configuration choices; it is not a
+competing issuer. Authority allocation is the configurator's decision.
+
+**Why:** The user clarified: “I am Genesis and use the IDE to configure
+authority as I see fit.”
+
+**How to apply:** Do not invent a Genesis method/API or count it as unfinished
+software. Prepare and validate the grants explicitly configured through the
+IDE. The current candidate decision below remains in force until the
+configurator changes it; the clarification alone does not grant M to Amoeba.
+
 Genesis is the only issuer of M authority, and SecurityRegulator is its only
 recipient. Neither Namespace, Amoeba, ordinary allocation services, nor the
 IDE/Builder may independently issue or receive that authority.
@@ -14,7 +27,7 @@ SecurityRegulator by Genesis.” This settles the candidate's authority boundary
 the existing Namespace-only execution gate is implementation history, not an
 alternative ownership policy.
 
-**How to apply:** Implement Genesis → SecurityRegulator issuance and native
+**How to apply:** Implement the Genesis-configured grants and native
 SecurityRegulator mediation. Do not provision raw M-control into Amoeba to
 enable SWITCH. Older provisioning/Namespace-custody statements below are
 historical where they conflict with this rule.
@@ -37,8 +50,9 @@ to implement or provision it.
 Historically, the user approved trusted IDE/Builder provisioning of the raw M-control
 capability into SecurityRegulator's private C-list during Namespace preparation
 on 2026-11-03. Ordinary Mint/FreeHandler allocation must not create or distribute
-it, and SR does not acquire it automatically at runtime. This earlier issuer
-description is superseded by Genesis-only issuance above. Boot and automatic
+it, and SR does not acquire it automatically at runtime. IDE/Builder preparation
+is compatible with Genesis-only issuance when it implements the human
+configurator's decisions; it is not independent issuance. Boot and automatic
 CR6.M retain their defined exceptions.
 
 **Why:** Explicit preparation establishes intended custody without giving
