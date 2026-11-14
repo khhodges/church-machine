@@ -1,7 +1,9 @@
-"""Fail-closed audit-intent gate for the isolated candidate.
+"""Bounded report-delivery tracking for the isolated candidate.
 
 The acknowledgement inputs belong to the trusted Home-IDE transport, not
 architectural registers. This module does not simulate a successful delivery.
+It is optional observation: no output connects to execution admission or faults.
+An undelivered report may be replaced by the next report; execution never waits.
 """
 from amaranth import Elaboratable, Module, Signal
 
@@ -25,8 +27,7 @@ class AuditGate(Elaboratable):
         m = Module()
         remaining = Signal(range(self.timeout_cycles + 1))
         with m.If(self.start):
-            with m.If(~self.enabled | (self.state == self.PENDING) |
-                      (self.state == self.FAILED) | (self.sequence == 0xffffffff)):
+            with m.If(~self.enabled | (self.sequence == 0xffffffff)):
                 m.d.sync += self.state.eq(self.FAILED)
             with m.Else():
                 m.d.sync += [

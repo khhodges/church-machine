@@ -72,25 +72,26 @@ The fixture's compiled instruction words execute directly in the maintained
 RTL model. Its local C-list binding and prepared Thread homes are diagnostic
 construction, not evidence of a completed saved-artifact admission pipeline.
 
-## Fail-closed audit intent
+## Reporting, not pre-authorization
 
-The configurator selected **Hard Fault on delivery failure**, not local
-queue-and-proceed behavior. The local regulator now submits an audit intent
-and waits for its receipt before writing M or executing SWITCH. The wait is
-bounded. An explicit rejection, missing receipt or stale receipt leads to
-Hard Fault with no privileged effect; a late receipt cannot revive failure.
+The configurator corrected both earlier agent interpretations: the IDE may
+not exist. Reporting is optional and cannot authorize, delay or fault execution.
+The native regulator contains no reporting capability, submission, wait or
+reporting-failure instruction. An optional observer captures completed SWITCH
+events outside the execution path. Missing, rejected and stale receipts affect
+only delivery tracking; undelivered reports may be replaced by later reports.
 
-The isolated Home-IDE receiver commits intent records to SQLite with FULL
+The isolated Home-IDE receiver commits report records to SQLite with FULL
 synchronous writes before returning their sequence as a receipt. An exact
 duplicate is idempotent; a conflicting sequence replay and storage failure
 cannot produce a receipt. Records identify the fixed image/session,
-Namespace, Thread, executing regulator and switch intent. These fields do
+destination Namespace, active Thread/execution and completed switch. These fields do
 not invent or replace the final Passcode audit identity.
 
 The native replay uses this real local receiver through testbench transport
 signals. **A production relay and authenticated acknowledgement channel are
-not wired or qualified by this work.** This is also not complete outcome
-auditing: the intent must never be displayed as successful execution.
+not wired or qualified by this work.** This is not a lossless reporting system
+or complete coverage of every regulator method and failed operation.
 
 Audit verification command:
 
@@ -101,6 +102,10 @@ python -m pytest \
   docs/phase-2/cooperative-retry/test_candidate_amoeba.py -q
 ```
 
-Result: **15 passed**, including native missing/rejected/stale-receipt
-Hard Faults before M/SWITCH, successful acknowledged round trips, durable
-receipt/idempotency checks, and unchanged delivery-service behavior.
+The earlier reporting-gate results are superseded. Corrected tests require the
+same successful execution with a receiver, no receiver, missing receipts,
+rejected delivery and stale receipts. No reporting fault is permitted.
+
+Corrected verification: **16 passed** across report tracking, delivery-service
+regressions and full native execution. All receiver-unavailable/failing cases
+completed the same Namespace round trips and USER lazy-load execution.

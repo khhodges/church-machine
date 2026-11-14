@@ -125,12 +125,10 @@ remain unselected/unqualified. Invocation grants and private local M-control
 binding remain separate from entry presence.
 Do not grant raw M to AppSystem or Amoeba.
 
-**Audit delivery decision:** SecurityRegulator must receive acknowledgement
-of the current audit intent from the Home IDE before the privileged operation.
-Delivery rejection or a missing acknowledgement within the bounded wait causes
-a Hard Fault. A stale receipt cannot authorize a new operation; local
-queue-and-proceed behavior is not approved. Intent acknowledgement is not
-evidence that execution succeeded.
+**Corrected reporting decision:** The IDE may not exist. Reporting is optional,
+best-effort observation, not pre-authorization or an execution dependency.
+Missing, failed or unacknowledged delivery must not fault or stall execution.
+Operations use their existing authority regardless of receiver availability.
 
 ## Resident replication — current decision
 

@@ -105,12 +105,12 @@ def prepare():
         list(r["words"]) for r in (amoeba, app, regulator)]
     if (len(amoeba_words) > 2048 or len(app_words) > 1024 or len(sr_words) > 1024
             or amoeba_words[0] & 255 != 8 or app_words[0] & 255 != 5
-            or sr_words[0] & 255 != 4):
+            or sr_words[0] & 255 != 3):
         raise ValueError("Mediated component exceeds its exact fixture reservation")
     amoeba_words[-8:] = [SYSTEM_EGT, 0x1a000008, 0x32000007, 0x32000009,
                         USER_GT, SYSTEM_GT, 0x022f000a, 0x4a000017]
     app_words[-5:] = [0x4a000018, SYSTEM_EGT, 0x32000009, USER_GT, SYSTEM_GT]
-    sr_words[-4:] = [0x4a000017, 0x2200000d, 0x022f000a, 0x32000019]
+    sr_words[-3:] = [0x4a000017, 0x2200000d, 0x022f000a]
     app_root, app_system, app_user, target = 0x10000, 0x11000, 0x11400, 0x12000
 
     def put(base, body):
@@ -127,7 +127,7 @@ def prepare():
     for root, amoeba_base, sr_base in ((0, 0x8000, 0xa000),
                                      (app_root, 0x16000, 0x18000)):
         local_amoeba, local_sr = list(amoeba_words), list(sr_words)
-        local_amoeba[-2] = local_sr[-2] = 0x022e000a if root else 0x022f000a
+        local_amoeba[-2] = local_sr[-1] = 0x022e000a if root else 0x022f000a
         put(amoeba_base, local_amoeba)
         put(sr_base, local_sr)
         descriptor(root, 1, root, 256, 47 if root else 46)
@@ -135,7 +135,6 @@ def prepare():
         descriptor(root, 9, 0x5400, 64)
         descriptor(root, 13, 0xffffff1c, 1, device=True)
         descriptor(root, 23, sr_base, len(sr_words))
-        descriptor(root, 25, 0x40000130, 3, device=True)
         descriptor(root, 40, target, record["sizeWords"])
         descriptor(root, 44, target, record["sizeWords"])
     descriptor(0, 10, app_root, 256, 47)

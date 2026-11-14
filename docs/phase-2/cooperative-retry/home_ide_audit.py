@@ -25,12 +25,12 @@ class HomeIDEAudit:
     def receive(self, *, sequence, namespace, thread, execution):
         for value, bits in ((sequence, 32), (namespace, 96), (thread, 32), (execution, 32)):
             if type(value) is not int or not 0 <= value < 1 << bits:
-                raise ValueError("Malformed audit intent")
+                raise ValueError("Malformed audit report")
         if sequence == 0:
             raise ValueError("Audit sequence zero is not a request")
         record = json.dumps(dict(image=self.image_sha256, namespace=namespace,
                                  thread=thread, execution=execution,
-                                 operation="namespace-switch-intent"), sort_keys=True)
+                                 operation="namespace-switch-completed"), sort_keys=True)
         with self.db:
             previous = self.db.execute(
                 "SELECT record FROM audit_intents WHERE session=? AND sequence=?",

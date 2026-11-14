@@ -102,14 +102,12 @@ The appendix records proposed audit fields and open delivery semantics.
 This is accountability, not an added policy engine; secret credential values
 must not be confused with the audit identity.
 
-**Later candidate delivery decision (2026-11-14):** The configurator selected
-Hard Fault on audit-delivery failure. Require a matching Home IDE
-acknowledgement of the current audit intent before the privileged operation.
-Use a bounded wait; missing, failed or stale acknowledgement must not permit
-the operation. Do not queue locally and proceed. Acknowledged intent is not
-an assertion that the operation later succeeded. This settles failure
-disposition, not the remaining audit identity, outcome delivery or transport
-qualification.
+**Corrected candidate reporting decision (2026-11-14):** The IDE may not exist.
+Reporting is optional and non-blocking, with no machine fault or stall for
+absent, failed or unacknowledged delivery. Existing authority alone governs
+execution. This supersedes both receipt-before-operation and reporting-fault
+interpretations. Remaining report content and transport qualification do not
+authorize an execution dependency.
 
 ## Authority and purpose
 

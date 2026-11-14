@@ -5,18 +5,17 @@ description: Canonical representation and custody rule for CR M state.
 
 ## Authoritative issuance rule
 
-SecurityRegulator audit delivery is fail-closed: the Home IDE must acknowledge
-the current audit intent before the privileged operation. Failed delivery or
-a missing acknowledgement causes a Hard Fault; do not queue the operation
-locally and proceed or accept an earlier operation's receipt.
+SecurityRegulator reporting is optional, non-blocking observation, never
+pre-authorization. The IDE may not exist. Missing, failed or unacknowledged
+report delivery must not cause a machine fault, stall, or execution dependency.
 
-**Why:** The user explicitly selected “Hard-fault on delivery failure” after
-reviewing the alternative of recording locally and forwarding later.
+**Why:** The user corrected both interpretations: “I did not request pre
+authorization only a report please change,” then “No failure the IDE may not
+exist.” This supersedes the earlier delivery-failure choice entirely.
 
-**How to apply:** Bound the wait, correlate acknowledgement to the exact
-current intent, and preserve the distinction between acknowledged intent and
-successful execution. This decision does not define a new credential scheme
-or authorize physical deployment.
+**How to apply:** Execute under existing authority whether or not any receiver
+is present. Keep best-effort reporting outside the execution path. Never
+reintroduce a receipt gate, reporting Hard Fault, or mandatory IDE connection.
 
 Genesis is the human authority configuring grants through the IDE, not a
 missing executable abstraction, resident LUMP, or runtime issuance service.

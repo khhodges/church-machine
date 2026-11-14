@@ -87,6 +87,8 @@ class CandidateCoreBridge(Elaboratable):
                 svc.namespace.eq(Cat(*core.debug_cr_words[15][:3])),
                 svc.thread.eq(core.debug_cr_words[12][0]),
                 svc.execution.eq(core.debug_cr_words[14][0]),
+                svc.report_start.eq(core.retire_valid & ~core.retire_fault_valid &
+                                    (core.retire_instr[27:32] == 5)),
                 p.address.eq(core.dmem_addr), p.wdata.eq(core.device_write_data),
                 p.read.eq(mmio & core.dmem_rd_en),
                 p.write.eq(mmio & core.dmem_wr_en & core.device_write_request),
