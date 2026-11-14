@@ -15,6 +15,15 @@ candidate that requires another build.
 Amoeba-only initial executable test and separate specification approval from
 implementation, vendor-build and physical-operation authorization.
 
+The next test candidate targets the second Wukong V3 used for the recent
+physical demonstrations.
+
+**Why:** The user selected that board to retain the established board/toolchain
+baseline.
+
+**How to apply:** Treat this as target selection only, not permission to alter
+its installed image or proof that newer runtime changes are installed.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.
