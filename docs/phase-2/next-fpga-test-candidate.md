@@ -138,7 +138,7 @@ body unless a separately reviewed streaming design is adopted. Verify selected
 LUMP sizes and recovery storage before freezing this limit. Oversized bodies
 must fail explicitly, not truncate or silently enlarge storage.
 
-## Proposed: first-candidate acceptance gates — awaiting review
+## Confirmed: first-candidate acceptance gates
 
 These are required results, not test results or build authorization.
 
@@ -166,6 +166,7 @@ also pass. No complete Phase 1, Phase 2 or W7 acceptance follows from these gate
 
 ## Next decisions
 
+- Readiness findings: [initial source and capacity review](next-fpga-test-readiness.md).
 - Exact source baseline.
 - Software fault recovery and exact shared-service handoff ABI/provisioning.
 - Exact memory ledger, receiver/device map and observation interface.

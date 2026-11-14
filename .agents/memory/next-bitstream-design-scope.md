@@ -71,6 +71,16 @@ without treating the earlier 64 KiB demonstration as a capacity requirement.
 resource fit, or approval to implement SD/Ethernet. Verify exact allocation,
 overhead, staging limits and new timing/resource results before freezing.
 
+The user approved the candidate's acceptance gates, including 100 rejected
+Mallory attempts and a read-back-verified Alice update after every rejection.
+
+**Why:** Define measurable bounded containment rather than infer success from
+one fault, a console PASS or successful byte transfer alone.
+
+**How to apply:** Keep generation/counter headroom without wrap, never
+reinitialize Alice, and distinguish local, vendor and physical evidence.
+The count is a functional target, not MTBF or full W7 closure.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.
