@@ -167,3 +167,10 @@ from the actual Namespace glass the user was using.
 Resident entry; resolve available sizes through the allocator and expose missing
 allocations prominently. Never imply that unresolved space is free or that a
 proposed map is a prepared/installed image.
+
+Resident entries without extents must remain selectable **inside the Glass**,
+not only in warnings beneath it.
+**Why:** The user explicitly rejected omitting SecurityRegulator despite its
+Resident policy.
+**How to apply:** Show an explicitly non-spatial unresolved annotation inside
+the glass until a real extent exists; never invent a proportional allocation.

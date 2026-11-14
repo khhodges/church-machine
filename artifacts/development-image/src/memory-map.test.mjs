@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {transform} from "esbuild";
+// Missing residents must be visible INSIDE the glass, not only in its footer.
+const page = readFileSync(new URL("./DevelopmentImage.tsx", import.meta.url), "utf8");
+const glass = page.slice(page.indexOf('<svg className="kiss-water-svg"'), page.indexOf("</svg>"));
+assert.match(glass, /missingResidents\.map/);
+assert.match(glass, /Resident · unplaced/);
+assert.match(glass, /Annotation, not an address range/);
+assert.match(glass, /onClick=\{\(\) => setSelectedSlot\(row\.slot\)\}/);
+assert.match(glass, /Size\/address unresolved/);
 const compiled = await transform(readFileSync(new URL("./memory-map.ts", import.meta.url), "utf8"), {loader: "ts", format: "esm"});
 const {builtSlots, byteToWord, containingRegion} = await import(`data:text/javascript;base64,${Buffer.from(compiled.code).toString("base64")}`);
 const image = {artifact_sha256: "exact", namespace_revision_id: "design:one", size: 65536};

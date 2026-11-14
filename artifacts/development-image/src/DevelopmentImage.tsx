@@ -457,6 +457,21 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
                         <text x="120" y="248" textAnchor="middle" className="kiss-glass-empty">NO LOCATIONS</text>
                         <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">Not present in this table</text>
                       </>}
+                      {missingResidents.length > 0 && <foreignObject x="58" y={glassTop + 12} width="124" height="180">
+                        <div style={{background:"#182334", border:"1px dashed #ee9b70", borderRadius:4, padding:6, maxHeight:166, overflowY:"auto", fontSize:11}}>
+                          <strong style={{color:"#ee9b70"}}>Resident · unplaced</strong>
+                          <div style={{fontSize:9, marginBottom:6}}>Annotation, not an address range</div>
+                          {missingResidents.map(row => <button key={row.slot} type="button"
+                            aria-pressed={selectedSlot === row.slot}
+                            aria-label={`Select resident slot ${row.slot} ${row.name}; size or address unresolved`}
+                            onClick={() => setSelectedSlot(row.slot)}
+                            style={{display:"block", width:"100%", padding:"6px 2px", marginBottom:4, whiteSpace:"normal", overflowWrap:"anywhere", textAlign:"left", fontSize:11,
+                              border:selectedSlot === row.slot ? "2px solid #f0ce7d" : "1px solid #63748b"}}>
+                            <b>Slot {row.slot}</b><br />{row.name}<br />
+                            <small>{row.allocationWords ? `${row.allocationWords} words · address unresolved` : "Size/address unresolved"}</small>
+                          </button>)}
+                        </div>
+                      </foreignObject>}
                     </svg>
                     <div className="kiss-glass-zero">{locatedEntries.length} {view === "built" ? "built-image" : input?.planning ? "resolved design" : "saved"} locations shown{missingResidents.length ? " · INCOMPLETE" : ""}</div>
                     {missingResidents.length > 0 && <section className="kiss-api-error" aria-label="Missing resident allocations">
