@@ -2068,6 +2068,11 @@ reactivation completes the method. Define which outgoing Thread performs the
 handoff and the wrapper's M setup. Do not add an ordinary RETURN after SWITCH
 and claim that it ran immediately in the original context.
 
+**Restoration prerequisite clarified:** The outgoing Thread can only be
+restored after another SWITCHM. This does not promise an automatic switch back
+or guaranteed restoration. Whether the restored method then executes RETURN
+to its caller remains a separate, unapproved continuation choice.
+
 ### A.5 Shared ABI and M-lifecycle review items
 
 Before any implementation claims conformance, close:
