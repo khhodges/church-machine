@@ -150,6 +150,17 @@ legacy slot messages as global record identifiers could silently misroute bytes.
 non-reused epoch when replacing the provisioned table; cancellation must not
 reuse transaction identifiers within an epoch.
 
+Entering maintenance cancels runtime delivery before an installation BEGIN;
+it does not independently reset the executing CPU or the UART transmitter.
+
+**Why:** Installer and runtime traffic must not compete for staging or serial
+ownership. A packet arbiter that retains a cancelled producer can otherwise
+block every later installer reply.
+
+**How to apply:** Release abandoned packet ownership while allowing an already
+transmitting byte to finish. Host delivery must resynchronize truncated
+requests; leaving maintenance alone must not reset the transaction counter.
+
 Keep the next work focused on the shortest path to this candidate bitstream:
 candidate-specific checks and exact build preparation, not unrelated legacy
 test cleanup or additional side projects. Stop before synthesis for approval.

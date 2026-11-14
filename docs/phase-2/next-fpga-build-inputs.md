@@ -34,12 +34,16 @@ checks and fourteen legacy receiver checks. The remaining cross-Namespace
 request ownership adapter now passes four integrated checks using real staging
 RAM; its qualified wire format and remaining native-service integration are recorded in
 [delivery ownership review](next-fpga-delivery-ownership-review.md).
-This adapter is not yet connected to the board's runtime MMIO/serial path.
+The adapter is now optionally composed into the core/board wrapper, with
+installer/runtime/probe inspection arbitration and runtime UART routing.
+Real-image installation followed by runtime LUMP verification passes locally.
+Native MMIO request/consumption and fault-termination inputs remain unconnected.
 
 - The final only-Amoeba-resident image and its Namespace-aware delivery/service
   path are not supplied by the diagnostic image used for core qualification.
-- The required runtime device/service routing is not connected to the new
-  wrapper. Unsupported MMIO assertions are not a production device decoder.
+- Native runtime device/service MMIO is not connected to the new wrapper.
+  Unsupported MMIO assertions are not a production device decoder. Qualified
+  UART routing does not by itself let native Amoeba request or publish a LUMP.
 - The final RTL export, complete constraints and exact image/source hashes
   must be frozen together after that integration, before synthesis approval.
 

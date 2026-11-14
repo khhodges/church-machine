@@ -5,6 +5,7 @@ The checked CPU-facing ports are integration seams, not a simulated ChurchCore.
 No LUMP receiver or new authority is invented to make this stage runnable.
 """
 from amaranth import Array, Const, Elaboratable, Module, Mux, ResetInserter, Signal
+from types import SimpleNamespace
 from .candidate_memory import CandidateMemory, Port, ALLOCATION_BYTES, STAGING_BYTES
 from .starter_transport import StarterTransport
 from .starter_sha256 import ReceivedImageSHA256
@@ -28,6 +29,12 @@ class CandidateAdmission(Elaboratable):
         self.admitted_epoch = Signal(32)
         self.admitted_digest = Signal(256)
         self.install_error = Signal()
+        # A separate interface prevents the runtime adapter from also driving
+        # the physical memory ports owned by this installer.
+        self.runtime_allowed = Signal()
+        self.runtime_memory = SimpleNamespace(
+            inspect=Port("runtime_inspect"), receive=Port("runtime_receive"),
+            receiver_enabled=Signal())
 
     def elaborate(self, platform):
         m = Module()
@@ -40,9 +47,8 @@ class CandidateAdmission(Elaboratable):
         m.d.comb += [
             mem.maintenance.eq(ctl.execution_reset),
             mem.cpu_enabled.eq(~ctl.execution_reset),
-            # Until Namespace-aware delivery is integrated, no runtime
-            # receiver is permitted to write staging through this foundation.
-            mem.receiver_enabled.eq(0),
+            mem.receiver_enabled.eq(self.runtime_allowed &
+                                    self.runtime_memory.receiver_enabled),
             mem.image.write.eq(ctl.memory_write),
             mem.image.address.eq(ctl.memory_address << 2),
             mem.image.wdata.eq(ctl.memory_data),
@@ -105,24 +111,46 @@ class CandidateAdmission(Elaboratable):
                          validation_match.eq(sha.digest == expected)]
         hashing = ctl.validate_request | verifying
         probe_owner = Signal()
+        runtime_owner = Signal()
+        rt = self.runtime_memory
+        runtime_selected = self.runtime_allowed & rt.receiver_enabled
         m.d.comb += [
-            mem.inspect.read.eq(Mux(hashing, 1, self.probe.read)),
-            mem.inspect.write.eq(Mux(hashing, 0, self.probe.write)),
-            mem.inspect.address.eq(Mux(hashing, inspection_address, self.probe.address)),
+            self.runtime_allowed.eq(~ctl.execution_reset & ~tr.maintenance &
+                                    ~hashing & ~ctl.begin_accepted),
+            mem.receive.write.eq(rt.receive.write & runtime_selected),
+            mem.receive.address.eq(rt.receive.address),
+            mem.receive.wdata.eq(rt.receive.wdata),
+            rt.receive.ready.eq(mem.receive.ready & runtime_selected),
+            rt.receive.error.eq(mem.receive.error & runtime_selected),
+        ]
+        m.d.comb += [
+            mem.inspect.read.eq(Mux(hashing, 1,
+                Mux(runtime_selected, rt.inspect.read, self.probe.read))),
+            mem.inspect.write.eq(Mux(hashing, 0,
+                Mux(runtime_selected, rt.inspect.write, self.probe.write))),
+            mem.inspect.address.eq(Mux(hashing, inspection_address,
+                Mux(runtime_selected, rt.inspect.address, self.probe.address))),
             sha.data.eq(mem.inspect.rdata),
             sha.start.eq(ctl.validate_request & ~verifying),
-            self.probe.ready.eq(mem.inspect.ready & ~hashing),
-            self.probe.error.eq(mem.inspect.error & ~hashing),
+            self.probe.ready.eq(mem.inspect.ready & ~hashing & ~runtime_selected),
+            self.probe.error.eq(mem.inspect.error & ~hashing & ~runtime_selected),
             self.probe.rvalid.eq(mem.inspect.rvalid & probe_owner),
             self.probe.rerror.eq(mem.inspect.rerror),
             self.probe.rdata.eq(mem.inspect.rdata),
+            rt.inspect.ready.eq(mem.inspect.ready & runtime_selected),
+            rt.inspect.error.eq(mem.inspect.error & runtime_selected),
+            rt.inspect.rvalid.eq(mem.inspect.rvalid & runtime_owner & runtime_selected),
+            rt.inspect.rerror.eq(mem.inspect.rerror & runtime_owner & runtime_selected),
+            rt.inspect.rdata.eq(Mux(runtime_owner & runtime_selected,
+                                    mem.inspect.rdata, 0)),
             ctl.validation_valid.eq(validation_done & verifying),
             ctl.validation_epoch.eq(verify_epoch),
             ctl.validation_ok.eq(digest_valid & validation_match &
                                  (verify_epoch == ctl.epoch) &
                                  self.staging_ready & ~self.install_error),
         ]
-        m.d.sync += probe_owner.eq(~hashing)
+        m.d.sync += [probe_owner.eq(~hashing & ~runtime_selected),
+                     runtime_owner.eq(runtime_selected)]
         with m.If(sha.start):
             m.d.sync += [verifying.eq(1), verify_epoch.eq(ctl.epoch),
                          expected.eq(tr.expected_digest), digest_valid.eq(tr.digest_valid)]

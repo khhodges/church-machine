@@ -15,8 +15,8 @@ The latch is now connected to the receiver in `candidate_qualified_delivery.py`.
 Trusted inputs select the full Namespace96/target-GT32 pair; changing those
 inputs after acceptance cannot redirect the transfer. The owner supplies the
 transaction number, including after same-epoch cancellation. Neither a queue
-nor a capability is created. Native service/MMIO and board integration remain
-unconnected, so this is not end-to-end native delivery evidence.
+nor a capability is created. Native service/MMIO remains unconnected, so this
+is not end-to-end native delivery evidence.
 
 Four integrated checks pass using actual banked staging RAM and SHA, covering
 completion, owner fault, disable and epoch replacement, duplicate target slots
@@ -52,9 +52,26 @@ The legacy profile still bounds memory at 64 KiB.
 `cooperative-retry/candidate_delivery.py` connects the selected-record receiver
 to real checked banked memory. Receiver grants follow actual staging-write
 acceptance; hashing and word consumption read actual staging RAM. The receiver
-never writes the executable destination. This adapter requires exclusive
-ownership of the inspection read channel, and is not yet connected alongside
-the installation verifier in the board top.
+never writes the executable destination. The admission wrapper now arbitrates
+the inspection channel: installer verification first, active runtime delivery
+second, diagnostic probe otherwise. Read responses retain their sampled owner.
+Runtime writes are separately gated out during installation and maintenance.
+
+The core/board wrappers optionally accept the provisioned delivery table and
+connect the qualified adapter through this interface. Entering maintenance
+cancels a transfer even before a new BEGIN packet. Leaving maintenance without
+reinstalling preserves the transaction counter. A real complete CSI3 install,
+runtime LUMP hash under competing probe reads, and cancellation/re-entry check
+passed alongside core and qualified-delivery regressions (13 checks).
+
+`candidate_serial.py` routes decoded input exclusively to CSI3 in maintenance,
+or to the enabled runtime receiver otherwise. Packet arbitration retains
+ownership until completion, except when a cancelled producer withdraws its
+request; then it releases arbitration without resetting the UART transmitter.
+Byte-level cancellation/routing and both board configurations passed three
+checks, including physical-top RTLIL elaboration with clock primitives. This
+is not a pin-timing test. Host tooling must recognize a truncated request at a
+maintenance/cancellation boundary and resynchronize on the protocol framing.
 
 Local results: seven candidate checks passed, including exact boundary
 rejection, real hash success/corruption rejection, complete word consumption,
@@ -88,8 +105,8 @@ Bounded service contract guiding integration:
    destination grants and publishes header last; normal CALL admission remains
    authoritative afterward.
 
-Next connect the qualified interface to service MMIO and serial routing,
-arbitrate admission versus runtime inspection ownership, and construct the
-exact only-Amoeba image.
+Next connect the qualified interface to native service MMIO and fault
+termination identity, prepare matching host delivery inputs, and construct
+the exact only-Amoeba image.
 Do not reuse CLA1's slot-only meaning for two Namespaces or preload dependencies
 to make the candidate appear ready. No synthesis or physical operations.

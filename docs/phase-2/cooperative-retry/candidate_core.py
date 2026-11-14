@@ -14,6 +14,7 @@ from hardware.reset_marker import RESET_MARKER_WORD
 from hardware.fault_entry import FaultBootBinding
 from .candidate_admission import CandidateAdmission
 from .candidate_memory import ALLOCATION_BYTES
+from .candidate_qualified_delivery import QualifiedDelivery
 
 
 class CandidateCoreBridge(Elaboratable):
@@ -113,7 +114,7 @@ The prepared image derives the binding; compatible later images may change
 other contents. Actual received Boot descriptors/header must still match.
 This does not authenticate the image sender or bypass normal guarded boot.
 """
-    def __init__(self, words, binding, *, clock_hz=25_000_000):
+    def __init__(self, words, binding, *, clock_hz=25_000_000, delivery_records=None):
         checked = FaultBootBinding.from_image(
             words, namespace=binding.namespace, thread_gt=binding.thread & 0xffffffff,
             image_sha256=binding.image_sha256, resident_words=binding.resident_words,
@@ -123,10 +124,17 @@ This does not authenticate the image sender or bypass normal guarded boot.
         self.admission = CandidateAdmission(clock_hz=clock_hz, trusted_words=binding.checks)
         self.bridge = CandidateCoreBridge(self.admission.memory, binding)
         self.core = self.bridge.core
+        self.delivery = (QualifiedDelivery(self.admission.runtime_memory,
+                         delivery_records, clock_hz=clock_hz)
+                         if delivery_records is not None else None)
 
     def elaborate(self, platform):
         m = Module()
         m.submodules.admission = self.admission
         m.submodules.bridge = self.bridge
         m.d.comb += self.bridge.held.eq(self.admission.control.execution_reset)
+        if self.delivery is not None:
+            m.submodules.delivery = d = self.delivery
+            m.d.comb += [d.enabled.eq(self.admission.runtime_allowed),
+                         d.epoch.eq(self.admission.admitted_epoch)]
         return m
