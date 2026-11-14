@@ -36,6 +36,18 @@ rejected attacks before expanding lifecycle acceptance.
 are distinct from executable residency. Inventory approval does not settle
 cross-Namespace dispatch, scheduling or fault recovery.
 
+The user approved explicit cross-Namespace Lazy servicing: USER LLR enters
+its local Slot 2; that SYSTEM records origin and request, explicitly SWITCHes
+to Boot/service Amoeba, then returns through application Slot 2 and CHANGE
+to the ready USER.
+
+**Why:** Preserve Namespace-local LLR and fixed Slot-2 SWITCH entry rather
+than introducing an implicit global SYSTEM transfer.
+
+**How to apply:** Retain full Namespace/Thread identity and explicit grants.
+Approval is for the route, not a completed request ABI, provisioning mechanism,
+startup bootstrap, scheduler, fault policy or implementation.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

@@ -56,16 +56,17 @@ fault/recovery path; an observed Mallory fault alone is insufficient.
 Mint/Cleaner and read-only retirement remain later software test stages on this
 candidate, subject to interface/capacity checks before hardware freeze. They
 are not silently added as dependencies of the initial loading demonstration.
-Cross-Namespace service entry, pending-request ownership, scheduling and fault
-return remain contracts to settle, not behavior established by this inventory.
+The cross-Namespace route below is approved. Exact pending-request ownership,
+scheduling and software fault recovery remain contracts to settle, not behavior
+established by this inventory.
 
-## Proposed: cross-Namespace Lazy service route — awaiting review
+## Confirmed: cross-Namespace Lazy service route
 
 Preserve the existing local LLR destination: the requesting Namespace's
 validated Slot 2 SYSTEM Thread. Do not silently redefine LLR as a direct
 cross-Namespace transfer to a globally addressed Boot Thread.
 
-Proposed software route:
+Approved software route:
 
 1. USER absence enters its local Slot 2 continuation through normal LLR.
 2. Local SYSTEM records the originating Namespace identity, full versioned
@@ -80,17 +81,36 @@ Request data does not grant write, SWITCH or Thread activation authority.
 SWITCH still requires CR15.M and enters the destination's Slot 2; CHANGE
 does not change the Namespace.
 
-This is a proposed control-flow contract, not an implemented protocol.
+This is an approved control-flow contract, not an implemented protocol.
 Private request/completion storage, grants, shared-code bindings, root identity
 validation, watchdog renewal and multiple-waiter scheduling need exact design
 and evidence. The application-side entry code must be available before USER
 dispatch without preloading a second executable: establish its explicit
 loading/bootstrap sequence as part of this contract.
 
+## Fault entry: carry forward the current ISA contract
+
+The Master ISA's Namespace fault recovery section and
+`../phase-1/boot-fault-rtl-contract.md` govern machine-owned fault entry:
+stash directly into configured Boot.Thread, prime it, attempt the outgoing
+Thread save once, finalize save status, then load Boot Namespace/Thread.
+The saved faulting context is evidence, not a resumable continuation.
+Original Thread and Namespace references must retain their original meaning.
+
+Failed Boot stash, priming or activation takes the specified indefinite LED
+loop, not an invented fallback or retry policy. This is distinct from an
+ordinary Lazy suspension, whose pending CALL is resumable.
+
+Software restoration of useful service remains to be specified. In particular,
+the initial test must choose whether to leave rejected Mallory stopped or
+explicitly initialize a fresh authorized attack attempt for repeated testing.
+Neither choice permits skipping the failed instruction and resuming the
+faulted context. Preserve Alice's protected state and verify later progress.
+
 ## Next decisions
 
 - Exact source baseline.
-- Exact service/application inventory and cross-Namespace handoff contract.
+- Software fault recovery and exact shared-service handoff ABI/provisioning.
 - Memory capacity, receiver/device map and observation interface.
 - Frozen test images, acceptance criteria and local build gates.
 
