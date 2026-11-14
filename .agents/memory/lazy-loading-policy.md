@@ -521,8 +521,12 @@ returned status 1 at maximum, retaining no-wrap and no automatic recovery.
 
 **How to apply:** Do not publish a wrapped version or release the reset context
 when increment is impossible. Keep hardware comparison-only; no automatic
-slot replacement or version recycling. This does not approve the proposed
-DR1 caller-register selector input or select a returned new-version GT.
+slot replacement or version recycling. Input DR1=n selecting the caller's
+CR[n] is now separately approved; DR1 becomes status on return. This does not
+select a returned new-version GT or prove caller-register access feasibility.
+
+**Why (input):** The user selected DR1 register selection for IncrementVersion,
+consistent with the other caller-register-targeting methods.
 
 Keep the ongoing Phase 2 review to FPGA rules and microcode/software interface
 contracts, not SYSTEM or IDE software orchestration.

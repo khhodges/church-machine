@@ -55,7 +55,8 @@ does not grant access. For Thread reset, change the authoritative entry version
 so old GTs become stale, with no wrap and DR1=1 at maximum (version unchanged).
 Success returns DR1=0; other HardFaults remain separate. Do not mutate
 versions automatically in FPGA or silently upgrade other GT copies. Exact
-method name is IncrementVersion; input ABI and returned-GT semantics remain open;
+method name is IncrementVersion; input DR1=n selects the caller's CR[n] holding
+the identifying GT, then DR1 returns status. Returned-GT semantics remain open;
 this is not permission
 to implement or provision it.
 

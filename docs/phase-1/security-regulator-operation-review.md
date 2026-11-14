@@ -20,7 +20,10 @@ the version is already at maximum, leaving the version unchanged; success
 returns DR1=0. This replaces the earlier exhaustion-HardFault requirement for
 that condition only. Other HardFaults retain the ISA fault path. A failed
 increment must not make the reset context runnable. Existing holders are not silently
-upgraded. **Approved method name: IncrementVersion.** Argument/result registers, authorized descriptor
+upgraded. **Approved method name and input: IncrementVersion, DR1=`n`.**
+DR1 selects the caller's CR[n] holding the identifying GT; it becomes status
+on return (0 success, 1 already at maximum). This approves the input signature,
+not caller-register access feasibility. The authorized descriptor
 update and any returned new-version GT remain to be specified under the current
 SR invocation rules. B alone does not imply invocation authority. This addition
 does not approve an implementation or expand the FPGA-only lifecycle review.
