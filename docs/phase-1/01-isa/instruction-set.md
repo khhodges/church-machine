@@ -2166,6 +2166,11 @@ evidence.
 MintM(Ctype, Permissions, Slot) -> GT
 ```
 
+**Approved software register assignments:** DR1 supplies Ctype, DR2 supplies
+Permissions, and DR3 supplies Slot. CR1 returns the constructed GT as capability
+authority, not a DR integer. This approval selects the software calling
+convention only; it does not select new field encodings or change ISA/RTL.
+
 **Function:** construct and return the Golden Token specified by these
 arguments using the trusted M mechanism. This is distinct from LOADM, which
 retrieves an existing GT, and SAVEM, which saves a supplied GT.
@@ -2207,9 +2212,10 @@ resolved identity fields, resulting GT identity, relevant M state and outcome.
 The common audit secret-handling and delivery requirements apply.
 
 **Review closure:** legal types/permissions, slot bounds and empty-slot behavior,
-non-Inform version and remaining identity sources, result register and clobbers, M setup/consumption,
+non-Inform version and remaining identity sources, clobbers, M setup/consumption,
 fault/write boundary, nested-call Passcode attribution and safe result return.
-No concrete register ABI or new numeric fault codes are selected here.
+Argument/result registers are approved above; no new numeric fault codes are
+selected here.
 
 **Acceptance cases:** verify exact returned bits for each supported Ctype and
 permission combination; invalid inputs; nonzero generations where applicable;
