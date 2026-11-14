@@ -124,6 +124,22 @@ bindings have been updated. Invocation grants, private local M-control binding
 and physical code sharing/copying remain separate from entry presence.
 Do not grant raw M to AppSystem or Amoeba.
 
+## Peer Namespace selection inside Amoeba
+
+The configurator selected encapsulating switching in Amoeba and placing the
+peer Namespace GT at the same CR6[n] C-list row in both local bindings.
+Identical instruction code therefore selects the configured peer without
+branching on Namespace identity or accepting a raw Namespace GT from AppSystem.
+Boot-side Amoeba targets AliceMallory.Application; application-side Amoeba
+targets Boot.Services. Amoeba calls local SecurityRegulator for the privileged
+operation; raw M remains exclusive to SecurityRegulator.
+
+Here n is a C-list row, not a Namespace slot number. The numeric row and exact
+bindings are not yet frozen. Physical instruction sharing versus copied bodies
+is separate: identical instructions do not establish that a single physical
+bound C-list works in both contexts. This records the design, not an applied
+Namespace change or qualified native implementation.
+
 ## Confirmed: fault entry preserves Boot's continuation
 
 Carry forward direct fault stashing into the configured Boot.Thread, one

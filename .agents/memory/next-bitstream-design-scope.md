@@ -80,6 +80,19 @@ candidate that requires another build.
 two-LUMP initial executable baseline and separate specification approval from
 implementation, vendor-build and physical-operation authorization.
 
+Amoeba encapsulates Namespace switching: identical instruction code uses the
+same CR6[n] C-list row for the peer Namespace GT in each local binding.
+Boot-side binding targets the application; application-side binding targets Boot.
+
+**Why:** The user proposed a SWITCH method in Amoeba to limit Namespace exposure,
+then specified the same CR6[n] row with identical code.
+
+**How to apply:** Keep the peer GT private to Amoeba, not an AppSystem argument.
+Amoeba invokes local SecurityRegulator for the M-requiring operation; it receives
+no raw M. The numeric C-list row, exact GT bindings and physical sharing/copying
+remain to be established. Identical instructions do not prove that one physical
+bound C-list is suitable for both Namespaces.
+
 The next test candidate targets the second Wukong V3 used for the recent
 physical demonstrations.
 
