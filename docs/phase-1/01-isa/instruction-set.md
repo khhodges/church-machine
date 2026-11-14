@@ -4,6 +4,7 @@
 
 - [Core execution reference](#core-execution-reference)
 - [Document authority](#document-authority)
+- [Common API return status](#common-api-return-status)
 - [Approved Phase 1 contract](#approved-phase-1-contract)
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
 - [CHANGE: one-GT Thread activation](#change-one-gt-thread-activation)
@@ -731,6 +732,28 @@ does not consume the enclosing CALL frame or perform RETURN cleanup; a
 LAMBDA-frame RETURN is not a substitute for CALL-frame capability erasure.
 These are Mint usage constraints, not new instruction encodings or evidence
 that the remaining Mint operation bodies are complete.
+
+### Common API return status
+
+**Approved software convention for every API RETURN:** DR1=0 indicates
+success; a nonzero DR1 carries a fault code for a returned failure. This applies
+to all API methods, not only SecurityRegulator, including methods with no
+functional result. HardFault is excepted: it follows the existing ISA fault
+path rather than becoming a normal status return.
+
+An API must consume or preserve any DR1 input before replacing it with status.
+Functional results are separate from status; GT results retain their declared
+capability destinations. APIs that currently use DR1 for a scalar payload need
+an explicit result-location and caller migration, not silent reinterpretation
+of their returned value as status. No universal replacement payload register
+is selected by this policy.
+
+This is a software API convention, not a change to RETURN instruction semantics,
+encoding, context preservation or RTL. It does not make RETURN automatically
+write DR1, authorize catching HardFault, or establish that existing API bodies,
+callers and saved LUMPs already conform. Exact nonzero codes and returnable
+failure cases remain to be specified. Historical artifacts are not rewritten
+by this documentation approval.
 
 ### Standard software hard fault
 
@@ -1677,8 +1700,10 @@ behavior does not supply a normative answer.
 
 ### A.1 Common contract and notation
 
-**Approved standard software return status:** All SecurityRegulator methods
-use DR1=0 for success and a nonzero fault code for a returned failure.
+**Approved standard software return status:** The
+[common API return policy](#common-api-return-status) applies to every API
+method, including all SecurityRegulator methods: DR1=0 for success and a
+nonzero fault code for a returned failure.
 HardFault is excepted: it follows the existing ISA fault path, not a normal
 method RETURN carrying status. This policy does not convert HardFaults into
 recoverable software failures or change ISA/RTL.

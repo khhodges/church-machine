@@ -6,10 +6,9 @@ description: Meaning and approval boundary of the DR1-selected MakeOutformM alte
 The proposed MakeOutformM alternative uses DR1=n to select the caller's CR[n]
 for in-place conversion, not the regulator's own CR[n].
 
-DR1 is approved as the standard status return for all SecurityRegulator methods:
-zero for success, nonzero fault code for a returned failure, except HardFault.
-HardFault retains its ISA fault path. This status rule is independent of whether
-the indexed conversion alternative is adopted; numeric codes remain unspecified.
+The [common API return policy](api-return-status.md) applies independently of
+whether this indexed conversion alternative is adopted; numeric codes remain
+unspecified. Its scope is every API, not just SecurityRegulator.
 
 **Why:** The user explicitly confirmed caller-context targeting when asked to
 distinguish it from the callee's register context.

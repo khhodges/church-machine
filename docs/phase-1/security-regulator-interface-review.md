@@ -11,7 +11,9 @@ No numeric method indices are assigned to the final `ide.SecurityRegulator`.
 
 ## Method and signature table
 
-**Standard return policy for all methods:** DR1=0 means success; a nonzero DR1
+**Standard return policy for every API, not only SecurityRegulator:**
+[Common API return status](01-isa/instruction-set.md#common-api-return-status)
+requires DR1=0 for success; a nonzero DR1
 is a returned fault code. HardFault follows the existing ISA fault path and is
 not converted into a status return. DR1 inputs are consumed before DR1 becomes
 the status result; GT results retain their specified capability destinations.
@@ -192,7 +194,7 @@ specific caller still needs to be named.
 ## Common contract: settled versus open
 
 The DR1 standard applies independently of the indexed MakeOutformM alternative:
-status is approved for all methods, while caller-register access remains under
+status is approved for every API method, while caller-register access remains under
 review. It supersedes older “no success flag” wording and any description of
 DR1 status as merely proposed. It does not authorize catching HardFault.
 
