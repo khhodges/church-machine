@@ -137,8 +137,21 @@ through repeated deliberate attacks.
 
 **How to apply:** Do not resume the faulted context or skip its failed
 instruction. Bring any required fresh-Thread initialization subset into initial
-test scope; general lifecycle work remains separate. Exact reset/grant/version
-mechanisms still need design and evidence.
+test scope; general lifecycle work remains separate.
+
+The user selected reuse of Mallory's Thread slot and allocated memory with a
+new generation and freshly initialized context for each subsequent attempt.
+
+**Why:** Keep a bounded Thread allocation while making each attempt a distinct
+authorized context, rather than resuming the faulted one.
+
+**How to apply:** Retain fault evidence outside the replaced context, advance
+the authoritative Thread generation through authorized software/SecurityRegulator
+(never automatically in hardware), initialize an approved template, and issue
+the scheduler a newly authorized GT. Old GTs stay stale; generation exhaustion
+stops rather than wraps. Preserve Alice's Thread and protected state and verify
+her progress before the next dispatch. Exact initialization ABI, grants and
+pending-request invalidation still require implementation and evidence.
 
 The user approved a provisional aggregate memory target of 128 KiB for
 resident allocations plus 16 KiB isolated incoming-LUMP staging, at the

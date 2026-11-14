@@ -174,8 +174,20 @@ Alice's protected state remains intact, with actual progress checked between
 attempts. Reinitializing Alice or reconstructing her value from a diagnostic
 counter does not satisfy this requirement.
 
-The exact fresh-Thread initialization contract, grants, generation handling
-and pending-request invalidation remain engineering work. Required
+The configurator selected reuse of Mallory's application Thread slot (12 in
+the reviewed layout) and its allocated Thread memory. Each subsequent attempt
+receives a fresh context and a new authoritative Thread-entry generation.
+Retain fault evidence outside the replaced context before reinitialization.
+Authorized software uses SecurityRegulator for generation advancement; hardware
+must not increment versions automatically. Initialize an approved starting
+template and issue the scheduler a newly authorized GT. Do not silently upgrade
+old GT copies, resume the faulted context or wrap an exhausted generation.
+Preserve Alice's Thread and protected state, checking her progress before the
+next Mallory dispatch and after the last rejection.
+
+This settles the reuse/generation policy, not an implemented restart mechanism.
+The exact fresh-Thread initialization ABI, grants and pending-request
+invalidation remain engineering work. Required
 Mint/Amoeba initialization may therefore enter the first containment test;
 this is not approval for the entire general lifecycle or a hardware build.
 
