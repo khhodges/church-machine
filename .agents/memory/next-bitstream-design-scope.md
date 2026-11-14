@@ -48,6 +48,18 @@ than introducing an implicit global SYSTEM transfer.
 Approval is for the route, not a completed request ABI, provisioning mechanism,
 startup bootstrap, scheduler, fault policy or implementation.
 
+The user approved automatic repeated Mallory attacks in the first containment
+test: record each rejection, initialize a fresh authorized Mallory attempt,
+and verify Alice's retained protected state and progress between attempts.
+
+**Why:** A single rejection does not demonstrate sustained useful service
+through repeated deliberate attacks.
+
+**How to apply:** Do not resume the faulted context or skip its failed
+instruction. Bring any required fresh-Thread initialization subset into initial
+test scope; general lifecycle work remains separate. Exact reset/grant/version
+mechanisms still need design and evidence.
+
 **Why:** The next platform layout needs a separate design workspace, not modification of the demonstrated image.
 
 **How to apply:** Use the Switch loop Namespace Designer → Image Development → Next Bitstream Design → Namespace Designer. Sizes and slot counts remain undecided. This approval covers the design workspace, not synthesis, flashing, board changes or automatic cross-Namespace access.

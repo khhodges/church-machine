@@ -53,9 +53,10 @@ attempts forbidden access and is rejected. Acceptance must additionally prove
 that Alice's retained state and subsequent progress survive the approved
 fault/recovery path; an observed Mallory fault alone is insufficient.
 
-Mint/Cleaner and read-only retirement remain later software test stages on this
-candidate, subject to interface/capacity checks before hardware freeze. They
-are not silently added as dependencies of the initial loading demonstration.
+General Mint/Cleaner and read-only retirement remain later software test stages,
+subject to interface/capacity checks before hardware freeze. The subsequently
+approved repeated-attack test brings any required fresh-Thread initialization
+subset into initial containment scope; its exact implementation is unresolved.
 The cross-Namespace route below is approved. Exact pending-request ownership,
 scheduling and software fault recovery remain contracts to settle, not behavior
 established by this inventory.
@@ -101,11 +102,41 @@ Failed Boot stash, priming or activation takes the specified indefinite LED
 loop, not an invented fallback or retry policy. This is distinct from an
 ordinary Lazy suspension, whose pending CALL is resumable.
 
-Software restoration of useful service remains to be specified. In particular,
-the initial test must choose whether to leave rejected Mallory stopped or
-explicitly initialize a fresh authorized attack attempt for repeated testing.
-Neither choice permits skipping the failed instruction and resuming the
-faulted context. Preserve Alice's protected state and verify later progress.
+## Confirmed: repeated Mallory attacks
+
+The first containment test automatically repeats controlled attack attempts.
+Boot records each rejection. Authorized software initializes a fresh Mallory
+attempt; it never skips the failed instruction or resumes the faulted context.
+Alice's protected state remains intact, with actual progress checked between
+attempts. Reinitializing Alice or reconstructing her value from a diagnostic
+counter does not satisfy this requirement.
+
+The exact fresh-Thread initialization contract, grants, generation handling
+and pending-request invalidation remain engineering work. Required
+Mint/Amoeba initialization may therefore enter the first containment test;
+this is not approval for the entire general lifecycle or a hardware build.
+
+## Proposed: aggregate memory target — awaiting review
+
+Use 128 KiB for resident Namespace/Thread structures, LUMP allocations,
+private state and software records, plus 16 KiB of isolated transfer staging.
+This is a 144 KiB aggregate target, not fixed equal Namespace partitions or
+authority to share mutable objects. Final allocations require exact selected
+sizes; Namespace slot counts and addresses remain unsettled.
+
+The earlier `development-implementation-scope.md` review estimated 108 of
+135 BRAM36 tiles for this payload with the current three-read-copy geometry,
+and 124 including its proposed overhead/peripheral allowances. These are
+planning estimates, not utilization measurements for this candidate.
+Reserving room is not implementing or approving SD/Ethernet in this stage.
+Retain the 25 MHz functional-test target and require new timing/resource
+evidence before declaring fit. Do not round a triplicated memory to 256 KiB:
+that would exceed the stated BRAM capacity.
+
+The provisional staging allocation implies a maximum 16 KiB complete received
+body unless a separately reviewed streaming design is adopted. Verify selected
+LUMP sizes and recovery storage before freezing this limit. Oversized bodies
+must fail explicitly, not truncate or silently enlarge storage.
 
 ## Next decisions
 
