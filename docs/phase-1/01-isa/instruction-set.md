@@ -1476,6 +1476,15 @@ Namespace images, catalogs, resident LUMPs, or deployment approvals.
 
 ## SWITCH: combined Namespace and Thread handoff
 
+**Latest Thread-selection correction:** SWITCH saves the outgoing Thread,
+changes Namespace, then loads the incoming Thread selected by the instruction's
+index. That Thread slot is **not necessarily 2**. This supersedes fixed-slot-2
+incoming Thread claims elsewhere in this document. The earlier source-row
+notation below must be reconciled with this index meaning before freezing
+SWITCHM's ABI or instruction encoding; it does not establish that the Thread
+index is a source C-list row. This correction does not claim implementation
+conformance or authorize hardware changes.
+
 **Approved Phase 1 semantics:** CHANGE is THREADSAVE → THREADLOAD. SWITCH is
 the same halves with LOAD NAMESPACE(CR15) inserted between them. Ordinary CHANGE
 leaves CR15 unchanged; CR13 is NULL and never touched. The earlier blanket
@@ -2021,6 +2030,12 @@ destination-M permission needed for this example.
 
 ### A.4 SWITCHM — M-authorized Namespace/Thread handoff
 
+**Thread-selection correction:** The incoming Thread slot is selected by the
+instruction's index, not fixed at 2. Preserve the sequence THREADSAVE →
+Namespace change → THREADLOAD. The source/row signature below remains a
+historical proposal pending reconciliation with this corrected index meaning;
+its input registers have not been approved.
+
 **Function:** select a Namespace GT from a supplied C-list and perform the
 existing combined SWITCH handoff with CR15.M authorization.
 
@@ -2042,8 +2057,8 @@ arbitrary destination-register number.
 3. Validate the selected Namespace capability, bounds, identity/integrity
    and Namespace type before outgoing save or incoming installation.
 4. Save the outgoing Thread, install the Namespace into fixed CR15, then
-   activate that Namespace's fixed slot-2 entry Thread into CR12 according
-   to the approved SWITCH contract.
+   load the incoming Thread selected by the instruction's index into CR12.
+   Do not substitute fixed slot 2 for the selected Thread slot.
 5. Consume CR15.M on successful handoff. CR13 remains untouched.
 
 No additional CR12.M grant is required. Instruction bits 22:19 remain

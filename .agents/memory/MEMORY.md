@@ -152,3 +152,4 @@
 - [Offline evidence licensing](offline-evidence-licensing.md) — owner approved GPL-3.0 for tooling and historical evidence; optional commercial licensing, no publication instruction.
 - [Native memory queue delivery](native-memory-queue-delivery.md) — native CLOOMC service execution is required; host fixtures and documentation cannot substitute for the allocator.
 - [Embedded browser storage](embedded-browser-storage.md) — standalone page success does not prove iframe startup; never replace durable drafts with silent temporary storage.
+- [SWITCH Thread selection](switch-thread-index.md) — instruction index selects the incoming Thread slot, not fixed slot 2; Namespace change lies between save/load halves.
