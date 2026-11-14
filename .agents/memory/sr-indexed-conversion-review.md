@@ -55,3 +55,13 @@ explicitly agreed to the register signature.
 **How to apply:** Do not reopen the register selection. Verify feasibility
 against unchanged ISA/RTL; signature approval does not settle missing-binding
 behavior, allowed registers or all conversion failure effects.
+
+MakeInformM also leaves the selected Outform GT unchanged on a returned
+software rejection, with nonzero DR1 status. Success replaces it with the
+Inform and returns DR1=0; HardFault carries no rollback guarantee.
+
+**Why:** The user explicitly approved matching MakeOutformM's rejection rule.
+
+**How to apply:** Keep this guarantee distinct from selecting which conditions
+are returnable failures versus HardFault and from the original request's Lazy
+Load responsibility.

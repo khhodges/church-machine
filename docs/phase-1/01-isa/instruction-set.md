@@ -2308,6 +2308,13 @@ This approves the register signature, not proof of caller-context access or
 the conversion mechanism under the existing ISA/RTL. It does not authorize
 Lazy Load by SR or select missing-binding behavior.
 
+**Approved MakeInformM returned-rejection behavior:** A returned software
+rejection leaves the selected caller's Outform GT unchanged and returns a
+nonzero fault code in DR1. Success replaces it with the Inform GT and returns
+DR1=0. HardFault remains on the ISA fault path, without a rollback guarantee.
+This selects the effect of a returned rejection, not which conditions return
+a code versus cause HardFault; it does not authorize Lazy Load by SR.
+
 The source GT is mandatory operation input, not an optional hint, a slot
 number, or a reconstructed current token. Validate it under the reviewed
 conversion rules and retain its identity evidence through conversion.
