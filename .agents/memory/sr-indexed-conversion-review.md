@@ -1,6 +1,6 @@
 ---
 name: SecurityRegulator indexed conversion review
-description: Meaning and approval boundary of the DR1-selected MakeOutformM alternative.
+description: Caller-register selection for conversion methods, status policy and Lazy Load boundary.
 ---
 
 The proposed MakeOutformM alternative uses DR1=n to select the caller's CR[n]
@@ -44,3 +44,14 @@ appeared to imply that SR would initiate Lazy Load.
 **How to apply:** Keep register selection and mechanical conversion separate
 from loading. Do not introduce an implicit SR fetch or infer an agreed
 missing-binding status/HardFault outcome from this ownership clarification.
+
+MakeInformM's register signature is approved: DR1=n selects the caller's
+CR[n] containing the original Outform; success converts that register in place
+to Inform, with DR1 then carrying common API status.
+
+**Why:** After separating the register question from Lazy Load, the user
+explicitly agreed to the register signature.
+
+**How to apply:** Do not reopen the register selection. Verify feasibility
+against unchanged ISA/RTL; signature approval does not settle missing-binding
+behavior, allowed registers or all conversion failure effects.

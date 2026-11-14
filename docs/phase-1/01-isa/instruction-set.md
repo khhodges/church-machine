@@ -2298,7 +2298,15 @@ CALL/RETURN, allowed registers, result preservation and implementation of the
 approved returned-rejection behavior must
 be resolved before adopting the alternative as an executable ABI. A software
 rejection status does not imply that ISA hard faults can be caught and returned
-in DR1. No ISA/RTL change is authorized. MakeInformM assignments remain separate.
+in DR1. No ISA/RTL change is authorized.
+
+**Approved MakeInformM register signature:** DR1=`n` selects the caller's
+CR[n] containing the original Outform GT. Successful conversion replaces it
+in place with the corresponding Inform GT; DR1 then carries the common API
+return status (0 success, nonzero returned fault code, HardFault excepted).
+This approves the register signature, not proof of caller-context access or
+the conversion mechanism under the existing ISA/RTL. It does not authorize
+Lazy Load by SR or select missing-binding behavior.
 
 The source GT is mandatory operation input, not an optional hint, a slot
 number, or a reconstructed current token. Validate it under the reviewed
@@ -2314,15 +2322,15 @@ Mint's preservation/resolution and binding responsibilities remain distinct
 from the regulator's mechanical conversion.
 
 **Lazy Load ownership clarification:** Lazy Load belongs to the original
-request, not to SecurityRegulator's conversion method. The MakeInformM
-register-interface proposal does not authorize SR to initiate Lazy Load.
+request, not to SecurityRegulator's conversion method. The approved MakeInformM
+register signature does not authorize SR to initiate Lazy Load.
 Do not interpret conversion as an implicit fetch/load request. Behavior when
 the required local binding is unavailable remains to be specified under the
 common status/HardFault policy.
 
 **Review closure:** exact source-form validation, output identity/permission
 mapping, destination Namespace and binding rules where applicable, invalid
-source/fault behavior, M lifecycle, MakeInformM register assignments and
+source/fault behavior, M lifecycle, verification of caller-register access and
 remaining clobber/return details. The source-required
 contract does not assert that changing type bits alone completes conversion.
 
