@@ -8,7 +8,8 @@ class AmoebaReceiver(Elaboratable):
     EMPTY, RECEIVING, SEALED, VERIFYING, READY, COPYING, CONSUMED, FAILED, WAITING = range(9)
 
     def __init__(self, records, *, staging_base=0xa000, staging_words=1024,
-                 clock_hz=25_000_000, memory_profile="legacy64"):
+                 clock_hz=25_000_000, memory_profile="legacy64", qualified=False):
+        self.qualified = qualified
         self.records = validate_records(records, staging_base=staging_base,
                                         staging_words=staging_words,
                                         memory_profile=memory_profile)
@@ -17,6 +18,7 @@ class AmoebaReceiver(Elaboratable):
         self.valid, self.error, self.running = Signal(), Signal(), Signal()
         self.byte, self.epoch = Signal(8), Signal(32)
         self.request, self.request_slot = Signal(), Signal(32)
+        self.request_transaction = Signal(32)
         self.pop, self.commit, self.commit_transaction = Signal(), Signal(), Signal(32)
         self.state, self.selector, self.transaction = Signal(4), Signal(8), Signal(32)
         self.size, self.expected_header = Signal(32), Signal(32)
@@ -85,18 +87,22 @@ class AmoebaReceiver(Elaboratable):
         with m.Else():
             with m.If(self.request):
                 with m.If(((self.state == self.EMPTY) | (self.state == self.CONSUMED)) &
-                          (self.transaction != 0xffffffff) & ~tx_busy):
+                          ((self.request_transaction != 0) if self.qualified else
+                           (self.transaction != 0xffffffff)) & ~tx_busy):
                     m.d.sync += self.state.eq(self.FAILED)
                     for i, record in enumerate(self.records):
                         with m.If(self.request_slot == record["slot"]):
                             m.d.sync += [
                                 selected.eq(i), self.selector.eq(record["slot"]),
-                                self.transaction.eq(self.transaction + 1),
+                                self.transaction.eq(self.request_transaction if self.qualified
+                                                    else self.transaction + 1),
                                 self.state.eq(self.WAITING), self.consumed.eq(0),
                                 index.eq(0), idle.eq(0), tx_index.eq(0), tx_busy.eq(1),
                                 # CAR1 | slot:u32 | epoch:u32 | transaction:u32
-                                packet.eq(Cat((self.transaction + 1)[:32], epoch,
-                                              self.request_slot, Const(0x43415231, 32))),
+                                packet.eq(Cat(self.request_transaction if self.qualified else
+                                              (self.transaction + 1)[:32], epoch,
+                                              self.request_slot, Const(
+                                                  0x43525131 if self.qualified else 0x43415231, 32))),
                             ]
                 with m.Else():
                     # Reentry is a software error, never permission to replace data.
@@ -138,7 +144,8 @@ class AmoebaReceiver(Elaboratable):
                     with m.Else():
                         m.d.sync += index.eq(0)
                         length = Cat(self.byte, header[18], header[17], header[16])
-                        framing = ((Cat(*header[:4]) == int.from_bytes(MAGIC, "little")) &
+                        framing = ((Cat(*header[:4]) == int.from_bytes(
+                            b"CLQ1" if self.qualified else MAGIC, "little")) &
                             (header[5] == self.selector) & (header[6] == 0) & (header[7] == 0) &
                             (Cat(header[11], header[10], header[9], header[8]) == epoch) &
                             (Cat(header[15], header[14], header[13], header[12]) == self.transaction))

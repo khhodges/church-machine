@@ -9,11 +9,11 @@ from .amoeba_receiver import AmoebaReceiver
 
 
 class CandidateDelivery(Elaboratable):
-    def __init__(self, memory, records, *, clock_hz=25_000_000):
+    def __init__(self, memory, records, *, clock_hz=25_000_000, qualified=False):
         self.memory = memory
         self.receiver = AmoebaReceiver(
             records, staging_base=0x20000, staging_words=4096,
-            clock_hz=clock_hz, memory_profile="candidate128")
+            clock_hz=clock_hz, memory_profile="candidate128", qualified=qualified)
         self.enabled = Signal()
         self.epoch = Signal(32)
 

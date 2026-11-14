@@ -31,7 +31,8 @@ does not qualify physical UART timing.
 
 The candidate's staging-only receiver connection now passes seven focused
 checks and fourteen legacy receiver checks. The remaining cross-Namespace
-request ownership interface is recorded in
+request ownership adapter now passes four integrated checks using real staging
+RAM; its qualified wire format and remaining native-service integration are recorded in
 [delivery ownership review](next-fpga-delivery-ownership-review.md).
 This adapter is not yet connected to the board's runtime MMIO/serial path.
 

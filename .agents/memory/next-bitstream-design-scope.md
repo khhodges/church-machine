@@ -139,6 +139,17 @@ that both Namespaces remain resident and runnable Threads can still take turns.
 candidate. Retain each request's originating identity across Namespace switches;
 a slot number alone is not a globally unique destination.
 
+Qualified candidate delivery uses a separately identified wire profile rather
+than redefining legacy slot-addressed messages. Its record table must be frozen
+with the host delivery inputs and installation epoch.
+
+**Why:** Two resident Namespaces may use identical target slots; interpreting
+legacy slot messages as global record identifiers could silently misroute bytes.
+
+**How to apply:** Keep old receiver profiles unchanged. Require a fresh,
+non-reused epoch when replacing the provisioned table; cancellation must not
+reuse transaction identifiers within an epoch.
+
 Keep the next work focused on the shortest path to this candidate bitstream:
 candidate-specific checks and exact build preparation, not unrelated legacy
 test cleanup or additional side projects. Stop before synthesis for approval.

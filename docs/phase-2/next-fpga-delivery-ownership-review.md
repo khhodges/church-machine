@@ -11,10 +11,37 @@ an unrelated Namespace's fault does not cancel it, and stale completion cannot
 release its successor. Transaction numbers are not reused on same-epoch
 cancellation.
 
-This latch is not yet wired into the receiver/native service path. In
-particular, trusted record selection, serial transaction numbering and
-publication authorization must be connected consistently before this is
-end-to-end delivery evidence. It creates neither a queue nor a capability.
+The latch is now connected to the receiver in `candidate_qualified_delivery.py`.
+Trusted inputs select the full Namespace96/target-GT32 pair; changing those
+inputs after acceptance cannot redirect the transfer. The owner supplies the
+transaction number, including after same-epoch cancellation. Neither a queue
+nor a capability is created. Native service/MMIO and board integration remain
+unconnected, so this is not end-to-end native delivery evidence.
+
+Four integrated checks pass using actual banked staging RAM and SHA, covering
+completion, owner fault, disable and epoch replacement, duplicate target slots
+across Namespaces, unrelated faults, delayed replies and unchanged executable
+destinations. RTLIL conversion checks the integration for combinational cycles.
+Together with the existing candidate and owner checks, 15 checks pass.
+The 14 legacy receiver checks also pass when loaded against the isolated local
+modules (their historical imports otherwise refer to removed hardware modules).
+
+### Qualified wire format
+
+The opt-in profile uses `CRQ1` requests and `CLQ1` replies, not the legacy
+slot-addressed CAR1/CLA1 meanings. CRQ1 contains big-endian u32 table selector,
+epoch and transaction after its four-byte magic. CLQ1 retains the 20-byte
+command layout: magic, operation u8, table selector u8, zero u16, epoch u32,
+transaction u32, payload length u32. Payload words remain little-endian.
+Selectors 3 onward identify records in the immutable provisioned table, not
+Namespace slots. The same table must be frozen with the host delivery inputs.
+Each table row binds Namespace96, exact target GT32, destination, length and
+SHA. Changing the table requires a new non-reused installation epoch; epochs
+and transactions must not be reused while old replies may exist.
+
+Stale/malformed responses fail closed and end that transfer; they do not
+authorize copying. Native retry policy is not implemented here. Legacy profiles
+retain their original framing and transaction behavior.
 
 ## Implemented locally
 
@@ -38,7 +65,7 @@ This is not native publication or a complete only-Amoeba image.
 
 ## Service interface to connect
 
-The retained CLA1 receiver selects records by slot alone and requires unique
+The legacy CLA1 receiver selects records by slot alone and requires unique
 slots across its table. Two resident Namespaces can legitimately use the same
 slot. Increasing RAM bounds does not fix that ownership ambiguity.
 
@@ -61,7 +88,8 @@ Bounded service contract guiding integration:
    destination grants and publishes header last; normal CALL admission remains
    authoritative afterward.
 
-Next implement the qualified request/record interface, connect
-service MMIO and serial routing, and construct the exact only-Amoeba image.
+Next connect the qualified interface to service MMIO and serial routing,
+arbitrate admission versus runtime inspection ownership, and construct the
+exact only-Amoeba image.
 Do not reuse CLA1's slot-only meaning for two Namespaces or preload dependencies
 to make the candidate appear ready. No synthesis or physical operations.
