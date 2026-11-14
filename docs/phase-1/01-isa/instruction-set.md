@@ -1618,6 +1618,15 @@ conformance evidence, nor authorization to synthesize or program hardware.
 
 ## Review appendix: SecurityRegulator methods
 
+**Consolidated review index (2026-11-14):**
+[SecurityRegulator interfaces](../security-regulator-interface-review.md)
+separates settled decisions, proposed signatures, diagnostic code and remaining
+choices. The later reporting correction supersedes historical delivery-gating
+paragraphs below: reporting is optional external observation; absent, failed or
+unacknowledged reporting must not preauthorize, stall or fault execution.
+The IDE may not exist. Older “required delivery” and “hard-fault if recording
+cannot be guaranteed” text is retained as review history, not current policy.
+
 **Latest B clarification:** B is a GT setting that defines movement, not a
 source/destination property and not register-local M state. Review its
 movement semantics as such; do not substitute a source/destination permission

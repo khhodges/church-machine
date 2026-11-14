@@ -2404,3 +2404,17 @@ mtime_ms = 1794672592219
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/fb430230-6a75-4eec-b020-a36b136b03e1/6305187d-6f8e-4dae-b8ec-3f8575ce5313"
 storage_version_token = "1794672602870564"
 content_type = "text/html"
+
+[[outputs]]
+id = "ozjsSwWmYdunbydeFV5S8"
+uri = "file://docs/phase-1/security-regulator-interface-review.md"
+type = "text"
+title = "SecurityRegulator — consolidated interface review"
+description = "Nine method requirements, settled decisions, diagnostic differences, and the remaining interface choices."
+logical_id = "3ab9d19a-91a4-4977-afa3-63c6b76f528a"
+content_hash = "sha256:08f92d2b2b4dc37780391e0021a629ac5dca92783aec2b4f99847e9f1e383712"
+size = 10446
+mtime_ms = 1794685157481
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3ab9d19a-91a4-4977-afa3-63c6b76f528a/d1ece4ef-a365-4892-867a-15612bc7c86d"
+storage_version_token = "1794685181740507"
+content_type = "text/markdown"

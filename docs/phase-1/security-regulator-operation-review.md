@@ -1,5 +1,10 @@
 # SecurityRegulator — machine-operation review
 
+**Consolidated interface review:** use the
+[method/signature review table](security-regulator-interface-review.md) to
+distinguish settled behavior, proposed ABIs, diagnostic implementations and
+remaining choices. This document retains the supporting review history.
+
 Phase 2 lifecycle authority is the [unified specification](../lazy-lifecycle-unified.md);
 its [test checklist](../phase-2/test-checklist.md) separates the agreed
 version-increment requirement from the still-open method ABI and provisioning.
