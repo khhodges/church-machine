@@ -42,6 +42,76 @@ Remaining failures:
 These are deliberately failing acceptance tests, not skips or expected-failure
 waivers. The later activation failure has not been repaired or bypassed.
 
+## Focused diagnosis of the remaining failures
+
+The bounded observer `cooperative-retry/diagnose_candidate_activation.py`
+completed all three failing fixture variants without changing RTL or forcing
+architectural state. It uses Python elaboration-local references to observe
+existing signals; it adds no ports, registers, grants or runtime behavior.
+
+### Confirmed cause 1: mLoad still classifies against 64 KiB
+
+`hardware/mload.py` uses a fixed **16,384-word** cutoff in its resident-location
+conversion and descriptor rejection. Both the shared LOAD resolver and the
+ordinary-CHANGE home resolver use it. Increasing the core, direct Namespace
+gate and fault-entry apertures did not increase this nested resolver.
+
+| Observed case | Evidence | Consequence |
+| --- | --- | --- |
+| Boot home CR0 resolution | At cycle 677, raw location `0x6800`, limit 63; Namespace gate completed without fault, but mLoad asserted invalid descriptor. | Valid byte address `0x1a000` was rejected. HOME_WAIT became THREAD_CONTEXT at cycle 679. |
+| Legal data setup | At cycle 514, raw location `0x4800`, limit 63; gate fault 0, invalid descriptor 1. | Valid byte address `0x12000` was rejected; setup LOAD faulted BOUNDS at cycle 515. |
+| Deliberately out-of-range data setup | At cycle 514, raw location `0x10000`, limit 63; invalid descriptor 1. | Byte address `0x40000` is outside even the 128 KiB aperture. LOAD rejection is correct, not a defect to bypass. |
+
+The legal LOAD's compact index was exactly 2, DR0 was zero, and its cached
+C-list limit was 2. Its failure was not an incorrectly selected index.
+Ordinary CHANGE maps context-validation failures to THREAD_CONTEXT; code 29
+alone does not establish corrupted frame contents or a version mismatch.
+
+### Confirmed cause 2: original LOAD reissues during activation
+
+For both LOAD-fault cases, cycle **603** showed all of:
+
+- original PC `0x4008`;
+- `load_start_sig = 1`;
+- `imem_valid = 1`;
+- fault entry active, source no longer frozen, cleanup inactive, activation live.
+
+The candidate bridge leaves fetch valid during recovery. When cleanup releases
+the frozen engine for machine-owned activation, the still-addressed original
+LOAD can start again. Its shared-resolver traffic then interleaves with
+activation's Namespace reads. This violates the faulted-context non-resumption
+contract; it is not an instruction that should be skipped or retried.
+
+The maintained `hardware/wukong_top.py` already suppresses `imem_valid` throughout
+`fault_entry_active`. The new bridge omitted that condition. The core's separate
+frozen-source fetch handling must remain intact for original fault evidence.
+
+### Bounded correction recommended, not applied in this diagnosis
+
+1. Pass the explicit candidate capacity into guarded mLoad instances, retaining
+   the 64 KiB default and existing seal/version/type/MMIO rules. Audit sibling
+   guarded resolvers too: CLOAD also retains 16,384-word checks, although it did
+   not cause these observed failures.
+2. Restore the existing recovery fetch exclusion in the candidate bridge, so
+   activation can run without redispatching the faulted instruction. Assert no
+   ordinary issue throughout the recovery/activation interval.
+3. Keep out-of-range capability rejection at its earliest valid check. Change
+   that fixture's expected issuer to LOAD rather than weakening mLoad so an
+   invalid capability reaches DWRITE. This does not replace separate evidence
+   for a physical-memory rejection's same-edge acceptance behavior.
+4. Run local graph checks, high-bank recovery/access tests and relevant legacy
+   resolver tests; then stop for review. Do not proceed to vendor or board work.
+
+Reproduce the read-only diagnosis from the workspace root:
+
+```sh
+PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}" timeout 45s \
+  python docs/phase-2/cooperative-retry/diagnose_candidate_activation.py
+```
+
+No passing integration result is claimed by this diagnostic. The last
+acceptance-suite result remains **4 passed, 3 failed**.
+
 ## Work implemented, not fully qualified
 
 - Explicit 128 KiB capacity options in the core's initial Namespace/Thread
@@ -171,9 +241,10 @@ separate and is not supplied by instantiating the maintained core alone.
    elaboration alone is not execution acceptance.
 
 The ownership/acceptance separation is now implemented and locally checked.
-The next unresolved action is to diagnose the activation THREAD_CONTEXT
-failure and the access fixtures' earlier setup LOAD faults. Do not broaden
-the scope to scheduling or physical tests.
+The activation and setup failure causes are now identified above. The next
+unresolved action is the bounded resolver-capacity and recovery-fetch
+correction, with the invalid-access fixture expecting the earliest rejection.
+Do not broaden the scope to scheduling or physical tests.
 Do not restore progress by tying grants or memory safety high, bypassing
 checks, skipping instructions, adding recovery retries or changing identities.
 The new path remains opt-in while this blocker is unresolved.

@@ -75,3 +75,14 @@ the dependency. This can prevent simulation from advancing at all.
 **How to apply:** For a settling hang, inspect the elaborated combinational
 dependency graph before changing timing. A cycle-free graph is necessary, but
 does not replace real execution and rejection-edge tests.
+
+Keep ordinary instruction dispatch excluded for the entire machine-owned
+fault recovery, including activation after the original engine is unfrozen.
+
+**Why:** Unfreezing to restore the next context does not authorize the original
+faulting instruction to run again. Its old PC can remain visible until
+activation commits, allowing a second transaction to interfere with recovery.
+
+**How to apply:** Preserve frozen-source evidence separately from eligibility
+to issue fresh instructions; test the cleanup-to-activation transition, not
+only the period when the source engine is frozen.
