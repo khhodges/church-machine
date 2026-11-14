@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import {build} from "esbuild";
+import {JSDOM} from "jsdom";
+import React, {act} from "react";
+import {createRoot} from "react-dom/client";
+const dom = new JSDOM("<div id='root'></div>");
+globalThis.window = dom.window;
+globalThis.document = dom.window.document;
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const compiled = await build({entryPoints:[new URL("./NamespacePicker.tsx", import.meta.url).pathname],bundle:true,write:false,format:"esm",packages:"external",jsx:"automatic"});
+// Resolve React imports from the same package tree, not a temporary directory.
+const {writeFileSync, unlinkSync, readFileSync} = await import("node:fs");
+const modulePath = new URL("./.picker-test-temp.mjs",import.meta.url);
+writeFileSync(modulePath,compiled.outputFiles[0].text);
+try {
+  const {default:Picker} = await import(modulePath.href);
+  const root=createRoot(document.getElementById("root"));
+  let selected="a";
+  const options=[{value:"a",label:"Boot.Services"},{value:"b",label:"AliceMallory.Application"},{value:"built",label:"Built image",disabled:true}];
+  const render = disabled => act(()=>root.render(React.createElement(Picker,{id:"picker",label:"Namespace",value:selected,loading:false,allowUnassigned:false,disabled,options,onChange:value=>{selected=value;}})));
+  await render(false);
+  document.querySelector("summary").click();
+  assert.equal(document.querySelector("details").open,true);
+  await act(()=>[...document.querySelectorAll("button")].find(b=>b.textContent.includes("AliceMallory")).click());
+  assert.equal(selected,"b");
+  assert.equal(document.querySelector("details").open,false);
+  await render(false);
+  assert.match(document.querySelector("summary").textContent,/AliceMallory.Application/);
+  document.querySelector("summary").click();
+  await act(()=>[...document.querySelectorAll("button")].find(b=>b.textContent==="Built image").click());
+  assert.equal(selected,"b");
+  await act(()=>document.querySelector("details").dispatchEvent(new dom.window.KeyboardEvent("keydown",{key:"Escape",bubbles:true})));
+  assert.equal(document.querySelector("details").open,false);
+  await render(true);
+  document.querySelector("summary").click();
+  assert.equal(document.querySelector("details").open,false);
+  await act(()=>root.unmount());
+  const page=readFileSync(new URL("./DevelopmentImage.tsx",import.meta.url),"utf8");
+  assert(!/<select id="(?:kiss-namespace|memory-view)"/.test(page));
+  console.log("PASS in-page choice opens, selects, updates label, closes, and respects disabled choices");
+} finally {unlinkSync(modulePath);dom.window.close();}

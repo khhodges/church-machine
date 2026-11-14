@@ -12,6 +12,7 @@ import {connectionStatus, reconnectHelp} from "./connection-status";
 import {useBridgeConnection} from "./use-bridge-connection";
 import {stopBeforeSend} from "./stop-before-send";
 import {inspectChoice, latestChoices, sourceId} from "./latest-image";
+import NamespacePicker from "./NamespacePicker";
 import {builtSlots, byteToWord, containingRegion} from "./memory-map";
 import type {BoardStatus, CatalogEntry, Inspection, PreparedImage, Receipt, Target} from "./image-api";
 
@@ -348,21 +349,23 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
         <div className="kiss-heading-controls">
           <div className="kiss-selector kiss-heading-selector">
             <label htmlFor="kiss-namespace">Namespace</label>
-            <select id="kiss-namespace" value={namespace} disabled={sending || !!confirmation} onChange={event => changeNamespace(event.target.value)}>
-              {!namespace && <option value="">Select a saved Namespace</option>}
-              <optgroup label="Namespaces">
-                {entries.filter(entry=>entry.selection_key).map(entry => <option key={entry.selection_key} value={entry.selection_key}>{entry.name}</option>)}
-              </optgroup>
-              {!entries.find(entry=>entry.selection_key===namespace) && namespace &&
-                <option value={namespace}>{entries.find(entry=>entry.id===namespace)?.name} · Historical inspection</option>}
-            </select>
+            <NamespacePicker id="kiss-namespace" label="Namespace" value={namespace}
+              disabled={sending || !!confirmation} loading={!entries.length && loading} allowUnassigned={false}
+              onChange={changeNamespace}
+              options={[
+                ...entries.filter(entry => entry.selection_key).map(entry => ({value: entry.selection_key!, label: entry.name})),
+                ...(!entries.some(entry => entry.selection_key === namespace) && namespace
+                  ? [{value: namespace, label: `${entries.find(entry => entry.id === namespace)?.name ?? namespace} · Historical inspection`}] : []),
+              ]} />
           </div>
           <div className="kiss-selector kiss-heading-selector">
             <label htmlFor="memory-view">Memory view</label>
-            <select id="memory-view" value={view} onChange={event => {setView(event.target.value as "saved" | "built"); setSelectedSlot(null);}}>
-              <option value="saved">{input?.planning ? "Resolved design layout" : "Saved design"}</option>
-              <option value="built" disabled={!builtImage}>Built image — prepared, not installation evidence</option>
-            </select>
+            <NamespacePicker id="memory-view" label="Memory view" value={view} loading={false} allowUnassigned={false}
+              onChange={value => {setView(value as "saved" | "built"); setSelectedSlot(null);}}
+              options={[
+                {value: "saved", label: input?.planning ? "Resolved design layout" : "Saved design"},
+                {value: "built", label: "Built image — prepared, not installation evidence", disabled: !builtImage},
+              ]} />
             <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare application image</button>
           </div>
         </div>

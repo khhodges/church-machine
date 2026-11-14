@@ -6,15 +6,17 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   loading: boolean;
-  options: {value: string; label: string}[];
+  disabled?: boolean;
+  allowUnassigned?: boolean;
+  options: {value: string; label: string; disabled?: boolean}[];
 };
 
 // Native disclosure, ordinary buttons, and in-flow content: no popup layer,
 // focus transfer on opening, or blur handlers that can swallow a choice click.
-export default function NamespacePicker({id, label, value, onChange, loading, options}: Props) {
+export default function NamespacePicker({id, label, value, onChange, loading, options, disabled = false, allowUnassigned = true}: Props) {
   const disclosure = useRef<HTMLDetailsElement>(null);
   const summary = useRef<HTMLElement>(null);
-  const items = [{value: "", label: "Unassigned"}, ...options];
+  const items = allowUnassigned ? [{value: "", label: "Unassigned"}, ...options] : options;
   function close() {
     if (disclosure.current) disclosure.current.open = false;
     summary.current?.focus();
@@ -24,13 +26,14 @@ export default function NamespacePicker({id, label, value, onChange, loading, op
       event.preventDefault(); event.stopPropagation(); close();
     }
   }}>
-    <summary ref={summary} id={id} aria-label={`Choose ${label}`} className="nb-picker-trigger">
+    <summary ref={summary} id={id} aria-disabled={disabled} onClick={event => { if (disabled) event.preventDefault(); }} aria-label={`Choose ${label}`} className="nb-picker-trigger">
       <span>{loading ? "Loading Namespaces…" : items.find(option => option.value === value)?.label || "Unassigned"}</span>
       <span className="nb-picker-action">Choose</span>
     </summary>
     <div id={`${id}-list`} role="group" aria-label={`${label} choices`} className="nb-picker-list">
       {loading ? <p role="status">Loading saved Namespaces…</p> :
         items.map(option => <button type="button" key={option.value}
+          disabled={disabled || option.disabled}
           aria-pressed={option.value === value} className="nb-picker-option"
           onClick={() => { onChange(option.value); close(); }}>
           <span>{option.label}</span>
