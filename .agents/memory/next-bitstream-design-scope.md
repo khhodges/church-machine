@@ -46,6 +46,17 @@ Thread continuations must remain explicit. A schema-valid layout is not a
 qualified two-Namespace image; compilation, binding and activation remain
 distinct from editing the drafts.
 
+The user selected a **separate AppSystem LUMP**, not an application-entry method
+in shared Amoeba. AppSystem remains Lazy and must be loaded by Boot-side Amoeba
+before the first application Namespace dispatch.
+
+**Why:** The user explicitly selected the separate-LUMP option in the native
+services review. This preserves the two initially resident executable identities.
+
+**How to apply:** Treat this as a software-structure decision, not evidence of
+implementation, tested startup or approval of additional grants. Native service
+qualification remains open.
+
 The user also confirmed two resident Namespaces for the next FPGA test
 candidate, with consequential specification decisions reviewed step by step.
 

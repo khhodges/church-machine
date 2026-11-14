@@ -42,6 +42,8 @@ Unfinished services and incompatible historical bindings have not been replaced 
 </tbody></table>
 <p>Removed the duplicate Boot services and all direct device entries from the application draft. Unlisted slots are empty, not assigned implicit capabilities.</p>
 <h2>Remaining blockers—not corrected by changing selectors</h2>
+<p><strong>Subsequent design decision:</strong> the configurator selected a separate AppSystem LUMP, loaded lazily by Boot-side Amoeba before first application dispatch. This does not close native-service qualification.</p>
+<p><strong>Authority review correction:</strong> the current removal of all application device entries is not a complete switching design. AppSystem needs a locally reachable SecurityRegulator invocation path before it can SWITCH out. The regulator's local M-control binding must be resolved without granting raw M to AppSystem or Amoeba.</p>
 <ol>
 <li><strong>Native services:</strong> select qualified Amoeba and SecurityRegulator implementations; implement the application service entry and its pre-dispatch loading sequence.</li>
 <li><strong>Authority:</strong> provision only Genesis-authorized grants. Neither the presence of M_BIT_DEV nor a Resident policy establishes SecurityRegulator-only custody. No automatic grants were issued.</li>

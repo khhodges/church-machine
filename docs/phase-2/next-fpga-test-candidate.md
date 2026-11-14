@@ -109,6 +109,19 @@ and evidence. The application-side entry code must be available before USER
 dispatch without preloading a second executable: establish its explicit
 loading/bootstrap sequence as part of this contract.
 
+## Application service implementation decision
+
+The configurator selected a separate AppSystem LUMP for the application SYSTEM
+entry, rather than an application-entry method in shared Amoeba. AppSystem is
+Lazy; Boot-side Amoeba must load it before the first application dispatch.
+This settles software structure, not implementation or qualification.
+
+The application-side SWITCH also requires a locally reachable SecurityRegulator
+invocation path before leaving that Namespace. Keeping every regulator/device
+binding solely in Boot cannot, by itself, implement that path. The exact
+invocation grants and local regulator/M-control binding remain subject to the
+authority and binding review; do not grant raw M to AppSystem or Amoeba.
+
 ## Confirmed: fault entry preserves Boot's continuation
 
 Carry forward direct fault stashing into the configured Boot.Thread, one
