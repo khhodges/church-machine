@@ -80,20 +80,20 @@ candidate that requires another build.
 two-LUMP initial executable baseline and separate specification approval from
 implementation, vendor-build and physical-operation authorization.
 
-Amoeba encapsulates Namespace switching: identical instruction code uses the
-same CR6[n] C-list row for the peer Namespace GT in each local binding.
-Boot-side binding targets the application; application-side binding targets Boot.
-The GTs in that row need not reference the same local Namespace slot number.
+Amoeba keeps **all configured Namespace GTs in its C-list** and implements a
+switching algorithm to select the appropriate entry. This supersedes treating
+one context-dependent peer row or a preset working register as the chosen design.
 
-**Why:** The user proposed a SWITCH method in Amoeba to limit Namespace exposure,
-then specified the same CR6[n] row with identical code and explicitly distinguished
-that fixed C-list row from potentially different Namespace slots.
+**Why:** The user explicitly corrected the alternatives: "the straightforward
+way is keep all NS GTs in the Clist and code a switching algorithm."
 
-**How to apply:** Keep the peer GT private to Amoeba, not an AppSystem argument.
-Amoeba invokes local SecurityRegulator for the M-requiring operation; it receives
-no raw M. The numeric C-list row, exact GT bindings and physical sharing/copying
-remain to be established. Identical instructions do not prove that one physical
-bound C-list is suitable for both Namespaces.
+**How to apply:** Keep Namespace GTs inside Amoeba. The algorithm selects the
+entry valid for the current context and intended destination, then invokes
+SecurityRegulator for the privileged operation without receiving raw M.
+Keep the authoritative GT copies in the C-list across CALLs. Do not impose
+matching Namespace slot numbers as a prerequisite: multiple context-appropriate
+GTs can occupy different rows of the one shared C-list. Exact route selection,
+bindings and native implementation remain to be verified.
 
 Whole-LUMP physical sharing requires identical C-list GT words as well as
 identical instructions. The same CR6 row with different GT bits works only
@@ -102,10 +102,10 @@ with separate bound copies, not one shared C-list word.
 **Why:** The user explicitly identified the clash when moving from identical
 code to one physically shared Amoeba LUMP.
 
-**How to apply:** A possible shared binding uses the same local slot index,
-permissions and generation in both Namespace tables, with different local
-descriptors resolving that index to the appropriate peer. Validate every C-list
-entry and keep mutable state private before claiming whole-LUMP sharing.
+**How to apply:** One shared C-list can contain multiple different GTs at
+different rows; it must not require different bits at the same physical row.
+Validate each selected route in its actual Namespace context and keep mutable
+state private before claiming whole-LUMP sharing.
 Do not assume support for separate per-Namespace C-lists attached to one shared
 instruction body; that would require a distinct supported execution mechanism.
 

@@ -126,31 +126,27 @@ Do not grant raw M to AppSystem or Amoeba.
 
 ## Peer Namespace selection inside Amoeba
 
-The configurator selected encapsulating switching in Amoeba and placing the
-peer Namespace GT at the same CR6[n] C-list row in both local bindings.
-Identical instruction code therefore selects the configured peer without
-branching on Namespace identity or accepting a raw Namespace GT from AppSystem.
-Boot-side Amoeba targets AliceMallory.Application; application-side Amoeba
-targets Boot.Services. Amoeba calls local SecurityRegulator for the privileged
-operation; raw M remains exclusive to SecurityRegulator.
+The configurator's selected approach is to keep **all configured Namespace GTs
+in Amoeba's C-list and implement a switching algorithm**. The algorithm selects
+the appropriate C-list entry for the current Namespace context and intended
+destination. AppSystem does not supply a raw Namespace GT. Amoeba invokes
+local SecurityRegulator for the privileged operation; raw M remains exclusive
+to SecurityRegulator.
 
-Here n is a C-list row, not a Namespace slot number. The numeric row and exact
-bindings are not yet frozen. The GT at that fixed row may reference different
-local Namespace slot numbers in the two bindings; identical instruction code
-does not require identical Namespace slot layouts.
-Physical instruction sharing versus copied bodies
-is separate: identical instructions do not establish that a single physical
-bound C-list works in both contexts. This records the design, not an applied
-Namespace change or qualified native implementation.
+The C-list retains the authoritative copies across CALLs. Preset working
+registers are not the sole storage for switching authority. This supersedes
+the proposed single context-dependent peer row and register-only approaches.
 
-For one physically shared LUMP, the C-list words themselves must also be
-identical. The earlier allowance for different local Namespace slot indices
-therefore applies to separately bound copies. A possible common binding uses
-the same local slot index and compatible GT type/rights/generation in both
-tables; each table's descriptor then identifies its own appropriate peer.
-Maintained Namespace lookup uses the active CR15 base plus the GT slot index.
-This is a layout option to validate, not approval of guessed GT values or a
-claim that all remaining C-list entries and mutable state are shareable.
+One physically shared C-list may contain different GT values at different
+rows. It must not require different values at the same physical word.
+Matching local Namespace slot numbers are not an imposed requirement:
+the algorithm may select different context-appropriate GT rows. Maintained
+lookup still uses active CR15 plus the selected GT's slot index, so every
+selected route must be validated in its actual Namespace context.
+
+The route-selection algorithm, exact rows and bindings, and native tests remain
+implementation work. This records the chosen design, not applied Namespace
+bindings or proof that all LUMP data and remaining dependencies are shareable.
 
 ## Confirmed: fault entry preserves Boot's continuation
 
