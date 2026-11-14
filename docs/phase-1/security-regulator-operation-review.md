@@ -62,9 +62,13 @@ and returns a nonzero fault code in DR1. HardFault remains on the ISA fault
 path, without a rollback guarantee. The common SR
 invocation, M-consumption and Passcode/Home IDE audit requirements apply.
 This does not authorize changes to other GT fields or other copies.
-F must explicitly set Near or Far, not toggle
-state or override its SAVE check. Its target, encoding and exact interface
-details remain open.
+F must explicitly set Near or Far, not toggle state or override its SAVE check.
+**Approved methods: SetNear and SetFar.** Each takes DR1=`n` selecting the
+caller's CR[n] and returns standard status in DR1 (0 success, nonzero returned
+fault code, HardFault excepted). SetNear selects Near; SetFar selects Far.
+No DR2 value argument is required. Exact F encoding, permitted targets,
+caller-register access and mechanism require verification under unchanged
+ISA/RTL; rejection effects and numeric codes remain open.
 The earlier six-method completeness discussion is
 historical, not a restriction against these requested additions.
 

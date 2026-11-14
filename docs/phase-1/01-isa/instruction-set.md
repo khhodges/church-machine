@@ -1694,8 +1694,13 @@ ISA fault path, without a rollback guarantee. The common SR invocation,
 M-consumption and Passcode/Home IDE audit requirements apply.
 For F, the required operation explicitly sets
 Near or Far, rather than toggling state or overriding the SAVE check.
-Its target, encoding, method signature and exact mechanism remain to be
-specified; no implementation or existing-artifact mutation is implied.
+**Approved methods: SetNear and SetFar.** Each takes DR1=`n` selecting the
+caller's CR[n]. SetNear selects Near; SetFar selects Far. Neither toggles F
+or takes a DR2 value argument. DR1 returns common API status (0 success,
+nonzero returned fault code, HardFault excepted). Exact F encoding, permitted
+targets, caller-register access and mechanism require verification against
+unchanged ISA/RTL. Rejection effects and numeric fault codes remain open.
+No implementation or existing-artifact mutation is implied.
 
 **Status: proposed method definitions for review, 2026-11-02.**
 This appendix is not an approved ISA amendment. It defines six proposed
