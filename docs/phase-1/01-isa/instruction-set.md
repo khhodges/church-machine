@@ -2238,6 +2238,11 @@ Contrast:
 MintM(Ctype, Permissions, Slot) -> GT    // no source GT argument
 ```
 
+**Approved MakeOutformM registers:** CR1 supplies the original Inform GT and
+receives the converted Outform GT, replacing the input. This selects only the
+software calling convention; conversion rules and ISA/RTL remain unchanged.
+MakeInformM register assignments remain a separate review item.
+
 The source GT is mandatory operation input, not an optional hint, a slot
 number, or a reconstructed current token. Validate it under the reviewed
 conversion rules and retain its identity evidence through conversion.
@@ -2253,7 +2258,8 @@ from the regulator's mechanical conversion.
 
 **Review closure:** exact source-form validation, output identity/permission
 mapping, destination Namespace and binding rules where applicable, invalid
-source/fault behavior, M lifecycle and register ABI. The source-required
+source/fault behavior, M lifecycle, MakeInformM register assignments and
+remaining clobber/return details. The source-required
 contract does not assert that changing type bits alone completes conversion.
 
 Every conversion action is logged against the Passcode and sent to the Home
