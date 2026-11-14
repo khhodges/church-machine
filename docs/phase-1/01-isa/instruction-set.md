@@ -1687,7 +1687,10 @@ SetB sets B=1; ResetB sets B=0. Neither toggles B or requires a DR2 value
 argument. DR1 returns the common API status: 0 success, nonzero returned fault
 code, HardFault excepted. Caller-register access and the instruction mechanism
 remain to be verified against unchanged ISA/RTL; allowed registers, rejection
-behavior and numeric fault codes remain open. The common SR invocation,
+conditions and numeric fault codes remain open. **Approved rejection effect:**
+both SetB and ResetB leave the selected GT unchanged on a returned software
+rejection, with a nonzero fault code in DR1. HardFault remains on the existing
+ISA fault path, without a rollback guarantee. The common SR invocation,
 M-consumption and Passcode/Home IDE audit requirements apply.
 For F, the required operation explicitly sets
 Near or Far, rather than toggling state or overriding the SAVE check.

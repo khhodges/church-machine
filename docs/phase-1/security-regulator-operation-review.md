@@ -56,7 +56,10 @@ methods are **SetB** (B=1) and **ResetB** (B=0). Each takes DR1=`n` selecting
 the caller's CR[n] and returns common status in DR1: 0 success, nonzero returned
 fault code, HardFault excepted. No DR2 value argument is required. Caller-register
 access and the mechanism must be verified against unchanged ISA/RTL; allowed
-registers, rejection behavior and numeric codes remain open. The common SR
+registers, rejection conditions and numeric codes remain open. A returned
+software rejection from either SetB or ResetB leaves the selected GT unchanged
+and returns a nonzero fault code in DR1. HardFault remains on the ISA fault
+path, without a rollback guarantee. The common SR
 invocation, M-consumption and Passcode/Home IDE audit requirements apply.
 This does not authorize changes to other GT fields or other copies.
 F must explicitly set Near or Far, not toggle

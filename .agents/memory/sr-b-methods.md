@@ -12,5 +12,14 @@ instead of a single method with a 0/1 value argument.
 
 **How to apply:** Do not reopen the paired-method choice. Verify caller-register
 access and the implementation against unchanged ISA/RTL; allowed registers,
-rejection behavior and numeric codes still require resolution. Do not infer
+rejection conditions and numeric codes still require resolution. Do not infer
 new instructions or permission to catch HardFault.
+
+Both methods leave the selected GT unchanged on returned software rejection
+and return a nonzero fault code in DR1. HardFault retains the ISA fault path,
+without a rollback guarantee.
+
+**Why:** The user approved the same unchanged-GT rejection rule for both methods.
+
+**How to apply:** Verify rejection effects independently of the still-open
+allowed-register set, numeric codes and returnable-failure classification.
