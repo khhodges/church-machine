@@ -1681,8 +1681,13 @@ a closed scope. SR must support explicitly setting a GT's B to 1 or 0,
 not merely toggling B. This is distinct from CALL/SAVE/RETURN movement
 rules and supersedes the earlier B-override-only proposal. Only B is selected
 for change; this requirement does not authorize other GT-field changes,
-an opcode, or updates to other copies. The concrete method name, register ABI
-and instruction mechanism remain to be specified. The common SR invocation,
+an opcode, or updates to other copies. **Approved methods: SetB and ResetB.**
+Both take DR1=`n`, selecting the caller's CR[n] for an in-place B update.
+SetB sets B=1; ResetB sets B=0. Neither toggles B or requires a DR2 value
+argument. DR1 returns the common API status: 0 success, nonzero returned fault
+code, HardFault excepted. Caller-register access and the instruction mechanism
+remain to be verified against unchanged ISA/RTL; allowed registers, rejection
+behavior and numeric fault codes remain open. The common SR invocation,
 M-consumption and Passcode/Home IDE audit requirements apply.
 For F, the required operation explicitly sets
 Near or Far, rather than toggling state or overriding the SAVE check.

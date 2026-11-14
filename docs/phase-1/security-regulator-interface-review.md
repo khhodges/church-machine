@@ -39,7 +39,8 @@ only a general capability, the missing concrete caller/use case is explicit.
 | **MintM — approved argument/result registers**<br>`MintM(Ctype, Permissions, Slot) → GT`<br>[ISA construction discussion](01-isa/instruction-set.md); [construction-port clarification](../phase-2/gt-construction-port.md) | DR1=`Ctype`, DR2=`Permissions`, DR3=`Slot`; return GT in CR1. Constructs a GT; it does not allocate an object or increment its version. Approved for new Inform GTs: read the current version from the selected slot's valid live entry in the active Namespace, without refreshing an existing GT. The clarified mechanism packs DATA and reads it as a GT under monitor M, rather than using an ordinary scratch L grant. | Exact `GTvars`/field mapping, remaining identity-field derivation and type validation, clobbers and return preservation. Reconcile naming with SecurityMonitor `Create(GTvars)` without assuming an alias. |
 | **MakeOutformM — indexed alternative under review**<br>Baseline: `MakeOutformM(sourceInformGT) → outformGT` in CR1<br>Alternative: DR1=`n`, convert caller's CR[n] in place; standard DR1 status<br>[ISA conversion discussion](01-isa/instruction-set.md) | User confirmed that the alternative selects the caller's CR[n], not the regulator's register. Original source GT remains mandatory. Earlier fixed CR1 convention remains the baseline pending alternative evaluation. Success replaces the selected GT and returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. | Verify caller-context access, result preservation and rejection behavior under existing ISA/RTL; settle allowed registers and numeric fault codes. HardFault retains the ISA fault path with no rollback guarantee. Conversion checks and M-use implementation remain open. |
 | **MakeInformM — approved register signature**<br>DR1=`n`: convert caller's CR[n] from Outform to Inform in place; DR1 returns status<br>[ISA conversion discussion](01-isa/instruction-set.md) | Caller CR[n] supplies the original Outform GT and receives the corresponding Inform on success, with DR1=0. A returned software rejection leaves the selected Outform GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. A slot-only reconstruction is not equivalent. Lazy Load belongs to the original request, not SR. | Verify caller-context access, result preservation and rejection behavior under existing ISA/RTL; specify allowed registers, conversion checks, preserved/transformed fields, fault classification/codes, clobbers and M-use implementation. |
-| **Explicit B setter — required extension; unnamed**<br>No selected signature<br>[B/F requirements](security-regulator-operation-review.md) | Set the supplied GT's B to **0 or 1**, not toggle. Do not change unrelated GT fields or other copies. Ordinary movement rules remain separate. | Method name, target/result convention, registers and instruction mechanism. |
+| **SetB — approved name and register signature**<br>DR1=`n`: set caller CR[n].B to 1; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set B to 1, not toggle. No DR2 value argument. Do not change unrelated GT fields or other copies. Return DR1=0 on success or a nonzero returned fault code; HardFault remains separate. | Verify caller-register access and instruction mechanism under unchanged ISA/RTL; specify allowed registers, rejection behavior and numeric fault codes. |
+| **ResetB — approved name and register signature**<br>DR1=`n`: set caller CR[n].B to 0; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set B to 0, not toggle. No DR2 value argument. Do not change unrelated GT fields or other copies. Ordinary movement rules remain separate. Return DR1=0 on success or a nonzero returned fault code; HardFault remains separate. | Verify caller-register access and instruction mechanism under unchanged ISA/RTL; specify allowed registers, rejection behavior and numeric fault codes. |
 | **Explicit F setter — required extension; unnamed**<br>No selected signature<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set **Near or Far**, not toggle or merely bypass a SAVE check. | Method name, precise target/encoding, argument/result registers and mechanism. |
 | **Version increment — required extension; unnamed**<br>No selected signature<br>[version-increment requirement](security-regulator-operation-review.md); [lifecycle specification](../lazy-lifecycle-unified.md) | Increment the authoritative version associated with a supplied GT. Thread-reset use must invalidate old GTs through the Namespace entry. No wrap; inability to increment hard-faults. No hardware automatic version mutation or silent upgrade of existing holders. | Method name, argument/result registers, authorized descriptor update, and whether/how a new-version GT is returned. |
 
@@ -151,13 +152,15 @@ specific caller still needs to be named.
 - **Usage still to specify:** The concrete Mint workflow/call site and the
   admissible source and destination-binding conditions.
 
-#### Explicit B setter — user and reason
+#### SetB and ResetB — user and reason
 
 - **User:** A specifically authorized caller has not yet been named for this
   operation. The compiler's ESaveLists workflow is cited as needing returned
-  GTs, but that is not evidence of a B-setter invocation.
-- **Reason:** Explicitly set the supplied GT's B to 0 or 1 without changing
-  unrelated fields or other copies.
+  GTs, but that is not evidence of a SetB or ResetB invocation.
+- **Reason:** SetB explicitly sets B to 1; ResetB explicitly sets B to 0 in the
+  caller's CR[n], selected by input DR1. Neither changes unrelated fields or
+  other copies. Separate methods avoid a DR2 value argument; DR1 returns the
+  common status.
 - **Why a separate method?** LOAD preserves B; CALL clears passed argument B;
   RETURN preserves B in kept CRs; SAVE clears B in the stored copy. None is a
   general explicit setter for both values. In particular, source B=0 does not
@@ -247,8 +250,9 @@ variants or candidate families into exported methods.
    `SwitchNamespace` name's disposition without reopening those assignments.
 2. **Complete callable ABI:** argument/result registers, clobbers, preservation
    masks and final method indices. Preserve already-approved SAVEM operands.
-3. **Required extensions:** choose B-setter, F-setter and version-increment
-   names/signatures and their exact operation mechanisms.
+3. **Required extensions:** SetB/ResetB names and DR1 signatures are approved;
+   verify their mechanism and settle allowed registers/rejection behavior.
+   Choose F-setter and version-increment names/signatures and mechanisms.
 4. **Construction/conversion details:** reconcile `MintM` with `Create(GTvars)`,
    specify identity-field handling and precise conversion rules.
 5. **Common implementation contracts:** finish invocation/proof propagation,

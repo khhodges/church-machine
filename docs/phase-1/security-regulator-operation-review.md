@@ -51,8 +51,12 @@ Existing implementation checks must be reconciled, not treated as this rule.
 for B and F. Resolve their intended operations before choosing signatures or
 changing SAVEM checks. SR must explicitly support setting a GT's B to 1 or 0,
 not merely toggling it. This supersedes the earlier B-override-only proposal.
-The operation is separate from CALL/SAVE/RETURN movement rules; its method
-name, register ABI and mechanism remain to be specified. The common SR
+The operation is separate from CALL/SAVE/RETURN movement rules. The selected
+methods are **SetB** (B=1) and **ResetB** (B=0). Each takes DR1=`n` selecting
+the caller's CR[n] and returns common status in DR1: 0 success, nonzero returned
+fault code, HardFault excepted. No DR2 value argument is required. Caller-register
+access and the mechanism must be verified against unchanged ISA/RTL; allowed
+registers, rejection behavior and numeric codes remain open. The common SR
 invocation, M-consumption and Passcode/Home IDE audit requirements apply.
 This does not authorize changes to other GT fields or other copies.
 F must explicitly set Near or Far, not toggle

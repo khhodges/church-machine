@@ -155,3 +155,4 @@
 - [SWITCH review boundary](switch-review-boundary.md) — retain existing ISA/RTL; direct Namespace and indexed incoming Thread proposals were withdrawn.
 - [Indexed conversion review](sr-indexed-conversion-review.md) — DR1 selects caller CR[n] in the MakeOutformM alternative; feasibility and error semantics remain unverified.
 - [Common API return status](api-return-status.md) — every API RETURN uses DR1=0 success or nonzero fault code; HardFault remains separate.
+- [SecurityRegulator B methods](sr-b-methods.md) — SetB/ResetB use DR1 caller-register selection, no DR2 value; mechanism and rejection details remain open.
