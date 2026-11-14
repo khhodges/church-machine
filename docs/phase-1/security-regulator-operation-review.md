@@ -68,7 +68,10 @@ caller's CR[n] and returns standard status in DR1 (0 success, nonzero returned
 fault code, HardFault excepted). SetNear selects Near; SetFar selects Far.
 No DR2 value argument is required. Exact F encoding, permitted targets,
 caller-register access and mechanism require verification under unchanged
-ISA/RTL; rejection effects and numeric codes remain open.
+ISA/RTL; rejection conditions and numeric codes remain open. Both methods leave
+the selected GT unchanged on a returned software rejection, with a nonzero
+fault code in DR1. HardFault retains the existing ISA fault path, without a
+rollback guarantee.
 The earlier six-method completeness discussion is
 historical, not a restriction against these requested additions.
 

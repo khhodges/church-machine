@@ -1699,7 +1699,11 @@ caller's CR[n]. SetNear selects Near; SetFar selects Far. Neither toggles F
 or takes a DR2 value argument. DR1 returns common API status (0 success,
 nonzero returned fault code, HardFault excepted). Exact F encoding, permitted
 targets, caller-register access and mechanism require verification against
-unchanged ISA/RTL. Rejection effects and numeric fault codes remain open.
+unchanged ISA/RTL. **Approved rejection effect:** both SetNear and SetFar leave
+the selected caller GT unchanged on a returned software rejection and return a
+nonzero fault code in DR1. Success sets the requested Near/Far state and returns
+DR1=0. HardFault remains on the existing ISA fault path, without a rollback
+guarantee. Rejection conditions and numeric fault codes remain open.
 No implementation or existing-artifact mutation is implied.
 
 **Status: proposed method definitions for review, 2026-11-02.**

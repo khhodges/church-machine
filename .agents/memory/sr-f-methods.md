@@ -12,5 +12,14 @@ SetB/ResetB interface approach.
 
 **How to apply:** Do not reopen names or register selection. Verify F encoding,
 permitted targets, caller-register access and mechanism against unchanged
-ISA/RTL. Rejection effects and numeric fault codes remain separate decisions;
-do not infer approval from the B methods.
+ISA/RTL. Rejection conditions and numeric fault codes remain separate decisions.
+
+Both methods leave the selected caller GT unchanged on returned software
+rejection and return a nonzero fault code in DR1. Success sets the requested
+Near/Far state and returns DR1=0. HardFault has no rollback guarantee.
+
+**Why:** The user explicitly approved unchanged-GT rejection behavior for
+SetNear and SetFar.
+
+**How to apply:** Verify rejection effects without treating this as a decision
+about permitted targets, rejection conditions or numeric fault codes.
