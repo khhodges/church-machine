@@ -13,6 +13,31 @@ from server.namespace_design_v1 import api_size
 from server.development_image_view import add_lump_geometry
 
 
+def resolve_layout(backend, inspection, document):
+    """Use the Namespace allocator itself, not browser-invented placements."""
+    from server.namespace_design_v1 import project
+    from server.development_image_view import normalize_rows
+    result = resolve_inspection(backend, inspection)
+    resolved = {r["slot"]: r for r in result["layoutRows"]}
+    draft = copy.deepcopy(document)
+    for row in draft["rows"]:
+        if row["kind"] == "lump":
+            row["selection"] = resolved[row["slot"]].get("selection")
+    projection = project(draft, Path(backend.LUMPS_DIR))
+    for allocation in normalize_rows(projection["rows"]):
+        row = resolved[allocation["slot"]]
+        row.update(location=allocation["location"],
+                   allocationWords=allocation["allocationWords"])
+        if allocation.get("limit") is not None:
+            row["limit"] = allocation["limit"]
+    result["layoutResolved"] = True
+    result["planningNote"] = (
+        "Latest verified saved LUMPs projected through the Namespace allocator. "
+        "Missing resident allocations prevent a complete bitstream layout. "
+        "These are proposed addresses, not an installed or prepared image.")
+    return result
+
+
 def resolve_lump(backend, name, manifest):
     candidates = [r for r in manifest if isinstance(r, dict) and r.get("abstraction") == name]
     if not candidates:

@@ -158,3 +158,12 @@ integration with the existing IDE on 2026-11-05.
 
 **How to apply:** Preserve the approved review contents and explicit send
 confirmation when changing presentation; integration must not rebind or send.
+
+Treat the Namespace memory glass as consequential build-layout evidence, not
+an optional illustration. The user states: “the memory map defined the bitstream”.
+**Why:** Fixing only the separate next-build planner left Resident slots absent
+from the actual Namespace glass the user was using.
+**How to apply:** Address the displayed Namespace glass itself. Account for every
+Resident entry; resolve available sizes through the allocator and expose missing
+allocations prominently. Never imply that unresolved space is free or that a
+proposed map is a prepared/installed image.

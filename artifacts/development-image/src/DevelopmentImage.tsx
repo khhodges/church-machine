@@ -116,12 +116,16 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
     start: wordValue(row.location),
     words: row.allocationWords ?? undefined,
   })).filter((item): item is typeof item & { start: number } =>
-    item.row.kind !== "mmio" && item.start !== undefined && item.start >= 0 && item.start < glassCapacity
+    item.row.kind !== "mmio" && item.start !== undefined && item.start >= 0 &&
+    typeof item.words === "number" && item.words > 0 && item.start + item.words <= glassCapacity
   );
   const colorForSlot = (slot: number) => {
     const index = locatedEntries.findIndex(item => item.row.slot === slot);
     return index < 0 ? undefined : colors[index % colors.length];
   };
+  const missingResidents = slots.filter(row => row.kind !== "mmio" &&
+    (row.policy ?? row.load_policy) !== "Lazy" &&
+    !locatedEntries.some(item => item.row.slot === row.slot));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -149,6 +153,9 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
     setLoading(true); setInput(null); setError("");
     setBuiltImage(null); setBuiltRows([]); setView("saved"); setSelectedSlot(null);
     inspectChoice(exactId, controller.signal)
+      .then(result => result.layoutSource === "saved-design-layout"
+        ? request<Inspection>("/api/development-image/inspect?planning=layout&id=" + encodeURIComponent(exactId), {signal: controller.signal})
+        : result)
       .then(result => {
         if (controller.signal.aborted) return;
         if (result.layoutSource === "latest-built-image" && result.image) showBuilt(result.image);
@@ -353,7 +360,7 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
           <div className="kiss-selector kiss-heading-selector">
             <label htmlFor="memory-view">Memory view</label>
             <select id="memory-view" value={view} onChange={event => {setView(event.target.value as "saved" | "built"); setSelectedSlot(null);}}>
-              <option value="saved">Saved design</option>
+              <option value="saved">{input?.planning ? "Resolved design layout" : "Saved design"}</option>
               <option value="built" disabled={!builtImage}>Built image — prepared, not installation evidence</option>
             </select>
             <button disabled={sending || loading || !!confirmation || !input?.id.startsWith("design:") || !sendAllowed(input)} onClick={() => void prepareInspection()}>Prepare application image</button>
@@ -374,8 +381,8 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
         <section className="kiss-panel" aria-labelledby="kiss-namespace-title">
           <div className="kiss-slot-visual-row">
           <div className="kiss-slot-column">
-          <div className="kiss-panel-head"><h2 id="kiss-namespace-title"><span className="kiss-step">01</span>Namespace Table</h2><span className="kiss-status">{view === "built" ? "Built-image allocations" : "Saved inputs"}</span></div>
-          <p className="kiss-meta">{slots.length} {view === "built" ? "built-image" : "saved"} rows · Select a name to inspect this view’s data.</p>
+          <div className="kiss-panel-head"><h2 id="kiss-namespace-title"><span className="kiss-step">01</span>Namespace Table</h2><span className="kiss-status">{view === "built" ? "Built-image allocations" : input?.planning ? "Resolved design inputs" : "Saved inputs"}</span></div>
+          <p className="kiss-meta">{slots.length} {view === "built" ? "built-image" : input?.planning ? "resolved design" : "saved"} rows · Select a name to inspect this view’s data.</p>
           <div className="kiss-table-scroll" tabIndex={0} role="region" aria-label={`${namespace} saved slot table`}>
             <table>
               <thead><tr><th scope="col">Slot</th><th scope="col">Name</th><th scope="col">Kind</th><th scope="col">Policy</th><th scope="col">Rev.</th></tr></thead>
@@ -394,14 +401,14 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
           </div>
           <section className="kiss-water-map" aria-labelledby="kiss-water-title">
                 <div className="kiss-water-heading">
-                  <div><span className="kiss-step">{view === "built" ? "BUILT-IMAGE LOCATIONS" : "SAVED LOCATIONS"}</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
-                  <span className="kiss-water-caveat">{locatedEntries.length} mapped entries</span>
+                  <div><span className="kiss-step">{view === "built" ? "BUILT-IMAGE LOCATIONS" : input?.planning ? "RESOLVED DESIGN LOCATIONS" : "SAVED LOCATIONS"}</span><h4 id="kiss-water-title">Namespace memory glass</h4></div>
+                  <span className="kiss-water-caveat">{locatedEntries.length} mapped · {missingResidents.length} resident allocations missing</span>
                 </div>
                 {view === "built" && <p className="kiss-meta" style={{overflowWrap: "anywhere"}}>Prepared image SHA-256: {builtImage?.artifact_sha256}. Preparation is not installation evidence.</p>}
                 <p className="kiss-water-intro">{view === "built"
                   ? "Exact staged allocations in word coordinates. Namespace shows its table, not its enclosing authority range. Threads occupy RAM; MMIO and unallocated lazy LUMPs are not painted. Names come only from this build."
                   : input?.layoutSource === "saved-design-layout"
-                  ? "Colored regions show the saved design’s memory layout, using its exact selected LUMPs and Thread allocations. Lazy entries stay outside resident memory. This is not an installed binary map."
+                  ? "Colored regions use the Namespace allocator with the latest verified saved LUMP sizes and configured Threads. Missing resident allocations are shown below; empty space is not a fit claim. Proposed layout only — Prepare produces the exact executable-image map."
                   : "Colored regions use each saved entry’s location and extent, including LUMPs, Threads, and Boot.NS / Boot.Thread. This is the Namespace layout, not a generated binary map."}</p>
                 <div className="kiss-glass-layout">
                   <div className="kiss-glass-figure">
@@ -448,7 +455,15 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
                         <text x="120" y="269" textAnchor="middle" className="kiss-glass-empty-note">Not present in this table</text>
                       </>}
                     </svg>
-                    <div className="kiss-glass-zero">{locatedEntries.length} {view === "built" ? "built-image" : "saved"} locations shown</div>
+                    <div className="kiss-glass-zero">{locatedEntries.length} {view === "built" ? "built-image" : input?.planning ? "resolved design" : "saved"} locations shown{missingResidents.length ? " · INCOMPLETE" : ""}</div>
+                    {missingResidents.length > 0 && <section className="kiss-api-error" aria-label="Missing resident allocations">
+                      <strong>Incomplete bitstream layout — not free memory</strong>
+                      <p>These Resident entries have no drawable allocation. No complete memory-fit claim can be made.</p>
+                      {missingResidents.map(row => <p key={row.slot}>
+                        <button type="button" onClick={() => setSelectedSlot(row.slot)}>Slot {row.slot} · {row.name}</button>
+                        {" — "}{row.resolutionError || (row.allocationWords ? `${row.allocationWords} words; address blocked by an earlier missing allocation.` : "No verified allocation size or address.")}
+                      </p>)}
+                    </section>}
                   </div>
                   {selected ? <aside className="kiss-device-card" aria-label={`${selected.name} selected slot details`}>
                     {selectedIsMmio ? <svg className="kiss-device-icon" viewBox="0 0 120 120" role="img" aria-labelledby="kiss-device-title">
@@ -529,7 +544,7 @@ export default function DevelopmentImage({onSwitch}: {onSwitch?: (selectionKey: 
                 <label htmlFor="memory-byte-address">FPGA byte address (decimal or 0x hex)</label>
                 <input id="memory-byte-address" value={address} onChange={event => setAddress(event.target.value)} placeholder="0x1000" />
                 {address && <p role="status">{addressWord === null ? "Enter a valid 32-bit byte address." : <>Word coordinate {addressWord} · {addressRegion ? `${addressRegion.name} (${addressRegion.kind}), NS[${addressRegion.slot}], byte offset ${Number(address) - addressRegion.location! * 4}` : "No containing resident region in this view."}</>}</p>}
-                <div className="kiss-water-legend"><span>{view === "built" ? "Digest-bound staged map; not installed-memory readback." : "Saved design only; preparing can change allocations and bindings."}</span><span>Threads and boot entries share the same word scale.</span></div>
+                <div className="kiss-water-legend"><span>{view === "built" ? "Digest-bound staged map; not installed-memory readback." : input?.planning ? "Allocator-derived design; missing residents prevent a complete bitstream layout." : "Saved design only; preparing can change allocations and bindings."}</span><span>Threads and boot entries share the same word scale.</span></div>
           </section>
           </div>
           <details className="kiss-technical">

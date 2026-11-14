@@ -281,6 +281,12 @@ def register(app, backend):
                 if request.args.get("planning") == "latest":
                     from server.development_memory_plan import resolve_inspection
                     result = resolve_inspection(backend, result)
+                elif request.args.get("planning") == "layout":
+                    if result.get("layoutSource") != "saved-design-layout":
+                        raise ValueError("Only a saved Namespace design can resolve a new layout.")
+                    from server.development_memory_plan import resolve_layout
+                    document = retained_document(backend, request.args.get("id", ""), None)
+                    result = resolve_layout(backend, result, document)
             response = jsonify(result)
         except (OSError, ValueError, KeyError, TypeError) as error:
             response = jsonify(ok=False, error=str(error), dataChanged=False)

@@ -121,3 +121,28 @@ def test_http_planning_is_opt_in_and_saved_inspection_unchanged(tmp_path, monkey
     assert planned["layoutRows"][0]["allocationWords"] == 64
     assert planned["rows"] == source["rows"]
     assert client.get("/api/development-image/inspect?id=fixture").get_json() == ordinary
+
+
+def test_namespace_glass_resolves_and_places_slot22_but_exposes_missing_slot23(tmp_path):
+    from server.development_memory_plan import resolve_layout
+    from server.namespace_design_v1 import FORMAT
+    backend, source, _ = fixture(tmp_path)
+    document = dict(format=FORMAT, capacityWords=16384, slotCount=64, outputProfile="api",
+        rows=[
+            dict(slot=1, name="Boot.NS", kind="namespace", policy="Resident", sequence=0),
+            dict(slot=2, name="Boot.Thread", kind="thread", policy="Resident", sequence=0, words=256),
+            dict(slot=22, name="ide.Example", kind="lump", policy="Resident", sequence=0, boot=True),
+            dict(slot=23, name="ide.Missing", kind="lump", policy="Resident", sequence=0),
+        ])
+    source["rows"] = copy.deepcopy(document["rows"])
+    source["layoutRows"] = copy.deepcopy(document["rows"])
+    before = copy.deepcopy(document)
+    result = resolve_layout(backend, source, document)
+    rows = {r["slot"]: r for r in result["layoutRows"]}
+    assert (rows[22]["location"], rows[22]["allocationWords"]) == (512, 64)
+    assert rows[23]["location"] is None
+    assert "No saved compilation exists" in rows[23]["resolutionError"]
+    assert rows[1]["allocationWords"] == 256
+    assert rows[2]["location"] == 256
+    assert result["layoutResolved"]
+    assert document == before and source["rows"] == before["rows"]
