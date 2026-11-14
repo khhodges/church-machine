@@ -29,6 +29,12 @@ does not qualify physical UART timing.
 
 ## Inputs not yet ready to freeze
 
+The candidate's staging-only receiver connection now passes seven focused
+checks and fourteen legacy receiver checks. The remaining cross-Namespace
+request ownership interface is recorded in
+[delivery ownership review](next-fpga-delivery-ownership-review.md).
+This adapter is not yet connected to the board's runtime MMIO/serial path.
+
 - The final only-Amoeba-resident image and its Namespace-aware delivery/service
   path are not supplied by the diagnostic image used for core qualification.
 - The required runtime device/service routing is not connected to the new

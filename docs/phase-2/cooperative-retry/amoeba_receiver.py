@@ -8,9 +8,10 @@ class AmoebaReceiver(Elaboratable):
     EMPTY, RECEIVING, SEALED, VERIFYING, READY, COPYING, CONSUMED, FAILED, WAITING = range(9)
 
     def __init__(self, records, *, staging_base=0xa000, staging_words=1024,
-                 clock_hz=25_000_000):
+                 clock_hz=25_000_000, memory_profile="legacy64"):
         self.records = validate_records(records, staging_base=staging_base,
-                                        staging_words=staging_words)
+                                        staging_words=staging_words,
+                                        memory_profile=memory_profile)
         self.staging_base, self.staging_words = staging_base, staging_words
         self.clock_hz = clock_hz
         self.valid, self.error, self.running = Signal(), Signal(), Signal()

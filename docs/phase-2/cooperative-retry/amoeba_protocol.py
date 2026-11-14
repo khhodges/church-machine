@@ -15,12 +15,20 @@ def command(operation, slot, epoch, transaction, length=0):
                                epoch, transaction, length)
 
 
-def validate_records(records, *, staging_base, staging_words):
+def validate_records(records, *, staging_base, staging_words, memory_profile="legacy64"):
+    if memory_profile == "legacy64":
+        allocation_end = staging_end = 65536
+    elif memory_profile == "candidate128":
+        allocation_end, staging_end = 131072, 147456
+        if staging_base != allocation_end or staging_words != 4096:
+            raise ValueError("Candidate staging must be the isolated 16 KiB bank")
+    else:
+        raise ValueError("Unknown receiver memory profile")
     if not records or len(records) > 61:
         raise ValueError("one to 61 selected targets required")
     if staging_words < 64 or staging_words > 4096 or staging_words & (staging_words - 1):
         raise ValueError("invalid staging capacity")
-    if staging_base % 4 or not 0 <= staging_base < staging_base + staging_words * 4 <= 65536:
+    if staging_base % 4 or not 0 <= staging_base < staging_base + staging_words * 4 <= staging_end:
         raise ValueError("staging outside RAM")
     slots, ranges = set(), [(staging_base, staging_base + staging_words * 4)]
     for r in records:
@@ -37,7 +45,7 @@ def validate_records(records, *, staging_base, staging_words):
             raise ValueError("target must be executable Inform")
         if 1 << (((h >> 23) & 15) + 6) != size or 1 + cw + cc > size:
             raise ValueError("invalid executable geometry")
-        if base % 4 or not 1024 <= base < base + size * 4 <= 65536:
+        if base % 4 or not 1024 <= base < base + size * 4 <= allocation_end:
             raise ValueError("target outside reserved RAM")
         if any(base < end and start < base + size * 4 for start, end in ranges):
             raise ValueError("overlapping target/staging")
