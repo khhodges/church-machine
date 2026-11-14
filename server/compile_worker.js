@@ -115,6 +115,18 @@ if (isMainThread) {
 
     // Set up global shim before loading the compiler
     global.ChurchAssembler = require(path.join(SIM_DIR, 'assembler.js'));
+    // Private offline candidate mode, never enabled by ordinary compilation.
+    // Compile the Namespace-handoff form directly; do not translate emitted
+    // instructions or reinterpret historical isolated-register SWITCH source.
+    if (payload._candidate_namespace_handoff === true) {
+        const BaseAssembler = global.ChurchAssembler;
+        global.ChurchAssembler = class extends BaseAssembler {
+            constructor(...args) {
+                super(...args);
+                this.namespaceHandoff = true;
+            }
+        };
+    }
     const CLOOMCCompiler   = require(path.join(SIM_DIR, 'cloomc_compiler.js'));
     const PortableBinding  = require(path.join(SIM_DIR, 'portable_lump_binding.js'));
     const { buildLump, embedSelfDefinition, buildApiDefinition } =

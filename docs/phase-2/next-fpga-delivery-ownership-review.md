@@ -15,8 +15,9 @@ The latch is now connected to the receiver in `candidate_qualified_delivery.py`.
 Trusted inputs select the full Namespace96/target-GT32 pair; changing those
 inputs after acceptance cannot redirect the transfer. The owner supplies the
 transaction number, including after same-epoch cancellation. Neither a queue
-nor a capability is created. Native service/MMIO remains unconnected, so this
-is not end-to-end native delivery evidence.
+nor a capability is created. Native service MMIO is now connected to the
+maintained core, but the final two-Namespace Amoeba program/image is not
+implemented, so this is not end-to-end native loading evidence.
 
 Four integrated checks pass using actual banked staging RAM and SHA, covering
 completion, owner fault, disable and epoch replacement, duplicate target slots
@@ -105,8 +106,92 @@ Bounded service contract guiding integration:
    destination grants and publishes header last; normal CALL admission remains
    authoritative afterward.
 
-Next connect the qualified interface to native service MMIO and fault
-termination identity, prepare matching host delivery inputs, and construct
-the exact only-Amoeba image.
+### Native MMIO connection
+
+`candidate_service.py` exposes a 12-word device window at `0x40000100`.
+Offsets are words: 0 stream/pop, 1 receiver state, 2 full target GT,
+3 transaction/commit, 4 size, 5 request (write 1), 6 expected header,
+7–9 origin Namespace96 (least-significant word first), 10 origin Thread GT,
+11 target GT. All five handoff fields must be written by the same executing
+Namespace/Thread before request acceptance; disable and acceptance clear the
+assembly mask. No write is accepted while another transfer owns the staging
+bank. The core's existing device capabilities remain the access authority.
+Origin fields do not grant authority; the provisioned table selects bytes.
+
+Reads before verified availability, excess pops, premature/wrong-transaction
+commit, incomplete/unknown/busy requests, unknown offsets, and wrong-direction
+access fail explicitly. This is not a software request queue. The native
+scheduler must retain pending work before issuing a request.
+
+The bridge separates original DWRITE payload from the recovery bus: otherwise
+payload-dependent MMIO rejection feeds fault selection back into the stash
+payload and creates a combinational loop. Fault Namespace/Thread are captured
+on the original fault edge, not read from the later Boot context. Service
+effects are disabled throughout fault entry.
+
+Exact newly compiled instructions now exercise real device writes/status reads
+and rejected writes through the maintained core, then reach healthy progress
+through Boot's retained recovery continuation. These diagnostic fixtures still
+contain resident test code and are NOT the final only-Amoeba image.
+
+`candidate_host_delivery.py` provides an offline matching CRQ1/CLQ1 codec.
+It validates provisioned records, rejects stale epochs/transactions and emits
+exact little-endian payload bytes. It opens no serial devices. Host state must
+retain its transaction counter across pauses. No live delivery was attempted.
+
+The focused run passed 73 checks covering native bus access, component delivery,
+serial routing, board elaboration, memory, ownership and maintained fault-entry
+regressions. Longer received-image regressions are tracked separately.
+
+### Remaining build qualification
+
+**Current stop: M-control authority, not a passing final image.**
+The new disposable two-Namespace source reaches Amoeba's M-control write and
+faults with PERM_S at NIA `0x8024`. The maintained core deliberately accepts
+M-bit writes only under Namespace execution identity (Inform RX at slot 5).
+A normal Amoeba E execution identity is not that authority, even when supplied
+an exact device capability. The hardware gate has NOT been relaxed.
+
+The diagnostic fixture is not approved provisioning and must not be exported
+as the final image. Completing its first SWITCH requires reconciling the
+only-Amoeba initial-executable rule with privileged M-control mediation, or
+explicitly approving a different M-control authority boundary. Do not erase
+this failure with host-set M bits, a new implicit privilege, instruction-word
+translation, or secretly preloaded executable dependencies.
+
+Before that stop, the real native qualified loader passed both valid and
+corrupt-delivery tests. The valid test observes native body writes, header-last
+publication, a normal CALL into the newly resident target and its result.
+The corrupt test observes native failure with no executable publication.
+Receiver failure status is now retained after releasing staging ownership so
+native polling cannot mistake a failed transfer for an idle receiver forever.
+
+The longer installation/capacity run passed 26 checks in 368.31 seconds.
+Two further candidate-specific gaps were found during cross-root integration:
+SWITCH's private resolver and Boot's saved-capability activation needed the
+explicit 128 KiB/word-addressed profile. SWITCH capacity, existing handoff and
+board elaboration checks passed (39 checks). These fixes preserve 64 KiB defaults.
+
+The offline compiler now has a private opt-in
+`_candidate_namespace_handoff: true`. Only that mode accepts `SWITCH CRsource,
+#row` with required-zero destination bits. Four checks verify exact generated
+words, rejected legacy syntax in candidate mode, range checks and unchanged
+legacy output in default mode. It is not an ISA-wide IDE migration; normal
+compilation remains unchanged. Candidate words are emitted directly, never
+rewritten after compilation.
+
+The existing `simulator/examples/amoeba_loader.cloomc` is explicitly a one-USER,
+slot-addressed legacy program. It cannot be silently reused with the new
+full-GT service status or treated as the two-Namespace round-robin service.
+The next implementation must supply the explicit application Slot-2 → SWITCH
+to Boot/Amoeba → SWITCH to application Slot-2 → CHANGE to USER route, private
+qualified destination/handoff data, only-Amoeba executable residency, and fresh
+Mallory initialization while retaining Alice across 100 rejected attempts.
+
+Compile new disposable candidates without rewriting saved LUMPs; bind the
+exact provisioned records and native grants into one 128 KiB image. Exercise
+native copy/header-last publication and normal CALL admission in RTL, not a
+host publication callback. Only then freeze the final binding, table, source
+hashes, RTL export and constraints together.
 Do not reuse CLA1's slot-only meaning for two Namespaces or preload dependencies
 to make the candidate appear ready. No synthesis or physical operations.

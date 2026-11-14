@@ -112,6 +112,10 @@ class ChurchCore(Elaboratable):
         self.dmem_rd_valid = Signal()
         self.dmem_wr_data = Signal(32)
         self.dmem_wr_en = Signal()
+        # Original DWRITE payload before the fault-recovery bus mux. Device
+        # validation must not feed fault-stash data back into fault selection.
+        self.device_write_data = Signal(32)
+        self.device_write_request = Signal()
 
         self.ns_addr = Signal(32)
         self.ns_rd_en = Signal()
@@ -409,7 +413,9 @@ class ChurchCore(Elaboratable):
                 resident_word_locations=self.expected_boot_guard is not None,
                 system_thread_gt=(0x02000002 |
                     (((self.expected_boot_guard or 0) & 0x1FF) << 16)))
-            u_switch = ChurchSwitch()
+            u_switch = ChurchSwitch(
+                resident_word_locations=self.expected_boot_guard is not None,
+                capacity_words=self.memory_bytes // 4)
             self.model_change = u_change
             u_eloadcall = ChurchELoadCall()
             u_xloadlambda = ChurchXLoadLambda()
@@ -505,7 +511,8 @@ class ChurchCore(Elaboratable):
             thread = BootThreadValidation(expected_guard=self.expected_boot_guard,
                                           capacity_words=self.memory_bytes // 4)
             m.submodules.boot_thread_validation = _rst(thread)
-            activation = BootThreadActivation(expected_guard=self.expected_boot_guard)
+            activation = BootThreadActivation(expected_guard=self.expected_boot_guard,
+                                              capacity_words=self.memory_bytes // 4)
             m.submodules.boot_thread_activation = _rst(activation)
             metadata_started = Signal()
             m.d.comb += [
@@ -3735,6 +3742,8 @@ class ChurchCore(Elaboratable):
                     self.active_thread_base.eq(activation.thread_base_byte),
                     self.active_thread_owned.eq(1),
                 ]
+        m.d.comb += [self.device_write_data.eq(u_dwrite.dmem_wr_data),
+                     self.device_write_request.eq(u_dwrite.dmem_wr_en)]
         if self.fault_boot_binding is not None:
             # All event data is consumed from the frozen issuing engine. No
             # fault-event register bank is inserted between it and Boot homes.

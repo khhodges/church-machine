@@ -2467,6 +2467,22 @@ class ChurchAssembler {
                 break;
             }
             case 5: {
+                if (this.namespaceHandoff === true) {
+                    if (parts.length !== 3) {
+                        this.errors.push({ line: lineNum, message:
+                            'Candidate Namespace SWITCH requires SWITCH CRsource, #row; isolated-register destinations are not supported.' });
+                        break;
+                    }
+                    crDst = 0;
+                    crSrc = this._parseCR(parts[1], lineNum);
+                    this._checkPrivCR(crSrc, 'Namespace SWITCH source', lineNum);
+                    imm = this._parseImm(parts[2], lineNum);
+                    if (!Number.isInteger(imm) || imm < 0 || imm > 0x7fff) {
+                        this.errors.push({ line: lineNum, message:
+                            'Candidate Namespace SWITCH row must be 0–32767 without truncation.' });
+                    }
+                    break;
+                }
                 // SWITCH has two forms:
                 //   SWITCH CR12..CR15, CRs, #row  — isolated C-list LOAD
                 //   SWITCH CR12..CR15, CR6[row] — explicit C-list row

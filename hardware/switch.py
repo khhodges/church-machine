@@ -12,7 +12,11 @@ from .mload import ChurchMLoad
 
 
 class ChurchSwitch(Elaboratable):
-    def __init__(self):
+    def __init__(self, *, resident_word_locations=False, capacity_words=16384):
+        if capacity_words not in (16384, 32768):
+            raise ValueError("Unsupported SWITCH memory capacity")
+        self.resident_word_locations = resident_word_locations
+        self.capacity_words = capacity_words
         self.switch_start = Signal()
         self.cr_src = Signal(4)
         self.target = Signal(4)  # required-zero encoding, NOT a CR selector
@@ -49,7 +53,9 @@ class ChurchSwitch(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
-        m.submodules.load = load = ChurchMLoad(enable_seal_check=True)
+        m.submodules.load = load = ChurchMLoad(enable_seal_check=True,
+            resident_word_locations=self.resident_word_locations,
+            capacity_words=self.capacity_words)
         src = Signal(CAP_REG_LAYOUT)
         namespace = Signal(CAP_REG_LAYOUT)
         row = Signal(32)

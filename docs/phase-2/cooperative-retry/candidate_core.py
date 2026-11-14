@@ -15,14 +15,16 @@ from hardware.fault_entry import FaultBootBinding
 from .candidate_admission import CandidateAdmission
 from .candidate_memory import ALLOCATION_BYTES
 from .candidate_qualified_delivery import QualifiedDelivery
+from .candidate_service import CandidateService
 
 
 class CandidateCoreBridge(Elaboratable):
     """Connect a one-cycle checked fabric to a trusted, reset-held core."""
-    def __init__(self, memory, binding):
+    def __init__(self, memory, binding, service=None):
         if binding.memory_bytes != ALLOCATION_BYTES:
             raise ValueError("Candidate requires explicit 128 KiB Boot binding")
         self.memory, self.binding = memory, binding
+        self.service = service
         self.core = ChurchCore(expected_boot_guard=binding.boot_guard,
                               fault_boot_binding=binding,
                               checked_memory=True, memory_bytes=ALLOCATION_BYTES)
@@ -62,30 +64,58 @@ class CandidateCoreBridge(Elaboratable):
                 (rom_selected | (mem.fetch.rvalid & ~mem.fetch.rerror))),
         ]
         requests, rejected = [], []
+        mmio_address = core.dmem_addr[30:32] == 1
         for p, address, read, write, data in (
                 (mem.ns, core.ns_addr, core.ns_rd_en, core.ns_wr_en, core.ns_wr_data[:32]),
                 (mem.clist, core.clist_addr, core.clist_rd_en, core.clist_wr_en, core.clist_wr_data),
                 (mem.data, core.dmem_addr, core.dmem_rd_en, core.dmem_wr_en, core.dmem_wr_data)):
-            m.d.comb += [p.address.eq(address), p.read.eq(active & read),
-                         p.write.eq(active & write), p.wdata.eq(data)]
+            ram = ~mmio_address if p is mem.data else Const(1)
+            m.d.comb += [p.address.eq(address), p.read.eq(active & read & ram),
+                          p.write.eq(active & write & ram), p.wdata.eq(data)]
             requests.append((read | write) & active)
             rejected.append(p.ready & p.error)
-        mmio = (core.dmem_addr[30:32] == 1) & requests[2]
+        mmio = mmio_address & requests[2]
+        service_read, service_valid, service_grant, service_error = (
+            Signal(32), Signal(), Signal(), Signal())
+        if self.service is not None:
+            m.submodules.service = svc = self.service
+            p = svc.bus
+            m.d.comb += [
+                svc.enabled.eq(active & ~core.fault_entry_active &
+                               self.memory.cpu_enabled & ~self.memory.maintenance),
+                svc.namespace.eq(Cat(*core.debug_cr_words[15][:3])),
+                svc.thread.eq(core.debug_cr_words[12][0]),
+                p.address.eq(core.dmem_addr), p.wdata.eq(core.device_write_data),
+                p.read.eq(mmio & core.dmem_rd_en),
+                p.write.eq(mmio & core.dmem_wr_en & core.device_write_request),
+                service_read.eq(p.rdata), service_valid.eq(p.rvalid & ~p.rerror),
+                service_grant.eq(p.ready & p.write & ~p.error),
+                service_error.eq((p.ready & p.error) |
+                    (mmio & core.dmem_wr_en & ~core.device_write_request)),
+            ]
+            m.d.sync += svc.delivery.fault.eq(
+                active & core.fault_valid & ~core.fault_entry_active)
+            with m.If(active & core.fault_valid & ~core.fault_entry_active):
+                m.d.sync += [
+                    svc.delivery.fault_namespace.eq(Cat(*core.debug_cr_words[15][:3])),
+                    svc.delivery.fault_thread.eq(core.debug_cr_words[12][0]),
+                ]
         m.d.comb += [
-            self.unsupported_mmio.eq(mmio),
+            self.unsupported_mmio.eq(mmio if self.service is None else 0),
             self.protocol_error.eq(
                 (requests[0] & ~mem.ns.ready) |
                 (requests[1] & ~mem.clist.ready) |
-                (requests[2] & ~mem.data.ready)),
-            core.memory_reject.eq(active & ~core.fault_entry_active & ~mmio &
+                 (requests[2] & ~mmio & ~mem.data.ready)),
+            core.memory_reject.eq(active & ~core.fault_entry_active &
+                (service_error | (~mmio &
                 (rejected[0] | rejected[1] | rejected[2] |
-                 mem.fetch.error | (rom_address & (core.imem_addr[:2] != 0)))),
+                  mem.fetch.error | (rom_address & (core.imem_addr[:2] != 0)))))),
             core.ns_rd_data.eq(Cat(mem.ns.rdata, Const(0, 96))),
             core.clist_rd_data.eq(mem.clist.rdata),
-            core.dmem_rd_data.eq(mem.data.rdata),
-            core.dmem_rd_valid.eq(mem.data.rvalid & ~mem.data.rerror),
-            core.dmem_write_granted.eq(mem.data.write & mem.data.ready & ~mem.data.error &
-                                      mem.commit & (mem.commit_source == 2)),
+            core.dmem_rd_data.eq(Mux(service_valid, service_read, mem.data.rdata)),
+            core.dmem_rd_valid.eq(service_valid | (mem.data.rvalid & ~mem.data.rerror)),
+            core.dmem_write_granted.eq(service_grant | (mem.data.write & mem.data.ready & ~mem.data.error &
+                                       mem.commit & (mem.commit_source == 2))),
             # Evidence is already directly stashed by the core. No external
             # diagnostic receiver is allowed to keep the local recovery held.
             core.fault_evidence_captured.eq(core.fault_evidence_ready),
@@ -122,11 +152,12 @@ This does not authenticate the image sender or bypass normal guarded boot.
         if checked != binding:
             raise ValueError("Unverified trusted Boot binding")
         self.admission = CandidateAdmission(clock_hz=clock_hz, trusted_words=binding.checks)
-        self.bridge = CandidateCoreBridge(self.admission.memory, binding)
-        self.core = self.bridge.core
         self.delivery = (QualifiedDelivery(self.admission.runtime_memory,
                          delivery_records, clock_hz=clock_hz)
                          if delivery_records is not None else None)
+        self.service = CandidateService(self.delivery) if self.delivery is not None else None
+        self.bridge = CandidateCoreBridge(self.admission.memory, binding, self.service)
+        self.core = self.bridge.core
 
     def elaborate(self, platform):
         m = Module()

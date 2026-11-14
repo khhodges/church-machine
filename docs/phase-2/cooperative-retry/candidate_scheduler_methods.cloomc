@@ -1,0 +1,60 @@
+; Source fragment composed with the qualified EnsureResident method.
+; This stage proves one cross-Namespace USER request, not Mallory containment.
+    main method Run() {
+    Serve:
+        LOAD CR9, CR6, #7
+        IADD DR7, DR0, #1
+        SHL DR7, DR7, #15
+        IADD DR7, DR7, #64
+        DWRITE DR7, CR9, #0
+        LOAD CR2, CR6, #6
+        SWITCH CR2, #0
+        LOAD CR8, CR6, #3
+        DREAD DR7, CR8, #6
+        ISUB DR8, DR7, #0
+        BRANCHNE Completed
+        DREAD DR1, CR8, #5
+        LOAD CR2, CR6, #0
+        CALL CR2, #1
+        BRANCH Serve
+    Completed:
+        CHANGE CR12
+        BRANCH Completed
+    }
+    main method AppSystem() {
+        LOAD CR1, CR6, #4
+    Dispatch:
+        ISUB DR8, DR0, #1
+        CHANGE CR1
+        BRANCHNE UserFinished
+        LOAD CR8, CR6, #3
+        DWRITE DR5, CR8, #5
+        DWRITE DR6, CR8, #3
+        LOAD CR9, CR6, #7
+        IADD DR7, DR0, #1
+        SHL DR7, DR7, #15
+        IADD DR7, DR7, #64
+        DWRITE DR7, CR9, #0
+        LOAD CR2, CR6, #6
+        SWITCH CR2, #0
+        LOAD CR1, CR6, #4
+        BRANCH Dispatch
+    UserFinished:
+        LOAD CR8, CR6, #3
+        IADD DR7, DR0, #1
+        DWRITE DR7, CR8, #6
+        LOAD CR9, CR6, #7
+        SHL DR7, DR7, #15
+        IADD DR7, DR7, #64
+        DWRITE DR7, CR9, #0
+        LOAD CR2, CR6, #6
+        SWITCH CR2, #0
+        BRANCH UserFinished
+    }
+    main method UserStart() {
+        CALL CR1, #0
+        LOAD CR11, CR6, #5
+    Finished:
+        CHANGE CR11
+        BRANCH Finished
+    }

@@ -35,6 +35,7 @@ class QualifiedDelivery(Elaboratable):
         self.request_target = Signal(32)
         self.accepted, self.rejected = Signal(), Signal()
         self.failed, self.completed = Signal(), Signal()
+        self.failure_latched = Signal()
         # Fault identity comes from the trusted termination path, not UART.
         self.fault = Signal()
         self.fault_namespace = Signal(96)
@@ -73,6 +74,10 @@ class QualifiedDelivery(Elaboratable):
             o.finish_epoch.eq(o.owner_epoch), o.finish_transaction.eq(rx.transaction),
         ]
         m.d.sync += launch.eq(o.accepted)
+        with m.If(~self.enabled | (o.owner_epoch != self.epoch) | o.accepted):
+            m.d.sync += self.failure_latched.eq(0)
+        with m.Elif(self.failed):
+            m.d.sync += self.failure_latched.eq(1)
         with m.If(o.accepted):
             m.d.sync += selected.eq(choice)
         return m

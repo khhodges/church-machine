@@ -11,7 +11,10 @@ from .ascending_authority import cached_authority
 
 
 class BootThreadActivation(Elaboratable):
-    def __init__(self, *, expected_guard):
+    def __init__(self, *, expected_guard, capacity_words=16384):
+        if capacity_words not in (16384, 32768):
+            raise ValueError("Unsupported Boot activation memory capacity")
+        self.capacity_words = capacity_words
         validate_boot_guard(expected_guard)
         self.expected_guard = expected_guard
         self.start = Signal()
@@ -124,8 +127,8 @@ class BootThreadActivation(Elaboratable):
                     fail(FaultType.SEAL)
                 with m.Elif(descriptor[1][31]):
                     fail(FaultType.BOUNDS)
-                with m.Elif(descriptor[0] < 16384):
-                    with m.If(descriptor[0] + descriptor[1][:21] >= 16384):
+                with m.Elif(descriptor[0] < self.capacity_words):
+                    with m.If(descriptor[0] + descriptor[1][:21] >= self.capacity_words):
                         fail(FaultType.BOUNDS)
                     with m.Else():
                         m.d.sync += caps[row].eq(Cat(

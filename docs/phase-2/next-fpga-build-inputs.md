@@ -29,6 +29,14 @@ does not qualify physical UART timing.
 
 ## Inputs not yet ready to freeze
 
+**Blocked on M-control authority:** the two-root native fixture reaches a
+PERM_S rejection when Amoeba attempts to arm the M bits needed for SWITCH.
+The existing Namespace-execution-only hardware gate remains intact. The
+only-Amoeba residency rule must be reconciled with privileged mediation before
+this can be a build-ready image. The failing two-root fixture is diagnostic,
+not a release image. No source/image freeze or vendor-build authorization is
+implied by passing loader component tests.
+
 The candidate's staging-only receiver connection now passes seven focused
 checks and fourteen legacy receiver checks. The remaining cross-Namespace
 request ownership adapter now passes four integrated checks using real staging
@@ -37,13 +45,15 @@ RAM; its qualified wire format and remaining native-service integration are reco
 The adapter is now optionally composed into the core/board wrapper, with
 installer/runtime/probe inspection arbitration and runtime UART routing.
 Real-image installation followed by runtime LUMP verification passes locally.
-Native MMIO request/consumption and fault-termination inputs remain unconnected.
+Native MMIO request/consumption and original fault identity are now connected
+and exercised with exact newly compiled instructions. The offline host codec
+also exists. These are not the final native two-Namespace program/image.
 
 - The final only-Amoeba-resident image and its Namespace-aware delivery/service
   path are not supplied by the diagnostic image used for core qualification.
-- Native runtime device/service MMIO is not connected to the new wrapper.
-  Unsupported MMIO assertions are not a production device decoder. Qualified
-  UART routing does not by itself let native Amoeba request or publish a LUMP.
+- The new service decoder rejects unknown accesses. The final program must
+  provision its private device grant and use the qualified handoff ABI; the
+  old one-USER, slot-addressed Amoeba source is not compatible unchanged.
 - The final RTL export, complete constraints and exact image/source hashes
   must be frozen together after that integration, before synthesis approval.
 

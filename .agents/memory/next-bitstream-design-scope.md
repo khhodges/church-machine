@@ -161,6 +161,31 @@ block every later installer reply.
 transmitting byte to finish. Host delivery must resynchronize truncated
 requests; leaving maintenance alone must not reset the transaction counter.
 
+Device rejection that depends on write data must inspect the original issuing
+engine payload, not the data bus after the fault-stash mux.
+
+**Why:** Native MMIO integration exposed a real combinational cycle from
+device rejection through fault-code selection and stash data back to rejection.
+RTLIL conversion catches this even when simulation guards appear mutually
+exclusive. Capturing fault identity must likewise avoid using post-SWITCH Boot
+identity or creating a same-cycle cancellation/admission feedback loop.
+
+**How to apply:** Keep the recovery and original device operands distinct and
+sample terminating Namespace/Thread at the original fault edge. Recheck
+elaboration whenever MMIO validation or fault routing changes.
+
+A larger RAM fabric does not establish that every capability restoration path
+accepts high-bank objects. Test saved home capabilities and Namespace switching
+as well as direct program reads/writes.
+
+**Why:** Native cross-root integration found private SWITCH and startup
+activation resolvers still using the smaller profile after basic high-bank
+execution already passed.
+
+**How to apply:** Exercise high-bank capabilities in initial homes and incoming
+Namespaces using exact compiled instructions; preserve the historical profile
+defaults rather than globally changing the meaning of old descriptors.
+
 Keep the next work focused on the shortest path to this candidate bitstream:
 candidate-specific checks and exact build preparation, not unrelated legacy
 test cleanup or additional side projects. Stop before synthesis for approval.
