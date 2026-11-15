@@ -2467,7 +2467,10 @@ class ChurchAssembler {
                 break;
             }
             case 5: {
-                if (this.namespaceHandoff === true) {
+                // Public indexed Namespace handoff: target is required-zero,
+                // not an isolated destination selector. Keep legacy forms intact.
+                if (this.namespaceHandoff === true ||
+                        (parts.length === 3 && /^DR/i.test(parts[2] || ''))) {
                     if (parts.length !== 3) {
                         this.errors.push({ line: lineNum, message:
                             'Candidate Namespace SWITCH requires SWITCH CRsource, #row; isolated-register destinations are not supported.' });
@@ -2476,6 +2479,13 @@ class ChurchAssembler {
                     crDst = 0;
                     crSrc = this._parseCR(parts[1], lineNum);
                     this._checkPrivCR(crSrc, 'Namespace SWITCH source', lineNum);
+                    if (crSrc > 11) {
+                        this.errors.push({ line: lineNum, message: 'Namespace SWITCH source must be CR0–CR11.' });
+                    }
+                    if (/^DR/i.test(parts[2] || '')) {
+                        imm = this._parseCompactIndex(parts[2], lineNum);
+                        break;
+                    }
                     imm = this._parseImm(parts[2], lineNum);
                     if (!Number.isInteger(imm) || imm < 0 || imm > 1023) {
                         this.errors.push({ line: lineNum, message:

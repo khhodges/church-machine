@@ -65,7 +65,7 @@ method SWITCHM() {
     SHL DR6, DR6, #6
     DWRITE DR6, CR11, #0
     LOAD CR11, NULL
-    SWITCH CR15, CR1, DR1
+    SWITCH CR1, DR1
     ; Reached only after another SWITCH restores this matching context.
     IADD DR1, DR0, #0
     RETURN

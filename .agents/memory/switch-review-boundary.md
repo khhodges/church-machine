@@ -48,3 +48,13 @@ choice: “Everything transactional is saved automatically by the ISA.”
 **How to apply:** Do not reopen architectural transactional preservation as an
 ABI choice. Verify implementation scratch use separately without weakening or
 duplicating the ISA's context mechanisms.
+
+The user approved a narrow candidate/compiler SWITCH encoding correction
+after exact-byte qualification found a target-field mismatch.
+
+**Why:** Qualification must execute the newly compiled source without rewriting
+instruction words or substituting the older fixed-row diagnostic. This approval
+does not authorize RTL changes or a JS context-handoff parity project.
+
+**How to apply:** Requalify corrected software bytes in isolated RTL fixtures;
+keep JS limitations explicit and physical operations separately authorized.

@@ -24,7 +24,7 @@ const report = {
     missingMethods: ['MakeOutformM', 'MakeInformM'],
     limitations: [
         'MintM and indexed object operations currently accept Inform only',
-        'SWITCHM two-Namespace round trip is not yet qualified',
+        'SWITCHM qualified in isolated RTL replay; JS Namespace context handoff remains unsupported',
         'Private context-local scratch and production bindings are not provisioned',
         'No physical hardware acceptance or ISA/RTL changes',
     ],

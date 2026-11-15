@@ -182,10 +182,89 @@ evidence. Any architecture proposal needs separate review; this report neither
 authorizes changes nor weakens the existing Outform authentication gate.
 
 SWITCHM's public indexed input compiles and its input/fault boundaries are
-tested. Its complete two-Namespace round trip still needs exact-candidate
-qualification; the earlier fixed-binding diagnostic is not that evidence.
+tested. The corrected exact candidate completes the two-Namespace round trip
+diagnostic is not used as evidence for this candidate.
+in the maintained RTL model, as detailed below. The earlier fixed-binding
 Physical hardware parity, safe production provisioning, non-Inform MintM and
 the two conversions are not claimed complete.
+
+### Exact SWITCHM qualification
+
+Reproduce with:
+
+```sh
+python -m pytest docs/phase-2/cooperative-retry/test_security_regulator_switch_candidate.py -q
+```
+
+This is a **successful RTL-model round-trip test**, not physical acceptance. It uses
+the isolated `candidate_mediated_fixture` memory/boot patterns and maintained
+RTL core, with two disposable roots at byte addresses `0` and `0x10000`,
+SYSTEM Thread slot 2 in each, separate callers, replicated exact SR bodies,
+and explicit per-root M-control recipients. Both callers load an explicit-L
+GT into CR1 and issue actual `CALL CR11, #2`. Separate runs select public
+DR1 row **1** and **3**; only the selected row names the opposite Namespace,
+with other rows NULL. This is not the earlier SR-private fixed-row-2 diagnostic.
+
+The first exact-byte attempt rejected `0x2f788001` with `INVALID_OP`: the
+old source supplied destination 15, while RTL requires target zero. The user
+then approved correcting the candidate/compiler encoding and requalifying.
+The source now says `SWITCH CR1, DR1`; the ordinary assembler emits target zero
+for this indexed source/row form, preserving the legacy destination forms.
+No experimental handoff compiler profile or instruction translation is used.
+Only declared C-list binding words are localized. Unused private
+bindings are NULL; SWITCHM needs only SELF and MControl. The binary is pinned:
+
+| Evidence | Value |
+|---|---|
+| Source SHA-256 | `ac9f3c46bf80425cf0be25a00d7c303b45c24283b82b95b8fb8ba9312ba88196` |
+| Unbound binary SHA-256, little endian | `f2d72bb5997c970c5d170103f82a21620e289839f920605eb76f9ee6437dffd1` |
+| Size | 512 words / 2,048 bytes |
+| SWITCHM dispatch word | word 3 = 43 (`0x2b`) |
+| SWITCH word | word 51 = `0x2f008001` (LE bytes `01 80 00 2f`) |
+| First-root physical SWITCH address | `0xa0cc` |
+
+Complete SWITCHM instruction words, offsets 43–55 inclusive:
+
+```text
+97308156 b77b4000 b8800009 075b0010 af304301 c7330006
+8f358000 07584000 2f008001 af084000 1f000000 af084002
+1f000000
+```
+
+The full-core replay reaches that exact SWITCH after the actual CALL and
+M-control DWRITE, with CR1=`0x1a00000b` (explicit L) and DR1=1 or 3. It observes
+native writes into the first SYSTEM home (`0x1000`–`0x13ff`), the root
+transition to `0x10000`, the second caller's actual CALL into its local SR,
+and the second SWITCH's writes into its SYSTEM home (`0x11000`–`0x113ff`).
+CR15 then returns to root zero. Execution resumes at `0xa0d0`, immediately
+after the first SWITCH, inside the suspended SR call. Native RETURN runs,
+and the first caller executes its post-CALL marker with DR1=0, CR12 still
+SYSTEM slot 2, and the original caller's version, code location and extent.
+No fault occurs. No callback supplies a successful return.
+
+The restored SR code view is RX (`0x52000017`), whereas CALL initially
+installs X (`0x42000017`); RETURN likewise reconstructs the caller RX view
+rather than reset's X-only view. Tests compare the matching object identity,
+location and extent with that explicit view change, not raw equality of
+every transient descriptor. Context construction occurs only before execution;
+runtime context saves and restores are entirely native.
+
+Remaining implementation differences:
+
+- Legacy destination-form SWITCH remains available for historical simulator
+  sources; it is not an RTL Namespace handoff. This candidate uses the new
+  public indexed source/row form and its required-zero target.
+- `simulator/simulator.js` `_execSwitch` accepts isolated destination
+  registers 12–15 and delegates to `_execLoad`; it does not perform the
+  maintained RTL's outgoing Thread save, Namespace midpoint publication,
+  and fixed-slot-2 incoming Thread restoration. A JS return after that reload
+  would not establish the requested two-context round trip.
+- The existing JS CALL B-clearing discrepancy noted above also remains.
+
+Only the approved software candidate/assembler encoding boundary changed.
+No ISA or RTL semantics, JS execution engine, live Namespace, saved image,
+or physical operation changed. The success claim is specifically the
+maintained RTL-model replay, not JS parity or production provisioning.
 
 ## Verification run
 
@@ -194,8 +273,11 @@ the two conversions are not claimed complete.
   `node simulator/test_security_regulator.js` and `git diff --check` also passed.
   These are boundary/helper checks, not acceptance of unimplemented conversions.
 
-Earlier candidate-build evidence (not rerun by the conversion investigation):
-
+SWITCHM qualification and candidate-build evidence:
+- `python -m pytest docs/phase-2/cooperative-retry/test_security_regulator_switch_candidate.py docs/phase-2/cooperative-retry/test_candidate_switch_compile.py -q`:
+  11 passed: both exact-candidate row selections and historical compiler-profile isolation.
+- `node simulator/test_sr_switch_encoding.js`: passed, covering public indexed
+  encoding, signed offsets, invalid source/index rejection and legacy-form isolation.
 - `node simulator/test_security_regulator.js`: passed, including rejection of
   public CALLs to private helpers and denial of host GT construction except
   architectural CALL/RETURN code views.
