@@ -142,6 +142,12 @@ already a valid Outform, return that exact Outform unchanged with DR1=0.
 This does not refresh stale GTs or waive validity checks, and does not by
 itself resolve the indexed caller-register mechanism.
 
+**Approved NULL conversion input result:** MakeInformM and MakeOutformM
+return NULL unchanged with a nonzero DR1 fault code when the selected GT is
+NULL. The numeric code remains unassigned. NULL input alone does not cause
+HardFault; other architectural HardFaults remain separate. This is not a
+successful conversion and does not construct a reference or initiate Lazy Load.
+
 **Audit requirement:** Every SecurityRegulator action is logged in detail
 against the Passcode and sent to the Home IDE, including unsuccessful actions.
 The appendix records proposed audit fields and open delivery semantics.

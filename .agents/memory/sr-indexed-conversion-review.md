@@ -104,3 +104,13 @@ unchanged with DR1=0.
 **How to apply:** Treat the already-achieved form as success. Preserve validity
 checks; do not silently refresh stale references or infer that the indexed
 caller-register mechanism has been verified.
+
+MakeInformM and MakeOutformM return NULL unchanged with a nonzero DR1 fault
+code when the selected input GT is NULL; the numeric code remains unassigned.
+
+**Why:** Asked how both conversion methods should handle NULL, the user chose
+“Return NULL and fault code”.
+
+**How to apply:** Do not HardFault solely for NULL conversion input, report
+success, construct a reference, or initiate Lazy Load. Other architectural
+HardFaults remain separate.

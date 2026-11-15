@@ -125,6 +125,8 @@ specific caller still needs to be named.
 
 #### MakeOutformM — user and reason
 
+- **NULL input result:** Return NULL unchanged with a nonzero DR1 fault code
+  (numeric value unassigned). NULL input alone does not cause HardFault.
 - **Already-Outform result:** If the selected GT is already a valid Outform,
   return that exact Outform unchanged with DR1=0. This does not refresh stale
   references or waive validity checks.
@@ -142,6 +144,8 @@ specific caller still needs to be named.
 
 #### MakeInformM — user and reason
 
+- **NULL input result:** Return NULL unchanged with a nonzero DR1 fault code
+  (numeric value unassigned). NULL input alone does not cause HardFault.
 - **Already-Inform result:** If caller CR[n] already contains a valid Inform,
   return that established Inform unchanged, with DR1=0. This does not authorize
   refreshing a stale GT or accepting an otherwise invalid GT.
