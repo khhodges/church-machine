@@ -137,6 +137,11 @@ Other architectural HardFaults remain separate.
 already holds a valid Inform, return that established Inform unchanged with
 DR1=0. This does not refresh stale GTs or waive other validity checks.
 
+**Approved MakeOutformM already-Outform result:** when the selected GT is
+already a valid Outform, return that exact Outform unchanged with DR1=0.
+This does not refresh stale GTs or waive validity checks, and does not by
+itself resolve the indexed caller-register mechanism.
+
 **Audit requirement:** Every SecurityRegulator action is logged in detail
 against the Passcode and sent to the Home IDE, including unsuccessful actions.
 The appendix records proposed audit fields and open delivery semantics.

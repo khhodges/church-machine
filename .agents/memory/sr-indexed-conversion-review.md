@@ -94,3 +94,13 @@ the established inform”.
 **How to apply:** Treat the already-achieved form as success, not a wrong-form
 rejection. Do not extend this to stale or otherwise invalid GTs, reconstruct
 the GT, or silently refresh its version.
+
+If MakeOutformM receives an already-valid Outform, return that exact Outform
+unchanged with DR1=0.
+
+**Why:** Asked about an already-valid Outform input, the user approved
+“Success + Outform GT”.
+
+**How to apply:** Treat the already-achieved form as success. Preserve validity
+checks; do not silently refresh stale references or infer that the indexed
+caller-register mechanism has been verified.

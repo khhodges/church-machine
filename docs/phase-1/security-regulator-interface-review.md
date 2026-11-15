@@ -125,6 +125,9 @@ specific caller still needs to be named.
 
 #### MakeOutformM — user and reason
 
+- **Already-Outform result:** If the selected GT is already a valid Outform,
+  return that exact Outform unchanged with DR1=0. This does not refresh stale
+  references or waive validity checks.
 - **User:** Mint, in its Inform-to-Outform conversion responsibility.
 - **Reason:** Produce an Outform representing the same living object as the
   supplied Inform, retaining source identity evidence rather than rebuilding a
