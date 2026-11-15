@@ -169,3 +169,14 @@ not evidence that Outform materialization works.
 **How to apply:** Verify the current native type path before implementing
 conversion. Do not substitute host GT manufacture, silent promotion, or RTL
 changes for the approved unchanged-ISA native implementation.
+
+Keep conversion feasibility evidence separate from conversion acceptance.
+An ingress test that rejects Outform installation without writes proves
+containment, not the required software-status failure or successful conversion.
+
+**Why:** The unchanged-ISA investigation reached a blocker before result
+installation; passing helper and ingress tests cannot certify absent methods.
+
+**How to apply:** Retain explicit unimplemented acceptance cases when reporting
+the conflict. Do not expose partial conversion methods as the full approved
+pair, or use privileged microcode/debug interfaces as programmer instructions.

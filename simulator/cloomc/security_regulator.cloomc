@@ -7,6 +7,8 @@
 ; M-control full-word writes preserve entry CR6.M/CR14.M, adding only the
 ; operation's required bit. The instruction consumes that added authority.
 ; No report delivery, host callback, ISA change or implicit recovery.
+; Conversion methods remain unexported: see the native conversion conflict
+; report in security-regulator-native.md. M does not permit raw Outform LOAD.
 abstraction ide.SecurityRegulator {
 capabilities {
     SELF E, ide.MControl W, ide.SRWork S, ide.SRWork RW,

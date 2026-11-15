@@ -118,6 +118,69 @@ implement “return the same Outform without loading.” No bypass, host
 manufacture, lazy fetch, or ISA/RTL alteration has been introduced.
 These conversions still require a compatible native mechanism.
 
+### Conversion feasibility finding (unchanged ISA/RTL)
+
+**The full approved conversion pair cannot be implemented with the currently
+exposed native mechanisms.** This is an architectural conflict report, not a
+completed conversion implementation. No conversion methods were exported, no
+live bindings were changed, and no ISA/RTL change is proposed here.
+
+The decisive counterexample is a valid Inform in an allowed caller register.
+MakeOutformM must produce an Outform while leaving its object, binding and other
+holders intact. Native arithmetic can construct the desired *data word*, but
+there is no exposed raw DATA-to-CR installation operation that accepts that
+Outform:
+
+| Candidate path | Why it does not satisfy the contract |
+|---|---|
+| SAVE / DREAD / BFINS / DWRITE / M-authorized LOAD | SAVE exposes token bits in scratch; arithmetic changes DATA only. `ChurchMLoad.FETCH_GT` rejects type 2 with `OUTFORM_UNAUTH`, even with M, before consulting the target Namespace. |
+| Internal `sub_direct_gt` | A hardware subroutine input, not a programmer instruction. `hardware/load.py` exposes direct loading only for NULL and drives the direct GT to zero. CALL/RETURN use internal direct loading for their own protected execution state, not arbitrary selected caller CRs. |
+| TPERM | Changes/checks permissions, not representation type; cannot create the missing Outform. |
+| RETURN keep mask | Can retain an already-held selected GT, not construct a new representation. |
+| Writing Thread homes followed by CHANGE/SWITCH | Changes execution context and invokes restore machinery; not a raw write of the current selected CR. This is not authority to forge protected frames or to change an object's binding. |
+| Simulator Outform LOAD | `_execLoadAccepted` takes the resolver path or the legacy loader/promotion path, even when the legacy manifest says the object is already loaded. It does not install the requested Outform unchanged. |
+
+This rejects the general pair; it does **not** prove that every individual
+MakeInformM case is impossible. An already-held Outform can be left untouched,
+and an independently validated local Inform can in principle be materialized.
+However, changing type bits or treating the Outform slot as an Inform slot is
+not proof of the same object's local binding. The current candidate has no
+native, authenticated identity-to-local-binding conversion protocol. Neither
+the simulator's host identity registry nor its resolver is an acceptable
+substitute. Missing binding must remain a normal nonzero return with the exact
+Outform retained, never an attempted LOAD of that Outform and ensuing HardFault.
+
+#### Contract disposition
+
+These are required acceptance cases, **not passing conversion tests**:
+
+| Input / condition | Required result | Evidence / remaining gap |
+|---|---|---|
+| NULL | Same NULL, nonzero DR1 | Existing selector can detect NULL without loading it; conversion entry points are absent. |
+| Valid Outform to MakeOutformM | Exact unchanged Outform, DR1=0 | Keep-mask retention is available; native validity protocol still needs definition/implementation. |
+| Valid Inform to MakeInformM | Exact unchanged Inform, DR1=0 | Existing descriptor/version validation offers a building block, not an implemented conversion. |
+| Inform to MakeOutformM | Outform, identical non-representation attributes | Blocked at raw Outform installation. |
+| Outform with valid local binding to MakeInformM | Inform of that exact object, identical attributes | Requires proven native identity/binding lookup; no implicit fetch or version refresh. |
+| Missing / unfinished binding | Exact same Outform, nonzero DR1 | Must retain the original CR rather than re-materialize it; not implemented. |
+| Permissions, type, B, F and other attributes | Preserve SR-entry attributes except representation fields | SAVE clears B in the stored copy; entry B is normally zero after CALL. F is shared Namespace authority, not a token bit. A conversion must not mutate it or the binding. |
+| Selectors 0–4, 7–10 | Operate only on the chosen caller CR | Existing native selector tests cover these helper paths, not conversion acceptance. |
+| Selectors 5, 6, 11–15 or out of range | Nonzero DR1, all candidate inputs retained | Existing helper rejection tests apply; conversions remain unexported. |
+| Returned failure | Exact selected GT retained | Must avoid selected-CR writes before success; architectural HardFault has no rollback promise. |
+
+`hardware/test_sr_conversion_boundary.py` exercises the actual mLoad FSM for
+every allowed destination, multiple permission encodings, nonzero and maximum
+versions, and B-clear/B-set raw inputs. It asserts `OUTFORM_UNAUTH`, no CR,
+Thread-home, memory or version writes, no download start, and no success pulse.
+Only the scratch address is read: presence, absence and F of a target binding
+cannot affect this earlier gate. This proves containment of the attempted
+materialization, **not** software-status rejection or exact-attribute conversion.
+The test deliberately does not bypass ingress with a debug-port Outform result.
+
+Next decision: reconcile the approved conversion contract with the absence of
+an exposed Outform installation mechanism and specify native local-binding
+evidence. Any architecture proposal needs separate review; this report neither
+authorizes changes nor weakens the existing Outform authentication gate.
+
 SWITCHM's public indexed input compiles and its input/fault boundaries are
 tested. Its complete two-Namespace round trip still needs exact-candidate
 qualification; the earlier fixed-binding diagnostic is not that evidence.
@@ -125,6 +188,13 @@ Physical hardware parity, safe production provisioning, non-Inform MintM and
 the two conversions are not claimed complete.
 
 ## Verification run
+
+- Conversion-boundary investigation: `python3 -m pytest
+  hardware/test_sr_conversion_boundary.py -q` passed all 45 cases;
+  `node simulator/test_security_regulator.js` and `git diff --check` also passed.
+  These are boundary/helper checks, not acceptance of unimplemented conversions.
+
+Earlier candidate-build evidence (not rerun by the conversion investigation):
 
 - `node simulator/test_security_regulator.js`: passed, including rejection of
   public CALLs to private helpers and denial of host GT construction except
