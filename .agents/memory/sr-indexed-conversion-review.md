@@ -76,3 +76,11 @@ numeric code remains unassigned; missing binding alone does not cause HardFault.
 **How to apply:** Preserve the GT exactly; do not clear it to NULL, reconstruct
 it, or initiate Lazy Load. IncrementVersion's NULL-on-failure rule does not
 extend to this method. Other architectural HardFaults remain separate.
+
+An object may be unfinished when MakeInformM is requested.
+
+**Why:** The user supplied this example to explain retaining the same Outform
+when conversion cannot yet produce an Inform.
+
+**How to apply:** Preserve the reference without claiming readiness. Do not
+infer that SR must finish the object, wait, or initiate Lazy Load.

@@ -150,6 +150,9 @@ specific caller still needs to be named.
   fetch/load. If no valid local binding exists, return the exact same Outform
   GT in caller CR[n], with a nonzero DR1 fault code (numeric value unassigned).
   Missing binding alone does not cause HardFault or clear the GT to NULL.
+  **User-supplied example:** the object might be unfinished. Retain its exact
+  Outform rather than claiming an Inform is available; this does not make SR
+  responsible for finishing the object or waiting for it.
 - **Evidence:** [source-required conversion contract](01-isa/instruction-set.md#a8-inform--outform-conversion--source-gt-required);
   [Mint resolution/binding coverage](01-isa/instruction-set.md#a91-service-operation-coverage).
 - **Usage still to specify:** The concrete Mint workflow/call site and the
