@@ -1,25 +1,24 @@
 ---
 name: SecurityRegulator B methods
-description: Separate SetB and ResetB interfaces selected instead of a value-argument setter.
+description: SetB remains required; ResetB was withdrawn because CALL already clears passed B.
 ---
 
-Use separate SetB and ResetB methods. DR1=n selects the caller's CR[n];
-SetB sets B=1 and ResetB sets B=0 in place. No DR2 value argument. DR1 then
-returns standard API status. Neither changes other GT fields or other copies.
+Use SetB only in the CALL-based SR API. DR1=n selects CR0–CR4 or CR7–CR10;
+SetB sets B=1 in place. No DR2 value argument. DR1 then returns standard API
+status. Do not change other GT fields or other copies. Omit ResetB.
 
-**Why:** The user selected separate names for clearer calls and simpler use,
-instead of a single method with a 0/1 value argument.
+**Why:** The user initially selected separate setters, then agreed ResetB is
+redundant because CALL clears B on passed registers before SR executes.
+SetB remains useful because RETURN preserves a deliberately returned B=1.
 
-**How to apply:** Do not reopen the paired-method choice. Verify caller-register
-access and the implementation against unchanged ISA/RTL; allowed registers,
-rejection conditions and numeric codes still require resolution. Do not infer
-new instructions or permission to catch HardFault.
+**How to apply:** Do not export ResetB or change CALL semantics. Verify SetB
+against unchanged ISA/RTL. Numeric error codes are delegated to the agent.
 
-Both methods leave the selected GT unchanged on returned software rejection
+SetB leaves the selected GT unchanged on returned software rejection
 and return a nonzero fault code in DR1. HardFault retains the ISA fault path,
 without a rollback guarantee.
 
-**Why:** The user approved the same unchanged-GT rejection rule for both methods.
+**Why:** The approved unchanged-GT rejection rule remains applicable to SetB.
 
-**How to apply:** Verify rejection effects independently of the still-open
-allowed-register set, numeric codes and returnable-failure classification.
+**How to apply:** Measure unchanged state at SR entry, after CALL effects;
+keep returned rejection distinct from architectural HardFault.

@@ -140,6 +140,10 @@ separate lifecycle operation.
 **Approved conversion attribute preservation:** MakeInformM and MakeOutformM
 preserve permissions, type, B, F and all other GT attributes except the
 representation fields required for conversion between Inform and Outform.
+Preservation is measured at SR entry, after CALL's architectural B clearing,
+not against the pre-CALL B value. The user approved omitting ResetB from the
+CALL-based API as redundant; SetB remains required and may return B=1.
+This supersedes the earlier paired SetB/ResetB requirement.
 The result identifies the same object without silently changing authority or
 refreshing stale references. If the destination form cannot preserve the
 attributes, return failure with the original GT unchanged. Exact field mapping

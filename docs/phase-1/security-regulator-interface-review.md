@@ -51,7 +51,9 @@ implemented call or an additional authority grant. Where the review supplies
 only a general capability, the missing concrete caller/use case is explicit.
 
 **Conversion attribute preservation:** MakeInformM and MakeOutformM preserve
-the source GT's permissions, type, B, F and other attributes. Only fields
+the source GT's permissions, type, B, F and other attributes as received at
+SR entry. CALL has already cleared B on passed registers; conversion does not
+recover the pre-CALL B value. Only fields
 required to represent the same object in the destination form may change;
 conversion must not silently change authority or refresh a stale identity.
 If the destination form cannot preserve those attributes, return failure with
@@ -68,7 +70,7 @@ settled behavior, not an open choice.
 | **MakeOutformM — indexed alternative under review**<br>Baseline: `MakeOutformM(sourceInformGT) → outformGT` in CR1<br>Alternative: DR1=`n`, convert caller's CR[n] in place; standard DR1 status<br>[ISA conversion discussion](01-isa/instruction-set.md) | User confirmed that the alternative selects the caller's CR[n], not the regulator's register. Original source GT remains mandatory. Earlier fixed CR1 convention remains the baseline pending alternative evaluation. Success replaces the selected GT and returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. | Verify caller-context access, result preservation and rejection behavior under existing ISA/RTL; settle allowed registers and numeric fault codes. HardFault retains the ISA fault path with no rollback guarantee. Conversion checks and M-use implementation remain open. |
 | **MakeInformM — approved register signature and missing-binding result**<br>DR1=`n`: convert caller's CR[n] from Outform to Inform in place; DR1 returns status<br>[ISA conversion discussion](01-isa/instruction-set.md) | Caller CR[n] supplies the original Outform GT and receives the corresponding Inform on success, with DR1=0. A returned software rejection leaves the selected Outform GT unchanged and returns a nonzero fault code. If no valid local binding exists, return the exact same Outform GT in caller CR[n], with nonzero DR1 under the common status convention; missing binding alone does not cause HardFault. Other HardFaults remain separate, without a rollback guarantee. A slot-only reconstruction is not equivalent. Lazy Load belongs to the original request, not SR. | Verify caller-context access, result preservation and rejection behavior under existing ISA/RTL; specify allowed registers, conversion checks, preserved/transformed fields, remaining fault classification/codes, clobbers and M-use implementation. The numeric missing-binding code is not yet assigned. |
 | **SetB — approved name and register signature**<br>DR1=`n`: set caller CR[n].B to 1; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set B to 1, not toggle. No DR2 value argument. Do not change unrelated GT fields or other copies. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify caller-register access, instruction mechanism and rejection effects under unchanged ISA/RTL; specify allowed registers, rejection conditions and numeric fault codes. |
-| **ResetB — approved name and register signature**<br>DR1=`n`: set caller CR[n].B to 0; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set B to 0, not toggle. No DR2 value argument. Do not change unrelated GT fields or other copies. Ordinary movement rules remain separate. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify caller-register access, instruction mechanism and rejection effects under unchanged ISA/RTL; specify allowed registers, rejection conditions and numeric fault codes. |
+| **ResetB — omitted from the CALL-based API** | CALL already clears B on passed registers before SR executes. The user approved removing this redundant method. SetB remains useful because RETURN can preserve the B=1 result. | No ResetB implementation or exported method is required. |
 | **SetNear — approved name and register signature**<br>DR1=`n`: set caller CR[n] to Near; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set F state to Near, not toggle or bypass a SAVE check. No DR2 value argument. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify exact F encoding, permitted targets, caller-register access, mechanism and rejection effects under unchanged ISA/RTL; settle rejection conditions and numeric fault codes. |
 | **SetFar — approved name and register signature**<br>DR1=`n`: set caller CR[n] to Far; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set F state to Far, not toggle or bypass a SAVE check. No DR2 value argument. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify exact F encoding, permitted targets, caller-register access, mechanism and rejection effects under unchanged ISA/RTL; settle rejection conditions and numeric fault codes. |
 | **IncrementVersion — approved input, NULL result and exhaustion status**<br>Input DR1=`n`: caller CR[n] holds identifying GT<br>Every normal RETURN: caller CR[n]=NULL; DR1=0 success, DR1=1 already at maximum<br>[version-increment requirement](security-regulator-operation-review.md); [lifecycle specification](../lazy-lifecycle-unified.md) | Increment the authoritative version associated with the selected GT. On success or returned software failure, set the selected caller CR[n] to NULL; do not return a new-version GT. Thread-reset use must invalidate old GTs through the Namespace entry. At maximum, return 1 with CR[n]=NULL and leave the version unchanged; never wrap or release the reset context after a failed increment. HardFault remains on the ISA fault path, without a NULL-result guarantee. No hardware automatic version mutation or silent upgrade of existing holders. | Verify caller-register access, NULL result preservation on success and returned failure, and authorized descriptor update under unchanged ISA/RTL. Allowed registers and remaining failure classification/codes still require specification. |
@@ -201,6 +203,9 @@ specific caller still needs to be named.
 
 #### SetB and ResetB — user and reason
 
+**Superseding decision:** ResetB is omitted from the CALL-based SR API.
+The paired-method rationale below is review history; only SetB remains required.
+
 - **User:** A specifically authorized caller has not yet been named for this
   operation. The compiler's ESaveLists workflow is cited as needing returned
   GTs, but that is not evidence of a SetB or ResetB invocation.
@@ -299,7 +304,8 @@ variants or candidate families into exported methods.
    `SwitchNamespace` name's disposition without reopening those assignments.
 2. **Complete callable ABI:** argument/result registers, clobbers, preservation
    masks and final method indices. Preserve already-approved SAVEM operands.
-3. **Required extensions:** SetB/ResetB names and DR1 signatures are approved;
+3. **Required extensions:** SetB's name and DR1 signature are approved;
+   ResetB is omitted because CALL already clears B on passed registers.
    verify their mechanism and unchanged-GT rejection effect; settle allowed
    registers and rejection conditions.
    SetNear/SetFar names and DR1 signatures are approved; verify their encoding,

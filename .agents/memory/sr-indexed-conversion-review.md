@@ -147,3 +147,13 @@ caller registers.
 range. Caller-context access and result preservation still need implementation
 verification. The user clarified that updating the Namespace version and
 making the code meet its contract are the task, not further approval questions.
+
+Conversion attribute preservation is measured at SR entry, after CALL's
+architectural B clearing. Do not recover the pre-CALL B value.
+
+**Why:** The user explicitly agreed after the CALL behavior was explained,
+also approving omission of redundant ResetB.
+
+**How to apply:** Preserve the B value received by SR (normally zero after
+CALL). Do not treat pre-CALL B preservation as an implementation blocker or
+change ISA/RTL to restore it.
