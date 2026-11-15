@@ -2565,9 +2565,13 @@ class ChurchAssembler {
                 } else if (bareNamedSwitch) {
                     switchRow = bareName.slot;
                 } else if (annotatedSwitch) {
-                    switchRow = this._parseImm(parts[4], lineNum);
+                    switchRow = /^DR/i.test(parts[4] || '')
+                        ? this._parseCompactIndex(parts[4], lineNum)
+                        : this._parseImm(parts[4], lineNum);
                 } else if (!directSwitch && !unknownNamedSwitch) {
-                    switchRow = this._parseImm(parts[3], lineNum);
+                    switchRow = /^DR/i.test(parts[3] || '')
+                        ? this._parseCompactIndex(parts[3], lineNum)
+                        : this._parseImm(parts[3], lineNum);
                 }
                 if (!Number.isInteger(switchRow) || switchRow < 0 || switchRow > 0x7FFF) {
                     const rowToken = namedSwitch

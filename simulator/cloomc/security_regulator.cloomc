@@ -1,0 +1,70 @@
+; Native SR candidate. Only implemented methods are exported.
+; Not installed, bound into a live Namespace, or a complete SR release.
+; Private row 1: MControl W. It must never be supplied as a caller argument.
+; DR1: home/row input, then status (0 success, 2 unencodable index).
+; Clobbers DR6 and CR11. CALL/RETURN architectural effects still apply.
+; M-control full-word writes preserve entry CR6.M/CR14.M, adding only the
+; operation's required bit. The instruction consumes that added authority.
+; No report delivery, host callback, ISA change or implicit recovery.
+abstraction ide.SecurityRegulator {
+capabilities { SELF E, ide.MControl W }
+
+method LOADM() {
+    ; CR1 source; exact loaded GT replaces CR1, including NULL.
+    BFEXT DR6, DR1, #10, #22
+    MCMP DR6, #0
+    BRANCHNE bad_load_index
+    LOAD CR11, CR6, #1
+    ; 0x4042 = M(CR14, CR6, CR1).
+    IADD DR6, DR0, #257
+    SHL DR6, DR6, #6
+    IADD DR6, DR6, #2
+    DWRITE DR6, CR11, #0
+    LOAD CR1, CR1, DR1
+    LOAD CR11, NULL
+    IADD DR1, DR0, #0
+    RETURNAL #2
+bad_load_index:
+    IADD DR1, DR0, #2
+    RETURNAL #2
+}
+
+method SAVEM() {
+    ; CR1 destination, CR2 value. SAVE clears B in the stored copy only.
+    BFEXT DR6, DR1, #10, #22
+    MCMP DR6, #0
+    BRANCHNE bad_save_index
+    LOAD CR11, CR6, #1
+    IADD DR6, DR0, #257
+    SHL DR6, DR6, #6
+    IADD DR6, DR6, #2
+    DWRITE DR6, CR11, #0
+    SAVE CR2, CR1, DR1
+    LOAD CR11, NULL
+    IADD DR1, DR0, #0
+    RETURNAL #6
+bad_save_index:
+    IADD DR1, DR0, #2
+    RETURNAL #6
+}
+
+method SWITCHM() {
+    ; CR1 must have explicit L. Execution is on SYSTEM Thread slot 2.
+    BFEXT DR6, DR1, #10, #22
+    MCMP DR6, #0
+    BRANCHNE bad_switch_index
+    LOAD CR11, CR6, #1
+    ; 0xC040 = M(CR15, CR14, CR6); no source M bypass.
+    IADD DR6, DR0, #769
+    SHL DR6, DR6, #6
+    DWRITE DR6, CR11, #0
+    LOAD CR11, NULL
+    SWITCH CR15, CR1, DR1
+    ; Reached only after another SWITCH restores this matching context.
+    IADD DR1, DR0, #0
+    RETURN
+bad_switch_index:
+    IADD DR1, DR0, #2
+    RETURN
+}
+}
