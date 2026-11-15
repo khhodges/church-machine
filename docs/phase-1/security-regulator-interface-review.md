@@ -37,6 +37,15 @@ the person requesting the feature. A documented use is not proof of an
 implemented call or an additional authority grant. Where the review supplies
 only a general capability, the missing concrete caller/use case is explicit.
 
+**Conversion attribute preservation:** MakeInformM and MakeOutformM preserve
+the source GT's permissions, type, B, F and other attributes. Only fields
+required to represent the same object in the destination form may change;
+conversion must not silently change authority or refresh a stale identity.
+If the destination form cannot preserve those attributes, return failure with
+the original GT unchanged. Exact representation mapping and implementation
+feasibility remain to be verified under unchanged ISA/RTL; preserving B/F is
+settled behavior, not an open choice.
+
 | Method / signature / evidence | Settled behavior or operand decisions | Remaining choices / implementation specifications |
 |---|---|---|
 | **LOADM — proposed interface with approved inputs**<br>`LOADM(sourceGT, homeIndex) → valueGT`<br>[ISA A.2](01-isa/instruction-set.md#a2-loadm--m-assisted-capability-load) | Approved inputs: CR1=`sourceGT`, DR1=`homeIndex` (zero-based). Source-register M may replace the source L requirement, not other checks. Return the exact loaded GT, including NULL data, in CR1 with CR1.M clear, replacing the source argument. NULL source authority remains invalid. Caller preserves ordinary working values needed after the call; protected CALL/RETURN behavior is unchanged. | Document exact working-register clobbers; verify the return mask and exact M acceptance/clear points. |

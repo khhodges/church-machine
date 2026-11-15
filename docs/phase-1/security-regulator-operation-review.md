@@ -126,6 +126,14 @@ unresolved identity fields, mechanism changes and audit requirements.
 source GT, unlike MintM. Appendix A.8 makes that input mandatory; conversion
 must not discard source identity evidence and reconstruct from a slot alone.
 
+**Approved conversion attribute preservation:** MakeInformM and MakeOutformM
+preserve permissions, type, B, F and all other GT attributes except the
+representation fields required for conversion between Inform and Outform.
+The result identifies the same object without silently changing authority or
+refreshing stale references. If the destination form cannot preserve the
+attributes, return failure with the original GT unchanged. Exact field mapping
+and feasibility require verification; this does not authorize ISA/RTL changes.
+
 **Approved MakeInformM missing-binding result:** if no valid local binding
 exists, return the exact same Outform GT in the selected caller CR[n].
 Under the common return convention, DR1 is a nonzero fault code (numeric value

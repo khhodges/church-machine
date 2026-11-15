@@ -114,3 +114,16 @@ code when the selected input GT is NULL; the numeric code remains unassigned.
 **How to apply:** Do not HardFault solely for NULL conversion input, report
 success, construct a reference, or initiate Lazy Load. Other architectural
 HardFaults remain separate.
+
+MakeInformM and MakeOutformM preserve permissions, type, B, F and other GT
+attributes; only the representation fields required for the form conversion
+may change. If preservation is impossible, return failure with the source
+GT unchanged.
+
+**Why:** Asked whether conversions preserve permissions exactly, the user
+extended the requirement to “including typer, b f etc”.
+
+**How to apply:** Treat attribute preservation as settled, not a future B/F
+policy question. Verify exact representation mapping against unchanged ISA/RTL;
+do not silently add/remove authority, refresh stale identities, or claim the
+implementation mechanism has already been proven.
