@@ -22,6 +22,12 @@ Signatures below describe functional results, with this common status implicit
 after restoration of its matching SYSTEM context. Numeric fault codes and
 returnable failure cases remain to be specified; ISA/RTL are unchanged.
 
+**Delegated error-code assignments:** The agent is authorized to decide numeric
+error codes across all APIs, not only SecurityRegulator. References below to
+unassigned numeric codes indicate engineering work, not questions for the user.
+Preserve approved values and behavior; this delegation does not authorize
+converting architectural HardFaults to returned failures.
+
 “Proposed” describes the published interface, not a rejection of behavior already
 approved within it. “Required extension” means the behavior was requested but
 its callable interface is not yet selected.

@@ -755,6 +755,14 @@ callers and saved LUMPs already conform. Exact nonzero codes and returnable
 failure cases remain to be specified. Historical artifacts are not rewritten
 by this documentation approval.
 
+**Error-code assignment authority:** The user authorizes the agent to decide
+numeric error codes for any and all APIs without per-code approval. Preserve
+agreed values, including DR1=0 for success and IncrementVersion's DR1=1 at
+maximum version, and document assignments against existing contracts.
+Unassigned numeric codes are engineering work, not pending user decisions.
+This does not change approved failure behavior or authorize converting
+architectural HardFaults into returned statuses.
+
 ### Standard software hard fault
 
 `HARDFAULT reason` is an approved compiler pseudo-instruction direction:
