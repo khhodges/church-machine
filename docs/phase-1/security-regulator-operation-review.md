@@ -126,6 +126,11 @@ unresolved identity fields, mechanism changes and audit requirements.
 source GT, unlike MintM. Appendix A.8 makes that input mandatory; conversion
 must not discard source identity evidence and reconstruct from a slot alone.
 
+**Approved MakeOutformM conversion-only scope:** Convert only the selected GT.
+Leave the local object, Namespace binding and other GT holders unchanged.
+Do not release local storage as a conversion side effect; reclamation is a
+separate lifecycle operation.
+
 **Approved conversion attribute preservation:** MakeInformM and MakeOutformM
 preserve permissions, type, B, F and all other GT attributes except the
 representation fields required for conversion between Inform and Outform.

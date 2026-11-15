@@ -140,6 +140,9 @@ specific caller still needs to be named.
 
 #### MakeOutformM — user and reason
 
+- **Conversion-only scope:** Leave the local object, Namespace binding and
+  other GT holders unchanged. Converting the selected GT does not release
+  storage; reclamation remains a separate lifecycle operation.
 - **NULL input result:** Return NULL unchanged with a nonzero DR1 fault code
   (numeric value unassigned). NULL input alone does not cause HardFault.
 - **Already-Outform result:** If the selected GT is already a valid Outform,

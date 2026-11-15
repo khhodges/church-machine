@@ -127,3 +127,12 @@ extended the requirement to “including typer, b f etc”.
 policy question. Verify exact representation mapping against unchanged ISA/RTL;
 do not silently add/remove authority, refresh stale identities, or claim the
 implementation mechanism has already been proven.
+
+MakeOutformM converts only the selected GT, leaving the local object, Namespace
+binding and other GT holders unchanged. It does not release local storage.
+
+**Why:** The user approved leaving the object and binding intact when asked
+whether conversion should also release storage.
+
+**How to apply:** Keep reclamation a separate lifecycle operation; do not
+couple conversion to eviction, unbinding or changes to other references.
