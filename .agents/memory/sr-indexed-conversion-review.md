@@ -42,8 +42,8 @@ Lazy Load belongs to the original request, not SR's MakeInformM conversion.
 appeared to imply that SR would initiate Lazy Load.
 
 **How to apply:** Keep register selection and mechanical conversion separate
-from loading. Do not introduce an implicit SR fetch or infer an agreed
-missing-binding status/HardFault outcome from this ownership clarification.
+from loading. Do not introduce an implicit SR fetch. The separately approved
+missing-binding return rule below now settles that outcome.
 
 MakeInformM's register signature is approved: DR1=n selects the caller's
 CR[n] containing the original Outform; success converts that register in place
@@ -53,8 +53,8 @@ to Inform, with DR1 then carrying common API status.
 explicitly agreed to the register signature.
 
 **How to apply:** Do not reopen the register selection. Verify feasibility
-against unchanged ISA/RTL; signature approval does not settle missing-binding
-behavior, allowed registers or all conversion failure effects.
+against unchanged ISA/RTL; signature approval alone does not settle allowed
+registers or all conversion failure effects.
 
 MakeInformM also leaves the selected Outform GT unchanged on a returned
 software rejection, with nonzero DR1 status. Success replaces it with the
@@ -65,3 +65,14 @@ Inform and returns DR1=0; HardFault carries no rollback guarantee.
 **How to apply:** Keep this guarantee distinct from selecting which conditions
 are returnable failures versus HardFault and from the original request's Lazy
 Load responsibility.
+
+If MakeInformM finds no valid local binding, return the exact same Outform GT
+in caller CR[n], with nonzero DR1 under the common status convention. The
+numeric code remains unassigned; missing binding alone does not cause HardFault.
+
+**Why:** When asked about the missing-binding outcome, the user specified
+“Return the same Outform GT”.
+
+**How to apply:** Preserve the GT exactly; do not clear it to NULL, reconstruct
+it, or initiate Lazy Load. IncrementVersion's NULL-on-failure rule does not
+extend to this method. Other architectural HardFaults remain separate.

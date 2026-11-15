@@ -126,6 +126,13 @@ unresolved identity fields, mechanism changes and audit requirements.
 source GT, unlike MintM. Appendix A.8 makes that input mandatory; conversion
 must not discard source identity evidence and reconstruct from a slot alone.
 
+**Approved MakeInformM missing-binding result:** if no valid local binding
+exists, return the exact same Outform GT in the selected caller CR[n].
+Under the common return convention, DR1 is a nonzero fault code (numeric value
+not yet assigned). Missing binding alone does not cause HardFault, clear the GT
+to NULL, or initiate Lazy Load; loading belongs to the original request.
+Other architectural HardFaults remain separate.
+
 **Audit requirement:** Every SecurityRegulator action is logged in detail
 against the Passcode and sent to the Home IDE, including unsuccessful actions.
 The appendix records proposed audit fields and open delivery semantics.
