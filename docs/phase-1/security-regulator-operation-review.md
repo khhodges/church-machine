@@ -36,6 +36,12 @@ does not approve an implementation or expand the FPGA-only lifecycle review.
 GT's B unchanged. Neither ordinary nor M-assisted LOAD grants or consumes B;
 other LOAD validation remains applicable.
 
+**Approved indexed caller-register range:** SR methods selecting caller CR[n]
+accept CR0–CR4 and CR7–CR10 only (`0 <= n < 5` or `6 < n < 11`).
+The permitted range is settled. Implementing caller-context access, updating
+the authoritative Namespace version and testing the specified outcomes are
+engineering work, not additional design decisions for the user.
+
 **Latest conceptual correction:** B is a GT setting defining movement,
 not a source/destination property or a hardware-register M setting. Do not
 infer a CALL clearing rule from the user's correction. The preceding

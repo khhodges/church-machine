@@ -136,3 +136,14 @@ whether conversion should also release storage.
 
 **How to apply:** Keep reclamation a separate lifecycle operation; do not
 couple conversion to eviction, unbinding or changes to other references.
+
+For SR methods targeting caller CR[n], permitted indices are 0–4 and 7–10.
+CR5, CR6 and CR11–CR15 are excluded.
+
+**Why:** The user specified “n<5 or (>6 and <11)” when asked about permitted
+caller registers.
+
+**How to apply:** Use `0 <= n < 5 || 6 < n < 11`; do not reopen the permitted
+range. Caller-context access and result preservation still need implementation
+verification. The user clarified that updating the Namespace version and
+making the code meet its contract are the task, not further approval questions.

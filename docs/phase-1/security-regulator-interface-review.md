@@ -28,6 +28,19 @@ unassigned numeric codes indicate engineering work, not questions for the user.
 Preserve approved values and behavior; this delegation does not authorize
 converting architectural HardFaults to returned failures.
 
+**Approved caller-register selector range:** For SR methods selecting caller
+CR[n], permitted indices are 0–4 and 7–10: `0 <= n < 5` or `6 < n < 11`.
+CR5, CR6 and CR11–CR15 are excluded. This settles the allowed-register question
+in the method rows below; access and return preservation remain implementation
+checks, not further interface choices.
+
+**Implementation responsibility clarification:** Updating the authoritative
+Namespace version is IncrementVersion's task. Implementing and testing the
+approved behavior are engineering responsibilities, not additional user
+approval gates. Private SR capability provisioning means supplying the
+capabilities required by the existing authority model; it does not introduce a
+new caller-purpose policy or an extra approval step.
+
 “Proposed” describes the published interface, not a rejection of behavior already
 approved within it. “Required extension” means the behavior was requested but
 its callable interface is not yet selected.
