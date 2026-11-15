@@ -287,6 +287,12 @@ variants or candidate families into exported methods.
 
 ## Current implementation evidence
 
+**Native candidate update:** [CLOOMC implementation and qualification limits](security-regulator-native.md)
+records the offline candidate's eight exported methods, native tests and
+remaining conversion/materialization limits. This is not a saved live
+installation or complete SR qualification. The audit observations below
+describe the earlier library audit.
+
 - A complete saved `ide.SecurityRegulator` compilation and method table were
   not present in the audited library.
 - The diagnostic `candidate.SecurityRegulator` implements only the bounded

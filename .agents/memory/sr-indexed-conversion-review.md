@@ -157,3 +157,15 @@ also approving omission of redundant ResetB.
 **How to apply:** Preserve the B value received by SR (normally zero after
 CALL). Do not treat pre-CALL B preservation as an implementation blocker or
 change ISA/RTL to restore it.
+
+Do not assume M-authorized DATA readback can install every GT representation.
+The existing Outform LOAD path rejects or resolves/promotes an Outform, rather
+than simply returning it unchanged.
+
+**Why:** Native SR implementation reached this concrete conflict with the
+approved no-Lazy-Load conversion contract. Successful Inform construction is
+not evidence that Outform materialization works.
+
+**How to apply:** Verify the current native type path before implementing
+conversion. Do not substitute host GT manufacture, silent promotion, or RTL
+changes for the approved unchanged-ISA native implementation.
