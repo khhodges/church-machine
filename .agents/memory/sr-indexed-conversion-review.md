@@ -84,3 +84,13 @@ when conversion cannot yet produce an Inform.
 
 **How to apply:** Preserve the reference without claiming readiness. Do not
 infer that SR must finish the object, wait, or initiate Lazy Load.
+
+If MakeInformM receives an already-valid Inform in caller CR[n], return that
+established Inform unchanged with DR1=0.
+
+**Why:** Asked about an already-valid Inform input, the user answered “Return
+the established inform”.
+
+**How to apply:** Treat the already-achieved form as success, not a wrong-form
+rejection. Do not extend this to stale or otherwise invalid GTs, reconstruct
+the GT, or silently refresh its version.

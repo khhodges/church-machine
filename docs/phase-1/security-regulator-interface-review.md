@@ -139,6 +139,9 @@ specific caller still needs to be named.
 
 #### MakeInformM — user and reason
 
+- **Already-Inform result:** If caller CR[n] already contains a valid Inform,
+  return that established Inform unchanged, with DR1=0. This does not authorize
+  refreshing a stale GT or accepting an otherwise invalid GT.
 - **User:** Mint, in its Outform-to-Inform conversion responsibility.
 - **Reason:** Produce an Inform for the same living object identified by the
   supplied Outform, with the required local binding established or reused.

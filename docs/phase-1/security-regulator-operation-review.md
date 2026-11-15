@@ -133,6 +133,10 @@ not yet assigned). Missing binding alone does not cause HardFault, clear the GT
 to NULL, or initiate Lazy Load; loading belongs to the original request.
 Other architectural HardFaults remain separate.
 
+**Approved MakeInformM already-Inform result:** when the selected caller CR[n]
+already holds a valid Inform, return that established Inform unchanged with
+DR1=0. This does not refresh stale GTs or waive other validity checks.
+
 **Audit requirement:** Every SecurityRegulator action is logged in detail
 against the Passcode and sent to the Home IDE, including unsuccessful actions.
 The appendix records proposed audit fields and open delivery semantics.
