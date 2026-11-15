@@ -23,10 +23,11 @@ increment must not make the reset context runnable. Existing holders are not sil
 upgraded. **Approved method name and input: IncrementVersion, DR1=`n`.**
 DR1 selects the caller's CR[n] holding the identifying GT; it becomes status
 on return (0 success, 1 already at maximum). This approves the input signature,
-not caller-register access feasibility. **Approved success result:** set the
-selected caller CR[n] to NULL and return DR1=0; do not return a new-version GT.
-This NULL result applies to success; selected-register behavior on returned
-failure remains unspecified. The authorized descriptor update and result
+not caller-register access feasibility. **Approved result on success or returned
+failure:** set the selected caller CR[n] to NULL; do not return a new-version GT.
+DR1=0 denotes success; at maximum, return DR1=1 with CR[n]=NULL and the
+authoritative version unchanged. HardFault remains separate, without a
+NULL-result guarantee. The authorized descriptor update and result
 preservation remain to be verified under the current SR invocation rules.
 B alone does not imply invocation authority. This addition
 does not approve an implementation or expand the FPGA-only lifecycle review.

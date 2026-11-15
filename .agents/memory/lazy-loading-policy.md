@@ -522,16 +522,21 @@ returned status 1 at maximum, retaining no-wrap and no automatic recovery.
 **How to apply:** Do not publish a wrapped version or release the reset context
 when increment is impossible. Keep hardware comparison-only; no automatic
 slot replacement or version recycling. Input DR1=n selecting the caller's
-CR[n] is now separately approved; DR1 becomes status on return. On success,
-set that caller CR[n] to NULL, not a new-version GT. Caller-register access
-feasibility remains unverified; the success decision does not settle the
-selected register's behavior on returned failure.
+CR[n] is now separately approved; DR1 becomes status on return. On success or
+returned software failure, set that caller CR[n] to NULL, not a new-version GT.
+This includes maximum-version failure: DR1=1, authoritative version unchanged,
+selected CR[n]=NULL. Caller-register access feasibility remains unverified.
+HardFault remains separate, without a NULL-result guarantee.
 
 **Why (input):** The user selected DR1 register selection for IncrementVersion,
 consistent with the other caller-register-targeting methods.
 
 **Why (success result):** Asked whether success should replace the selected GT
 with a new-version GT, the user specified “Set to NULL”.
+
+**Why (failure result):** The user extended this rule: “I think fail should also
+set to null”. Apply it to returned failures, not as an architectural HardFault
+cleanup guarantee or a change to other methods' unchanged-GT rejection rules.
 
 Keep the ongoing Phase 2 review to FPGA rules and microcode/software interface
 contracts, not SYSTEM or IDE software orchestration.

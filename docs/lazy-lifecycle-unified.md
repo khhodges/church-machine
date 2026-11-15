@@ -550,9 +550,11 @@ must affect the authoritative Namespace-entry version so old GTs become stale,
 not merely change a copied token. Apply the Phase 2 no-wrap/DR1=1 exhaustion rule.
 The approved method is **IncrementVersion**, with input DR1=`n` selecting the
 caller's CR[n] holding the identifying GT. DR1 becomes status on return.
-On success, set the selected caller CR[n] to NULL and return DR1=0; this method
-does not supply the new context's GT. Caller-register access feasibility and
-selected-register behavior on returned failure remain open in the
+On success or returned software failure, set the selected caller CR[n] to NULL;
+this method does not supply the new context's GT. Success returns DR1=0.
+At maximum, return DR1=1 with CR[n]=NULL and the authoritative version unchanged.
+HardFault remains separate, without a NULL-result guarantee. Caller-register
+access feasibility and remaining failure classification remain open in the
 [SecurityRegulator operation review](phase-1/security-regulator-operation-review.md).
 This records a software dependency, not another FPGA rule or implementation.
 

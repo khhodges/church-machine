@@ -43,7 +43,7 @@ only a general capability, the missing concrete caller/use case is explicit.
 | **ResetB — approved name and register signature**<br>DR1=`n`: set caller CR[n].B to 0; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set B to 0, not toggle. No DR2 value argument. Do not change unrelated GT fields or other copies. Ordinary movement rules remain separate. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify caller-register access, instruction mechanism and rejection effects under unchanged ISA/RTL; specify allowed registers, rejection conditions and numeric fault codes. |
 | **SetNear — approved name and register signature**<br>DR1=`n`: set caller CR[n] to Near; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set F state to Near, not toggle or bypass a SAVE check. No DR2 value argument. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify exact F encoding, permitted targets, caller-register access, mechanism and rejection effects under unchanged ISA/RTL; settle rejection conditions and numeric fault codes. |
 | **SetFar — approved name and register signature**<br>DR1=`n`: set caller CR[n] to Far; DR1 returns status<br>[B/F requirements](security-regulator-operation-review.md) | Explicitly set F state to Far, not toggle or bypass a SAVE check. No DR2 value argument. Success returns DR1=0. A returned software rejection leaves the selected GT unchanged and returns a nonzero fault code. HardFault remains separate, without a rollback guarantee. | Verify exact F encoding, permitted targets, caller-register access, mechanism and rejection effects under unchanged ISA/RTL; settle rejection conditions and numeric fault codes. |
-| **IncrementVersion — approved input, success result and exhaustion status**<br>Input DR1=`n`: caller CR[n] holds identifying GT<br>Success: caller CR[n]=NULL, DR1=0; DR1=1 already at maximum<br>[version-increment requirement](security-regulator-operation-review.md); [lifecycle specification](../lazy-lifecycle-unified.md) | Increment the authoritative version associated with the selected GT. On success, set the selected caller CR[n] to NULL; do not return a new-version GT. Thread-reset use must invalidate old GTs through the Namespace entry. At maximum, return 1 and leave the version unchanged; never wrap or release the reset context after a failed increment. Other HardFaults remain on the ISA fault path. No hardware automatic version mutation or silent upgrade of existing holders. | Verify caller-register access, NULL result preservation and authorized descriptor update under unchanged ISA/RTL. The NULL decision applies to success; selected-register behavior on returned failure remains to be specified. |
+| **IncrementVersion — approved input, NULL result and exhaustion status**<br>Input DR1=`n`: caller CR[n] holds identifying GT<br>Every normal RETURN: caller CR[n]=NULL; DR1=0 success, DR1=1 already at maximum<br>[version-increment requirement](security-regulator-operation-review.md); [lifecycle specification](../lazy-lifecycle-unified.md) | Increment the authoritative version associated with the selected GT. On success or returned software failure, set the selected caller CR[n] to NULL; do not return a new-version GT. Thread-reset use must invalidate old GTs through the Namespace entry. At maximum, return 1 with CR[n]=NULL and leave the version unchanged; never wrap or release the reset context after a failed increment. HardFault remains on the ISA fault path, without a NULL-result guarantee. No hardware automatic version mutation or silent upgrade of existing holders. | Verify caller-register access, NULL result preservation on success and returned failure, and authorized descriptor update under unchanged ISA/RTL. Allowed registers and remaining failure classification/codes still require specification. |
 
 The six named methods are **not a closed inventory** after the B, F and
 version-increment requirements. Watchdog-control ownership is specified
@@ -197,8 +197,8 @@ specific caller still needs to be named.
   [version-method requirement](security-regulator-operation-review.md).
 - **Boundary:** No wrap, no silent upgrade of old holders, and no change to other
   Threads or the requested target LUMP. New-context GT provisioning and the
-   concrete caller remain open. Successful IncrementVersion sets the selected
-   caller CR[n] to NULL rather than supplying the new context's GT.
+  concrete caller remain open. IncrementVersion sets the selected caller CR[n]
+  to NULL on success or returned failure rather than supplying the new context's GT.
 
 ## Common contract: settled versus open
 
@@ -259,8 +259,8 @@ variants or candidate families into exported methods.
    SetNear/SetFar names and DR1 signatures are approved; verify their encoding,
    permitted targets, mechanism and unchanged-GT rejection effect; settle
    rejection conditions and numeric codes.
-   IncrementVersion's name, DR1 selector input and NULL success result are
-   approved; verify its mechanism and specify selected-register failure behavior.
+   IncrementVersion's name, DR1 selector input and NULL result on success or
+   returned failure are approved; verify its mechanism and remaining failure cases.
 4. **Construction/conversion details:** reconcile `MintM` with `Create(GTvars)`,
    specify identity-field handling and precise conversion rules.
 5. **Common implementation contracts:** finish invocation/proof propagation,
