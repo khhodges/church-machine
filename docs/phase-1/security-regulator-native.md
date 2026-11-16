@@ -116,17 +116,19 @@ materialization, and the simulator's LOAD Outform branch invokes resolution
 or promotion. Thus manufacturing an Outform word and LOADing it does not
 implement “return the same Outform without loading.” No bypass, host
 manufacture, lazy fetch, or ISA/RTL alteration has been introduced.
-These conversions still require a compatible native mechanism.
+The reduced MakeOutformM contract below avoids new Outform installation;
+native validity checking still needs proof before export. MakeInformM still
+requires a compatible native identity-to-local-binding mechanism.
 
 ### Conversion feasibility finding (unchanged ISA/RTL)
 
-**The full approved conversion pair cannot be implemented with the currently
+**The original full conversion pair cannot be implemented with the currently
 exposed native mechanisms.** This is an architectural conflict report, not a
 completed conversion implementation. No conversion methods were exported, no
 live bindings were changed, and no ISA/RTL change is proposed here.
 
 The decisive counterexample is a valid Inform in an allowed caller register.
-MakeOutformM must produce an Outform while leaving its object, binding and other
+The original MakeOutformM contract required producing an Outform while leaving its object, binding and other
 holders intact. Native arithmetic can construct the desired *data word*, but
 there is no exposed raw DATA-to-CR installation operation that accepts that
 Outform:
@@ -150,21 +152,63 @@ the simulator's host identity registry nor its resolver is an acceptable
 substitute. Missing binding must remain a normal nonzero return with the exact
 Outform retained, never an attempted LOAD of that Outform and ensuing HardFault.
 
-#### Contract disposition
+#### Approved reduced MakeOutformM contract
+
+The user approved the reduced conversion contract on 2026-11-16. This
+**supersedes the Inform-to-Outform success requirement**, not the authentication
+boundary. MakeOutformM now retains the selected caller GT on every normal
+return: an already-valid Outform succeeds; an Inform returns unsupported
+operation. It does not construct, install, resolve, promote or fetch an Outform.
+Retaining an existing CR through RETURN is the result mechanism, not LOAD.
+
+DR1 first selects caller CR[n], then carries status. Use the candidate's
+existing codes: 0 for an already-valid Outform, 2 for an invalid selector,
+3 for NULL, and 4 for an Inform (unsupported conversion). Other unsupported
+types also return 4 unchanged. Type bits alone do not establish a **valid**
+Outform; stale or unauthenticated inputs must not take the success branch.
+Their native validation and failure classification must be established before
+export, without turning architectural HardFaults into software returns.
+
+Validate the full selector before any indexing: only 0–4 and 7–10 are allowed;
+do not truncate or mask out-of-range selectors into that set. Invalid selectors
+return 2 without changing any candidate input CR. For a valid selector, every
+normal return preserves the exact entry GT, including permissions, semantic
+type, representation, B, identity/version and all other token attributes.
+F remains the same shared Namespace authority. No object, binding, version,
+other holder, or cached descriptor is changed by this reduced operation.
+“Entry” means after CALL's architectural B clearing; do not restore pre-CALL B
+or reconstruct the result from SAVE's B-cleared scratch copy. Preserve the
+selected CR with the RETURN keep mask instead.
+
+NULL alone is a normal failure, not a HardFault. An Inform must take the
+unsupported return without attempting Outform LOAD. Already-Outform success
+requires proven native validity checks that do not fetch or re-materialize the
+GT. The reduced method remains **unimplemented and unexported** until those
+checks and real CALL/RETURN retention are qualified. This approval does not
+authorize success-returning stubs or grant authority to pre-seed live Outforms.
+
+MakeInformM's contract is unchanged; its native local-binding evidence is a
+separate investigation. No ISA/RTL changes, ingress-authentication weakening,
+host result manufacture, live artifact installation or hardware programming
+are authorized by this decision.
+
+#### Acceptance matrix after the revision
 
 These are required acceptance cases, **not passing conversion tests**:
 
 | Input / condition | Required result | Evidence / remaining gap |
 |---|---|---|
-| NULL | Same NULL, nonzero DR1 | Existing selector can detect NULL without loading it; conversion entry points are absent. |
+| NULL | Same NULL, nonzero DR1 (3 for MakeOutformM) | Existing selector can detect NULL without loading it; conversion entry points are absent. |
 | Valid Outform to MakeOutformM | Exact unchanged Outform, DR1=0 | Keep-mask retention is available; native validity protocol still needs definition/implementation. |
 | Valid Inform to MakeInformM | Exact unchanged Inform, DR1=0 | Existing descriptor/version validation offers a building block, not an implemented conversion. |
-| Inform to MakeOutformM | Outform, identical non-representation attributes | Blocked at raw Outform installation. |
+| Inform to MakeOutformM | Exact unchanged Inform, DR1=4 | Revised contract: unsupported conversion; no Outform installation attempted. Native returned-status acceptance remains to be implemented. |
+| Other unsupported types to MakeOutformM | Exact unchanged GT, DR1=4 | No reinterpretation as an Inform or Outform. |
+| Invalid / unproven Outform | Never claim valid-Outform success | Native validity and failure classification remain an export gate; no resolver or authentication bypass. |
 | Outform with valid local binding to MakeInformM | Inform of that exact object, identical attributes | Requires proven native identity/binding lookup; no implicit fetch or version refresh. |
 | Missing / unfinished binding | Exact same Outform, nonzero DR1 | Must retain the original CR rather than re-materialize it; not implemented. |
-| Permissions, type, B, F and other attributes | Preserve SR-entry attributes except representation fields | SAVE clears B in the stored copy; entry B is normally zero after CALL. F is shared Namespace authority, not a token bit. A conversion must not mutate it or the binding. |
+| Permissions, type, B, F and other attributes | Reduced MakeOutformM preserves every SR-entry attribute including representation; MakeInformM may change only required representation fields | SAVE clears B in the stored copy; entry B is normally zero after CALL. F is shared Namespace authority, not a token bit. Neither method may mutate it or the binding. |
 | Selectors 0–4, 7–10 | Operate only on the chosen caller CR | Existing native selector tests cover these helper paths, not conversion acceptance. |
-| Selectors 5, 6, 11–15 or out of range | Nonzero DR1, all candidate inputs retained | Existing helper rejection tests apply; conversions remain unexported. |
+| Selectors 5, 6, 11–15 or out of range | DR1=2 for MakeOutformM, all candidate inputs retained | Test full-width values as well as excluded registers; existing helper tests are not conversion acceptance. |
 | Returned failure | Exact selected GT retained | Must avoid selected-CR writes before success; architectural HardFault has no rollback promise. |
 
 `hardware/test_sr_conversion_boundary.py` exercises the actual mLoad FSM for
@@ -176,15 +220,17 @@ cannot affect this earlier gate. This proves containment of the attempted
 materialization, **not** software-status rejection or exact-attribute conversion.
 The test deliberately does not bypass ingress with a debug-port Outform result.
 
-Next decision: reconcile the approved conversion contract with the absence of
-an exposed Outform installation mechanism and specify native local-binding
-evidence. Any architecture proposal needs separate review; this report neither
-authorizes changes nor weakens the existing Outform authentication gate.
+The contract conflict is resolved by the approved reduced operation, not by a
+new installation mechanism. Remaining implementation gates are native Outform
+validity evidence and exact CALL/RETURN retention/status acceptance.
+MakeInformM separately needs native local-binding evidence. Any future proposal
+to restore Inform-to-Outform success needs separate approval; this decision
+does not weaken the existing Outform authentication gate.
 
 SWITCHM's public indexed input compiles and its input/fault boundaries are
 tested. The corrected exact candidate completes the two-Namespace round trip
-diagnostic is not used as evidence for this candidate.
 in the maintained RTL model, as detailed below. The earlier fixed-binding
+diagnostic is not used as evidence for this candidate.
 Physical hardware parity, safe production provisioning, non-Inform MintM and
 the two conversions are not claimed complete.
 
@@ -268,6 +314,9 @@ maintained RTL-model replay, not JS parity or production provisioning.
 
 ## Verification run
 
+- Reduced-contract review: the unchanged `hardware/test_sr_conversion_boundary.py`
+  passed all 45 cases. This verifies containment only; no conversion runtime
+  implementation was added or qualified by the contract revision.
 - Conversion-boundary investigation: `python3 -m pytest
   hardware/test_sr_conversion_boundary.py -q` passed all 45 cases;
   `node simulator/test_security_regulator.js` and `git diff --check` also passed.

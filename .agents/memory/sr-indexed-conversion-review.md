@@ -30,6 +30,9 @@ A returned software rejection leaves the selected caller GT unchanged and
 returns a nonzero fault code in DR1. Success replaces it with the Outform and
 returns DR1=0. HardFault has no rollback guarantee under this decision.
 
+The original Inform-to-Outform success requirement above was superseded by
+the reduced contract below; it must not be used to authorize installation.
+
 **Why:** The user explicitly approved leaving the GT unchanged on rejection.
 
 **How to apply:** Verify rejection paths do not modify the selected GT; keep
@@ -180,3 +183,17 @@ installation; passing helper and ingress tests cannot certify absent methods.
 **How to apply:** Retain explicit unimplemented acceptance cases when reporting
 the conflict. Do not expose partial conversion methods as the full approved
 pair, or use privileged microcode/debug interfaces as programmer instructions.
+
+The user approved a reduced MakeOutformM contract on 2026-11-16: Inform inputs
+return unsupported operation with the exact input retained; only an already-valid
+Outform succeeds unchanged. NULL and invalid selectors still return failures.
+All SR-entry attributes, including representation, remain unchanged on normal
+returns. MakeInformM's contract was not revised.
+
+**Why:** The user chose the reduced contract rather than deferring the original
+conversion pair after reviewing the unavailable native Outform installation path.
+
+**How to apply:** Do not implement Inform-to-Outform success or change ingress
+rules under this approval. Keep MakeOutformM unexported until native Outform
+validity and real CALL/RETURN retention are proven. No host manufacture, lazy
+fetch, live installation or ISA/RTL changes were authorized.
